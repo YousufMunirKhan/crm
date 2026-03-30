@@ -222,6 +222,10 @@ class TicketController extends Controller
             return;
         }
 
+        if ($ticket->isPosSupport() && $user->canAccessPosSupport()) {
+            return;
+        }
+
         if ($ticket->created_by === $user->id || $ticket->assigned_to === $user->id) {
             return;
         }

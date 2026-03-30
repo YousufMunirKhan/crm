@@ -18,6 +18,21 @@ export const useAuthStore = defineStore('auth', {
             if (sectionKey === 'dashboard') return true;
             const roleName = state.user.role?.name;
             if (roleName === 'Admin' || roleName === 'System Admin') return true;
+
+            // POS Support is opt-in: explicit pos_support on user/role whitelist, or Admin / Manager / System Admin.
+            if (sectionKey === 'pos_support') {
+                if (roleName === 'Manager') return true;
+                const userP = state.user.nav_permissions;
+                if (userP && typeof userP === 'object' && Object.keys(userP).length > 0) {
+                    return !!userP.pos_support;
+                }
+                const roleP = state.user.role?.nav_permissions;
+                if (roleP && typeof roleP === 'object' && Object.keys(roleP).length > 0) {
+                    return !!roleP.pos_support;
+                }
+                return false;
+            }
+
             const userP = state.user.nav_permissions;
             if (userP && typeof userP === 'object' && Object.keys(userP).length > 0) {
                 return !!userP[sectionKey];

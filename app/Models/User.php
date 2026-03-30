@@ -80,6 +80,30 @@ class User extends Authenticatable
         return true;
     }
 
+    /**
+     * POS Support queue and tickets: never "default open" when nav_permissions are empty.
+     * Grant only to Admin / Manager / System Admin, or explicit pos_support on user/role whitelist.
+     */
+    public function canAccessPosSupport(): bool
+    {
+        if ($this->isRole('Admin') || $this->isRole('Manager') || $this->isRole('System Admin')) {
+            return true;
+        }
+
+        $userP = $this->nav_permissions;
+        if (is_array($userP) && $userP !== []) {
+            return ! empty($userP['pos_support']);
+        }
+
+        $this->loadMissing('role');
+        $roleP = $this->role?->nav_permissions;
+        if (is_array($roleP) && $roleP !== []) {
+            return ! empty($roleP['pos_support']);
+        }
+
+        return false;
+    }
+
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
