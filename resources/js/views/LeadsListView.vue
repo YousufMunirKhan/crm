@@ -1,31 +1,31 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                 <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Leads</h1>
             </div>
-            <div class="flex flex-wrap items-center gap-3">
-                <div class="flex items-center gap-2">
-                    <label class="text-sm font-medium text-slate-700">From</label>
+            <div class="flex flex-wrap items-stretch sm:items-center gap-3 w-full sm:w-auto min-w-0">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto min-w-0">
+                    <label class="text-sm font-medium text-slate-700 shrink-0">From</label>
                     <input
                         v-model="filters.from"
                         type="date"
-                        class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
-                <div class="flex items-center gap-2">
-                    <label class="text-sm font-medium text-slate-700">To</label>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto min-w-0">
+                    <label class="text-sm font-medium text-slate-700 shrink-0">To</label>
                     <input
                         v-model="filters.to"
                         type="date"
-                        class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
-                <div class="flex items-center gap-2">
-                    <label class="text-sm font-medium text-slate-700">Stage</label>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto min-w-0">
+                    <label class="text-sm font-medium text-slate-700 shrink-0">Stage</label>
                     <select
                         v-model="filters.stage"
-                        class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <option value="">All</option>
                         <option value="follow_up">Follow-up</option>
@@ -35,11 +35,11 @@
                         <option value="lost">Lost</option>
                     </select>
                 </div>
-                <div v-if="isAdmin" class="flex items-center gap-2">
-                    <label class="text-sm font-medium text-slate-700">Employee</label>
+                <div v-if="isAdmin" class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto min-w-0">
+                    <label class="text-sm font-medium text-slate-700 shrink-0">Employee</label>
                     <select
                         v-model="filters.assigned_to"
-                        class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <option value="">All</option>
                         <option v-for="emp in employees" :key="emp.id" :value="emp.id">
@@ -49,14 +49,14 @@
                 </div>
                 <button
                     @click="loadLeads(1)"
-                    class="px-3 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800"
+                    class="px-3 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 touch-manipulation w-full sm:w-auto"
                 >
                     Apply
                 </button>
                 <button
                     @click="exportCsv"
                     :disabled="!leads.length"
-                    class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                    class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 touch-manipulation w-full sm:w-auto"
                 >
                     Export CSV
                 </button>
@@ -69,7 +69,7 @@
             No leads found for this period.
         </div>
 
-        <div v-else class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div v-else class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-w-0">
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[1000px]">
                     <thead class="bg-slate-50 border-b border-slate-200">

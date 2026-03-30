@@ -19,6 +19,13 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
+        if ($request->get('type') === 'prospect' && ! $user->allowsNavSection('prospects')) {
+            abort(403, 'You do not have access to Prospects.');
+        }
+        if ($request->get('type') === 'customer' && ! $user->allowsNavSection('customers')) {
+            abort(403, 'You do not have access to Customers.');
+        }
+
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
 
         $query = Customer::with(['leads', 'invoices', 'tickets', 'assignedUsers', 'creator']);
@@ -43,11 +50,12 @@ class CustomerController extends Controller
             });
         }
 
-        // General search (searches across name, phone, email)
+        // General search (searches across name, business name, phone, email, location)
         if ($request->has('search') && $request->search) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('business_name', 'like', "%{$search}%")
                   ->orWhere('phone', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
                   ->orWhere('postcode', 'like', "%{$search}%")
@@ -58,6 +66,10 @@ class CustomerController extends Controller
         // Individual field filters
         if ($request->has('name') && $request->name) {
             $query->where('name', 'like', "%{$request->name}%");
+        }
+
+        if ($request->has('business_name') && $request->business_name) {
+            $query->where('business_name', 'like', "%{$request->business_name}%");
         }
 
         if ($request->has('phone') && $request->phone) {

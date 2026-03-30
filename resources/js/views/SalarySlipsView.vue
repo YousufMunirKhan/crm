@@ -1,5 +1,5 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 lg:p-6 space-y-4 lg:space-y-6">
+    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 lg:p-6 space-y-4 lg:space-y-6">
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
                 <h1 class="text-xl lg:text-2xl font-bold text-slate-900">Salary Slips</h1>
@@ -7,14 +7,14 @@
             </div>
             <router-link
                 to="/salaries"
-                class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition text-sm lg:text-base text-center"
+                class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition text-sm lg:text-base text-center touch-manipulation w-full sm:w-auto"
             >
                 + Create Salary Slip
             </router-link>
         </div>
 
         <!-- Filters -->
-        <div class="bg-white rounded-xl shadow-sm p-4">
+        <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 min-w-0">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Employee</label>

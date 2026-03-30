@@ -1,5 +1,5 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <!-- Header: one list per URL (?type=prospect | ?type=customer), no tab switcher -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
@@ -24,23 +24,23 @@
                     </router-link>
                 </p>
             </div>
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap gap-2 w-full sm:w-auto">
                 <button
                     @click="exportToCSV"
                     :disabled="exporting"
-                    class="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 text-sm disabled:opacity-50"
+                    class="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 text-sm disabled:opacity-50 touch-manipulation flex-1 min-w-[8rem] sm:flex-initial text-center"
                 >
                     {{ exporting ? 'Exporting...' : 'Export CSV' }}
                 </button>
                 <button
                     @click="showImportModal = true"
-                    class="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 text-sm"
+                    class="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 text-sm touch-manipulation flex-1 min-w-[8rem] sm:flex-initial text-center"
                 >
                     Import
                 </button>
                 <router-link
                     :to="{ path: '/customers/add', query: { type: activeTab } }"
-                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 text-sm"
+                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 text-sm touch-manipulation flex-1 min-w-[8rem] sm:flex-initial text-center"
                 >
                     + {{ activeTab === 'prospect' ? 'Add Prospect' : 'Add Customer' }}
                 </router-link>
@@ -48,8 +48,8 @@
         </div>
 
         <!-- Filters Section -->
-        <div class="bg-white rounded-xl shadow-sm p-4">
-            <div class="flex items-center justify-between mb-4">
+        <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 min-w-0">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
                 <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -58,7 +58,7 @@
                 </h3>
                 <button
                     @click="showFilters = !showFilters"
-                    class="text-sm text-blue-600 hover:text-blue-800"
+                    class="text-sm text-blue-600 hover:text-blue-800 touch-manipulation self-start sm:self-auto"
                 >
                     {{ showFilters ? 'Hide Filters' : 'Show Filters' }}
                 </button>
@@ -72,7 +72,7 @@
                 <input
                     v-model="filters.search"
                     type="text"
-                    placeholder="Quick search by name, phone, email, city, or postcode..."
+                    placeholder="Quick search by name, business name, phone, email, city, or postcode..."
                     class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     @input="handleSearch"
                 />
@@ -87,6 +87,16 @@
                             v-model="filters.name"
                             type="text"
                             placeholder="Filter by name..."
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            @input="handleFilterChange"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Business name</label>
+                        <input
+                            v-model="filters.business_name"
+                            type="text"
+                            placeholder="Filter by business name..."
                             class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             @input="handleFilterChange"
                         />
@@ -241,12 +251,13 @@
         </div>
 
         <!-- Customers Table -->
-        <div v-else class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div v-else class="bg-white rounded-xl shadow-sm overflow-hidden min-w-0">
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[900px]">
+                <table class="w-full min-w-[1000px]">
                     <thead class="bg-slate-50 border-b border-slate-200">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Customer</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Business name</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Contact</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Location</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Created By</th>
@@ -278,6 +289,10 @@
                                         </div>
                                     </div>
                                 </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span v-if="customer.business_name" class="text-sm text-slate-900">{{ customer.business_name }}</span>
+                                <span v-else class="text-slate-400 text-sm">—</span>
                             </td>
                             <td class="px-6 py-4">
                                 <div class="space-y-1">
@@ -389,18 +404,18 @@
             </div>
 
             <!-- Pagination -->
-            <div v-if="pagination && pagination.last_page > 1" class="px-6 py-4 border-t border-slate-200 bg-slate-50">
-                <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div class="text-sm text-slate-600">
+            <div v-if="pagination && pagination.last_page > 1" class="px-4 sm:px-6 py-4 border-t border-slate-200 bg-slate-50">
+                <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
+                    <div class="text-sm text-slate-600 text-center sm:text-left min-w-0">
                         Showing {{ ((pagination.current_page - 1) * pagination.per_page) + 1 }} 
                         to {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} 
                         of {{ pagination.total }} customers
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center justify-center sm:justify-end gap-2">
                         <button
                             @click="loadCustomers(1)"
                             :disabled="pagination.current_page === 1"
-                            class="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
@@ -409,7 +424,7 @@
                         <button
                             @click="loadCustomers(pagination.current_page - 1)"
                             :disabled="pagination.current_page === 1"
-                            class="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -422,7 +437,7 @@
                                     v-if="page !== '...'"
                                     @click="loadCustomers(page)"
                                     :class="[
-                                        'w-10 h-10 rounded-lg text-sm font-medium transition-colors',
+                                        'w-10 h-10 rounded-lg text-sm font-medium transition-colors touch-manipulation',
                                         page === pagination.current_page
                                             ? 'bg-slate-900 text-white'
                                             : 'border border-slate-300 hover:bg-white text-slate-700'
@@ -437,7 +452,7 @@
                         <button
                             @click="loadCustomers(pagination.current_page + 1)"
                             :disabled="pagination.current_page === pagination.last_page"
-                            class="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -446,7 +461,7 @@
                         <button
                             @click="loadCustomers(pagination.last_page)"
                             :disabled="pagination.current_page === pagination.last_page"
-                            class="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
@@ -528,6 +543,7 @@ let searchTimeout = null;
 const filters = ref({
     search: '',
     name: '',
+    business_name: '',
     phone: '',
     email: '',
     city: '',
@@ -540,6 +556,7 @@ const filters = ref({
 const hasActiveFilters = computed(() => {
     return filters.value.search || 
            filters.value.name || 
+           filters.value.business_name ||
            filters.value.phone || 
            filters.value.email || 
            filters.value.city || 
@@ -550,6 +567,7 @@ const hasActiveFilters = computed(() => {
 const activeFilterTags = computed(() => {
     const tags = {};
     if (filters.value.name) tags['Name'] = filters.value.name;
+    if (filters.value.business_name) tags['Business name'] = filters.value.business_name;
     if (filters.value.phone) tags['Phone'] = filters.value.phone;
     if (filters.value.email) tags['Email'] = filters.value.email;
     if (filters.value.city) tags['City'] = filters.value.city;
@@ -611,6 +629,7 @@ const loadCustomers = async (page = 1) => {
         
         if (filters.value.search) params.search = filters.value.search;
         if (filters.value.name) params.name = filters.value.name;
+        if (filters.value.business_name) params.business_name = filters.value.business_name;
         if (filters.value.phone) params.phone = filters.value.phone;
         if (filters.value.email) params.email = filters.value.email;
         if (filters.value.city) params.city = filters.value.city;
@@ -656,6 +675,7 @@ const clearFilters = () => {
     filters.value = {
         search: '',
         name: '',
+        business_name: '',
         phone: '',
         email: '',
         city: '',
@@ -670,6 +690,7 @@ const clearFilters = () => {
 const removeFilter = (key) => {
     const keyMap = {
         'Name': 'name',
+        'Business name': 'business_name',
         'Phone': 'phone',
         'Email': 'email',
         'City': 'city',
@@ -693,6 +714,7 @@ const exportToCSV = async () => {
         const params = { per_page: 10000, type: activeTab.value };
         if (filters.value.search) params.search = filters.value.search;
         if (filters.value.name) params.name = filters.value.name;
+        if (filters.value.business_name) params.business_name = filters.value.business_name;
         if (filters.value.phone) params.phone = filters.value.phone;
         if (filters.value.email) params.email = filters.value.email;
         if (filters.value.city) params.city = filters.value.city;
@@ -703,6 +725,7 @@ const exportToCSV = async () => {
         
         const columns = [
             { key: 'name', label: 'Name' },
+            { key: 'business_name', label: 'Business name' },
             { key: 'phone', label: 'Phone' },
             { key: 'email', label: 'Email' },
             { key: 'address', label: 'Address' },

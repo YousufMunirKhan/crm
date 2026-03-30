@@ -1,22 +1,22 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Invoices</h1>
             <router-link
                 to="/invoices/create"
-                class="inline-flex px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
+                class="inline-flex justify-center px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors touch-manipulation w-full sm:w-auto text-center"
             >
                 + Create Invoice
             </router-link>
         </div>
 
         <!-- Filters Section -->
-        <div class="bg-white rounded-xl shadow-sm p-4 md:p-6">
-            <div class="flex items-center justify-between mb-4">
+        <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 md:p-6 min-w-0">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
                 <h2 class="text-lg font-semibold text-slate-900">Filters</h2>
                 <button
                     @click="showFilters = !showFilters"
-                    class="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1"
+                    class="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1 touch-manipulation self-start sm:self-auto"
                 >
                     <svg class="w-4 h-4" :class="{ 'rotate-180': showFilters }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -124,18 +124,18 @@
 
         <!-- Summary Cards -->
         <div v-if="summary" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="bg-white rounded-xl shadow-sm p-4">
+            <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 min-w-0">
                 <div class="text-sm text-slate-600">Total Invoices</div>
-                <div class="text-2xl font-bold text-slate-900 mt-1">{{ summary.total || 0 }}</div>
+                <div class="text-xl sm:text-2xl font-bold text-slate-900 mt-1 tabular-nums">{{ summary.total || 0 }}</div>
             </div>
-            <div class="bg-white rounded-xl shadow-sm p-4">
+            <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 min-w-0">
                 <div class="text-sm text-slate-600">Total Amount</div>
-                <div class="text-2xl font-bold text-slate-900 mt-1">£{{ formatNumber(summary.total_amount || 0) }}</div>
+                <div class="text-xl sm:text-2xl font-bold text-slate-900 mt-1 tabular-nums break-words">£{{ formatNumber(summary.total_amount || 0) }}</div>
             </div>
         </div>
 
         <!-- Invoices Table -->
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden min-w-0">
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-slate-50">

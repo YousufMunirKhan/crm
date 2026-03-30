@@ -1,5 +1,5 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 lg:p-6">
+    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 lg:p-6">
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
             <h1 class="text-xl lg:text-2xl font-bold text-slate-900">Employees</h1>
             <router-link
@@ -60,13 +60,13 @@
                 @click="viewEmployee(employee.id)"
                 class="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition cursor-pointer border border-slate-200 hover:border-slate-300"
             >
-                <div class="flex items-start justify-between mb-4">
-                    <div class="flex-1">
-                        <h3 class="text-lg font-semibold text-slate-900">{{ employee.name }}</h3>
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4 min-w-0">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-lg font-semibold text-slate-900 break-words">{{ employee.name }}</h3>
                         <p class="text-sm text-slate-500 mt-1">{{ employee.role?.name || 'No Role' }}</p>
                     </div>
                     <span
-                        class="px-2 py-1 text-xs font-medium rounded"
+                        class="px-2 py-1 text-xs font-medium rounded shrink-0 self-start"
                         :class="getRoleBadgeClass(employee.role?.name)"
                     >
                         {{ employee.role?.name || 'N/A' }}

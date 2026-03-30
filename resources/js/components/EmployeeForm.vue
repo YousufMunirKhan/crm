@@ -113,6 +113,39 @@
                     />
                 </div>
 
+                <div v-if="canEditNavPerms" class="border border-slate-200 rounded-lg p-4 bg-slate-50 space-y-3">
+                    <h4 class="text-sm font-medium text-slate-900">Sidebar menu access</h4>
+                    <p class="text-xs text-slate-600">
+                        By default this user gets every menu item their role allows. Turn on to hide sections (Dashboard always stays).
+                    </p>
+                    <label class="flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
+                        <input
+                            v-model="restrictMenu"
+                            type="checkbox"
+                            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        Limit sidebar to selected sections only
+                    </label>
+                    <div
+                        v-if="restrictMenu"
+                        class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-white"
+                    >
+                        <label
+                            v-for="opt in NAV_SECTION_OPTIONS"
+                            v-show="opt.key !== 'dashboard'"
+                            :key="opt.key"
+                            class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
+                        >
+                            <input
+                                v-model="sectionChecks[opt.key]"
+                                type="checkbox"
+                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            {{ opt.label }}
+                        </label>
+                    </div>
+                </div>
+
                 <!-- Attachments when creating/editing (optional uploads) -->
                 <div class="border-t pt-4 space-y-3">
                     <div class="flex items-center justify-between">
@@ -197,11 +230,30 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
+import { useAuthStore } from '@/stores/auth';
+import { NAV_SECTION_OPTIONS } from '@/constants/navSections';
 
 const toast = useToastStore();
+const auth = useAuthStore();
+
+const canEditNavPerms = computed(() => {
+    const r = auth.user?.role?.name;
+    return r === 'Admin' || r === 'System Admin';
+});
+
+function defaultSectionChecks() {
+    const o = {};
+    for (const { key } of NAV_SECTION_OPTIONS) {
+        o[key] = true;
+    }
+    return o;
+}
+
+const sectionChecks = ref(defaultSectionChecks());
+const restrictMenu = ref(false);
 
 const props = defineProps({
     employee: {
@@ -254,6 +306,18 @@ watch(() => props.employee, (newEmployee) => {
             send_contract: false,
             is_active: newEmployee.is_active ?? true,
         };
+        const np = newEmployee.nav_permissions;
+        if (np && typeof np === 'object' && Object.keys(np).length > 0) {
+            restrictMenu.value = true;
+            const d = defaultSectionChecks();
+            for (const key of Object.keys(d)) {
+                d[key] = !!np[key];
+            }
+            sectionChecks.value = d;
+        } else {
+            restrictMenu.value = false;
+            sectionChecks.value = defaultSectionChecks();
+        }
     } else {
         form.value = {
             name: '',
@@ -267,6 +331,8 @@ watch(() => props.employee, (newEmployee) => {
             send_contract: false,
             is_active: true,
         };
+        restrictMenu.value = false;
+        sectionChecks.value = defaultSectionChecks();
     }
 }, { immediate: true });
 
@@ -286,6 +352,18 @@ const handleSubmit = async () => {
         if (!payload.hire_date) payload.hire_date = null;
         if (!payload.employee_type) payload.employee_type = null;
 
+        if (canEditNavPerms.value) {
+            if (restrictMenu.value) {
+                const nav_permissions = {};
+                for (const { key } of NAV_SECTION_OPTIONS) {
+                    nav_permissions[key] = !!sectionChecks.value[key];
+                }
+                payload.nav_permissions = nav_permissions;
+            } else {
+                payload.nav_permissions = null;
+            }
+        }
+
         // Ensure send_contract is boolean
         if (payload.send_contract === undefined) {
             payload.send_contract = false;
@@ -298,6 +376,9 @@ const handleSubmit = async () => {
             delete payload.send_contract;
             const response = await axios.put(`/api/users/${props.employee.id}`, payload);
             userId = response.data?.id || props.employee.id;
+            if (props.employee.id === auth.user?.id) {
+                await auth.bootstrap();
+            }
             toast.success('Employee updated successfully!');
         } else {
             // For new employees, ensure password is provided

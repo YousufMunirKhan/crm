@@ -36,7 +36,7 @@
                 </button>
             </div>
             <nav class="flex-1 py-4 space-y-1 overflow-y-auto">
-                <template v-for="(item, idx) in navItems" :key="item.to || item.label + idx">
+                <template v-for="(item, idx) in navItemsVisible" :key="item.to || item.label + idx">
                     <!-- Submenu group (e.g. Marketing) -->
                     <div v-if="item.children" class="space-y-0">
                         <button
@@ -97,7 +97,7 @@
         </aside>
 
         <!-- Main content -->
-        <div :class="['flex-1 flex flex-col w-full', showSidebar ? 'lg:ml-64' : '']">
+        <div :class="['flex-1 flex flex-col w-full min-w-0 overflow-x-hidden', showSidebar ? 'lg:ml-64' : '']">
             <!-- Top header - Only show if sidebar is visible -->
             <header v-if="showSidebar" class="min-h-14 sm:min-h-16 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-y-2 gap-x-2 sm:gap-x-3 px-3 sm:px-4 lg:px-6 py-2 sticky top-0 z-30">
                 <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 sm:flex-initial">
@@ -160,92 +160,96 @@ const companyLogo = ref('');
 const expandedGroups = ref(new Set());
 const todayAppointmentCount = ref(0);
 
+/** Full nav tree (role-based). `section` keys map to users.nav_permissions whitelist. */
 const navItems = computed(() => {
     if (!auth.user) return [];
 
     const userRole = auth.user?.role?.name;
     const isAdmin = userRole === 'Admin' || userRole === 'Manager' || userRole === 'System Admin';
 
+    const uid = auth.user?.id;
     const items = [
-        { to: '/', label: 'Dashboard' },
-        { to: '/appointments', label: 'Appointments' },
-        { to: '/followups', label: 'Follow-ups' },
+        { to: '/', label: 'Dashboard', section: 'dashboard' },
+        ...(uid ? [{ to: `/employees/${uid}/edit`, label: 'Bank & documents', section: 'dashboard' }] : []),
+        { to: '/appointments', label: 'Appointments', section: 'appointments' },
+        { to: '/followups', label: 'Follow-ups', section: 'followups' },
+        { to: '/customers?type=prospect', label: 'Prospects', section: 'prospects' },
+        { to: '/customers?type=customer', label: 'Customers', section: 'customers' },
     ];
-
-    // On the list page only, show Prospects OR Customers — never both in the sidebar.
-    if (route.name === 'customers') {
-        const onCustomers = route.query.type === 'customer';
-        items.push(
-            onCustomers
-                ? { to: '/customers?type=customer', label: 'Customers' }
-                : { to: '/customers?type=prospect', label: 'Prospects' },
-        );
-    } else {
-        items.push({ to: '/customers?type=prospect', label: 'Prospects' });
-        items.push({ to: '/customers?type=customer', label: 'Customers' });
-    }
 
     items.push(
-        { to: '/leads/pipeline', label: 'Lead Pipeline' },
-        { to: '/products', label: 'Products' },
-        { to: '/tickets', label: 'Tickets' },
-        ...(isAdmin ? [{ to: '/pos-support', label: 'POS Support' }] : []),
-        { to: '/invoices', label: 'Invoices' },
+        { to: '/leads/pipeline', label: 'Lead Pipeline', section: 'leads_pipeline' },
+        { to: '/products', label: 'Products', section: 'products' },
+        { to: '/tickets', label: 'Tickets', section: 'tickets' },
+        ...(isAdmin ? [{ to: '/pos-support', label: 'POS Support', section: 'pos_support' }] : []),
+        { to: '/invoices', label: 'Invoices', section: 'invoices' },
     );
 
-    // Today's Activity for non-admin users
     if (!isAdmin) {
-        items.push({ to: '/today-activity', label: "Today's Activity" });
+        items.push({ to: '/today-activity', label: "Today's Activity", section: 'today_activity' });
     }
 
-    // Report menu: employees see My Report only; admins see full submenu
     const reportChildren = [
-        { to: '/report/my-report', label: 'My Report' },
+        { to: '/report/my-report', label: 'My Report', section: 'report' },
     ];
     if (isAdmin) {
-        reportChildren.push({ to: '/report/target-achievement', label: 'Target vs Achievement' });
-        reportChildren.push({ to: '/report/products-by-employee', label: 'Products by Employee' });
-        reportChildren.push({ to: '/reports', label: 'Reports & Analytics' });
+        reportChildren.push({ to: '/report/target-achievement', label: 'Target vs Achievement', section: 'report' });
+        reportChildren.push({ to: '/report/products-by-employee', label: 'Products by Employee', section: 'report' });
+        reportChildren.push({ to: '/reports', label: 'Reports & Analytics', section: 'report' });
     }
     items.push({
         label: 'Report',
         children: reportChildren,
     });
     if (isAdmin) {
-        items.push({ to: '/todays-report', label: "Today's Report" });
-        // Marketing submenu: Email Management, SMS Management, Bulk Whatsapp, Templates, WhatsApp Templates
+        items.push({ to: '/todays-report', label: "Today's Report", section: 'todays_report' });
         items.push({
             label: 'Marketing',
             children: [
-                { to: '/email-management', label: 'Email Management' },
-                { to: '/sms-management', label: 'SMS Management' },
-                { to: '/bulk-whatsapp', label: 'Bulk Whatsapp' },
-                { to: '/templates', label: 'Templates' },
-                { to: '/whatsapp-templates', label: 'WhatsApp Templates' },
+                { to: '/email-management', label: 'Email Management', section: 'marketing' },
+                { to: '/sms-management', label: 'SMS Management', section: 'marketing' },
+                { to: '/bulk-whatsapp', label: 'Bulk Whatsapp', section: 'marketing' },
+                { to: '/templates', label: 'Templates', section: 'marketing' },
+                { to: '/whatsapp-templates', label: 'WhatsApp Templates', section: 'marketing' },
             ],
         });
     }
 
-    // Only show HR & Employees for Admin/Manager/System Admin
     if (isAdmin) {
-        items.push({ to: '/employees', label: 'Employees' });
-        items.push({ to: '/hr', label: 'HR' });
-        items.push({ to: '/expenses', label: 'Expenses' });
-        items.push({ to: '/salaries/list', label: 'Salary Slips' });
-        items.push({ to: '/salaries/reports', label: 'Salary Reports' });
+        items.push({ to: '/employees', label: 'Employees', section: 'employees' });
+        items.push({ to: '/hr', label: 'HR', section: 'hr' });
+        items.push({ to: '/expenses', label: 'Expenses', section: 'expenses' });
+        items.push({ to: '/salaries/list', label: 'Salary Slips', section: 'salary_slips' });
+        items.push({ to: '/salaries/reports', label: 'Salary Reports', section: 'salary_reports' });
     }
 
-    // Only show Settings for Admin/System Admin
     if (userRole === 'Admin' || userRole === 'System Admin') {
-        items.push({ to: '/settings', label: 'Settings' });
+        items.push({ to: '/access-manager', label: 'Access Manager', section: 'access_manager' });
+        items.push({ to: '/settings', label: 'Settings', section: 'settings' });
     }
 
     return items;
 });
 
+const navItemsVisible = computed(() => {
+    if (!auth.user) return [];
+    const allow = (key) => auth.navSectionAllowed(key);
+    const out = [];
+    for (const item of navItems.value) {
+        if (item.children) {
+            const children = item.children.filter((c) => !c.section || allow(c.section));
+            if (children.length) out.push({ ...item, children });
+            continue;
+        }
+        if (item.section && !allow(item.section)) continue;
+        out.push(item);
+    }
+    return out;
+});
+
 // Auto-expand the group that contains the current route
 function ensureActiveGroupExpanded() {
-    const items = navItems.value;
+    const items = navItemsVisible.value;
     for (const item of items) {
         if (item.children && item.children.some(c => route.path === c.to || (c.to !== '/' && route.path.startsWith(c.to)))) {
             expandedGroups.value = new Set([...expandedGroups.value, item.label]);
@@ -254,7 +258,7 @@ function ensureActiveGroupExpanded() {
     }
 }
 watch(() => route.path, ensureActiveGroupExpanded);
-watch(navItems, (items) => { if (items.length) ensureActiveGroupExpanded(); }, { immediate: true });
+watch(navItemsVisible, (items) => { if (items.length) ensureActiveGroupExpanded(); }, { immediate: true });
 
 function toggleGroup(label) {
     const next = new Set(expandedGroups.value);

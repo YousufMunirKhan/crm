@@ -1,5 +1,5 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+    <div class="max-w-7xl mx-auto w-full min-w-0 p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <!-- Filters for Admin: compact on mobile, full row on desktop -->
         <div v-if="isAdmin" class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden">
             <button
@@ -86,67 +86,67 @@
         </div>
 
         <!-- Attendance Clock for non-admin -->
-        <AttendanceClock v-if="!isAdmin" />
+        <AttendanceClock />
 
         <!-- Main Stats Cards -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div
-                class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-5 text-white cursor-pointer hover:shadow-xl transition-transform transform hover:-translate-y-0.5"
+                class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-3 sm:p-5 text-white cursor-pointer hover:shadow-xl transition-transform transform hover:-translate-y-0.5 min-w-0"
                 @click="goToTotalLeadsListing"
             >
-                <div class="flex items-center justify-between">
-                    <div>
-                        <div class="text-blue-100 text-sm font-medium">Total Leads</div>
-                        <div class="text-3xl font-bold mt-1">{{ dashboardData.total_leads || 0 }}</div>
-                        <div class="text-blue-200 text-xs mt-2">{{ filterPeriodLabel }}</div>
+                <div class="flex items-start sm:items-center justify-between gap-2 min-w-0">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-blue-100 text-xs sm:text-sm font-medium leading-tight">Total Leads</div>
+                        <div class="text-2xl sm:text-3xl font-bold mt-0.5 sm:mt-1 tabular-nums">{{ dashboardData.total_leads || 0 }}</div>
+                        <div class="text-blue-200 text-[10px] sm:text-xs mt-1 sm:mt-2 line-clamp-2">{{ filterPeriodLabel }}</div>
                     </div>
-                    <div class="bg-blue-400/30 p-3 rounded-lg">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="bg-blue-400/30 p-2 sm:p-3 rounded-lg shrink-0">
+                        <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg p-5 text-white">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <div class="text-emerald-100 text-sm font-medium">Revenue</div>
-                        <div class="text-3xl font-bold mt-1">£{{ formatNumber(dashboardData.revenue || 0) }}</div>
-                        <div class="text-emerald-200 text-xs mt-2">{{ filterPeriodLabel }}</div>
+            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg p-3 sm:p-5 text-white min-w-0">
+                <div class="flex items-start sm:items-center justify-between gap-2 min-w-0">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-emerald-100 text-xs sm:text-sm font-medium leading-tight">Revenue</div>
+                        <div class="text-2xl sm:text-3xl font-bold mt-0.5 sm:mt-1 tabular-nums break-words">£{{ formatNumber(dashboardData.revenue || 0) }}</div>
+                        <div class="text-emerald-200 text-[10px] sm:text-xs mt-1 sm:mt-2 line-clamp-2">{{ filterPeriodLabel }}</div>
                     </div>
-                    <div class="bg-emerald-400/30 p-3 rounded-lg">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="bg-emerald-400/30 p-2 sm:p-3 rounded-lg shrink-0">
+                        <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-gradient-to-br from-violet-500 to-violet-600 rounded-xl shadow-lg p-5 text-white">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <div class="text-violet-100 text-sm font-medium">Pipeline Value</div>
-                        <div class="text-3xl font-bold mt-1">£{{ formatNumber(dashboardData.pipeline_value || 0) }}</div>
-                        <div class="text-violet-200 text-xs mt-2">Active deals</div>
+            <div class="bg-gradient-to-br from-violet-500 to-violet-600 rounded-xl shadow-lg p-3 sm:p-5 text-white min-w-0">
+                <div class="flex items-start sm:items-center justify-between gap-2 min-w-0">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-violet-100 text-xs sm:text-sm font-medium leading-tight">Pipeline Value</div>
+                        <div class="text-2xl sm:text-3xl font-bold mt-0.5 sm:mt-1 tabular-nums break-words">£{{ formatNumber(dashboardData.pipeline_value || 0) }}</div>
+                        <div class="text-violet-200 text-[10px] sm:text-xs mt-1 sm:mt-2">Active deals</div>
                     </div>
-                    <div class="bg-violet-400/30 p-3 rounded-lg">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="bg-violet-400/30 p-2 sm:p-3 rounded-lg shrink-0">
+                        <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg p-5 text-white">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <div class="text-amber-100 text-sm font-medium">Conversion Rate</div>
-                        <div class="text-3xl font-bold mt-1">{{ dashboardData.conversion_rate || 0 }}%</div>
-                        <div class="text-amber-200 text-xs mt-2">Won / Total</div>
+            <div class="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg p-3 sm:p-5 text-white min-w-0">
+                <div class="flex items-start sm:items-center justify-between gap-2 min-w-0">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-amber-100 text-xs sm:text-sm font-medium leading-tight">Conversion Rate</div>
+                        <div class="text-2xl sm:text-3xl font-bold mt-0.5 sm:mt-1 tabular-nums">{{ dashboardData.conversion_rate || 0 }}%</div>
+                        <div class="text-amber-200 text-[10px] sm:text-xs mt-1 sm:mt-2">Won / Total</div>
                     </div>
-                    <div class="bg-amber-400/30 p-3 rounded-lg">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="bg-amber-400/30 p-2 sm:p-3 rounded-lg shrink-0">
+                        <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                         </svg>
                     </div>
@@ -155,70 +155,108 @@
         </div>
 
         <!-- Secondary Stats Row -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div
-                class="bg-white rounded-xl shadow-sm p-4 border-l-4 border-blue-500 cursor-pointer hover:bg-blue-50 transition-colors"
+                class="bg-white rounded-xl shadow-sm p-3 sm:p-4 border-l-4 border-blue-500 cursor-pointer hover:bg-blue-50 transition-colors min-w-0"
                 @click="goToLeadsListing('follow_up')"
             >
-                <div class="text-xs text-slate-500 uppercase tracking-wider">Follow-ups</div>
-                <div class="text-2xl font-bold text-slate-900 mt-1">{{ pipelineStats.follow_up || 0 }}</div>
+                <div class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider leading-tight">Follow-ups</div>
+                <div class="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 tabular-nums">{{ pipelineStats.follow_up || 0 }}</div>
             </div>
             <div
-                class="bg-white rounded-xl shadow-sm p-4 border-l-4 border-yellow-500 cursor-pointer hover:bg-yellow-50 transition-colors"
+                class="bg-white rounded-xl shadow-sm p-3 sm:p-4 border-l-4 border-yellow-500 cursor-pointer hover:bg-yellow-50 transition-colors min-w-0"
                 @click="goToLeadsListing('lead')"
             >
-                <div class="text-xs text-slate-500 uppercase tracking-wider">Leads</div>
-                <div class="text-2xl font-bold text-slate-900 mt-1">{{ pipelineStats.lead || 0 }}</div>
+                <div class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider leading-tight">Leads</div>
+                <div class="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 tabular-nums">{{ pipelineStats.lead || 0 }}</div>
             </div>
             <div
-                class="bg-white rounded-xl shadow-sm p-4 border-l-4 border-orange-500 cursor-pointer hover:bg-orange-50 transition-colors"
+                class="bg-white rounded-xl shadow-sm p-3 sm:p-4 border-l-4 border-orange-500 cursor-pointer hover:bg-orange-50 transition-colors min-w-0"
                 @click="goToLeadsListing('hot_lead')"
             >
-                <div class="text-xs text-slate-500 uppercase tracking-wider">Hot Leads</div>
-                <div class="text-2xl font-bold text-slate-900 mt-1">{{ pipelineStats.hot_lead || 0 }}</div>
+                <div class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider leading-tight">Hot Leads</div>
+                <div class="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 tabular-nums">{{ pipelineStats.hot_lead || 0 }}</div>
             </div>
             <div
-                class="bg-white rounded-xl shadow-sm p-4 border-l-4 border-green-500 cursor-pointer hover:bg-green-50 transition-colors"
+                class="bg-white rounded-xl shadow-sm p-3 sm:p-4 border-l-4 border-green-500 cursor-pointer hover:bg-green-50 transition-colors min-w-0"
                 @click="goToLeadsListing('won')"
             >
-                <div class="text-xs text-slate-500 uppercase tracking-wider">Won</div>
-                <div class="text-2xl font-bold text-green-600 mt-1">{{ pipelineStats.won || 0 }}</div>
+                <div class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider leading-tight">Won</div>
+                <div class="text-xl sm:text-2xl font-bold text-green-600 mt-0.5 sm:mt-1 tabular-nums">{{ pipelineStats.won || 0 }}</div>
             </div>
         </div>
 
         <!-- Products Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-5 flex items-center gap-3 sm:gap-4 min-w-0">
                 <div class="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
                     <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <div>
-                    <div class="text-sm text-slate-500">Products Won</div>
-                    <div class="text-2xl font-bold text-green-600">{{ productStats.won || 0 }}</div>
+                <div class="min-w-0">
+                    <div class="text-xs sm:text-sm text-slate-500">Products Won</div>
+                    <div class="text-xl sm:text-2xl font-bold text-green-600 tabular-nums">{{ productStats.won || 0 }}</div>
                 </div>
             </div>
-            <div class="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
+            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-5 flex items-center gap-3 sm:gap-4 min-w-0">
                 <div class="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center">
                     <svg class="w-7 h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <div>
-                    <div class="text-sm text-slate-500">Products Lost</div>
-                    <div class="text-2xl font-bold text-red-600">{{ productStats.lost || 0 }}</div>
+                <div class="min-w-0">
+                    <div class="text-xs sm:text-sm text-slate-500">Products Lost</div>
+                    <div class="text-xl sm:text-2xl font-bold text-red-600 tabular-nums">{{ productStats.lost || 0 }}</div>
                 </div>
             </div>
-            <div class="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
+            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-5 flex items-center gap-3 sm:gap-4 min-w-0">
                 <div class="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center">
                     <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <div>
-                    <div class="text-sm text-slate-500">Products Pending</div>
-                    <div class="text-2xl font-bold text-amber-600">{{ productStats.pending || 0 }}</div>
+                <div class="min-w-0">
+                    <div class="text-xs sm:text-sm text-slate-500">Products Pending</div>
+                    <div class="text-xl sm:text-2xl font-bold text-amber-600 tabular-nums">{{ productStats.pending || 0 }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly #1 Spotlight (visible to everyone, hidden when no activity) -->
+        <div
+            v-if="monthlyTopPerformer"
+            class="bg-gradient-to-r from-amber-50 via-white to-emerald-50 border border-amber-100 rounded-2xl shadow-sm p-4 sm:p-5 md:p-6 min-w-0"
+        >
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 min-w-0">
+                <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <div class="w-12 h-12 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-lg">
+                        1
+                    </div>
+                    <div>
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold mb-2">
+                            🏅 Top Performer of the Month
+                        </div>
+                        <div class="text-xl font-bold text-slate-900">{{ monthlyTopPerformer.name }}</div>
+                        <div class="text-sm text-slate-600">
+                            {{ monthlyTopPerformer.leads_count || 0 }} leads •
+                            {{ monthlyTopPerformer.won_products || monthlyTopPerformer.won_count || 0 }} won
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-center w-full md:max-w-md md:ml-auto">
+                    <div class="px-3 py-2 bg-white rounded-lg border border-slate-100 min-w-0">
+                        <div class="text-xs text-slate-500">Revenue</div>
+                        <div class="text-sm font-bold text-emerald-600 break-words">£{{ formatNumber(monthlyTopPerformer.revenue || 0) }}</div>
+                    </div>
+                    <div class="px-3 py-2 bg-white rounded-lg border border-slate-100">
+                        <div class="text-xs text-slate-500">Sales Won</div>
+                        <div class="text-sm font-bold text-slate-900">{{ monthlyTopPerformer.won_products || monthlyTopPerformer.won_count || 0 }}</div>
+                    </div>
+                    <div class="px-3 py-2 bg-white rounded-lg border border-slate-100">
+                        <div class="text-xs text-slate-500">Conversion</div>
+                        <div class="text-sm font-bold text-slate-900">{{ monthlyTopPerformer.conversion_rate || 0 }}%</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -226,10 +264,10 @@
         <!-- Today's Follow-ups & Top Performers -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Today's Follow-ups -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-slate-900">📅 Today's Follow-ups</h3>
-                    <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+                    <h3 class="text-base sm:text-lg font-semibold text-slate-900">📅 Today's Follow-ups</h3>
+                    <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium shrink-0 self-start sm:self-auto">
                         {{ todayFollowUps.length }}
                     </span>
                 </div>
@@ -243,13 +281,13 @@
                     <div
                         v-for="followUp in todayFollowUps"
                         :key="followUp.id"
-                        class="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors group"
+                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors group"
                     >
-                        <div class="flex-1">
+                        <div class="flex-1 min-w-0">
                             <router-link
                                 v-if="followUp.customer_id"
                                 :to="`/customers/${followUp.customer_id}`"
-                                class="font-medium text-slate-900 text-blue-600 hover:text-blue-800 hover:underline"
+                                class="font-medium text-slate-900 text-blue-600 hover:text-blue-800 hover:underline break-words"
                             >
                                 {{ followUp.customer?.name || 'Customer' }}
                             </router-link>
@@ -261,17 +299,17 @@
                                 {{ formatTime(followUp.next_follow_up_at) }}
                             </div>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
                             <button
                                 @click="openActivityModal(followUp)"
-                                class="opacity-0 group-hover:opacity-100 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-all"
+                                class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 px-2 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-opacity touch-manipulation"
                             >
                                 Log
                             </button>
                             <router-link
                                 v-if="followUp.customer_id"
                                 :to="`/customers/${followUp.customer_id}`"
-                                class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                class="px-2 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 touch-manipulation"
                             >
                                 View
                             </router-link>
@@ -281,10 +319,10 @@
             </div>
 
             <!-- Top Performers -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-slate-900">🏆 Top Performers</h3>
-                    <span class="text-sm text-slate-500">This Month</span>
+            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+                    <h3 class="text-base sm:text-lg font-semibold text-slate-900">🏆 Top Performers</h3>
+                    <span class="text-xs sm:text-sm text-slate-500">This Month</span>
                 </div>
                 <div v-if="topPerformers.length === 0" class="text-center py-8 text-slate-400">
                     No performance data available
@@ -293,10 +331,10 @@
                     <div
                         v-for="(performer, index) in topPerformers"
                         :key="performer.id"
-                        class="flex items-center gap-4"
+                        class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4"
                     >
                         <div
-                            class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white"
+                            class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shrink-0"
                             :class="{
                                 'bg-yellow-500': index === 0,
                                 'bg-slate-400': index === 1,
@@ -306,11 +344,11 @@
                         >
                             {{ index + 1 }}
                         </div>
-                        <div class="flex-1">
-                            <div class="font-medium text-slate-900">{{ performer.name }}</div>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-medium text-slate-900 truncate">{{ performer.name }}</div>
                             <div class="text-xs text-slate-500">{{ performer.leads_count }} leads • {{ performer.won_count }} won</div>
                         </div>
-                        <div class="text-right">
+                        <div class="text-left sm:text-right sm:ml-auto shrink-0">
                             <div class="font-bold text-green-600">£{{ formatNumber(performer.revenue) }}</div>
                             <div class="text-xs text-slate-500">{{ performer.conversion_rate }}% conv.</div>
                         </div>
@@ -324,11 +362,11 @@
                             :key="t.user_id"
                             class="flex flex-col gap-1 p-3 rounded-lg bg-slate-50"
                         >
-                            <div class="flex items-center justify-between">
-                                <div class="font-medium text-slate-900 truncate">
+                            <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="font-medium text-slate-900 truncate min-w-0">
                                     {{ t.user?.name || 'Employee' }}
                                 </div>
-                                <div class="text-xs text-slate-500 ml-2 shrink-0">
+                                <div class="text-xs text-slate-500 sm:ml-2 shrink-0">
                                     {{ t.achieved_appointments }} / {{ t.target_appointments || 0 }} appointments
                                 </div>
                             </div>
@@ -352,10 +390,10 @@
             </div>
 
             <!-- Today's Appointments (full width row) -->
-            <div class="bg-white rounded-xl shadow-sm p-6 lg:col-span-2">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-slate-900">📆 Today's Appointments</h3>
-                    <span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
+            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 lg:col-span-2 min-w-0">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+                    <h3 class="text-base sm:text-lg font-semibold text-slate-900">📆 Today's Appointments</h3>
+                    <span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium shrink-0 self-start sm:self-auto">
                         {{ todayAppointments.length }}
                     </span>
                 </div>
@@ -370,13 +408,13 @@
                     <div
                         v-for="apt in todayAppointments"
                         :key="apt.id"
-                        class="flex items-center justify-between p-3 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors group"
+                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors group"
                     >
-                        <div class="flex-1">
+                        <div class="flex-1 min-w-0">
                             <router-link
                                 v-if="apt.customer_id"
                                 :to="`/customers/${apt.customer_id}`"
-                                class="font-medium text-slate-900 text-blue-600 hover:text-blue-800 hover:underline"
+                                class="font-medium text-slate-900 text-blue-600 hover:text-blue-800 hover:underline break-words"
                             >
                                 {{ apt.customer?.name || 'Customer' }}
                             </router-link>
@@ -386,18 +424,18 @@
                             <div class="text-sm text-slate-600 mt-0.5">{{ apt.description || 'Appointment' }}</div>
                             <div class="text-xs text-slate-500 mt-1">{{ apt.appointment_time || '10:00' }}</div>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
                             <button
                                 v-if="apt.lead_id"
                                 @click="openCompleteForAppointment(apt)"
-                                class="opacity-0 group-hover:opacity-100 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-all"
+                                class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 px-2 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-opacity touch-manipulation"
                             >
                                 Complete
                             </button>
                             <router-link
                                 v-if="apt.customer_id"
                                 :to="`/customers/${apt.customer_id}`"
-                                class="px-2 py-1 text-xs bg-amber-600 text-white rounded hover:bg-amber-700"
+                                class="px-2 py-1.5 text-xs bg-amber-600 text-white rounded hover:bg-amber-700 touch-manipulation"
                             >
                                 View
                             </router-link>
@@ -410,10 +448,10 @@
         <!-- My Targets (any role with a target set, no revenue shown) -->
         <div
             v-if="myTarget"
-            class="bg-white rounded-xl shadow-sm p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+            class="bg-white rounded-xl shadow-sm p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 min-w-0"
         >
-            <div>
-                <h3 class="text-lg font-semibold text-slate-900">🎯 My Targets (this month)</h3>
+            <div class="min-w-0">
+                <h3 class="text-base sm:text-lg font-semibold text-slate-900">🎯 My Targets (this month)</h3>
                 <p class="text-xs text-slate-500 mt-1">
                     Set by your admin. Achievements are calculated automatically from your appointments and won sales.
                 </p>
@@ -449,8 +487,8 @@
         <!-- Lead Sources & Recent Leads -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Lead Sources -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <h3 class="text-lg font-semibold text-slate-900 mb-4">📊 Lead Sources</h3>
+            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
+                <h3 class="text-base sm:text-lg font-semibold text-slate-900 mb-4">📊 Lead Sources</h3>
                 <div v-if="Object.keys(leadSources).length === 0" class="text-center py-8 text-slate-400">
                     No lead source data
                 </div>
@@ -473,10 +511,10 @@
             </div>
 
             <!-- Recent Leads -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-slate-900">🆕 Recent Leads</h3>
-                    <router-link to="/leads/pipeline" class="text-sm text-blue-600 hover:underline">View All</router-link>
+            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+                    <h3 class="text-base sm:text-lg font-semibold text-slate-900">🆕 Recent Leads</h3>
+                    <router-link to="/leads/pipeline" class="text-sm text-blue-600 hover:underline shrink-0">View All</router-link>
                 </div>
                 <div v-if="recentLeads.length === 0" class="text-center py-8 text-slate-400">
                     No recent leads
@@ -485,9 +523,9 @@
                     <div
                         v-for="lead in recentLeads"
                         :key="lead.id"
-                        class="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors group"
+                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors group"
                     >
-                        <div class="flex-1">
+                        <div class="flex-1 min-w-0">
                             <router-link
                                 v-if="lead.customer_id"
                                 :to="`/customers/${lead.customer_id}`"
@@ -508,18 +546,18 @@
                                 <span class="text-xs text-slate-500">{{ lead.source || '-' }}</span>
                             </div>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <div class="text-sm font-medium text-slate-700">£{{ formatNumber(getLeadValue(lead)) }}</div>
+                        <div class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 sm:justify-end">
+                            <div class="text-sm font-medium text-slate-700 tabular-nums">£{{ formatNumber(getLeadValue(lead)) }}</div>
                             <button
                                 @click="openActivityModal(lead)"
-                                class="opacity-0 group-hover:opacity-100 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-all"
+                                class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 px-2 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-opacity touch-manipulation"
                             >
                                 Log
                             </button>
                             <router-link
                                 v-if="lead.customer_id"
                                 :to="`/customers/${lead.customer_id}`"
-                                class="opacity-0 group-hover:opacity-100 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-all"
+                                class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 px-2 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-opacity touch-manipulation"
                             >
                                 View
                             </router-link>
@@ -530,78 +568,78 @@
         </div>
 
         <!-- Quick Stats Row -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div
-                class="bg-white rounded-xl shadow-sm p-5 cursor-pointer hover:bg-blue-50 transition-colors"
+                class="bg-white rounded-xl shadow-sm p-3 sm:p-5 cursor-pointer hover:bg-blue-50 transition-colors min-w-0"
                 @click="router.push({ path: '/customers', query: { type: 'customer' } })"
             >
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
                     </div>
-                    <div>
-                        <div class="text-xs text-slate-500">Total Customers</div>
-                        <div class="text-xl font-bold text-slate-900">{{ quickStats.total_customers || 0 }}</div>
+                    <div class="min-w-0">
+                        <div class="text-[10px] sm:text-xs text-slate-500 leading-tight">Total Customers</div>
+                        <div class="text-lg sm:text-xl font-bold text-slate-900 tabular-nums">{{ quickStats.total_customers || 0 }}</div>
                     </div>
                 </div>
             </div>
             <div
-                class="bg-white rounded-xl shadow-sm p-5 cursor-pointer hover:bg-green-50 transition-colors"
+                class="bg-white rounded-xl shadow-sm p-3 sm:p-5 cursor-pointer hover:bg-green-50 transition-colors min-w-0"
                 @click="router.push('/invoices')"
             >
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 bg-green-100 rounded-lg flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                     </div>
-                    <div>
-                        <div class="text-xs text-slate-500">Total Invoices</div>
-                        <div class="text-xl font-bold text-slate-900">{{ quickStats.total_invoices || 0 }}</div>
+                    <div class="min-w-0">
+                        <div class="text-[10px] sm:text-xs text-slate-500 leading-tight">Total Invoices</div>
+                        <div class="text-lg sm:text-xl font-bold text-slate-900 tabular-nums">{{ quickStats.total_invoices || 0 }}</div>
                     </div>
                 </div>
             </div>
             <div
-                class="bg-white rounded-xl shadow-sm p-5 cursor-pointer hover:bg-orange-50 transition-colors"
+                class="bg-white rounded-xl shadow-sm p-3 sm:p-5 cursor-pointer hover:bg-orange-50 transition-colors min-w-0"
                 @click="router.push('/tickets')"
             >
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 bg-orange-100 rounded-lg flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                         </svg>
                     </div>
-                    <div>
-                        <div class="text-xs text-slate-500">Open Tickets</div>
-                        <div class="text-xl font-bold text-slate-900">{{ quickStats.open_tickets || 0 }}</div>
+                    <div class="min-w-0">
+                        <div class="text-[10px] sm:text-xs text-slate-500 leading-tight">Open Tickets</div>
+                        <div class="text-lg sm:text-xl font-bold text-slate-900 tabular-nums">{{ quickStats.open_tickets || 0 }}</div>
                     </div>
                 </div>
             </div>
             <div
-                class="bg-white rounded-xl shadow-sm p-5 cursor-pointer hover:bg-purple-50 transition-colors"
+                class="bg-white rounded-xl shadow-sm p-3 sm:p-5 cursor-pointer hover:bg-purple-50 transition-colors min-w-0"
                 @click="router.push('/employees')"
             >
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 bg-purple-100 rounded-lg flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
                     </div>
-                    <div>
-                        <div class="text-xs text-slate-500">Active Agents</div>
-                        <div class="text-xl font-bold text-slate-900">{{ quickStats.active_agents || 0 }}</div>
+                    <div class="min-w-0">
+                        <div class="text-[10px] sm:text-xs text-slate-500 leading-tight">Active Agents</div>
+                        <div class="text-lg sm:text-xl font-bold text-slate-900 tabular-nums">{{ quickStats.active_agents || 0 }}</div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Open Tickets -->
-        <div v-if="openTickets.length > 0" class="bg-white rounded-xl shadow-sm p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-slate-900">🎫 Open Tickets</h3>
-                <router-link to="/tickets" class="text-sm text-blue-600 hover:underline">View All</router-link>
+        <div v-if="openTickets.length > 0" class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+                <h3 class="text-base sm:text-lg font-semibold text-slate-900">🎫 Open Tickets</h3>
+                <router-link to="/tickets" class="text-sm text-blue-600 hover:underline shrink-0">View All</router-link>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div
@@ -722,6 +760,7 @@ const recentLeads = ref([]);
 const todayFollowUps = ref([]);
 const todayAppointments = ref([]);
 const topPerformers = ref([]);
+const monthlyTopPerformer = ref(null);
 const leadSources = ref({});
 const quickStats = ref({});
 const openTickets = ref([]);
@@ -855,6 +894,21 @@ const resetFilters = () => {
     loadDashboard();
 };
 
+/** Safe numeric parse for API values (strings, decimals, commas). */
+function num(v) {
+    if (v === null || v === undefined || v === '') return 0;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+    const n = parseFloat(String(v).replace(/,/g, ''));
+    return Number.isFinite(n) ? n : 0;
+}
+
+/** Reporting /agents may be a bare array or wrapped in { data: [...] }. */
+function normalizeAgentsList(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (payload && Array.isArray(payload.data)) return payload.data;
+    return [];
+}
+
 const loadDashboard = async () => {
     loading.value = true;
     try {
@@ -919,8 +973,25 @@ const loadDashboard = async () => {
         leadSources.value = data.lead_sources || {};
 
         // Quick stats
-        const agents = agentsRes.data || [];
-        const activeAgents = agents.filter(a => (a.leads_count || 0) > 0).length;
+        const agents = normalizeAgentsList(agentsRes.data);
+        const activeAgents = agents.filter((a) => num(a.leads_count) > 0).length;
+
+        const performanceCandidates = agents
+            .filter((a) =>
+                num(a.leads_count) > 0 ||
+                num(a.won_count) > 0 ||
+                num(a.won_products) > 0 ||
+                num(a.won_leads) > 0 ||
+                num(a.revenue) > 0
+            )
+            .sort((a, b) => {
+                const aWon = Math.max(num(a.won_products), num(a.won_count), num(a.won_leads));
+                const bWon = Math.max(num(b.won_products), num(b.won_count), num(b.won_leads));
+                if (bWon !== aWon) return bWon - aWon;
+                if (num(b.revenue) !== num(a.revenue)) return num(b.revenue) - num(a.revenue);
+                return num(b.leads_count) - num(a.leads_count);
+            });
+        monthlyTopPerformer.value = performanceCandidates[0] || null;
 
         quickStats.value = {
             total_customers: data.all_customers || 0,
@@ -930,54 +1001,95 @@ const loadDashboard = async () => {
             active_agents: activeAgents,
         };
 
-        // Top performers
+        // Top performers: must match on-screen stats — only if they have won sales or revenue (£).
+        // (Leads alone do not count; avoids "1 lead • 0 won £0" clutter.)
         topPerformers.value = agents
-            .sort((a, b) => (b.revenue || 0) - (a.revenue || 0))
+            .filter((a) => {
+                const wonProducts = num(a.won_count) || num(a.won_products);
+                const wonLeads = num(a.won_leads);
+                const revenue = num(a.revenue);
+                return wonProducts > 0 || wonLeads > 0 || revenue > 0;
+            })
+            .sort((a, b) => num(b.revenue) - num(a.revenue))
             .slice(0, 5);
 
         // Employee targets / achievement board (current month)
+        // Only include: (1) users with at least one non-zero target for this month, or
+        // (2) users with real activity (appointments / wins / revenue). Do not list every sales agent.
         const targetsRaw = targetsRes.data?.data || [];
         const targetsByUser = {};
+
         for (const t of targetsRaw) {
+            const tp = num(t.target_appointments);
+            const ts = num(t.target_sales);
+            const tr = num(t.target_revenue);
+            if (tp === 0 && ts === 0 && tr === 0) {
+                continue;
+            }
             targetsByUser[t.user_id] = {
                 user_id: t.user_id,
                 user: t.user,
-                target_appointments: t.target_appointments || 0,
-                target_sales: t.target_sales || 0,
-                target_revenue: t.target_revenue || 0,
+                target_appointments: tp,
+                target_sales: ts,
+                target_revenue: tr,
                 achieved_appointments: 0,
                 achieved_sales: 0,
                 achieved_revenue: 0,
             };
         }
 
-        // Map agent stats into targets if available
+        const agentHasMeasurableActivity = (ag) =>
+            num(ag.appointments_count) > 0 ||
+            num(ag.won_products) > 0 ||
+            num(ag.won_count) > 0 ||
+            num(ag.won_leads) > 0 ||
+            num(ag.revenue) > 0;
+
         for (const ag of agents) {
-            const existing = targetsByUser[ag.id] || {
-                user_id: ag.id,
-                user: { id: ag.id, name: ag.name },
-                target_appointments: 0,
-                target_sales: 0,
-                target_revenue: 0,
-                achieved_appointments: 0,
-                achieved_sales: 0,
-                achieved_revenue: 0,
-            };
-            existing.achieved_appointments = ag.appointments_count || 0;
-            // Sales = individual products marked WON
-            existing.achieved_sales = ag.won_products || ag.won_count || 0;
-            existing.achieved_revenue = ag.revenue || 0;
-            targetsByUser[ag.id] = existing;
+            const id = ag.id;
+            const existing = targetsByUser[id];
+            if (!existing && !agentHasMeasurableActivity(ag)) {
+                continue;
+            }
+            const row =
+                existing || {
+                    user_id: id,
+                    user: { id: ag.id, name: ag.name },
+                    target_appointments: 0,
+                    target_sales: 0,
+                    target_revenue: 0,
+                    achieved_appointments: 0,
+                    achieved_sales: 0,
+                    achieved_revenue: 0,
+                };
+            row.achieved_appointments = num(ag.appointments_count);
+            row.achieved_sales = num(ag.won_products) || num(ag.won_count);
+            row.achieved_revenue = num(ag.revenue);
+            targetsByUser[id] = row;
         }
 
-        employeeTargets.value = Object.values(targetsByUser).map((t) => {
-            const denom = t.target_appointments || 0;
-            const progress = denom > 0 ? Math.min(100, Math.round((t.achieved_appointments / denom) * 100)) : 0;
-            return {
-                ...t,
-                appointment_progress: progress,
-            };
-        }).sort((a, b) => (b.achieved_appointments || 0) - (a.achieved_appointments || 0));
+        employeeTargets.value = Object.values(targetsByUser)
+            .map((t) => {
+                const denom = num(t.target_appointments);
+                const achievedAppt = num(t.achieved_appointments);
+                const progress = denom > 0 ? Math.min(100, Math.round((achievedAppt / denom) * 100)) : 0;
+                return {
+                    ...t,
+                    appointment_progress: progress,
+                };
+            })
+            .filter((t) => {
+                const hasTargets =
+                    num(t.target_appointments) > 0 ||
+                    num(t.target_sales) > 0 ||
+                    num(t.target_revenue) > 0;
+                const hasAchievement =
+                    num(t.achieved_appointments) > 0 ||
+                    num(t.achieved_sales) > 0 ||
+                    num(t.achieved_revenue) > 0;
+                return hasTargets || hasAchievement;
+            })
+            .sort((a, b) => num(b.achieved_appointments) - num(a.achieved_appointments));
 
         // Open tickets
         openTickets.value = ticketsRes.data.data || [];

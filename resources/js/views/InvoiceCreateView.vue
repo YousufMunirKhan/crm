@@ -1,6 +1,6 @@
 <template>
-    <div class="min-h-screen bg-slate-50">
-        <div class="max-w-3xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
+    <div class="min-h-screen bg-slate-50 w-full min-w-0 overflow-x-hidden">
+        <div class="max-w-3xl mx-auto px-3 sm:px-6 py-6 lg:py-8 w-full min-w-0">
             <!-- Back + Title -->
             <div class="mb-6">
                 <router-link

@@ -1,21 +1,21 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 min-w-0">
             <h1 class="text-2xl font-bold text-slate-900">Reports & Analytics</h1>
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap gap-2 w-full sm:w-auto min-w-0">
                 <input
                     v-model="filters.from"
                     type="date"
-                    class="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                    class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm"
                 />
                 <input
                     v-model="filters.to"
                     type="date"
-                    class="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                    class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm"
                 />
                 <select
                     v-model="filters.employee_id"
-                    class="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[150px]"
+                    class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm sm:min-w-[150px]"
                 >
                     <option value="">All Employees</option>
                     <option v-for="emp in employees" :key="emp.id" :value="emp.id">
@@ -25,7 +25,7 @@
                 <button 
                     @click="loadReports" 
                     :disabled="loading"
-                    class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 touch-manipulation w-full sm:w-auto"
                 >
                     <svg v-if="loading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -37,29 +37,29 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
                 <h3 class="text-lg font-semibold text-slate-900 mb-4">Funnel Report</h3>
                 <div class="space-y-3">
                     <div
                         v-for="(count, stage) in funnelData.funnel"
                         :key="stage"
-                        class="flex items-center justify-between"
+                        class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-w-0"
                     >
-                        <span class="text-sm text-slate-600 capitalize">{{ stage.replace('_', ' ') }}</span>
-                        <div class="flex items-center gap-3">
-                            <div class="w-32 bg-slate-200 rounded-full h-2">
+                        <span class="text-sm text-slate-600 capitalize min-w-0">{{ stage.replace('_', ' ') }}</span>
+                        <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 sm:flex-initial sm:justify-end">
+                            <div class="flex-1 sm:w-32 max-w-full bg-slate-200 rounded-full h-2 min-w-0">
                                 <div
                                     class="bg-blue-600 h-2 rounded-full"
                                     :style="{ width: `${(count / (funnelData.funnel.follow_up || 1)) * 100}%` }"
                                 ></div>
                             </div>
-                            <span class="text-sm font-medium text-slate-900 w-12 text-right">{{ count }}</span>
+                            <span class="text-sm font-medium text-slate-900 w-10 sm:w-12 text-right tabular-nums shrink-0">{{ count }}</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
                 <h3 class="text-lg font-semibold text-slate-900 mb-4">Communication Analytics</h3>
                 <div class="space-y-3">
                     <div class="flex justify-between">
@@ -79,7 +79,7 @@
         </div>
 
         <!-- Today's Follow-ups -->
-        <div class="bg-white rounded-xl shadow-sm p-4 md:p-6">
+        <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 md:p-6 min-w-0">
             <h3 class="text-lg font-semibold text-slate-900 mb-4">Today's Follow-ups by Employee</h3>
             <div v-if="todaysFollowUps.length === 0" class="text-center py-8 text-slate-500">
                 No follow-ups scheduled for today
@@ -97,25 +97,25 @@
                         <div
                             v-for="followUp in group.follow_ups"
                             :key="followUp.id"
-                            class="flex items-center justify-between text-sm text-slate-600 pl-4 border-l-2 border-blue-200 py-1"
+                            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-slate-600 pl-4 border-l-2 border-blue-200 py-2 min-w-0"
                         >
-                            <div>
+                            <div class="min-w-0 break-words">
                                 {{ followUp.customer?.name }} - 
                                 <span v-if="followUp.items?.length">
                                     {{ followUp.items.map(item => item.product?.name).filter(Boolean).join(', ') }}
                                 </span>
                             </div>
-                            <div class="flex gap-2">
+                            <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
                                 <button
                                     @click="openActivityModal(followUp)"
-                                    class="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                                    class="px-2 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 touch-manipulation"
                                 >
                                     Log
                                 </button>
                                 <router-link
                                     v-if="followUp.customer_id"
                                     :to="`/customers/${followUp.customer_id}`"
-                                    class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                    class="px-2 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 touch-manipulation inline-block text-center"
                                 >
                                     View
                                 </router-link>
@@ -127,7 +127,7 @@
         </div>
 
         <!-- All Employees Pipeline -->
-        <div class="bg-white rounded-xl shadow-sm p-4 md:p-6">
+        <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 md:p-6 min-w-0">
             <h3 class="text-lg font-semibold text-slate-900 mb-4">All Employees Sales Pipeline</h3>
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[900px]">
@@ -168,7 +168,7 @@
         </div>
 
         <!-- Revenue by Employee -->
-        <div class="bg-white rounded-xl shadow-sm p-4 md:p-6">
+        <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 md:p-6 min-w-0">
             <h3 class="text-lg font-semibold text-slate-900 mb-4">Revenue by Employee</h3>
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[600px]">
@@ -197,7 +197,7 @@
         </div>
 
         <!-- Team Location Status -->
-        <div class="bg-white rounded-xl shadow-sm p-4 md:p-6">
+        <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 md:p-6 min-w-0">
             <h3 class="text-lg font-semibold text-slate-900 mb-4">Team Location Status</h3>
             <div v-if="teamLocationStatus.length === 0" class="text-center py-8 text-slate-500">
                 No recent customer visits/meetings
@@ -226,7 +226,7 @@
         </div>
 
         <!-- Agent Performance -->
-        <div class="bg-white rounded-xl shadow-sm p-4 md:p-6">
+        <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 md:p-6 min-w-0">
             <h3 class="text-lg font-semibold text-slate-900 mb-4">Agent Performance</h3>
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[600px]">
@@ -290,7 +290,7 @@ const loading = ref(false);
 
 const loadEmployees = async () => {
     try {
-        const response = await axios.get('/api/users');
+        const response = await axios.get('/api/users', { params: { for_sales_report: 1 } });
         employees.value = response.data.data || response.data || [];
     } catch (error) {
         console.error('Failed to load employees:', error);

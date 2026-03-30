@@ -1,21 +1,21 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 lg:p-6">
-        <div class="flex items-center justify-between gap-3 lg:gap-4 mb-4 lg:mb-6">
-            <div class="flex items-center gap-3 lg:gap-4">
+    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 lg:p-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 min-w-0">
+            <div class="flex items-center gap-3 lg:gap-4 min-w-0">
                 <button
                     @click="$router.back()"
-                    class="p-2 hover:bg-slate-100 rounded-lg transition"
+                    class="p-2 hover:bg-slate-100 rounded-lg transition touch-manipulation shrink-0"
                 >
                     <svg class="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
                 </button>
-                <h1 class="text-xl lg:text-2xl font-bold text-slate-900">Employee Details</h1>
+                <h1 class="text-xl lg:text-2xl font-bold text-slate-900 break-words">Employee Details</h1>
             </div>
             <button
                 v-if="employee"
                 @click="goToEdit"
-                class="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800"
+                class="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 touch-manipulation w-full sm:w-auto text-center shrink-0"
             >
                 Edit Employee
             </button>
@@ -28,14 +28,14 @@
 
         <div v-else-if="employee" class="space-y-6">
             <!-- Employee Info Card -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <div class="flex items-start justify-between mb-6">
-                    <div>
-                        <h2 class="text-xl font-semibold text-slate-900">{{ employee.name }}</h2>
+            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6 min-w-0">
+                    <div class="min-w-0">
+                        <h2 class="text-xl font-semibold text-slate-900 break-words">{{ employee.name }}</h2>
                         <p class="text-slate-500 mt-1">{{ employee.role?.name || 'No Role' }}</p>
                     </div>
                     <span
-                        class="px-3 py-1 text-sm font-medium rounded"
+                        class="px-3 py-1 text-sm font-medium rounded shrink-0 self-start"
                         :class="getRoleBadgeClass(employee.role?.name)"
                     >
                         {{ employee.role?.name || 'N/A' }}

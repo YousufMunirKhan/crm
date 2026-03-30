@@ -1,12 +1,12 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 min-w-0">
             <h1 class="text-2xl font-bold text-slate-900">Employees</h1>
-            <div class="flex flex-wrap gap-3">
+            <div class="flex flex-wrap gap-3 w-full sm:w-auto min-w-0">
                 <select
                     v-model="filters.role"
                     @change="loadEmployees"
-                    class="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    class="w-full sm:w-auto min-w-0 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
                 >
                     <option value="">All Roles</option>
                     <option v-for="role in roles" :key="role.id" :value="role.name">
@@ -16,7 +16,7 @@
                 <select
                     v-model="filters.employee_type"
                     @change="loadEmployees"
-                    class="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    class="w-full sm:w-auto min-w-0 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
                 >
                     <option value="">All Types</option>
                     <option value="field_worker">Field Worker</option>
@@ -26,7 +26,7 @@
                 <select
                     v-model="filters.is_active"
                     @change="loadEmployees"
-                    class="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    class="w-full sm:w-auto min-w-0 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
                 >
                     <option value="1">Active</option>
                     <option value="0">Inactive</option>
@@ -36,26 +36,26 @@
                     v-model="search"
                     type="text"
                     placeholder="Search employees..."
-                    class="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    class="w-full min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[12rem] px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
                     @input="handleSearch"
                 />
                 <button
                     v-if="canAddEmployee"
                     @click="openCreateForm"
-                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
+                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 touch-manipulation flex-1 sm:flex-initial min-w-[8rem] text-center"
                 >
                     + Add Employee
                 </button>
                 <button
                     @click="goToGoals"
-                    class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+                    class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 touch-manipulation flex-1 sm:flex-initial min-w-[8rem] text-center"
                 >
                     View Goals
                 </button>
             </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden min-w-0">
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[600px]">
                     <thead class="bg-slate-50">

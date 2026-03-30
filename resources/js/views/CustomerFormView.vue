@@ -1,6 +1,6 @@
 <template>
-    <div class="min-h-screen bg-slate-50">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
+    <div class="min-h-screen bg-slate-50 w-full min-w-0 overflow-x-hidden">
+        <div class="max-w-4xl mx-auto px-3 sm:px-6 py-6 lg:py-8 w-full min-w-0">
             <!-- Header -->
             <div class="mb-6 lg:mb-8">
                 <router-link
@@ -138,7 +138,7 @@
                             :key="idx"
                             class="mb-6 p-4 border border-slate-200 rounded-xl bg-slate-50/50 space-y-4"
                         >
-                            <div class="flex justify-between items-center">
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <span class="text-sm font-medium text-slate-700">Entry {{ idx + 1 }}</span>
                                 <button
                                     v-if="form.remote_licenses.length > 1"
@@ -363,14 +363,14 @@
                 <div class="px-4 sm:px-6 lg:px-8 py-4 bg-slate-50 border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
                     <router-link
                         :to="form.type === 'prospect' ? { path: '/customers', query: { type: 'prospect' } } : { path: '/customers', query: { type: 'customer' } }"
-                        class="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium text-sm text-center"
+                        class="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium text-sm text-center touch-manipulation"
                     >
                         Cancel
                     </router-link>
                     <button
                         type="submit"
                         :disabled="loading"
-                        class="px-6 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        class="px-6 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm touch-manipulation"
                     >
                         <span v-if="loading" class="inline-flex items-center gap-2">
                             <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">

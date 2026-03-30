@@ -785,6 +785,51 @@ class ReportingService
             'total_employees_with_targets' => $totalWithTargets,
         ];
     }
+
+    /**
+     * User IDs with at least one recorded sale: won lead / won line item (assignee or customer rep)
+     * or an invoice they created. Used to scope sales-report employee pickers for non-admin users.
+     *
+     * @return list<int>
+     */
+    public function userIdsWithRecordedSales(): array
+    {
+        $assigneeIds = Lead::query()
+            ->where(function ($q) {
+                $q->where('stage', 'won')
+                    ->orWhereHas('items', function ($iq) {
+                        $iq->where('status', LeadItem::STATUS_WON);
+                    });
+            })
+            ->whereNotNull('assigned_to')
+            ->distinct()
+            ->pluck('assigned_to');
+
+        $fromAssignedCustomers = User::query()
+            ->whereHas('assignedCustomers.leads', function ($q) {
+                $q->where(function ($sub) {
+                    $sub->where('stage', 'won')
+                        ->orWhereHas('items', function ($iq) {
+                            $iq->where('status', LeadItem::STATUS_WON);
+                        });
+                });
+            })
+            ->pluck('id');
+
+        $invoiceCreators = Invoice::query()
+            ->whereNotNull('created_by')
+            ->distinct()
+            ->pluck('created_by');
+
+        return $assigneeIds
+            ->merge($fromAssignedCustomers)
+            ->merge($invoiceCreators)
+            ->filter(fn ($id) => $id !== null && $id !== '')
+            ->unique()
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
 }
 
 

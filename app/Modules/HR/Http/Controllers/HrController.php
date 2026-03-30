@@ -22,12 +22,6 @@ class HrController extends Controller
     public function checkIn(Request $request)
     {
         $user = $request->user();
-        
-        // Only non-admin users can check in
-        if ($user->isRole('Admin') || $user->isRole('Manager') || $user->isRole('System Admin')) {
-            return response()->json(['error' => 'Admin users cannot check in. Please use the attendance management section.'], 403);
-        }
-
         $userId = $user->id;
 
         try {
@@ -41,12 +35,6 @@ class HrController extends Controller
     public function checkOut(Request $request)
     {
         $user = $request->user();
-        
-        // Only non-admin users can check out
-        if ($user->isRole('Admin') || $user->isRole('Manager') || $user->isRole('System Admin')) {
-            return response()->json(['error' => 'Admin users cannot check out. Please use the attendance management section.'], 403);
-        }
-
         $userId = $user->id;
 
         try {
@@ -94,19 +82,6 @@ class HrController extends Controller
     public function todayStatus(Request $request)
     {
         $user = $request->user();
-        
-        // Admin users don't need today status
-        if ($user->isRole('Admin') || $user->isRole('Manager') || $user->isRole('System Admin')) {
-            return response()->json([
-                'checked_in' => false,
-                'checked_out' => false,
-                'check_in_time' => null,
-                'check_out_time' => null,
-                'attendance' => null,
-                'is_admin' => true,
-            ]);
-        }
-
         $userId = $user->id;
         $today = now()->toDateString();
 
@@ -122,7 +97,6 @@ class HrController extends Controller
             'attendance' => $attendance,
             'server_date' => $today,
             'server_time' => now()->toDateTimeString(),
-            'is_admin' => false,
         ]);
     }
 
@@ -255,8 +229,12 @@ class HrController extends Controller
         ]);
     }
 
-    public function employeeDocuments($userId)
+    public function employeeDocuments(Request $request, $userId)
     {
+        if (! $this->canAccessEmployeeDocuments($request->user(), (int) $userId)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $docs = EmployeeDocument::where('user_id', $userId)
             ->orderByDesc('created_at')
             ->get();
@@ -266,6 +244,10 @@ class HrController extends Controller
 
     public function storeEmployeeDocument(Request $request, $userId)
     {
+        if (! $this->canAccessEmployeeDocuments($request->user(), (int) $userId)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'file' => ['required', 'file', 'max:5120'],
@@ -282,12 +264,25 @@ class HrController extends Controller
         return response()->json($doc, 201);
     }
 
-    public function destroyEmployeeDocument($userId, $id)
+    public function destroyEmployeeDocument(Request $request, $userId, $id)
     {
+        if (! $this->canAccessEmployeeDocuments($request->user(), (int) $userId)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $doc = EmployeeDocument::where('user_id', $userId)->findOrFail($id);
         $doc->delete();
 
         return response()->noContent();
+    }
+
+    protected function canAccessEmployeeDocuments($viewer, int $userId): bool
+    {
+        if ((int) $viewer->id === $userId) {
+            return true;
+        }
+
+        return $viewer->isRole('Admin') || $viewer->isRole('Manager') || $viewer->isRole('System Admin');
     }
 
     public function salaryReport(Request $request)

@@ -1,5 +1,5 @@
 <template>
-        <div class="max-w-7xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+        <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         <div class="flex flex-col gap-3">
             <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Lead Pipeline</h1>
             <div class="flex flex-wrap items-center gap-2">
@@ -31,19 +31,19 @@
                 </select>
                 <button
                     @click="applyFilters"
-                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm touch-manipulation"
                 >
                     Apply
                 </button>
                 <button
                     @click="clearFilters"
-                    class="px-3 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 text-sm"
+                    class="px-3 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 text-sm touch-manipulation"
                 >
                     Clear
                 </button>
                 <button
                     @click="openCreateForm"
-                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 text-sm"
+                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 text-sm touch-manipulation w-full sm:w-auto text-center"
                 >
                     + Create Lead
                 </button>

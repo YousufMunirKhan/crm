@@ -1,6 +1,6 @@
 <template>
-    <div class="min-h-screen bg-slate-50">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
+    <div class="min-h-screen bg-slate-50 w-full min-w-0 overflow-x-hidden">
+        <div class="max-w-4xl mx-auto px-3 sm:px-6 py-6 lg:py-8 w-full min-w-0">
             <!-- Back + Header -->
             <div class="mb-6">
                 <router-link
@@ -19,12 +19,12 @@
                     </svg>
                     Loading ticket...
                 </div>
-                <div v-else-if="ticket" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                        <h1 class="text-2xl font-bold text-slate-900">{{ ticket.ticket_number }}</h1>
-                        <p class="text-lg text-slate-700 mt-0.5">{{ ticket.subject }}</p>
+                <div v-else-if="ticket" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
+                    <div class="min-w-0">
+                        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 break-words">{{ ticket.ticket_number }}</h1>
+                        <p class="text-base sm:text-lg text-slate-700 mt-0.5 break-words">{{ ticket.subject }}</p>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <span
                             class="px-3 py-1 rounded-lg text-sm font-medium"
                             :class="getStatusClass(ticket.status)"

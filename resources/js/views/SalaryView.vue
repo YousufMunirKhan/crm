@@ -1,5 +1,5 @@
 <template>
-    <div class="max-w-4xl mx-auto p-4 lg:p-6 space-y-4 lg:space-y-6">
+    <div class="w-full min-w-0 max-w-4xl mx-auto p-3 sm:p-4 lg:p-6 space-y-4 lg:space-y-6">
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
                 <h1 class="text-xl lg:text-2xl font-bold text-slate-900">{{ editingSalary ? 'Edit Salary' : 'Add Salary' }}</h1>
@@ -7,7 +7,7 @@
             </div>
             <router-link
                 to="/salaries/list"
-                class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm lg:text-base text-center"
+                class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm lg:text-base text-center touch-manipulation w-full sm:w-auto"
             >
                 ← Back to Salary Slips
             </router-link>

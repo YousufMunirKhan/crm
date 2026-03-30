@@ -1,5 +1,5 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-slate-900">Employee Goals</h1>
@@ -7,17 +7,17 @@
                     Set monthly targets for appointments and sales, and see what each employee achieved.
                 </p>
             </div>
-            <div class="flex flex-wrap gap-3 items-center">
+            <div class="flex flex-wrap gap-3 items-stretch sm:items-center w-full sm:w-auto">
                 <input
                     v-model="selectedMonth"
                     type="month"
-                    class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
                     @change="loadData"
                 />
             </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden min-w-0">
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[800px]">
                     <thead class="bg-slate-50">

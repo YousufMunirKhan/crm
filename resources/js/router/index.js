@@ -226,6 +226,12 @@ const routes = [
         meta: { requiresAuth: true, title: 'Email Templates', roles: ['Admin', 'System Admin'] },
     },
     {
+        path: '/access-manager',
+        name: 'access-manager',
+        component: () => import('@/views/AccessManagerView.vue'),
+        meta: { requiresAuth: true, title: 'Access Manager', roles: ['Admin', 'System Admin'] },
+    },
+    {
         path: '/settings',
         name: 'settings',
         component: () => import('@/views/SettingsView.vue'),
@@ -325,10 +331,28 @@ router.beforeEach(async (to, from, next) => {
 
     // Role-based access control for routes
     if (to.meta.roles && auth.isAuthenticated && auth.user) {
+        // Any logged-in user may open their own employee edit page (bank details & documents only in UI).
+        if (to.name === 'employee-edit') {
+            const id = Number(to.params.id);
+            if (Number.isFinite(id) && id === auth.user.id) {
+                return next();
+            }
+        }
         const userRole = auth.user.role?.name;
         if (!to.meta.roles.includes(userRole)) {
             // Redirect to dashboard if user doesn't have access
             return next({ name: 'dashboard' });
+        }
+    }
+
+    // Per-user sidebar permissions: Prospects / Customers list
+    if (to.name === 'customers' && auth.isAuthenticated && auth.user) {
+        const t = to.query.type;
+        if (t === 'customer' && !auth.navSectionAllowed('customers')) {
+            return next({ name: auth.user.role?.name === 'Sales' || auth.user.role?.name === 'CallAgent' ? 'sales-dashboard' : 'dashboard' });
+        }
+        if (t === 'prospect' && !auth.navSectionAllowed('prospects')) {
+            return next({ name: auth.user.role?.name === 'Sales' || auth.user.role?.name === 'CallAgent' ? 'sales-dashboard' : 'dashboard' });
         }
     }
 

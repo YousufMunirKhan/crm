@@ -1,25 +1,25 @@
 <template>
-    <div class="max-w-7xl mx-auto p-6 space-y-6">
+    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <!-- Header -->
-        <div class="flex justify-between items-center">
-            <div>
-                <h1 class="text-2xl font-bold text-slate-900">Monthly Expense Report</h1>
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between min-w-0">
+            <div class="min-w-0">
+                <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Monthly Expense Report</h1>
                 <p class="text-sm text-slate-600 mt-1">Detailed breakdown of expenses by currency and category</p>
             </div>
-            <div class="flex gap-3">
-                <div>
+            <div class="flex flex-col sm:flex-row gap-3 sm:items-end w-full lg:w-auto min-w-0">
+                <div class="w-full sm:w-auto min-w-0">
                     <label class="block text-sm font-medium text-slate-700 mb-1">Select Month</label>
                     <input
                         v-model="reportMonth"
                         type="month"
                         @change="loadMonthlyReport"
-                        class="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                        class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
                     />
                 </div>
                 <button
                     v-if="monthlyReport"
                     @click="exportMonthlyReport"
-                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 h-fit mt-6"
+                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 touch-manipulation w-full sm:w-auto shrink-0"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

@@ -16,6 +16,7 @@ use App\Modules\HR\Http\Controllers\ExpenseController;
 use App\Modules\Reporting\Http\Controllers\ReportingController;
 use App\Modules\ImportExport\Http\Controllers\ImportExportController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\RoleController;
 
 // Public routes
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -85,9 +86,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Users Management
     Route::apiResource('users', UserController::class);
-    Route::get('/roles', function () {
-        return response()->json(\App\Models\Role::all());
-    });
+    Route::get('/roles', [RoleController::class, 'index']);
+    Route::patch('/roles/{role}', [RoleController::class, 'update']);
 
     // CRM – static customer paths first so they are not matched as {customer} id
     Route::get('/customers/import-template', [CustomerController::class, 'importTemplate']);

@@ -1,5 +1,5 @@
 <template>
-    <div v-if="pagination && pagination.last_page > 1" class="flex items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
+    <div v-if="pagination && pagination.last_page > 1" class="flex w-full min-w-0 max-w-full items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
         <div class="flex flex-1 justify-between sm:hidden">
             <button
                 @click="$emit('page-change', pagination.current_page - 1)"

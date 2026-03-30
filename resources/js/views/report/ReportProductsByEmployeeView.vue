@@ -1,12 +1,12 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h1 class="text-2xl font-bold text-slate-900">Products Sold by Employee</h1>
             <div class="flex flex-wrap items-center gap-3">
                 <select
                     v-model="selectedEmployeeId"
                     @change="loadData"
-                    class="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[200px]"
+                    class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm sm:min-w-[200px]"
                 >
                     <option value="">Select Employee</option>
                     <option v-for="emp in employees" :key="emp.id" :value="emp.id">
@@ -16,14 +16,14 @@
                 <select
                     v-model="selectedMonth"
                     @change="loadData"
-                    class="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                    class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm"
                 >
                     <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
                 </select>
                 <button
                     @click="loadData"
                     :disabled="loading"
-                    class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50"
+                    class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50 touch-manipulation w-full sm:w-auto text-center"
                 >
                     {{ loading ? 'Loading...' : 'Apply' }}
                 </button>
@@ -54,7 +54,7 @@
                     No products sold by this employee in the selected period.
                 </div>
 
-                <div v-else class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div v-else class="bg-white rounded-xl shadow-sm overflow-hidden min-w-0">
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[600px]">
                             <thead class="bg-slate-50">
@@ -135,7 +135,7 @@ const formatNumber = (n) => new Intl.NumberFormat('en-GB').format(n);
 
 const loadEmployees = async () => {
     try {
-        const res = await axios.get('/api/users');
+        const res = await axios.get('/api/users', { params: { for_sales_report: 1 } });
         employees.value = res.data.data || res.data || [];
     } catch (e) {
         console.error('Failed to load employees:', e);

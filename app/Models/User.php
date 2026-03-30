@@ -31,6 +31,7 @@ class User extends Authenticatable
         'contract_sent_at',
         'contract_pdf_path',
         'is_active',
+        'nav_permissions',
     ];
 
     protected $hidden = [
@@ -46,7 +47,37 @@ class User extends Authenticatable
             'hire_date' => 'date',
             'date_of_birth' => 'date',
             'contract_sent_at' => 'datetime',
+            'nav_permissions' => 'array',
         ];
+    }
+
+    /**
+     * Sidebar section visibility.
+     * User nav_permissions (if set) overrides role nav_permissions (if set); otherwise full menu.
+     * Whitelist: only keys with true are shown. Dashboard always allowed. Admin/System Admin: all sections.
+     */
+    public function allowsNavSection(string $key): bool
+    {
+        if ($key === 'dashboard') {
+            return true;
+        }
+
+        if ($this->isRole('Admin') || $this->isRole('System Admin')) {
+            return true;
+        }
+
+        $userP = $this->nav_permissions;
+        if (is_array($userP) && $userP !== []) {
+            return ! empty($userP[$key]);
+        }
+
+        $this->loadMissing('role');
+        $roleP = $this->role?->nav_permissions;
+        if (is_array($roleP) && $roleP !== []) {
+            return ! empty($roleP[$key]);
+        }
+
+        return true;
     }
 
     public function role(): BelongsTo

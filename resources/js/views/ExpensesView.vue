@@ -1,17 +1,17 @@
 <template>
-    <div class="max-w-7xl mx-auto p-6 space-y-6">
-        <div class="flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-slate-900">Expense Management</h1>
-            <div class="flex gap-2">
+    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Expense Management</h1>
+            <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-start sm:justify-end">
                 <button
                     @click="downloadTemplate"
-                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm touch-manipulation flex-1 min-w-[10rem] sm:flex-initial text-center"
                 >
                     📥 Download Template
                 </button>
                 <button
                     @click="triggerFileInput"
-                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm touch-manipulation flex-1 min-w-[10rem] sm:flex-initial text-center"
                 >
                     📤 Import Expenses
                 </button>
@@ -24,7 +24,7 @@
                 />
                 <button
                     @click="openExpenseForm"
-                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
+                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 touch-manipulation flex-1 min-w-[10rem] sm:flex-initial text-center"
                 >
                     + Add Expense
                 </button>
@@ -32,7 +32,7 @@
         </div>
 
         <!-- Filters -->
-        <div class="bg-white rounded-xl shadow-sm p-4">
+        <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 min-w-0">
             <div class="flex flex-wrap items-center gap-3">
                 <div class="flex items-center gap-2">
                     <label class="text-sm text-slate-600">From:</label>

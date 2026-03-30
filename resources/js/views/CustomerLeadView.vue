@@ -1,5 +1,5 @@
 <template>
-    <div class="min-h-screen bg-slate-50">
+    <div class="min-h-screen bg-slate-50 w-full min-w-0 overflow-x-hidden">
         <!-- Top Navigation Bar -->
         <header class="bg-white border-b border-slate-200 sticky top-0 z-20">
             <div class="px-4 sm:px-6 py-3 sm:py-4">
@@ -20,16 +20,16 @@
                             <span class="text-slate-900 font-semibold sm:font-medium truncate">{{ customer?.name || 'Loading...' }}</span>
                         </nav>
                     </div>
-                    <div class="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                    <div class="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto shrink-0">
                         <router-link
                             :to="`/customers/${customer?.id}/edit`"
-                            class="px-3 sm:px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700"
+                            class="px-3 sm:px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 touch-manipulation text-center flex-1 sm:flex-initial min-w-[8rem]"
                         >
                             Edit Customer
                         </router-link>
                         <button
                             @click="logout"
-                            class="px-3 sm:px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800"
+                            class="px-3 sm:px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 touch-manipulation flex-1 sm:flex-initial min-w-[8rem]"
                         >
                             Logout
                         </button>
@@ -39,12 +39,12 @@
         </header>
 
         <!-- Main Content -->
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 w-full min-w-0">
             <!-- Customer Header (compact) -->
             <div class="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 sm:p-5 mb-4 sm:mb-6">
                 <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-                    <div>
-                        <h1 class="text-xl sm:text-2xl font-bold text-slate-900">{{ customer?.name }}</h1>
+                    <div class="min-w-0">
+                        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 break-words">{{ customer?.name }}</h1>
                         <p class="text-sm text-slate-500 mt-0.5">{{ customer?.business_name || '—' }}</p>
                         <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-slate-600">
                             <span v-if="customer?.email">{{ customer.email }}</span>
@@ -265,10 +265,10 @@
                                 <div
                                     v-for="item in activeLead.items"
                                     :key="item.id"
-                                    class="flex items-center justify-between p-3 rounded-lg"
+                                    class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg min-w-0"
                                     :class="getItemStatusClass(item.status)"
                                 >
-                                    <div class="flex items-center gap-3">
+                                    <div class="flex items-center gap-3 min-w-0 flex-1">
                                         <span v-if="item.status === 'won'" class="text-green-600">✓</span>
                                         <span v-else-if="item.status === 'lost'" class="text-red-600">✗</span>
                                         <span v-else class="text-amber-600">○</span>
@@ -279,21 +279,21 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div v-if="item.status === 'pending'" class="flex gap-2">
+                                    <div v-if="item.status === 'pending'" class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
                                         <button
                                             @click="openCloseItemModal(activeLead, item, 'won')"
-                                            class="px-3 py-1 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                            class="px-3 py-1 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 touch-manipulation"
                                         >
                                             Won
                                         </button>
                                         <button
                                             @click="openCloseItemModal(activeLead, item, 'lost')"
-                                            class="px-3 py-1 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700"
+                                            class="px-3 py-1 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 touch-manipulation"
                                         >
                                             Lost
                                         </button>
                                     </div>
-                                    <span v-else class="text-xs px-2 py-1 rounded" :class="item.status === 'won' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+                                    <span v-else class="text-xs px-2 py-1 rounded shrink-0" :class="item.status === 'won' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
                                         {{ item.status.toUpperCase() }}
                                     </span>
                                 </div>
@@ -394,7 +394,7 @@
 
             <!-- Tickets & Invoices -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
-                <div class="bg-white rounded-xl shadow-sm p-6">
+                <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
                     <h3 class="text-lg font-semibold text-slate-700 mb-4">Tickets</h3>
                     <div v-if="tickets.length === 0" class="text-center py-8 text-slate-400 text-sm">
                         No tickets yet
@@ -403,20 +403,20 @@
                         <li
                             v-for="t in tickets"
                             :key="t.id"
-                            class="flex justify-between items-start p-3 bg-slate-50 rounded-lg"
+                            class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between p-3 bg-slate-50 rounded-lg min-w-0"
                         >
-                            <div>
+                            <div class="min-w-0 flex-1">
                                 <div class="font-medium text-slate-900">{{ t.ticket_number }}</div>
-                                <div class="text-sm text-slate-600 mt-1">{{ t.subject }}</div>
+                                <div class="text-sm text-slate-600 mt-1 break-words">{{ t.subject }}</div>
                             </div>
-                            <span class="text-xs px-2 py-1 rounded" :class="getStatusClass(t.status)">
+                            <span class="text-xs px-2 py-1 rounded shrink-0 self-start" :class="getStatusClass(t.status)">
                                 {{ t.status }}
                             </span>
                         </li>
                     </ul>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm p-6">
+                <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
                     <h3 class="text-lg font-semibold text-slate-700 mb-4">Invoices</h3>
                     <div v-if="invoices.length === 0" class="text-center py-8 text-slate-400 text-sm">
                         No invoices yet
@@ -425,13 +425,13 @@
                         <li
                             v-for="inv in invoices"
                             :key="inv.id"
-                            class="flex justify-between items-start p-3 bg-slate-50 rounded-lg"
+                            class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between p-3 bg-slate-50 rounded-lg min-w-0"
                         >
-                            <div>
+                            <div class="min-w-0 flex-1">
                                 <div class="font-medium text-slate-900">{{ inv.invoice_number }}</div>
                                 <div class="text-sm text-slate-600 mt-1">{{ formatDate(inv.invoice_date) }}</div>
                             </div>
-                            <div class="text-right">
+                            <div class="text-left sm:text-right shrink-0">
                                 <div class="font-medium text-slate-900">£{{ formatNumber(inv.total) }}</div>
                                 <div class="text-xs text-slate-500 mt-1">{{ inv.status }}</div>
                             </div>

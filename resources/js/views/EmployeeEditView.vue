@@ -1,16 +1,18 @@
 <template>
-    <div class="max-w-4xl mx-auto p-4 lg:p-6 space-y-6">
-        <div class="flex items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
+    <div class="w-full min-w-0 max-w-4xl mx-auto p-3 sm:p-4 lg:p-6 space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
+            <div class="flex items-center gap-2 min-w-0">
                 <button
                     @click="$router.back()"
-                    class="p-2 hover:bg-slate-100 rounded-lg transition"
+                    class="p-2 hover:bg-slate-100 rounded-lg transition touch-manipulation shrink-0"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
                 </button>
-                <h1 class="text-xl lg:text-2xl font-bold text-slate-900">Edit Employee</h1>
+                <h1 class="text-xl lg:text-2xl font-bold text-slate-900">
+                    {{ isSelfHrOnly ? 'Bank details & documents' : 'Edit Employee' }}
+                </h1>
             </div>
         </div>
 
@@ -20,11 +22,22 @@
 
         <form
             v-else
-            class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-6 space-y-6"
+            class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-6 space-y-6 min-w-0"
             @submit.prevent="handleSubmit"
         >
+            <div
+                v-if="isSelfHrOnly"
+                class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"
+            >
+                <p class="font-medium text-slate-900">Signed in as {{ form.name || '—' }}</p>
+                <p class="text-slate-600">{{ form.email }}</p>
+                <p class="text-xs text-slate-500 mt-2">
+                    Update your bank details and upload HR documents here. For name, role, or other changes, contact HR.
+                </p>
+            </div>
+
             <!-- Personal details -->
-            <div class="space-y-4">
+            <div v-if="!isSelfHrOnly" class="space-y-4">
                 <h2 class="text-sm font-semibold text-slate-900">Personal details</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -73,7 +86,7 @@
             </div>
 
             <!-- Job & access -->
-            <div class="space-y-4">
+            <div v-if="!isSelfHrOnly" class="space-y-4">
                 <h2 class="text-sm font-semibold text-slate-900">Job & access</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -119,6 +132,39 @@
                             <option :value="false">Inactive</option>
                         </select>
                     </div>
+                </div>
+            </div>
+
+            <div v-if="canEditNavPerms" class="space-y-4 border border-slate-200 rounded-lg p-4 bg-slate-50">
+                <h2 class="text-sm font-semibold text-slate-900">Sidebar menu access</h2>
+                <p class="text-xs text-slate-600">
+                    Leave this off for default role menu. Turn on to limit this user to selected sections.
+                </p>
+                <label class="inline-flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
+                    <input
+                        v-model="restrictMenu"
+                        type="checkbox"
+                        class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Limit sidebar to selected sections only
+                </label>
+                <div
+                    v-if="restrictMenu"
+                    class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-56 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-white"
+                >
+                    <label
+                        v-for="opt in NAV_SECTION_OPTIONS"
+                        v-show="opt.key !== 'dashboard'"
+                        :key="opt.key"
+                        class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
+                    >
+                        <input
+                            v-model="sectionChecks[opt.key]"
+                            type="checkbox"
+                            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        {{ opt.label }}
+                    </label>
                 </div>
             </div>
 
@@ -192,6 +238,15 @@
                             >
                                 View
                             </a>
+                            <button
+                                v-if="canManageDocuments"
+                                type="button"
+                                class="text-red-600 hover:underline text-xs disabled:opacity-50"
+                                :disabled="removingDocId === doc.id"
+                                @click="removeDocument(doc)"
+                            >
+                                {{ removingDocId === doc.id ? 'Removing…' : 'Remove' }}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -247,7 +302,7 @@
             </div>
 
             <!-- Password -->
-            <div class="space-y-2">
+            <div v-if="!isSelfHrOnly" class="space-y-2">
                 <label class="block text-sm font-medium text-slate-700 mb-1">Password (leave blank to keep current)</label>
                 <input
                     v-model="form.password"
@@ -277,14 +332,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
+import { useAuthStore } from '@/stores/auth';
+import { NAV_SECTION_OPTIONS } from '@/constants/navSections';
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToastStore();
+const auth = useAuthStore();
 
 const loading = ref(true);
 const saving = ref(false);
@@ -310,6 +368,35 @@ const queuedDocuments = ref([]);
 const newDocName = ref('');
 const fileInput = ref(null);
 const documents = ref([]);
+const restrictMenu = ref(false);
+const removingDocId = ref(null);
+
+const isElevatedRole = computed(() => {
+    const r = auth.user?.role?.name;
+    return r === 'Admin' || r === 'Manager' || r === 'System Admin';
+});
+
+const isSelf = computed(() => {
+    if (!auth.user?.id || route.params.id === undefined || route.params.id === '') return false;
+    return Number(route.params.id) === Number(auth.user.id);
+});
+
+/** Non-admin viewing own record: bank + documents only (server enforces the same). */
+const isSelfHrOnly = computed(() => isSelf.value && !isElevatedRole.value);
+
+const canManageDocuments = computed(() => isElevatedRole.value || isSelf.value);
+
+function defaultSectionChecks() {
+    const out = {};
+    for (const { key } of NAV_SECTION_OPTIONS) out[key] = true;
+    return out;
+}
+const sectionChecks = ref(defaultSectionChecks());
+
+const canEditNavPerms = computed(() => {
+    const r = auth.user?.role?.name;
+    return r === 'Admin' || r === 'System Admin';
+});
 
 const loadRoles = async () => {
     try {
@@ -340,6 +427,16 @@ const loadEmployee = async () => {
             bank_sort_code: data.bank_sort_code || '',
             bank_account_number: data.bank_account_number || '',
         };
+        const np = data.nav_permissions;
+        if (np && typeof np === 'object' && Object.keys(np).length > 0) {
+            restrictMenu.value = true;
+            const checks = defaultSectionChecks();
+            for (const key of Object.keys(checks)) checks[key] = !!np[key];
+            sectionChecks.value = checks;
+        } else {
+            restrictMenu.value = false;
+            sectionChecks.value = defaultSectionChecks();
+        }
 
         // Load existing documents for this employee
         try {
@@ -368,17 +465,41 @@ const formatDate = (date) => {
 const handleSubmit = async () => {
     saving.value = true;
     try {
-        const payload = { ...form.value };
-        if (!payload.password) {
-            delete payload.password;
+        let payload;
+        if (isSelfHrOnly.value) {
+            payload = {
+                bank_account_name: form.value.bank_account_name || null,
+                bank_name: form.value.bank_name || null,
+                bank_sort_code: form.value.bank_sort_code || null,
+                bank_account_number: form.value.bank_account_number || null,
+            };
+        } else {
+            payload = { ...form.value };
+            if (!payload.password) {
+                delete payload.password;
+            }
+            if (!payload.employee_type) payload.employee_type = null;
+            if (!payload.phone) payload.phone = null;
+            if (!payload.address) payload.address = null;
+            if (!payload.hire_date) payload.hire_date = null;
+            if (!payload.date_of_birth) payload.date_of_birth = null;
+            if (canEditNavPerms.value) {
+                if (restrictMenu.value) {
+                    const nav_permissions = {};
+                    for (const { key } of NAV_SECTION_OPTIONS) {
+                        nav_permissions[key] = !!sectionChecks.value[key];
+                    }
+                    payload.nav_permissions = nav_permissions;
+                } else {
+                    payload.nav_permissions = null;
+                }
+            }
         }
-        if (!payload.employee_type) payload.employee_type = null;
-        if (!payload.phone) payload.phone = null;
-        if (!payload.address) payload.address = null;
-        if (!payload.hire_date) payload.hire_date = null;
-        if (!payload.date_of_birth) payload.date_of_birth = null;
 
         await axios.put(`/api/users/${route.params.id}`, payload);
+        if (route.params.id == auth.user?.id) {
+            await auth.bootstrap();
+        }
 
         // Upload any queued documents
         if (queuedDocuments.value.length) {
@@ -396,8 +517,15 @@ const handleSubmit = async () => {
             }
         }
 
-        toast.success('Employee updated.');
-        router.push('/employees');
+        toast.success(isSelfHrOnly.value ? 'Saved.' : 'Employee updated.');
+        if (isSelfHrOnly.value) {
+            const role = auth.user?.role?.name;
+            router.push({
+                name: role === 'Sales' || role === 'CallAgent' ? 'sales-dashboard' : 'dashboard',
+            });
+        } else {
+            router.push('/employees');
+        }
     } catch (e) {
         console.error('Failed to save employee', e);
         let msg = 'Failed to save employee';
@@ -412,8 +540,25 @@ const handleSubmit = async () => {
     }
 };
 
+const removeDocument = async (doc) => {
+    if (!canManageDocuments.value) return;
+    if (!window.confirm('Remove this document?')) return;
+    removingDocId.value = doc.id;
+    try {
+        await axios.delete(`/api/hr/employees/${route.params.id}/documents/${doc.id}`);
+        documents.value = documents.value.filter((d) => d.id !== doc.id);
+        toast.success('Document removed');
+    } catch (e) {
+        toast.error(e.response?.data?.message || 'Could not remove document');
+    } finally {
+        removingDocId.value = null;
+    }
+};
+
 onMounted(async () => {
-    await loadRoles();
+    if (!isSelfHrOnly.value) {
+        await loadRoles();
+    }
     await loadEmployee();
 });
 

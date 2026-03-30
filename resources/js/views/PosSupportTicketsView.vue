@@ -1,7 +1,7 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
-        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div>
+    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 min-w-0">
+            <div class="min-w-0">
                 <h1 class="text-xl sm:text-2xl font-bold text-slate-900">POS support</h1>
                 <p class="text-sm text-slate-600 mt-1">
                     Technical issues reported from desktop POS (ingested via API).
@@ -9,7 +9,7 @@
             </div>
             <select
                 v-model="statusFilter"
-                class="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm"
                 @change="loadItems(1)"
             >
                 <option value="">All statuses</option>
@@ -19,7 +19,7 @@
             </select>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm overflow-x-auto">
+        <div class="bg-white rounded-xl shadow-sm overflow-x-auto min-w-0">
             <table class="w-full min-w-[900px]">
                 <thead class="bg-slate-50">
                     <tr>
@@ -68,7 +68,7 @@
                 >Previous</button>
                 <button
                     type="button"
-                    class="px-3 py-1 border rounded-lg disabled:opacity-40"
+                    class="px-3 py-1 border rounded-lg disabled:opacity-40 touch-manipulation"
                     :disabled="pagination.current_page >= pagination.last_page"
                     @click="loadItems(pagination.current_page + 1)"
                 >Next</button>

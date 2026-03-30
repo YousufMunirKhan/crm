@@ -12,6 +12,22 @@ export const useAuthStore = defineStore('auth', {
     getters: {
         isAuthenticated: (state) => !!state.user && !!state.token,
         role: (state) => state.user?.role?.name ?? null,
+        /** User nav_permissions override role nav_permissions; either whitelist when set. Dashboard always allowed. */
+        navSectionAllowed: (state) => (sectionKey) => {
+            if (!state.user || !sectionKey) return true;
+            if (sectionKey === 'dashboard') return true;
+            const roleName = state.user.role?.name;
+            if (roleName === 'Admin' || roleName === 'System Admin') return true;
+            const userP = state.user.nav_permissions;
+            if (userP && typeof userP === 'object' && Object.keys(userP).length > 0) {
+                return !!userP[sectionKey];
+            }
+            const roleP = state.user.role?.nav_permissions;
+            if (roleP && typeof roleP === 'object' && Object.keys(roleP).length > 0) {
+                return !!roleP[sectionKey];
+            }
+            return true;
+        },
     },
 
     actions: {
