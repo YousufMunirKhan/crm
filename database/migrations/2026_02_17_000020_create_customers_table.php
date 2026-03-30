@@ -1,0 +1,33 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('customers', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('phone')->index();
+            $table->string('email')->nullable()->index();
+            $table->string('address')->nullable();
+            $table->string('postcode', 20)->nullable()->index();
+            $table->string('city', 100)->nullable()->index();
+            $table->string('vat_number', 50)->nullable()->index();
+            $table->text('notes')->nullable();
+            $table->decimal('latitude', 10, 7)->nullable();
+            $table->decimal('longitude', 10, 7)->nullable();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('customers');
+    }
+};
+
+

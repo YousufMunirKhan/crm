@@ -1,0 +1,40 @@
+# WhatsApp Business API Configuration
+# Add these to your .env file
+
+# API Version (you're using v22.0)
+WHATSAPP_API_URL=https://graph.facebook.com/v22.0
+
+# Phone Number ID (from Meta App → WhatsApp → API Setup)
+WHATSAPP_PHONE_NUMBER_ID=397428073449586
+
+# WhatsApp Business Account ID (optional, for reference)
+WHATSAPP_BUSINESS_ACCOUNT_ID=383539848172438
+
+# Access Token (from Meta App → WhatsApp → API Setup)
+# Replace <access token> with your actual token from the curl example
+WHATSAPP_ACCESS_TOKEN=<access token>
+
+# App Secret (from Meta App → Settings → Basic)
+# Click "Show" button to reveal it
+WHATSAPP_APP_SECRET=your_app_secret_here
+
+# Verify Token (create a custom random string - not from Meta)
+# Example: Generate a secure random string (at least 32 characters)
+WHATSAPP_VERIFY_TOKEN=your_custom_verify_token_here
+
+# ============================================
+# INSTRUCTIONS:
+# ============================================
+# 1. Copy the Access Token from your curl command
+#    (Replace <access token> with the actual token)
+#
+# 2. Get App Secret from:
+#    Meta App → Settings → Basic → App Secret (click Show)
+#
+# 3. Create Verify Token:
+#    Any secure random string (e.g., use: https://randomkeygen.com/)
+#    Or generate: MySecureToken2024!@#$%^&*
+#
+# 4. Once all values are filled, save this file and add to .env
+#    Or copy the values directly to your .env file
+

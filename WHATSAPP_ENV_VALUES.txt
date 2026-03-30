@@ -1,0 +1,23 @@
+# WhatsApp Business API Configuration
+# Copy these values to your .env file
+
+WHATSAPP_API_URL=https://graph.facebook.com/v22.0
+WHATSAPP_PHONE_NUMBER_ID=397428073449586
+WHATSAPP_BUSINESS_ACCOUNT_ID=383539848172438
+WHATSAPP_ACCESS_TOKEN=EAANwuZCENv0oBQzn1PcHTIttanhni9yKyWzUdYcvfGaZCJAKS8ZCUGZCWOgj0av6Uis1UDj8ZAZAPbGtejLcPWe46A3vOxfmN6WAA3ZBnCugTJIDNzkLU2OtcS4uWfRw5xWYnAlzuW1Qq3eviTiRdWb3fZC4pKSLyHroEZB8pg03dp9IxZCNZAp77bWyZBIG5HaJig723ZC1sNx4pWCPR97ydFKKFVnnz7VZAxXUlFJkH4AuGBy5NZAt8XcizWpzOdl2Dciqkch3AwvnOfdofyuv1UEiyRRjTo8
+WHATSAPP_APP_SECRET=c59623cfaeb15159f9a3e8f957123626
+WHATSAPP_VERIFY_TOKEN=SwitchSaveCRM2024SecureVerifyToken!@#$%^&*
+
+# ============================================
+# INSTRUCTIONS:
+# ============================================
+# 1. Open your .env file in the project root
+# 2. Add or update the above lines
+# 3. The VERIFY_TOKEN above is a generated secure token
+#    You can change it to any secure random string if you prefer
+# 4. Save the .env file
+# 5. Restart your Laravel application/server if needed
+
+# Note: App ID is not needed for WhatsApp API, but kept for reference:
+# APP_ID=968377435537226
+
