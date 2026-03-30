@@ -10,7 +10,7 @@ class PosSupportTicketAdminController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        if (!$user->isRole('Admin') && !$user->isRole('Manager') && !$user->isRole('System Admin')) {
+        if (! $user->allowsNavSection('pos_support')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -33,7 +33,7 @@ class PosSupportTicketAdminController extends Controller
     public function updateStatus(Request $request, int $id)
     {
         $user = $request->user();
-        if (!$user->isRole('Admin') && !$user->isRole('Manager') && !$user->isRole('System Admin')) {
+        if (! $user->allowsNavSection('pos_support')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 

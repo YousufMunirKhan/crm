@@ -181,7 +181,7 @@ const navItems = computed(() => {
         { to: '/leads/pipeline', label: 'Lead Pipeline', section: 'leads_pipeline' },
         { to: '/products', label: 'Products', section: 'products' },
         { to: '/tickets', label: 'Tickets', section: 'tickets' },
-        ...(isAdmin ? [{ to: '/pos-support', label: 'POS Support', section: 'pos_support' }] : []),
+        { to: '/pos-support', label: 'POS Support', section: 'pos_support' },
         { to: '/invoices', label: 'Invoices', section: 'invoices' },
     );
 

@@ -95,7 +95,7 @@ const routes = [
         path: '/pos-support',
         name: 'pos-support',
         component: () => import('@/views/PosSupportTicketsView.vue'),
-        meta: { requiresAuth: true, title: 'POS Support', roles: ['Admin', 'Manager', 'System Admin'] },
+        meta: { requiresAuth: true, title: 'POS Support' },
     },
     {
         path: '/invoices',
@@ -342,6 +342,14 @@ router.beforeEach(async (to, from, next) => {
         if (!to.meta.roles.includes(userRole)) {
             // Redirect to dashboard if user doesn't have access
             return next({ name: 'dashboard' });
+        }
+    }
+
+    // Per-user sidebar permissions: POS Support (nav section pos_support)
+    if (to.name === 'pos-support' && auth.isAuthenticated && auth.user) {
+        if (!auth.navSectionAllowed('pos_support')) {
+            const r = auth.user.role?.name;
+            return next({ name: r === 'Sales' || r === 'CallAgent' ? 'sales-dashboard' : 'dashboard' });
         }
     }
 
