@@ -5,6 +5,7 @@ namespace App\Modules\Communication\Services;
 use App\Modules\Communication\Models\WhatsAppConversation;
 use App\Modules\Communication\Models\WhatsAppMessage;
 use App\Modules\Communication\Models\WhatsAppSetting;
+use App\Modules\Communication\Models\WhatsAppTemplate;
 use App\Modules\CRM\Models\Customer;
 use Illuminate\Support\Facades\Log;
 
@@ -76,6 +77,111 @@ class WhatsAppServiceV2
     }
 
     /**
+     * Build Cloud API template.components from synced template JSON + user params.
+     * Returns null if the template has no variable placeholders (Meta: omit "components").
+     *
+     * @param  array<int, array<string, mixed>>|null  $componentsJson
+     * @return array<int, array<string, mixed>>|null
+     */
+    private function buildTemplateComponentsForSend(?array $componentsJson, array $templateParams): ?array
+    {
+        if (empty($componentsJson)) {
+            return null;
+        }
+
+        $byType = [];
+        foreach ($componentsJson as $c) {
+            $t = strtoupper((string) ($c['type'] ?? ''));
+            if ($t === 'HEADER' || $t === 'BODY') {
+                $byType[$t] = $c;
+            }
+        }
+
+        $queue = array_values($templateParams);
+        $out = [];
+
+        foreach (['HEADER', 'BODY'] as $slot) {
+            if (!isset($byType[$slot])) {
+                continue;
+            }
+            $c = $byType[$slot];
+            $apiType = $slot === 'HEADER' ? 'header' : 'body';
+
+            if ($slot === 'HEADER') {
+                $format = strtoupper((string) ($c['format'] ?? 'TEXT'));
+                if ($format !== 'TEXT') {
+                    continue;
+                }
+            }
+
+            $text = (string) ($c['text'] ?? '');
+            if ($text === '' || !preg_match_all('/\{\{([^}]+)\}\}/', $text, $matches, PREG_SET_ORDER)) {
+                continue;
+            }
+
+            $parameters = $this->placeholderRowsToParameters($matches, $templateParams, $queue);
+            $out[] = [
+                'type' => $apiType,
+                'parameters' => $parameters,
+            ];
+        }
+
+        return $out === [] ? null : $out;
+    }
+
+    /**
+     * @param  array<int, array<int, string>>  $pregSetOrder  matches from PREG_SET_ORDER
+     * @param  array<int|string, mixed>  $templateParams
+     * @param  array<int, mixed>  $queue  consumed for positional params (by appearance order)
+     * @return array<int, array<string, mixed>>
+     */
+    private function placeholderRowsToParameters(array $pregSetOrder, array $templateParams, array &$queue): array
+    {
+        $placeholders = array_map(static fn ($m) => trim($m[1]), $pregSetOrder);
+
+        $hasNumeric = false;
+        $hasNamed = false;
+        foreach ($placeholders as $ph) {
+            if (preg_match('/^\d+$/', $ph)) {
+                $hasNumeric = true;
+            } else {
+                $hasNamed = true;
+            }
+        }
+
+        if ($hasNumeric && $hasNamed) {
+            throw new \InvalidArgumentException('Template mixes {{1}}-style and {{name}}-style placeholders in the same component; fix the template in Meta or send valid parameters.');
+        }
+
+        $parameters = [];
+        if ($hasNamed) {
+            foreach ($placeholders as $name) {
+                $val = $templateParams[$name]
+                    ?? $templateParams[mb_strtolower($name)]
+                    ?? $templateParams[mb_strtoupper($name)]
+                    ?? '';
+                $parameters[] = [
+                    'type' => 'text',
+                    'parameter_name' => $name,
+                    'text' => (string) $val,
+                ];
+            }
+
+            return $parameters;
+        }
+
+        foreach ($placeholders as $_) {
+            $val = array_shift($queue);
+            $parameters[] = [
+                'type' => 'text',
+                'text' => (string) ($val ?? ''),
+            ];
+        }
+
+        return $parameters;
+    }
+
+    /**
      * Send template message (can be sent outside window)
      */
     public function sendTemplateMessage(
@@ -95,26 +201,25 @@ class WhatsAppServiceV2
 
         $conversation = $this->windowService->getOrCreateConversation($customer, $phoneE164);
 
-        // Build template payload
-        $components = [];
-        if (!empty($templateParams)) {
-            $components[] = [
-                'type' => 'body',
-                'parameters' => array_map(function ($param) {
-                    return ['type' => 'text', 'text' => $param];
-                }, $templateParams),
-            ];
+        $templateModel = WhatsAppTemplate::where('name', $templateName)->first();
+        $lang = $templateModel?->language ?: $language ?: 'en_US';
+        $componentsJson = is_array($templateModel?->components_json) ? $templateModel->components_json : null;
+
+        $components = $this->buildTemplateComponentsForSend($componentsJson, $templateParams);
+
+        $templateBlock = [
+            'name' => $templateName,
+            'language' => ['code' => $lang],
+        ];
+        if ($components !== null) {
+            $templateBlock['components'] = $components;
         }
 
         $payload = [
             'messaging_product' => 'whatsapp',
             'to' => $phoneE164,
             'type' => 'template',
-            'template' => [
-                'name' => $templateName,
-                'language' => ['code' => $language],
-                'components' => $components,
-            ],
+            'template' => $templateBlock,
         ];
 
         // Send via API
