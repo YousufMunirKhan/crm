@@ -658,8 +658,14 @@
                     </div>
 
                     <div v-if="whatsappCloudTestResult" class="p-4 rounded-lg" :class="whatsappCloudTestResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'">
-                        <p class="text-sm" :class="whatsappCloudTestResult.success ? 'text-green-800' : 'text-red-800'">
+                        <p class="text-sm whitespace-pre-wrap break-words" :class="whatsappCloudTestResult.success ? 'text-green-800' : 'text-red-800'">
                             {{ whatsappCloudTestResult.message }}
+                        </p>
+                        <p
+                            v-if="!whatsappCloudTestResult.success && whatsappCloudTestResult.hint"
+                            class="mt-2 text-xs text-red-700 whitespace-pre-wrap break-words"
+                        >
+                            Hint: {{ whatsappCloudTestResult.hint }}
                         </p>
                     </div>
                 </div>
@@ -1214,11 +1220,14 @@ const testWhatsappCloudConnection = async () => {
         };
         toast.success('Connection test successful');
     } catch (error) {
+        const serverMessage = error.response?.data?.message || 'Connection test failed';
+        const serverHint = error.response?.data?.hint || '';
         whatsappCloudTestResult.value = {
             success: false,
-            message: error.response?.data?.message || 'Connection test failed'
+            message: serverMessage,
+            hint: serverHint,
         };
-        toast.error('Connection test failed');
+        toast.error(serverMessage);
     } finally {
         testingWhatsappCloud.value = false;
     }

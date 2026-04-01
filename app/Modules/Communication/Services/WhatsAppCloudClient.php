@@ -107,8 +107,22 @@ class WhatsAppCloudClient
             ]);
 
             if ($response->failed()) {
-                $errorMessage = $responseData['error']['message'] ?? 'Unknown error';
-                throw new \Exception("WhatsApp API error: {$errorMessage}");
+                $error = $responseData['error'] ?? [];
+                $errorMessage = $error['message'] ?? 'Unknown error';
+                $errorCode = $error['code'] ?? null;
+                $errorType = $error['type'] ?? null;
+                $errorSubcode = $error['error_subcode'] ?? null;
+                $fbTraceId = $error['fbtrace_id'] ?? null;
+                $parts = [
+                    "WhatsApp API HTTP {$statusCode}",
+                    $errorType ? "type={$errorType}" : null,
+                    $errorCode !== null ? "code={$errorCode}" : null,
+                    $errorSubcode !== null ? "subcode={$errorSubcode}" : null,
+                    "message={$errorMessage}",
+                    $fbTraceId ? "fbtrace_id={$fbTraceId}" : null,
+                ];
+                $parts = array_values(array_filter($parts, fn ($p) => $p !== null && $p !== ''));
+                throw new \Exception(implode(' | ', $parts));
             }
 
             return $responseData;

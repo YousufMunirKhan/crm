@@ -86,6 +86,12 @@ class WhatsAppSettingsController extends Controller
                 'message' => 'Access token or phone number ID is missing',
             ], 400);
         }
+        if (!$settings->waba_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'WABA ID is missing',
+            ], 400);
+        }
 
         try {
             $client = new WhatsAppCloudClient(
@@ -104,6 +110,7 @@ class WhatsAppSettingsController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Connection failed: ' . $e->getMessage(),
+                'hint' => 'Check WABA ID, Phone Number ID, token scopes, and whether app mode/number permissions are correct in Meta.',
             ], 500);
         }
     }
