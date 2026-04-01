@@ -12,6 +12,7 @@ class WhatsAppSetting extends Model
     protected $fillable = [
         'waba_id',
         'phone_number_id',
+        'meta_app_id',
         'access_token_encrypted',
         'verify_token',
         'graph_version',
@@ -24,6 +25,7 @@ class WhatsAppSetting extends Model
 
     protected $hidden = [
         'access_token_encrypted',
+        'meta_app_secret_encrypted',
     ];
 
     /**
@@ -53,6 +55,33 @@ class WhatsAppSetting extends Model
         }
 
         $this->attributes['access_token_encrypted'] = Crypt::encryptString($value);
+    }
+
+    /**
+     * Meta App Secret (for debug_token) — stored encrypted in meta_app_secret_encrypted.
+     */
+    public function getMetaAppSecretAttribute(): ?string
+    {
+        if (empty($this->attributes['meta_app_secret_encrypted'] ?? null)) {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($this->attributes['meta_app_secret_encrypted']);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    public function setMetaAppSecretAttribute(?string $value): void
+    {
+        if ($value === null || $value === '') {
+            $this->attributes['meta_app_secret_encrypted'] = null;
+
+            return;
+        }
+
+        $this->attributes['meta_app_secret_encrypted'] = Crypt::encryptString($value);
     }
 
     /**

@@ -593,6 +593,29 @@
                             <p class="text-xs text-slate-500 mt-1">From Meta Business Dashboard</p>
                         </div>
 
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Meta App ID (optional)</label>
+                            <input
+                                v-model="whatsappCloudSettings.meta_app_id"
+                                type="text"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="From Meta for Developers → App → Basic"
+                            >
+                            <p class="text-xs text-slate-500 mt-1">Used only so &quot;Test connection&quot; can check if your token may send messages</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Meta App Secret (optional)</label>
+                            <input
+                                v-model="whatsappCloudSettings.meta_app_secret"
+                                type="password"
+                                autocomplete="new-password"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Leave blank to keep existing secret"
+                            >
+                            <p class="text-xs text-slate-500 mt-1">Stored encrypted like the access token. Same app as above.</p>
+                        </div>
+
                         <div class="sm:col-span-2">
                             <label class="block text-sm font-medium text-slate-700 mb-1">Access Token *</label>
                             <input
@@ -602,6 +625,9 @@
                                 placeholder="EAAN..."
                             >
                             <p class="text-xs text-slate-500 mt-1">Permanent access token from Meta</p>
+                            <p class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-2">
+                                If sends fail with <strong>(#10) permission</strong>, your token needs <strong>whatsapp_business_messaging</strong> for this Phone Number ID. Fill <strong>Meta App ID</strong> and <strong>Meta App Secret</strong> above, save, then use <strong>Test connection</strong> to confirm send permission (Meta <code class="text-amber-900">debug_token</code>).
+                            </p>
                         </div>
 
                         <div>
@@ -657,16 +683,25 @@
                         </button>
                     </div>
 
-                    <div v-if="whatsappCloudTestResult" class="p-4 rounded-lg" :class="whatsappCloudTestResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'">
-                        <p class="text-sm whitespace-pre-wrap break-words" :class="whatsappCloudTestResult.success ? 'text-green-800' : 'text-red-800'">
+                    <div
+                        v-if="whatsappCloudTestResult"
+                        class="p-4 rounded-lg border"
+                        :class="whatsappCloudTestResultBoxClass"
+                    >
+                        <p class="text-sm whitespace-pre-wrap break-words" :class="whatsappCloudTestResultTextClass">
                             {{ whatsappCloudTestResult.message }}
                         </p>
                         <p
-                            v-if="!whatsappCloudTestResult.success && whatsappCloudTestResult.hint"
-                            class="mt-2 text-xs text-red-700 whitespace-pre-wrap break-words"
+                            v-if="whatsappCloudTestResult.hint"
+                            class="mt-2 text-xs whitespace-pre-wrap break-words"
+                            :class="whatsappCloudTestResult.success ? 'text-amber-900' : 'text-red-700'"
                         >
                             Hint: {{ whatsappCloudTestResult.hint }}
                         </p>
+                        <pre
+                            v-if="whatsappCloudTestResult.token_inspection"
+                            class="mt-3 text-xs bg-white/60 border border-slate-200 rounded p-2 overflow-x-auto max-h-40 text-slate-700"
+                        >{{ JSON.stringify(whatsappCloudTestResult.token_inspection, null, 2) }}</pre>
                     </div>
                 </div>
             </div>
@@ -815,7 +850,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import axios from 'axios';
 import { usePwaStore } from '@/stores/pwa';
 import { useToastStore } from '@/stores/toast';
@@ -833,6 +868,27 @@ const savingWhatsappCloud = ref(false);
 const testingWhatsappCloud = ref(false);
 const whatsappCloudLoading = ref(false);
 const whatsappCloudTestResult = ref(null);
+
+const whatsappCloudTestResultBoxClass = computed(() => {
+    const r = whatsappCloudTestResult.value;
+    if (!r) return '';
+    if (!r.success) return 'bg-red-50 border-red-200';
+    if (r.hint || r.token_inspection?.detail === 'missing_app_credentials' || r.token_inspection?.can_send === null) {
+        return 'bg-amber-50 border-amber-200';
+    }
+    return 'bg-green-50 border-green-200';
+});
+
+const whatsappCloudTestResultTextClass = computed(() => {
+    const r = whatsappCloudTestResult.value;
+    if (!r) return '';
+    if (!r.success) return 'text-red-800';
+    if (r.hint || r.token_inspection?.detail === 'missing_app_credentials' || r.token_inspection?.can_send === null) {
+        return 'text-amber-900';
+    }
+    return 'text-green-800';
+});
+
 const savingFacebook = ref(false);
 const testingSmtp = ref(false);
 const uploadingLogo = ref(false);
@@ -905,6 +961,8 @@ const testingSms = ref(false);
 const whatsappCloudSettings = reactive({
     waba_id: '',
     phone_number_id: '',
+    meta_app_id: '',
+    meta_app_secret: '',
     access_token: '',
     verify_token: '',
     graph_version: 'v20.0',
@@ -992,6 +1050,8 @@ const loadWhatsappCloudSettings = async () => {
         const data = response.data;
         whatsappCloudSettings.waba_id = data.waba_id || '';
         whatsappCloudSettings.phone_number_id = data.phone_number_id || '';
+        whatsappCloudSettings.meta_app_id = data.meta_app_id || '';
+        whatsappCloudSettings.meta_app_secret = '';
         whatsappCloudSettings.verify_token = data.verify_token || '';
         whatsappCloudSettings.graph_version = data.graph_version || 'v20.0';
         whatsappCloudSettings.is_enabled = data.is_enabled || false;
@@ -1215,17 +1275,25 @@ const testWhatsappCloudConnection = async () => {
     try {
         const response = await axios.post('/api/whatsapp/settings/test-connection');
         whatsappCloudTestResult.value = {
-            success: true,
-            message: response.data.message || 'Connection successful!'
+            success: response.data.success !== false,
+            message: response.data.message || 'Connection successful!',
+            hint: response.data.hint || '',
+            token_inspection: response.data.token_inspection || null,
         };
-        toast.success('Connection test successful');
+        if (response.data.hint) {
+            toast.success('Test finished — see note below');
+        } else {
+            toast.success('Connection test successful');
+        }
     } catch (error) {
-        const serverMessage = error.response?.data?.message || 'Connection test failed';
-        const serverHint = error.response?.data?.hint || '';
+        const d = error.response?.data || {};
+        const serverMessage = d.message || 'Connection test failed';
+        const serverHint = d.hint || '';
         whatsappCloudTestResult.value = {
             success: false,
             message: serverMessage,
             hint: serverHint,
+            token_inspection: d.token_inspection || null,
         };
         toast.error(serverMessage);
     } finally {

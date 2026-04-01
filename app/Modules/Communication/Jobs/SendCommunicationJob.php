@@ -73,7 +73,7 @@ class SendCommunicationJob implements ShouldQueue
             (str_contains($m, 'code=10') || str_contains($m, '#10)'))
             && str_contains($m, 'permission')
         ) {
-            return 'Meta blocked this action for your app/token (error 10 = missing permission). Fix in Meta Business / Developer: generate a token with WhatsApp permissions for this Business (whatsapp_business_messaging, whatsapp_business_management), use the same WABA and phone number ID as in CRM, and if the app is still in Development add the customer number under WhatsApp → API setup test list—or go Live with Advanced Access. Then paste a fresh token into CRM and try again.';
+            return 'Meta blocked this action for your app/token (error 10). Most often the token can read templates but cannot send: it needs whatsapp_business_messaging for this exact Phone Number ID. In CRM Settings → WhatsApp, save Meta App ID + Meta App Secret and use Test connection to verify send permission. In Meta: Business Settings → System users (or WhatsApp API setup), assign message-sending access to this number, regenerate a permanent token, paste into CRM. Development mode: add recipient to the WhatsApp test list or go Live.';
         }
         if (str_contains($m, 'template') || str_contains($m, '131047') || str_contains($m, 're-engagement') || str_contains($m, 'outside the 24')) {
             return 'WhatsApp lets you send a normal typed message once this person has recently messaged your business number. For the very first outreach, Meta requires an approved business template (created in Meta Business Suite), then the CRM can send it.';
