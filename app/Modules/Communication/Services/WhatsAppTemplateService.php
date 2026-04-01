@@ -16,6 +16,26 @@ class WhatsAppTemplateService
     private WhatsAppCloudClient $client;
 
     /**
+     * Legacy whatsapp_templates.message column is NOT NULL — derive from Meta BODY component.
+     *
+     * @param  array<int, array<string, mixed>>  $components
+     */
+    private function messageFromComponents(array $components, ?string $fallbackName = null): string
+    {
+        foreach ($components as $component) {
+            if (strtoupper((string) ($component['type'] ?? '')) === 'BODY' && isset($component['text'])) {
+                return (string) $component['text'];
+            }
+        }
+
+        $fallback = $fallbackName !== null && $fallbackName !== ''
+            ? sprintf('[%s]', $fallbackName)
+            : '[WhatsApp template]';
+
+        return $fallback;
+    }
+
+    /**
      * Create template locally and submit to Meta
      */
     public function createTemplate(array $data): WhatsAppTemplate
@@ -25,12 +45,15 @@ class WhatsAppTemplateService
             throw new \Exception('WhatsApp is not enabled or WABA ID not configured');
         }
 
+        $components = $data['components'] ?? [];
+
         // Create template locally
         $template = WhatsAppTemplate::create([
             'name' => $data['name'],
             'category' => $data['category'],
             'language' => $data['language'] ?? 'en_US',
-            'components_json' => $data['components'] ?? [],
+            'components_json' => $components,
+            'message' => $this->messageFromComponents($components, $data['name'] ?? null),
             'status' => 'PENDING',
         ]);
 
@@ -90,15 +113,26 @@ class WhatsAppTemplateService
                         ->orWhere('meta_template_id', $metaTemplate['id'])
                         ->first();
 
+                    $status = strtoupper($metaTemplate['status'] ?? 'PENDING');
+                    $components = $metaTemplate['components'] ?? [];
+                    $payload = [
+                        'meta_template_id' => $metaTemplate['id'] ?? null,
+                        'name' => $metaTemplate['name'] ?? null,
+                        'category' => strtoupper($metaTemplate['category'] ?? 'TRANSACTIONAL'),
+                        'language' => $metaTemplate['language'] ?? 'en_US',
+                        'status' => $status,
+                        'rejection_reason' => $metaTemplate['rejection_reason'] ?? null,
+                        'components_json' => $components,
+                        'message' => $this->messageFromComponents($components, $metaTemplate['name'] ?? null),
+                    ];
+
                     if ($template) {
-                        $status = strtoupper($metaTemplate['status'] ?? 'PENDING');
-                        $template->update([
-                            'meta_template_id' => $metaTemplate['id'],
-                            'status' => $status,
-                            'rejection_reason' => $metaTemplate['rejection_reason'] ?? null,
-                        ]);
-                        $synced++;
+                        $template->update($payload);
+                    } else {
+                        // Create local record for templates that were created directly in Meta.
+                        WhatsAppTemplate::create($payload);
                     }
+                    $synced++;
                 } catch (\Exception $e) {
                     $errors[] = "Failed to sync template {$metaTemplate['name']}: " . $e->getMessage();
                 }

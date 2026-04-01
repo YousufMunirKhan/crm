@@ -20,12 +20,24 @@ class WhatsAppTemplateController extends Controller
     {
         $query = WhatsAppTemplate::query();
 
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
+        if ($request->filled('status')) {
+            $statuses = array_filter(array_map(
+                static fn ($s) => strtoupper(trim((string) $s)),
+                explode(',', (string) $request->get('status'))
+            ));
+            if (!empty($statuses)) {
+                $query->whereIn('status', $statuses);
+            }
         }
 
-        if ($request->has('category')) {
-            $query->where('category', $request->category);
+        if ($request->filled('category')) {
+            $categories = array_filter(array_map(
+                static fn ($c) => strtoupper(trim((string) $c)),
+                explode(',', (string) $request->get('category'))
+            ));
+            if (!empty($categories)) {
+                $query->whereIn('category', $categories);
+            }
         }
 
         $templates = $query->orderBy('created_at', 'desc')
