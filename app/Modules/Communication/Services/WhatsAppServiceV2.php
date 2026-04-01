@@ -80,10 +80,14 @@ class WhatsAppServiceV2
      * Build Cloud API template.components from synced template JSON + user params.
      * Returns null if the template has no variable placeholders (Meta: omit "components").
      *
+     * Meta error #132012 is usually wrong shape: named templates require example.body_text_named_params
+     * order + parameter_name; positional templates must NOT include parameter_name. URL buttons need a
+     * separate "button" component with sub_type url.
+     *
      * @param  array<int, array<string, mixed>>|null  $componentsJson
      * @return array<int, array<string, mixed>>|null
      */
-    private function buildTemplateComponentsForSend(?array $componentsJson, array $templateParams): ?array
+    private function buildTemplateComponentsForSend(?array $componentsJson, array $templateParams, ?string $parameterFormat = null): ?array
     {
         if (empty($componentsJson)) {
             return null;
@@ -100,77 +104,164 @@ class WhatsAppServiceV2
         $queue = array_values($templateParams);
         $out = [];
 
-        foreach (['HEADER', 'BODY'] as $slot) {
-            if (!isset($byType[$slot])) {
-                continue;
+        if (isset($byType['HEADER'])) {
+            $headerParams = $this->buildHeaderParametersForSend($byType['HEADER'], $templateParams, $queue, $parameterFormat);
+            if ($headerParams !== null) {
+                $out[] = ['type' => 'header', 'parameters' => $headerParams];
             }
-            $c = $byType[$slot];
-            $apiType = $slot === 'HEADER' ? 'header' : 'body';
+        }
 
-            if ($slot === 'HEADER') {
-                $format = strtoupper((string) ($c['format'] ?? 'TEXT'));
-                if ($format !== 'TEXT') {
-                    continue;
-                }
+        if (isset($byType['BODY'])) {
+            $bodyParams = $this->buildBodyParametersForSend($byType['BODY'], $templateParams, $queue, $parameterFormat);
+            if ($bodyParams !== null) {
+                $out[] = ['type' => 'body', 'parameters' => $bodyParams];
             }
+        }
 
-            $text = (string) ($c['text'] ?? '');
-            if ($text === '' || !preg_match_all('/\{\{([^}]+)\}\}/', $text, $matches, PREG_SET_ORDER)) {
-                continue;
-            }
-
-            $parameters = $this->placeholderRowsToParameters($matches, $templateParams, $queue);
-            $out[] = [
-                'type' => $apiType,
-                'parameters' => $parameters,
-            ];
+        foreach ($this->buildUrlButtonComponentsForSend($componentsJson, $queue) as $btn) {
+            $out[] = $btn;
         }
 
         return $out === [] ? null : $out;
     }
 
     /**
-     * @param  array<int, array<int, string>>  $pregSetOrder  matches from PREG_SET_ORDER
+     * @param  array<string, mixed>  $c
      * @param  array<int|string, mixed>  $templateParams
-     * @param  array<int, mixed>  $queue  consumed for positional params (by appearance order)
+     * @param  array<int, mixed>  $queue
+     * @return array<int, array<string, mixed>>|null
+     */
+    private function buildHeaderParametersForSend(array $c, array $templateParams, array &$queue, ?string $parameterFormat = null): ?array
+    {
+        $format = strtoupper((string) ($c['format'] ?? 'TEXT'));
+        if ($format !== 'TEXT') {
+            return null;
+        }
+
+        $fmt = $parameterFormat ? strtoupper($parameterFormat) : null;
+
+        if ($fmt !== 'POSITIONAL') {
+            $example = $c['example'] ?? [];
+            $namedDefs = $example['header_text_named_params'] ?? null;
+            if (is_array($namedDefs) && $namedDefs !== []) {
+                $named = $this->namedParametersFromExampleRows($namedDefs, $templateParams);
+                if ($named !== []) {
+                    return $named;
+                }
+            }
+        }
+
+        $text = (string) ($c['text'] ?? '');
+        if ($text === '' || !preg_match_all('/\{\{([^}]+)\}\}/', $text, $matches, PREG_SET_ORDER)) {
+            return null;
+        }
+
+        return $this->positionalParametersFromPlaceholderMatches($matches, $queue);
+    }
+
+    /**
+     * @param  array<string, mixed>  $c
+     * @param  array<int|string, mixed>  $templateParams
+     * @param  array<int, mixed>  $queue
+     * @return array<int, array<string, mixed>>|null
+     */
+    private function buildBodyParametersForSend(array $c, array $templateParams, array &$queue, ?string $parameterFormat = null): ?array
+    {
+        $fmt = $parameterFormat ? strtoupper($parameterFormat) : null;
+
+        if ($fmt === 'POSITIONAL') {
+            $text = (string) ($c['text'] ?? '');
+            if ($text === '' || !preg_match_all('/\{\{([^}]+)\}\}/', $text, $matches, PREG_SET_ORDER)) {
+                return null;
+            }
+
+            return $this->positionalParametersFromPlaceholderMatches($matches, $queue);
+        }
+
+        $example = $c['example'] ?? [];
+        $namedDefs = $example['body_text_named_params'] ?? null;
+        if (is_array($namedDefs) && $namedDefs !== []) {
+            $named = $this->namedParametersFromExampleRows($namedDefs, $templateParams);
+            if ($named !== []) {
+                return $named;
+            }
+        }
+
+        $text = (string) ($c['text'] ?? '');
+        if ($text === '' || !preg_match_all('/\{\{([^}]+)\}\}/', $text, $matches, PREG_SET_ORDER)) {
+            return null;
+        }
+
+        $placeholders = array_map(static fn ($m) => trim($m[1]), $matches);
+        $allNumeric = true;
+        foreach ($placeholders as $ph) {
+            if (!preg_match('/^\d+$/', $ph)) {
+                $allNumeric = false;
+                break;
+            }
+        }
+
+        if ($allNumeric) {
+            return $this->positionalParametersFromPlaceholderMatches($matches, $queue);
+        }
+
+        // Named placeholders in body text (no body_text_named_params in sync payload): send parameter_name.
+        $parameters = [];
+        foreach ($placeholders as $name) {
+            $val = $templateParams[$name]
+                ?? $templateParams[mb_strtolower($name)]
+                ?? $templateParams[mb_strtoupper($name)]
+                ?? '';
+            $parameters[] = [
+                'type' => 'text',
+                'parameter_name' => $name,
+                'text' => (string) $val,
+            ];
+        }
+
+        return $parameters;
+    }
+
+    /**
+     * @param  array<int, mixed>  $namedDefs
+     * @param  array<int|string, mixed>  $templateParams
      * @return array<int, array<string, mixed>>
      */
-    private function placeholderRowsToParameters(array $pregSetOrder, array $templateParams, array &$queue): array
+    private function namedParametersFromExampleRows(array $namedDefs, array $templateParams): array
     {
-        $placeholders = array_map(static fn ($m) => trim($m[1]), $pregSetOrder);
-
-        $hasNumeric = false;
-        $hasNamed = false;
-        foreach ($placeholders as $ph) {
-            if (preg_match('/^\d+$/', $ph)) {
-                $hasNumeric = true;
-            } else {
-                $hasNamed = true;
-            }
-        }
-
-        if ($hasNumeric && $hasNamed) {
-            throw new \InvalidArgumentException('Template mixes {{1}}-style and {{name}}-style placeholders in the same component; fix the template in Meta or send valid parameters.');
-        }
-
         $parameters = [];
-        if ($hasNamed) {
-            foreach ($placeholders as $name) {
-                $val = $templateParams[$name]
-                    ?? $templateParams[mb_strtolower($name)]
-                    ?? $templateParams[mb_strtoupper($name)]
-                    ?? '';
-                $parameters[] = [
-                    'type' => 'text',
-                    'parameter_name' => $name,
-                    'text' => (string) $val,
-                ];
+        foreach ($namedDefs as $entry) {
+            if (!is_array($entry)) {
+                continue;
             }
-
-            return $parameters;
+            $pname = $entry['param_name'] ?? $entry['name'] ?? null;
+            if ($pname === null || $pname === '') {
+                continue;
+            }
+            $pname = (string) $pname;
+            $val = $templateParams[$pname]
+                ?? $templateParams[mb_strtolower($pname)]
+                ?? $templateParams[mb_strtoupper($pname)]
+                ?? '';
+            $parameters[] = [
+                'type' => 'text',
+                'parameter_name' => $pname,
+                'text' => (string) $val,
+            ];
         }
 
-        foreach ($placeholders as $_) {
+        return $parameters;
+    }
+
+    /**
+     * @param  array<int, array<int, string>>  $pregSetOrder
+     * @param  array<int, mixed>  $queue
+     * @return array<int, array<string, mixed>>
+     */
+    private function positionalParametersFromPlaceholderMatches(array $pregSetOrder, array &$queue): array
+    {
+        $parameters = [];
+        foreach ($pregSetOrder as $_) {
             $val = array_shift($queue);
             $parameters[] = [
                 'type' => 'text',
@@ -179,6 +270,56 @@ class WhatsAppServiceV2
         }
 
         return $parameters;
+    }
+
+    /**
+     * URL buttons with {{...}} in the URL need a button component (positional text params, no parameter_name).
+     *
+     * @param  array<int, array<string, mixed>>  $componentsJson
+     * @param  array<int, mixed>  $queue
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildUrlButtonComponentsForSend(array $componentsJson, array &$queue): array
+    {
+        $out = [];
+        foreach ($componentsJson as $c) {
+            if (strtoupper((string) ($c['type'] ?? '')) !== 'BUTTONS') {
+                continue;
+            }
+            $buttons = $c['buttons'] ?? [];
+            if (!is_array($buttons)) {
+                continue;
+            }
+            foreach (array_values($buttons) as $idx => $btn) {
+                if (!is_array($btn)) {
+                    continue;
+                }
+                if (strtoupper((string) ($btn['type'] ?? '')) !== 'URL') {
+                    continue;
+                }
+                $url = (string) ($btn['url'] ?? '');
+                if ($url === '' || !preg_match_all('/\{\{[^}]+\}\}/', $url, $varMatches)) {
+                    continue;
+                }
+                $n = count($varMatches[0]);
+                $params = [];
+                for ($i = 0; $i < $n; $i++) {
+                    $val = array_shift($queue);
+                    $params[] = [
+                        'type' => 'text',
+                        'text' => (string) ($val ?? ''),
+                    ];
+                }
+                $out[] = [
+                    'type' => 'button',
+                    'sub_type' => 'url',
+                    'index' => (string) $idx,
+                    'parameters' => $params,
+                ];
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -205,7 +346,11 @@ class WhatsAppServiceV2
         $lang = $templateModel?->language ?: $language ?: 'en_US';
         $componentsJson = is_array($templateModel?->components_json) ? $templateModel->components_json : null;
 
-        $components = $this->buildTemplateComponentsForSend($componentsJson, $templateParams);
+        $components = $this->buildTemplateComponentsForSend(
+            $componentsJson,
+            $templateParams,
+            $templateModel?->parameter_format
+        );
 
         $templateBlock = [
             'name' => $templateName,

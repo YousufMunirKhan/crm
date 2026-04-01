@@ -13,6 +13,7 @@ class WhatsAppTemplate extends Model
         'name',
         'category',
         'language',
+        'parameter_format',
         'components_json',
         'status',
         'rejection_reason',

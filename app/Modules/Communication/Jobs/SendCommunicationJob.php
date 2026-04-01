@@ -78,7 +78,7 @@ class SendCommunicationJob implements ShouldQueue
             return 'Meta rejected the access token. An admin should renew the WhatsApp access token in Meta and update server settings.';
         }
         if (str_contains($m, '132012') || str_contains($m, 'parameter format does not match')) {
-            return 'The send payload did not match this template in Meta (language code, named vs numbered variables, or missing header/body parameters). Sync templates in CRM, pick the exact template language, and pass template_params if the template has {{1}} or {{name}} placeholders.';
+            return 'Meta rejected the template payload (error 132012). Re-sync templates in CRM (WhatsApp Templates → Sync from Meta), then send again. If the template uses named fields from Meta, pass template_params as JSON keys matching those names; if it uses {{1}}, {{2}}, pass a list of values in order. URL buttons with variables need extra values in the same order after body/header.';
         }
 
         return 'WhatsApp could not send. Check the number includes country code (e.g. 447…). If it still fails, see the server log or ask an admin to verify the Meta app and token.';

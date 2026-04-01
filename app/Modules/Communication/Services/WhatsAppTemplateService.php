@@ -101,7 +101,11 @@ class WhatsAppTemplateService
             $this->client->setAccessToken($settings->access_token);
             $this->client->setGraphVersion($settings->graph_version);
 
-            $response = $this->client->listTemplates($settings->waba_id);
+            // Request full components (including `example` / body_text_named_params) or sends hit #132012.
+            $response = $this->client->listTemplates($settings->waba_id, [
+                'fields' => 'name,status,language,category,components,parameter_format,id,rejection_reason',
+                'limit' => '200',
+            ]);
             $metaTemplates = $response['data'] ?? [];
 
             $synced = 0;
@@ -120,6 +124,9 @@ class WhatsAppTemplateService
                         'name' => $metaTemplate['name'] ?? null,
                         'category' => strtoupper($metaTemplate['category'] ?? 'TRANSACTIONAL'),
                         'language' => $metaTemplate['language'] ?? 'en_US',
+                        'parameter_format' => isset($metaTemplate['parameter_format'])
+                            ? strtoupper((string) $metaTemplate['parameter_format'])
+                            : null,
                         'status' => $status,
                         'rejection_reason' => $metaTemplate['rejection_reason'] ?? null,
                         'components_json' => $components,
