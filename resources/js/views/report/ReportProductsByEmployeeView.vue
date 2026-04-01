@@ -1,36 +1,33 @@
 <template>
-    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h1 class="text-2xl font-bold text-slate-900">Products Sold by Employee</h1>
-            <div class="flex flex-wrap items-center gap-3">
-                <select
-                    v-model="selectedEmployeeId"
-                    @change="loadData"
-                    class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm sm:min-w-[200px]"
-                >
-                    <option value="">Select Employee</option>
-                    <option v-for="emp in employees" :key="emp.id" :value="emp.id">
-                        {{ emp.name }}
-                    </option>
-                </select>
-                <select
-                    v-model="selectedMonth"
-                    @change="loadData"
-                    class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                >
-                    <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
-                </select>
-                <button
-                    @click="loadData"
-                    :disabled="loading"
-                    class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50 touch-manipulation w-full sm:w-auto text-center"
-                >
-                    {{ loading ? 'Loading...' : 'Apply' }}
+    <ListingPageShell
+        title="Products sold by employee"
+        subtitle="Per-employee product lines and revenue for a selected month."
+        :badge="productsReportBadge"
+    >
+        <template #filters>
+            <div class="flex flex-col lg:flex-row lg:flex-wrap gap-3 lg:items-end">
+                <div class="w-full lg:w-auto lg:min-w-[12rem]">
+                    <label class="listing-label">Employee</label>
+                    <select v-model="selectedEmployeeId" class="listing-input" @change="loadData">
+                        <option value="">Select employee</option>
+                        <option v-for="emp in employees" :key="emp.id" :value="emp.id">
+                            {{ emp.name }}
+                        </option>
+                    </select>
+                </div>
+                <div class="w-full sm:w-48">
+                    <label class="listing-label">Month</label>
+                    <select v-model="selectedMonth" class="listing-input" @change="loadData">
+                        <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
+                    </select>
+                </div>
+                <button type="button" class="listing-btn-primary" :disabled="loading" @click="loadData">
+                    {{ loading ? 'Loading…' : 'Refresh' }}
                 </button>
             </div>
-        </div>
+        </template>
 
-        <div v-if="!selectedEmployeeId" class="bg-slate-50 rounded-xl p-8 text-center text-slate-500">
+        <div v-if="!selectedEmployeeId" class="mx-3 sm:mx-5 mb-4 rounded-xl border border-slate-200 bg-slate-50/50 p-8 text-center text-slate-500 text-sm">
             Select an employee from the dropdown to view products they sold this month.
         </div>
 
@@ -50,53 +47,50 @@
                     </span>
                 </div>
 
-                <div v-if="report.products?.length === 0" class="bg-white rounded-xl shadow-sm p-12 text-center text-slate-500">
+                <div v-if="report.products?.length === 0" class="px-5 py-12 text-center text-slate-500 text-sm">
                     No products sold by this employee in the selected period.
                 </div>
 
-                <div v-else class="bg-white rounded-xl shadow-sm overflow-hidden min-w-0">
-                    <div class="overflow-x-auto">
-                        <table class="w-full min-w-[600px]">
-                            <thead class="bg-slate-50">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-700">Product</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-700">Customer</th>
-                                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-700">Qty</th>
-                                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-700">Unit Price</th>
-                                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-700">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-200">
-                                <tr v-for="(p, i) in report.products" :key="i" class="hover:bg-slate-50">
-                                    <td class="px-4 py-3 text-sm font-medium text-slate-900">{{ p.product_name }}</td>
-                                    <td class="px-4 py-3 text-sm">
-                                        <router-link
-                                            v-if="p.customer_id"
-                                            :to="`/customers/${p.customer_id}`"
-                                            class="text-blue-600 hover:text-blue-800 hover:underline"
-                                        >
-                                            {{ p.customer_name }}
-                                        </router-link>
-                                        <span v-else class="text-slate-600">
-                                            {{ p.customer_name }}
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-3 text-sm text-right text-slate-700">{{ p.quantity }}</td>
-                                    <td class="px-4 py-3 text-sm text-right text-slate-700">£{{ formatNumber(p.unit_price) }}</td>
-                                    <td class="px-4 py-3 text-sm text-right font-medium text-slate-900">£{{ formatNumber(p.total_price) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                <div v-else class="overflow-x-auto min-w-0">
+                    <table class="w-full min-w-[600px]">
+                        <thead class="listing-thead">
+                            <tr>
+                                <th class="listing-th">Product</th>
+                                <th class="listing-th">Customer</th>
+                                <th class="listing-th text-right">Qty</th>
+                                <th class="listing-th text-right">Unit price</th>
+                                <th class="listing-th text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(p, i) in report.products" :key="i" class="listing-row">
+                                <td class="listing-td-strong">{{ p.product_name }}</td>
+                                <td class="listing-td">
+                                    <router-link
+                                        v-if="p.customer_id"
+                                        :to="`/customers/${p.customer_id}`"
+                                        class="listing-link-edit"
+                                    >
+                                        {{ p.customer_name }}
+                                    </router-link>
+                                    <span v-else class="text-slate-600">{{ p.customer_name }}</span>
+                                </td>
+                                <td class="listing-td text-right">{{ p.quantity }}</td>
+                                <td class="listing-td text-right">£{{ formatNumber(p.unit_price) }}</td>
+                                <td class="listing-td text-right font-semibold text-slate-900">£{{ formatNumber(p.total_price) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </template>
         </template>
-    </div>
+    </ListingPageShell>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
+import ListingPageShell from '@/components/ListingPageShell.vue';
 
 const selectedEmployeeId = ref('');
 
@@ -116,6 +110,12 @@ const report = ref({
     period: { from: null, to: null },
     products: [],
     total_revenue: 0,
+});
+
+const productsReportBadge = computed(() => {
+    const n = report.value.products?.length;
+    if (!selectedEmployeeId.value || !n) return null;
+    return `${n} ${n === 1 ? 'line' : 'lines'}`;
 });
 
 const monthOptions = (() => {

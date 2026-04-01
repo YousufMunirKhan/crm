@@ -6,17 +6,36 @@ use App\Mail\TicketAssignedMail;
 use App\Mail\TicketCommentMail;
 use App\Mail\TicketStatusChangedMail;
 use App\Modules\Settings\Models\Setting;
+use App\Models\User;
+use App\Modules\CRM\Models\Customer;
 use App\Modules\Ticket\Models\Ticket;
 use App\Modules\Ticket\Models\TicketMessage;
-use App\Modules\CRM\Models\Customer;
 use App\Services\MailConfigFromDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class TicketService
 {
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<int, int>
+     */
+    public function normalizeAssigneeIdsFromPayload(array $data): array
+    {
+        if (! empty($data['assigned_user_ids']) && is_array($data['assigned_user_ids'])) {
+            $ids = $data['assigned_user_ids'];
+        } elseif (! empty($data['assigned_to'])) {
+            $ids = [(int) $data['assigned_to']];
+        } else {
+            $ids = [];
+        }
+
+        return array_values(array_unique(array_filter(array_map('intval', $ids))));
+    }
+
     public function create(array $data, ?int $userId = null): Ticket
     {
         $customer = null;
@@ -38,12 +57,14 @@ class TicketService
             ? now()->addHours($estimatedHours)
             : $this->calculateSLADueDate($priority);
 
+        $assigneeIds = $this->normalizeAssigneeIdsFromPayload($data);
+
         $ticket = Ticket::create([
             'ticket_number' => $this->generateTicketNumber(),
             'source' => 'crm',
             'customer_id' => $customer?->id,
             'created_by' => $userId ?? auth()->id(),
-            'assigned_to' => $data['assigned_to'] ?? null,
+            'assigned_to' => $assigneeIds[0] ?? null,
             'subject' => $data['subject'],
             'description' => $data['description'] ?? null,
             'reference_url' => $data['reference_url'] ?? null,
@@ -53,9 +74,11 @@ class TicketService
             'sla_due_at' => $slaDue,
         ]);
 
-        $ticket->load(['customer', 'creator', 'assignee']);
-        if ($ticket->assigned_to && $ticket->assignee?->email) {
-            $this->notifyAssigned($ticket);
+        $ticket->assignees()->sync($assigneeIds);
+        $ticket->load(['customer', 'creator', 'assignee', 'assignees']);
+
+        if ($assigneeIds !== []) {
+            $this->notifyAssigned($ticket->fresh(['customer', 'creator', 'assignees', 'attachments']));
         }
 
         return $ticket;
@@ -111,30 +134,49 @@ class TicketService
         ]);
 
         $ticketMessage->load('user');
-        $ticket->loadMissing(['customer', 'creator', 'assignee']);
-        $this->notifyCommentPosted($ticket, $ticketMessage);
+        $ticket->loadMissing(['customer', 'creator', 'assignee', 'assignees']);
+        if (! $isInternal) {
+            $this->notifyCommentPosted($ticket, $ticketMessage);
+        }
 
         return $ticketMessage;
     }
 
-    public function notifyAssigned(Ticket $ticket): void
+    /**
+     * @param  array<int>|null  $onlyUserIds  When set, only these users receive mail (e.g. newly added assignees).
+     */
+    public function notifyAssigned(Ticket $ticket, ?array $onlyUserIds = null): void
     {
-        $ticket->loadMissing(['customer', 'creator', 'assignee', 'attachments']);
-        if (!$ticket->assigned_to || !$ticket->assignee?->email) {
+        $ticket->loadMissing(['customer', 'creator', 'assignees', 'attachments']);
+        $recipients = $ticket->assignees;
+        if ($onlyUserIds !== null && count($onlyUserIds) > 0) {
+            $recipients = $recipients->whereIn('id', $onlyUserIds);
+        }
+        if ($recipients->isEmpty()) {
             return;
         }
 
-        try {
-            MailConfigFromDatabase::apply();
-            Mail::to($ticket->assignee->email)->send(new TicketAssignedMail($ticket));
-        } catch (\Throwable $e) {
-            Log::warning('Ticket assignment email failed: ' . $e->getMessage(), ['ticket_id' => $ticket->id]);
+        foreach ($recipients as $user) {
+            if (! $user->email) {
+                continue;
+            }
+            try {
+                MailConfigFromDatabase::apply();
+                Mail::to($user->email)->send(new TicketAssignedMail($ticket, $user));
+            } catch (\Throwable $e) {
+                Log::warning('Ticket assignment email failed: ' . $e->getMessage(), ['ticket_id' => $ticket->id, 'user_id' => $user->id]);
+            }
         }
     }
 
     public function notifyCommentPosted(Ticket $ticket, TicketMessage $message): void
     {
-        $ticket->loadMissing(['customer', 'creator', 'assignee', 'attachments']);
+        if ($message->is_internal) {
+            return;
+        }
+
+        $ticket->refresh();
+        $ticket->load(['assignees', 'assignee', 'creator', 'customer', 'attachments']);
         $message->loadMissing('user');
 
         $recipients = $this->commentNotificationRecipients($ticket, $message);
@@ -144,8 +186,9 @@ class TicketService
                 'ticket_id' => $ticket->id,
                 'message_id' => $message->id,
                 'commenter_user_id' => $message->user_id,
-                'has_assignee' => (bool) $ticket->assigned_to,
+                'pivot_assignee_count' => DB::table('ticket_assignees')->where('ticket_id', $ticket->id)->count(),
                 'has_creator' => (bool) $ticket->created_by,
+                'assigned_to' => $ticket->assigned_to,
             ]);
 
             return;
@@ -157,10 +200,11 @@ class TicketService
             try {
                 Mail::to($email)->send(new TicketCommentMail($ticket, $message));
             } catch (\Throwable $e) {
-                Log::warning('Ticket comment email failed: ' . $e->getMessage(), [
+                Log::error('Ticket comment email failed: ' . $e->getMessage(), [
                     'ticket_id' => $ticket->id,
                     'message_id' => $message->id,
                     'to' => $email,
+                    'exception' => $e::class,
                 ]);
             }
         }
@@ -183,18 +227,31 @@ class TicketService
             }
         }
 
-        $candidates = collect();
+        // Resolve recipients by ID from DB (pivot + legacy assigned_to + creator) so we never miss people due to stale relations.
+        $notifyUserIds = collect(DB::table('ticket_assignees')->where('ticket_id', $ticket->id)->pluck('user_id'))
+            ->map(fn ($id) => (int) $id)
+            ->filter();
 
-        if ($ticket->assigned_to && $ticket->assignee) {
-            if ($commenterId === null || (int) $ticket->assignee->id !== $commenterId) {
-                $candidates->push($ticket->assignee->email ?? null);
-            }
+        if ($ticket->assigned_to) {
+            $notifyUserIds->push((int) $ticket->assigned_to);
+        }
+        if ($ticket->created_by) {
+            $notifyUserIds->push((int) $ticket->created_by);
         }
 
-        if ($ticket->created_by && $ticket->creator) {
-            if ($commenterId === null || (int) $ticket->creator->id !== $commenterId) {
-                $candidates->push($ticket->creator->email ?? null);
-            }
+        $notifyUserIds = $notifyUserIds->unique()->values();
+
+        $candidates = collect();
+        if ($notifyUserIds->isNotEmpty()) {
+            User::query()
+                ->whereIn('id', $notifyUserIds->all())
+                ->get(['id', 'email'])
+                ->each(function (User $u) use ($commenterId, $candidates) {
+                    if ($commenterId !== null && (int) $u->id === $commenterId) {
+                        return;
+                    }
+                    $candidates->push($u->email);
+                });
         }
 
         $recipients = $this->filterValidNotificationEmails($candidates, $commenterEmailNorm);
@@ -228,18 +285,29 @@ class TicketService
             return;
         }
 
-        $ticket->loadMissing(['customer', 'creator', 'assignee', 'attachments']);
+        $ticket->loadMissing(['customer', 'creator', 'assignee', 'assignees', 'attachments']);
 
         $emails = collect();
-        if ($ticket->assigned_to && $ticket->assignee && $ticket->assignee->email) {
-            if ((int) $ticket->assignee->id !== (int) ($actorUserId ?? 0)) {
-                $emails->push($ticket->assignee->email);
+        $pivotIds = $ticket->assignees->pluck('id')->map(fn ($id) => (int) $id)->all();
+        foreach ($ticket->assignees as $assignee) {
+            if ($assignee->email && (int) $assignee->id !== (int) ($actorUserId ?? 0)) {
+                $emails->push($assignee->email);
             }
         }
-        if ($ticket->created_by && $ticket->creator && $ticket->creator->email) {
-            if ((int) $ticket->creator->id !== (int) ($actorUserId ?? 0)) {
-                $emails->push($ticket->creator->email);
+        if ($ticket->assigned_to) {
+            $pid = (int) $ticket->assigned_to;
+            if (! in_array($pid, $pivotIds, true)) {
+                $u = ($ticket->assignee && (int) $ticket->assignee->id === $pid)
+                    ? $ticket->assignee
+                    : User::query()->find($pid);
+                if ($u && $u->email && (int) $u->id !== (int) ($actorUserId ?? 0)) {
+                    $emails->push($u->email);
+                }
             }
+        }
+        $creator = $ticket->creator ?? ($ticket->created_by ? User::query()->find($ticket->created_by) : null);
+        if ($creator && $creator->email && (int) $creator->id !== (int) ($actorUserId ?? 0)) {
+            $emails->push($creator->email);
         }
 
         MailConfigFromDatabase::apply();

@@ -1,169 +1,189 @@
 <template>
-    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 min-w-0">
-            <h1 class="text-2xl font-bold text-slate-900">Employees</h1>
-            <div class="flex flex-wrap gap-3 w-full sm:w-auto min-w-0">
-                <select
-                    v-model="filters.role"
-                    @change="loadEmployees"
-                    class="w-full sm:w-auto min-w-0 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                >
-                    <option value="">All Roles</option>
-                    <option v-for="role in roles" :key="role.id" :value="role.name">
-                        {{ role.name }}
-                    </option>
-                </select>
-                <select
-                    v-model="filters.employee_type"
-                    @change="loadEmployees"
-                    class="w-full sm:w-auto min-w-0 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                >
-                    <option value="">All Types</option>
-                    <option value="field_worker">Field Worker</option>
-                    <option value="call_center">Call Center</option>
-                    <option value="ticket_manager">Ticket Manager</option>
-                </select>
-                <select
-                    v-model="filters.is_active"
-                    @change="loadEmployees"
-                    class="w-full sm:w-auto min-w-0 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                >
-                    <option value="1">Active</option>
-                    <option value="0">Inactive</option>
-                    <option value="all">All</option>
-                </select>
-                <input
-                    v-model="search"
-                    type="text"
-                    placeholder="Search employees..."
-                    class="w-full min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[12rem] px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                    @input="handleSearch"
-                />
-                <button
-                    v-if="canAddEmployee"
-                    @click="openCreateForm"
-                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 touch-manipulation flex-1 sm:flex-initial min-w-[8rem] text-center"
-                >
-                    + Add Employee
-                </button>
-                <button
-                    @click="goToGoals"
-                    class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 touch-manipulation flex-1 sm:flex-initial min-w-[8rem] text-center"
-                >
-                    View Goals
-                </button>
+    <ListingPageShell
+        title="Employees"
+        subtitle="Manage team members, roles, types, and activation — HR and directory data stay in sync."
+        :badge="employeesBadge"
+    >
+        <template #actions>
+            <button
+                v-if="canAddEmployee"
+                type="button"
+                @click="openCreateForm"
+                class="listing-btn-accent w-full sm:w-auto touch-manipulation"
+            >
+                + Add employee
+            </button>
+            <button type="button" @click="goToGoals" class="listing-btn-outline w-full sm:w-auto touch-manipulation">
+                View Goals
+            </button>
+        </template>
+
+        <template #filters>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 lg:gap-4 items-end w-full min-w-0">
+                <div class="sm:col-span-2 lg:col-span-3">
+                    <label class="listing-label">Search</label>
+                    <input
+                        v-model="search"
+                        type="text"
+                        placeholder="Employee name or email..."
+                        class="listing-input"
+                        @input="handleSearch"
+                    />
+                </div>
+                <div class="sm:col-span-1 lg:col-span-2">
+                    <label class="listing-label">Role</label>
+                    <select v-model="filters.role" class="listing-input" @change="loadEmployees(1)">
+                        <option value="">All roles</option>
+                        <option v-for="role in roles" :key="role.id" :value="role.name">
+                            {{ role.name }}
+                        </option>
+                    </select>
+                </div>
+                <div class="sm:col-span-1 lg:col-span-2">
+                    <label class="listing-label">Type</label>
+                    <select v-model="filters.employee_type" class="listing-input" @change="loadEmployees(1)">
+                        <option value="">All types</option>
+                        <option value="field_worker">Field Worker</option>
+                        <option value="call_center">Call Center</option>
+                        <option value="ticket_manager">Ticket Manager</option>
+                    </select>
+                </div>
+                <div class="sm:col-span-1 lg:col-span-2">
+                    <label class="listing-label">Status</label>
+                    <select v-model="filters.is_active" class="listing-input" @change="loadEmployees(1)">
+                        <option value="1">Active</option>
+                        <option value="0">Inactive</option>
+                        <option value="all">All</option>
+                    </select>
+                </div>
+                <div class="sm:col-span-2 lg:col-span-3 flex flex-wrap gap-2">
+                    <button type="button" class="listing-btn-primary w-full sm:w-auto" @click="loadEmployees(1)">
+                        Filter
+                    </button>
+                </div>
+            </div>
+        </template>
+
+        <div class="hidden md:block overflow-x-auto">
+            <table class="w-full min-w-[640px]">
+                <thead class="listing-thead">
+                    <tr>
+                        <th class="listing-th">Name</th>
+                        <th class="listing-th">Email</th>
+                        <th class="listing-th">Role</th>
+                        <th class="listing-th">Type</th>
+                        <th class="listing-th">Status</th>
+                        <th class="listing-th">Phone</th>
+                        <th class="listing-th">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-if="employees.length === 0">
+                        <td colspan="7" class="listing-td text-center text-slate-500 py-10">
+                            No employees found
+                        </td>
+                    </tr>
+                    <tr v-for="employee in employees" :key="employee.id" class="listing-row">
+                        <td class="listing-td-strong">{{ employee.name }}</td>
+                        <td class="listing-td">{{ employee.email }}</td>
+                        <td class="listing-td">{{ employee.role?.name || '—' }}</td>
+                        <td class="listing-td">
+                            <span v-if="employee.employee_type" class="inline-flex rounded-md bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800 ring-1 ring-sky-100">
+                                {{ formatEmployeeType(employee.employee_type) }}
+                            </span>
+                            <span v-else class="text-slate-400">—</span>
+                        </td>
+                        <td class="listing-td">
+                            <span
+                                v-if="employee.is_active === false || employee.is_active === 0"
+                                class="listing-badge-inactive"
+                            >
+                                Inactive
+                            </span>
+                            <span v-else class="listing-badge-active">
+                                Active
+                            </span>
+                        </td>
+                        <td class="listing-td">{{ employee.phone || '—' }}</td>
+                        <td class="listing-td">
+                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <router-link :to="`/hr/employees/${employee.id}`" class="listing-link-edit">
+                                    View
+                                </router-link>
+                                <button type="button" class="listing-link-edit" @click="openEditForm(employee)">
+                                    Edit
+                                </button>
+                                <button
+                                    v-if="employee.contract_pdf_path"
+                                    type="button"
+                                    class="listing-link-edit"
+                                    @click="downloadContract(employee)"
+                                >
+                                    Contract
+                                </button>
+                                <button
+                                    v-if="employee.email !== 'admin@switchsave.com' && (employee.is_active === false || employee.is_active === 0)"
+                                    type="button"
+                                    class="text-emerald-600 hover:text-emerald-800 font-medium text-sm"
+                                    @click="toggleStatus(employee, true)"
+                                >
+                                    Activate
+                                </button>
+                                <button
+                                    v-else-if="employee.email !== 'admin@switchsave.com'"
+                                    type="button"
+                                    class="listing-link-delete"
+                                    @click="toggleStatus(employee, false)"
+                                >
+                                    Inactivate
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="md:hidden space-y-3 px-3 pb-3">
+            <div
+                v-for="employee in employees"
+                :key="`mobile-${employee.id}`"
+                class="rounded-xl border border-slate-200 bg-slate-50/40 p-4 space-y-2"
+            >
+                <div class="flex items-start justify-between gap-2">
+                    <div class="text-sm font-semibold text-slate-900">{{ employee.name }}</div>
+                    <span v-if="employee.is_active === false || employee.is_active === 0" class="listing-badge-inactive">Inactive</span>
+                    <span v-else class="listing-badge-active">Active</span>
+                </div>
+                <div class="text-sm text-slate-600">{{ employee.email }}</div>
+                <div class="text-sm text-slate-600">Role: {{ employee.role?.name || '—' }}</div>
+                <div class="text-sm text-slate-600">Type: {{ employee.employee_type ? formatEmployeeType(employee.employee_type) : '—' }}</div>
+                <div class="text-sm text-slate-600">Phone: {{ employee.phone || '—' }}</div>
+                <div class="flex flex-wrap items-center gap-3 pt-1">
+                    <router-link :to="`/hr/employees/${employee.id}`" class="listing-link-edit">View</router-link>
+                    <button type="button" class="listing-link-edit" @click="openEditForm(employee)">Edit</button>
+                </div>
             </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden min-w-0">
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[600px]">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Name</th>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Email</th>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Role</th>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Type</th>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Status</th>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Phone</th>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200">
-                        <tr v-if="employees.length === 0">
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
-                                No employees found
-                            </td>
-                        </tr>
-                        <tr v-for="employee in employees" :key="employee.id" class="hover:bg-slate-50">
-                            <td class="px-4 md:px-6 py-4 text-sm text-slate-900">{{ employee.name }}</td>
-                            <td class="px-4 md:px-6 py-4 text-sm text-slate-600">{{ employee.email }}</td>
-                            <td class="px-4 md:px-6 py-4 text-sm text-slate-600">{{ employee.role?.name || '-' }}</td>
-                            <td class="px-4 md:px-6 py-4 text-sm text-slate-600">
-                                <span v-if="employee.employee_type" class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                                    {{ formatEmployeeType(employee.employee_type) }}
-                                </span>
-                                <span v-else class="text-slate-400">-</span>
-                            </td>
-                            <td class="px-4 md:px-6 py-4 text-sm">
-                                <span
-                                    v-if="employee.is_active === false || employee.is_active === 0"
-                                    class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-medium"
-                                >
-                                    Inactive
-                                </span>
-                                <span
-                                    v-else
-                                    class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium"
-                                >
-                                    Active
-                                </span>
-                            </td>
-                            <td class="px-4 md:px-6 py-4 text-sm text-slate-600">{{ employee.phone || '-' }}</td>
-                            <td class="px-4 md:px-6 py-4 text-sm">
-                                <div class="flex flex-wrap gap-2">
-                                    <router-link
-                                        :to="`/hr/employees/${employee.id}`"
-                                        class="text-blue-600 hover:underline text-xs md:text-sm"
-                                    >
-                                        View
-                                    </router-link>
-                                    <button
-                                        @click="openEditForm(employee)"
-                                        class="text-green-600 hover:underline text-xs md:text-sm"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        v-if="employee.contract_pdf_path"
-                                        @click="downloadContract(employee)"
-                                        class="text-blue-600 hover:underline text-xs md:text-sm"
-                                    >
-                                        Contract
-                                    </button>
-                                    <button
-                                        v-if="employee.email !== 'admin@switchsave.com' && (employee.is_active === false || employee.is_active === 0)"
-                                        @click="toggleStatus(employee, true)"
-                                        class="text-green-600 hover:underline text-xs md:text-sm"
-                                    >
-                                        Activate
-                                    </button>
-                                    <button
-                                        v-else-if="employee.email !== 'admin@switchsave.com'"
-                                        @click="toggleStatus(employee, false)"
-                                        class="text-red-600 hover:underline text-xs md:text-sm"
-                                    >
-                                        Inactivate
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <template #pagination>
+            <Pagination
+                v-if="pagination"
+                :pagination="pagination"
+                embedded
+                result-label="employees"
+                singular-label="employee"
+                @page-change="handlePageChange"
+            />
+        </template>
+    </ListingPageShell>
 
-        <Pagination
-            v-if="pagination"
-            :pagination="pagination"
-            @page-change="handlePageChange"
-        />
-
-        <EmployeeForm
-            v-if="showForm"
-            :employee="selectedEmployee"
-            @close="closeForm"
-            @saved="handleSaved"
-        />
-
-        <DeleteConfirm
-            v-if="showDeleteConfirm"
-            :item="selectedEmployee"
-            item-name="employee"
-            @confirm="handleDelete"
-            @cancel="closeDeleteConfirm"
-        />
-    </div>
+    <EmployeeForm
+        v-if="showForm"
+        :employee="selectedEmployee"
+        @close="closeForm"
+        @saved="handleSaved"
+    />
 </template>
 
 <script setup>
@@ -174,6 +194,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import EmployeeForm from '@/components/EmployeeForm.vue';
 import Pagination from '@/components/Pagination.vue';
+import ListingPageShell from '@/components/ListingPageShell.vue';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -196,6 +217,10 @@ const canAddEmployee = computed(() => {
     const userRole = auth.user?.role?.name;
     return userRole === 'Admin' || userRole === 'Manager';
 });
+
+const employeesBadge = computed(() =>
+    pagination.value?.total != null ? `${pagination.value.total} Total` : null,
+);
 
 const formatEmployeeType = (type) => {
     const types = {

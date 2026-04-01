@@ -7,12 +7,16 @@ import router from './router';
 import App from './App.vue';
 
 const app = createApp(App);
-app.use(createPinia());
+const pinia = createPinia();
+app.use(pinia);
 app.use(router);
 
-// Bootstrap auth before mounting
 import { useAuthStore } from './stores/auth';
+import { useBrandingStore } from './stores/branding';
+
 const auth = useAuthStore();
-auth.bootstrap().then(() => {
+const branding = useBrandingStore();
+
+Promise.all([auth.bootstrap(), branding.loadPublic()]).then(() => {
     app.mount('#app');
 });

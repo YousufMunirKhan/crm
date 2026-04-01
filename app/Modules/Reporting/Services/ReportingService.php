@@ -25,8 +25,14 @@ class ReportingService
         $ticketQuery = Ticket::whereBetween('created_at', [$from, $to]);
 
         if (isset($filters['agent_id'])) {
-            $leadQuery->where('assigned_to', $filters['agent_id']);
-            $ticketQuery->where('assigned_to', $filters['agent_id']);
+            $aid = $filters['agent_id'];
+            $leadQuery->where('assigned_to', $aid);
+            $ticketQuery->where(function ($q) use ($aid) {
+                $q->where('assigned_to', $aid)
+                    ->orWhereHas('assignees', function ($q2) use ($aid) {
+                        $q2->where('users.id', $aid);
+                    });
+            });
         }
 
         $leadsCount = $leadQuery->count();

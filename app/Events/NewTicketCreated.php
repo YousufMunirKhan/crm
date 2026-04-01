@@ -19,9 +19,14 @@ class NewTicketCreated implements ShouldBroadcast
     public function broadcastOn(): array
     {
         $channels = [new Channel('notifications.all')];
-        
-        if ($this->ticket->assigned_to) {
-            $channels[] = new Channel('notifications.' . $this->ticket->assigned_to);
+
+        $this->ticket->loadMissing('assignees');
+        $ids = $this->ticket->assignees->pluck('id')->all();
+        if ($ids === [] && $this->ticket->assigned_to) {
+            $ids = [(int) $this->ticket->assigned_to];
+        }
+        foreach (array_unique($ids) as $userId) {
+            $channels[] = new Channel('notifications.' . $userId);
         }
 
         return $channels;
@@ -35,7 +40,7 @@ class NewTicketCreated implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'ticket' => $this->ticket->load(['customer', 'assignee']),
+            'ticket' => $this->ticket->load(['customer', 'assignee', 'assignees']),
             'message' => "New ticket created: {$this->ticket->subject}",
         ];
     }

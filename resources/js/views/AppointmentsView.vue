@@ -1,34 +1,40 @@
 <template>
-    <div class="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h1 class="text-xl sm:text-2xl font-bold text-slate-900">My Appointments</h1>
-            <div class="flex items-center gap-3">
-                <label class="text-sm font-medium text-slate-700">Date</label>
-                <input
-                    v-model="selectedDate"
-                    type="date"
-                    @change="loadAppointments"
-                    class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+    <ListingPageShell
+        title="My appointments"
+        subtitle="Visits and meetings for the day you pick — open a card for full detail and status."
+        :badge="appointmentsBadge"
+    >
+        <template #filters>
+            <div class="listing-filters-row">
+                <div>
+                    <label class="listing-label">Date</label>
+                    <input
+                        v-model="selectedDate"
+                        type="date"
+                        class="listing-input w-full sm:w-44"
+                        @change="loadAppointments"
+                    />
+                </div>
                 <button
                     v-if="selectedDate !== todayStr"
+                    type="button"
+                    class="listing-btn-outline"
                     @click="resetDate"
-                    class="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
                 >
                     Today
                 </button>
             </div>
-        </div>
+        </template>
 
-        <div v-if="loading" class="text-center py-12 text-slate-500">Loading...</div>
-        <div v-else-if="!appointments.length" class="bg-white rounded-xl shadow-sm p-8 text-center text-slate-500">
+        <div v-if="loading" class="px-5 py-14 text-center text-slate-500 text-sm">Loading…</div>
+        <div v-else-if="!appointments.length" class="px-5 py-12 text-center text-slate-500 text-sm">
             No appointments for this date.
         </div>
-        <div v-else class="space-y-3">
+        <div v-else class="space-y-3 px-3 pb-3 sm:px-5 sm:pb-5">
             <div
                 v-for="apt in appointments"
                 :key="apt.id"
-                class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:border-blue-300 transition-colors"
+                class="rounded-xl border border-slate-200 bg-slate-50/40 overflow-hidden hover:border-slate-300 transition-colors"
             >
                 <router-link :to="`/appointments/${apt.id}`" class="block p-4 sm:p-5">
                     <div class="flex flex-wrap items-start justify-between gap-3">
@@ -62,12 +68,13 @@
                 </router-link>
             </div>
         </div>
-    </div>
+    </ListingPageShell>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
+import ListingPageShell from '@/components/ListingPageShell.vue';
 
 const loading = ref(true);
 const appointments = ref([]);
@@ -77,6 +84,10 @@ const todayStr = computed(() => {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 });
+
+const appointmentsBadge = computed(() =>
+    !loading.value && appointments.value.length ? `${appointments.value.length} this day` : null,
+);
 
 function resetDate() {
     selectedDate.value = todayStr.value;

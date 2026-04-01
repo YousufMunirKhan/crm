@@ -25,9 +25,9 @@ class MailConfigFromDatabase
 
         $settings = Setting::whereIn('key', $keys)->pluck('value', 'key')->all();
 
-        // If host is set in DB, use DB for mail config
-        $host = $settings['smtp_host'] ?? null;
-        if ($host !== null && $host !== '') {
+        // If host is set in DB, use DB for mail config (trim so saved whitespace does not disable SMTP)
+        $host = isset($settings['smtp_host']) ? trim((string) $settings['smtp_host']) : '';
+        if ($host !== '') {
             $encryption = $settings['smtp_encryption'] ?? null;
             if ($encryption === 'none') {
                 $encryption = null;
@@ -44,8 +44,12 @@ class MailConfigFromDatabase
                 'mail.from.name' => $settings['smtp_from_name'] ?? config('mail.from.name'),
             ]);
 
-            // Laravel caches MailManager; without this, Mail::send may still use pre-DB config (.env).
+            // Laravel caches the mail manager / resolved SMTP transport; forget so the next send uses DB config.
             if (app()->bound('mail.manager')) {
+                $manager = app('mail.manager');
+                if (method_exists($manager, 'purge')) {
+                    $manager->purge();
+                }
                 app()->forgetInstance('mail.manager');
             }
         }

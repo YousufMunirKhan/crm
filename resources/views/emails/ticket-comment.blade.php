@@ -49,7 +49,7 @@
         </div>
         <div class="footer">
             <p style="font-weight: 600; color: #1e293b; margin: 0;">{{ $companyName }}</p>
-            <p style="margin: 8px 0 0; font-size: 12px;">You are notified because you created or are assigned to this ticket.</p>
+            <p style="margin: 8px 0 0; font-size: 12px;">You are notified because you created this ticket or are on the assignee list.</p>
         </div>
     </div>
 </body>

@@ -1,16 +1,11 @@
 <template>
-    <div class="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
-        <div>
-            <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Access Manager</h1>
-            <p class="text-sm text-slate-600 mt-1 max-w-3xl">
-                Choose which sidebar sections each <strong>role</strong> can see. Leave “Limit menu” off to use the normal menu for that role.
-                If a user has <strong>custom menu</strong> set on their employee profile, that overrides the role here.
-                <span class="block mt-2 text-slate-700"><strong>Admin</strong> and <strong>System Admin</strong> roles always have full access; they cannot be limited here.</span>
-            </p>
-        </div>
-
-        <div v-if="loading" class="text-center py-16 text-slate-500">Loading roles…</div>
-        <div v-else class="space-y-4">
+    <ListingPageShell
+        title="Access manager"
+        :subtitle="accessManagerSubtitle"
+        :badge="accessManagerBadge"
+    >
+        <div v-if="loading" class="px-5 py-16 text-center text-slate-500 text-sm">Loading roles…</div>
+        <div v-else class="space-y-4 px-3 pb-3 sm:px-5 sm:pb-5">
             <div
                 v-for="role in managedRoles"
                 :key="role.id"
@@ -25,7 +20,7 @@
                         v-if="!isFullAccessRole(role)"
                         type="button"
                         :disabled="savingId === role.id"
-                        class="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
+                        class="listing-btn-primary disabled:opacity-50"
                         @click="saveRole(role)"
                     >
                         {{ savingId === role.id ? 'Saving…' : 'Save' }}
@@ -67,12 +62,13 @@
                 </div>
             </div>
         </div>
-    </div>
+    </ListingPageShell>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue';
 import axios from 'axios';
+import ListingPageShell from '@/components/ListingPageShell.vue';
 import { NAV_SECTION_OPTIONS } from '@/constants/navSections';
 import { useToastStore } from '@/stores/toast';
 
@@ -88,6 +84,15 @@ const sectionOptions = NAV_SECTION_OPTIONS;
 const managedRoles = computed(() =>
     roles.value.filter((r) => r.name !== 'Customer').sort((a, b) => a.name.localeCompare(b.name)),
 );
+
+const accessManagerSubtitle =
+    'Choose which sidebar sections each role can see. Leave “Limit menu” off to use the normal menu for that role. If a user has custom menu on their employee profile, that overrides the role here. Admin and System Admin always have full access; they cannot be limited here.';
+
+const accessManagerBadge = computed(() => {
+    if (loading.value) return null;
+    const n = managedRoles.value.length;
+    return n ? `${n} ${n === 1 ? 'role' : 'roles'}` : null;
+});
 
 function defaultChecks() {
     const c = {};

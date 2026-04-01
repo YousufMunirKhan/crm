@@ -124,6 +124,15 @@ class User extends Authenticatable
         return $this->hasMany(\App\Modules\Ticket\Models\Ticket::class, 'assigned_to');
     }
 
+    /**
+     * Tickets where this user is in the multi-assignee list (CRM tickets).
+     */
+    public function coAssignedTickets(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(\App\Modules\Ticket\Models\Ticket::class, 'ticket_assignees', 'user_id', 'ticket_id')
+            ->withTimestamps();
+    }
+
     public function assignedCustomers(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(\App\Modules\CRM\Models\Customer::class, 'customer_user_assignments', 'user_id', 'customer_id')

@@ -12,106 +12,126 @@
                     </svg>
                     {{ form.type === 'prospect' ? 'Back to Prospects' : 'Back to Customers' }}
                 </router-link>
-                <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-                    {{ isEdit ? 'Edit Customer' : (form.type === 'customer' ? 'Add New Customer' : 'Add New Prospect') }}
-                </h1>
-                <p class="text-slate-500 mt-1 text-sm">
-                    {{ isEdit ? 'Update customer information' : (form.type === 'customer' ? 'Fill in the details to add a new customer' : 'Fill in the details to add a new prospect') }}
-                </p>
             </div>
 
             <!-- Form Card -->
-            <form @submit.prevent="handleSubmit" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div class="p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
+            <form novalidate @submit.prevent="handleSubmit" class="form-card">
+                <div class="form-section-head-mint">
+                    <h1 class="form-section-title-mint text-2xl sm:text-3xl">
+                        {{ isEdit ? 'Edit Customer' : (form.type === 'customer' ? 'Add New Customer' : 'Add New Prospect') }}
+                    </h1>
+                    <p class="form-section-desc-mint">
+                        {{ isEdit ? 'Update customer information' : (form.type === 'customer' ? 'Fill in the details to add a new customer' : 'Fill in the details to add a new prospect') }}
+                    </p>
+                </div>
+                <div class="form-body space-y-6 lg:space-y-8">
+                    <div v-if="!isEdit" class="mb-2">
+                        <div class="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1">
+                            <button
+                                v-for="step in createSteps"
+                                :key="step.id"
+                                type="button"
+                                @click="goToStep(step.id)"
+                                class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-xs sm:text-sm whitespace-nowrap transition-colors"
+                                :class="currentStep === step.id ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'"
+                            >
+                                <span
+                                    class="w-5 h-5 rounded-full text-[11px] flex items-center justify-center"
+                                    :class="currentStep === step.id ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'"
+                                >
+                                    {{ step.id }}
+                                </span>
+                                {{ step.title }}
+                            </button>
+                        </div>
+                    </div>
                     <!-- Required fields -->
-                    <div>
+                    <div v-show="isEdit || currentStep === 1">
                         <h2 class="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
                             <span class="w-6 h-6 rounded-full bg-slate-900 text-white text-xs flex items-center justify-center">1</span>
                             Basic Information
                         </h2>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="sm:col-span-2">
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Customer Name *</label>
+                                <label class="form-label">Customer Name *</label>
                                 <input
                                     v-model="form.name"
                                     type="text"
-                                    required
                                     placeholder="Full name or primary contact"
-                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Business Name</label>
+                                <label class="form-label">Business Name</label>
                                 <input
                                     v-model="form.business_name"
                                     type="text"
                                     placeholder="Company or business name"
-                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Owner Name</label>
+                                <label class="form-label">Owner Name</label>
                                 <input
                                     v-model="form.owner_name"
                                     type="text"
                                     placeholder="Owner or director name"
-                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Contact Person 2 Name</label>
+                                <label class="form-label">Contact Person 2 Name</label>
                                 <input
                                     v-model="form.contact_person_2_name"
                                     type="text"
                                     placeholder="Second contact name"
-                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Contact Person 2 Phone</label>
+                                <label class="form-label">Contact Person 2 Phone</label>
                                 <input
                                     v-model="form.contact_person_2_phone"
                                     type="tel"
                                     placeholder="e.g. 07700900123"
-                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Phone *</label>
+                                <label class="form-label">Phone *</label>
                                 <input
                                     v-model="form.phone"
                                     type="tel"
-                                    required
                                     placeholder="e.g. 07700900123"
-                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                    class="form-input"
                                     @blur="syncPhoneToWhatsApp"
                                 />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Customer WhatsApp</label>
+                                <label class="form-label">Customer WhatsApp</label>
                                 <input
                                     v-model="form.whatsapp_number"
                                     type="tel"
                                     placeholder="e.g. 447700900123"
-                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                    class="form-input"
                                     @blur="syncWhatsAppToPhone"
                                 />
                                 <p class="text-xs text-slate-500 mt-1">Phone and WhatsApp sync when one is empty; you can change either.</p>
                             </div>
                             <div class="sm:col-span-2">
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Customer Email</label>
+                                <label class="form-label">Customer Email</label>
                                 <input
                                     v-model="form.email"
                                     type="email"
                                     placeholder="customer@example.com"
-                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                             <div class="sm:col-span-2">
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Source</label>
+                                <label class="form-label">Source</label>
                                 <select
                                     v-model="form.source"
-                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                    class="form-input"
                                 >
                                     <option value="">Select Source</option>
                                     <option value="call_center">Call Center</option>
@@ -127,7 +147,7 @@
                     </div>
 
                     <!-- Optional remote/license fields (multiple) -->
-                    <div>
+                    <div v-show="isEdit || currentStep === 2">
                         <h2 class="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
                             <span class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs flex items-center justify-center">2</span>
                             Remote & License (Optional)
@@ -151,39 +171,39 @@
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <div class="sm:col-span-2 lg:col-span-1">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Anydesk or Rustdesk</label>
+                                    <label class="form-label">Anydesk or Rustdesk</label>
                                     <input
                                         v-model="rl.anydesk_rustdesk"
                                         type="text"
                                         placeholder="ID or connection details"
-                                        class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                        class="form-input"
                                     />
                                 </div>
                                 <div class="sm:col-span-2 lg:col-span-1">
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Passwords</label>
+                                    <label class="form-label">Passwords</label>
                                     <input
                                         v-model="rl.passwords"
                                         type="text"
                                         placeholder="Relevant passwords"
-                                        class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                        class="form-input"
                                     />
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">ePOS Type</label>
+                                    <label class="form-label">ePOS Type</label>
                                     <input
                                         v-model="rl.epos_type"
                                         type="text"
                                         placeholder="e.g. TouchBistro, Square"
-                                        class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                        class="form-input"
                                     />
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Lic-days (Optional)</label>
+                                    <label class="form-label">Lic-days (Optional)</label>
                                     <input
                                         v-model="rl.lic_days"
                                         type="text"
                                         placeholder="e.g. 30, 90, 1 Year"
-                                        class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                        class="form-input"
                                     />
                                 </div>
                             </div>
@@ -191,73 +211,73 @@
                         <button
                             type="button"
                             @click="addRemoteLicense"
-                            class="text-sm text-blue-600 hover:text-blue-800"
+                            class="text-sm font-medium text-emerald-700 hover:text-emerald-900"
                         >
                             + Add Remote & License
                         </button>
                     </div>
 
                     <!-- Address -->
-                    <div>
+                    <div v-show="isEdit || currentStep === 3">
                         <h2 class="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
                             <span class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs flex items-center justify-center">3</span>
                             Address & Notes
                         </h2>
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Address</label>
+                                <label class="form-label">Address</label>
                                 <textarea
                                     v-model="form.address"
                                     rows="2"
                                     placeholder="Street address"
-                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 resize-none"
+                                    class="form-input resize-none"
                                 />
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">City</label>
+                                    <label class="form-label">City</label>
                                     <input
                                         v-model="form.city"
                                         type="text"
                                         placeholder="City"
-                                        class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                        class="form-input"
                                     />
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Postcode</label>
+                                    <label class="form-label">Postcode</label>
                                     <input
                                         v-model="form.postcode"
                                         type="text"
                                         placeholder="Postcode"
-                                        class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                        class="form-input"
                                     />
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">VAT Number</label>
+                                <label class="form-label">VAT Number</label>
                                 <input
                                     v-model="form.vat_number"
                                     type="text"
                                     placeholder="VAT number"
-                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+                                <label class="form-label">Notes</label>
                                 <textarea
                                     v-model="form.notes"
                                     rows="3"
                                     placeholder="Additional notes"
-                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 resize-none"
+                                    class="form-input resize-none"
                                 />
                             </div>
                         </div>
                     </div>
 
                     <!-- Also create: Follow-up / Appointment / Lead (only when adding) -->
-                    <div v-if="!isEdit" class="border-t border-slate-200 pt-6">
+                    <div v-if="!isEdit" v-show="currentStep === 4" ref="quickAddSectionRef" class="border-t border-slate-200 pt-6">
                         <h2 class="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                            <span class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs flex items-center justify-center">+</span>
+                            <span class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs flex items-center justify-center">4</span>
                             Also create (optional)
                         </h2>
                         <p class="text-sm text-slate-500 mb-4">Quickly add a follow-up, appointment, or lead when creating this customer.</p>
@@ -272,7 +292,7 @@
                             </label>
                             <label
                                 class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all"
-                                :class="quickAddType === 'follow_up' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'"
+                                :class="quickAddType === 'follow_up' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'"
                             >
                                 <input v-model="quickAddType" type="radio" value="follow_up" class="sr-only" />
                                 <span>🔄</span>
@@ -280,7 +300,7 @@
                             </label>
                             <label
                                 class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all"
-                                :class="quickAddType === 'appointment' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'"
+                                :class="quickAddType === 'appointment' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'"
                             >
                                 <input v-model="quickAddType" type="radio" value="appointment" class="sr-only" />
                                 <span>📅</span>
@@ -288,7 +308,7 @@
                             </label>
                             <label
                                 class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all"
-                                :class="quickAddType === 'lead' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'"
+                                :class="quickAddType === 'lead' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'"
                             >
                                 <input v-model="quickAddType" type="radio" value="lead" class="sr-only" />
                                 <span>➕</span>
@@ -297,48 +317,48 @@
                         </div>
                         <div v-if="quickAddType" class="space-y-4 p-4 bg-slate-50 rounded-xl">
                             <div v-if="quickAddType === 'follow_up' || quickAddType === 'lead' || quickAddType === 'appointment'">
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Product(s) *</label>
+                                <label class="form-label">Product(s) *</label>
                                 <div class="border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto bg-white">
                                     <label v-for="p in products" :key="p.id" class="flex items-center gap-2 py-1.5 cursor-pointer">
-                                        <input type="checkbox" :value="p.id" v-model="quickAddProductIds" class="rounded" />
+                                        <input type="checkbox" :value="p.id" v-model="quickAddProductIds" class="form-checkbox" />
                                         <span class="text-sm">{{ p.name }}</span>
                                     </label>
                                     <p v-if="!products.length" class="text-sm text-slate-400 py-2">Loading products...</p>
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-                                <textarea v-model="quickAddComment" rows="2" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="Comment or notes..." />
+                                <label class="form-label">Notes</label>
+                                <textarea v-model="quickAddComment" rows="2" class="form-input resize-none" placeholder="Comment or notes..." />
                             </div>
                             <div v-if="quickAddType === 'follow_up'" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Follow-up Date & Time *</label>
-                                    <input v-model="quickAddFollowUpAt" type="datetime-local" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" />
+                                    <label class="form-label">Follow-up Date & Time *</label>
+                                    <input v-model="quickAddFollowUpAt" type="datetime-local" class="form-input" />
                                 </div>
                             </div>
                             <div v-if="quickAddType === 'appointment'" class="space-y-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Assign to (who will attend) *</label>
-                                    <select v-model="quickAddAssignedUserId" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+                                    <label class="form-label">Assign to (who will attend) *</label>
+                                    <select v-model="quickAddAssignedUserId" class="form-input">
                                         <option value="">Select team member...</option>
                                         <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }} ({{ u.role?.name || '—' }})</option>
                                     </select>
                                 </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-sm font-medium text-slate-700 mb-1">Date *</label>
-                                        <input v-model="quickAddAppointmentDate" type="date" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" />
+                                        <label class="form-label">Date *</label>
+                                        <input v-model="quickAddAppointmentDate" type="date" class="form-input" />
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-slate-700 mb-1">Time *</label>
-                                        <input v-model="quickAddAppointmentTime" type="time" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" />
+                                        <label class="form-label">Time *</label>
+                                        <input v-model="quickAddAppointmentTime" type="time" class="form-input" />
                                     </div>
                                 </div>
                             </div>
                             <div v-if="quickAddType === 'lead'" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Stage</label>
-                                    <select v-model="quickAddStage" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+                                    <label class="form-label">Stage</label>
+                                    <select v-model="quickAddStage" class="form-input">
                                         <option value="follow_up">Follow-up</option>
                                         <option value="lead">Lead</option>
                                         <option value="hot_lead">Hot Lead</option>
@@ -346,8 +366,8 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Expected Closing Date</label>
-                                    <input v-model="quickAddExpectedDate" type="date" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" />
+                                    <label class="form-label">Expected Closing Date</label>
+                                    <input v-model="quickAddExpectedDate" type="date" class="form-input" />
                                 </div>
                             </div>
                         </div>
@@ -360,17 +380,34 @@
                 </div>
 
                 <!-- Footer actions -->
-                <div class="px-4 sm:px-6 lg:px-8 py-4 bg-slate-50 border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
+                <div class="form-actions">
                     <router-link
                         :to="form.type === 'prospect' ? { path: '/customers', query: { type: 'prospect' } } : { path: '/customers', query: { type: 'customer' } }"
-                        class="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium text-sm text-center touch-manipulation"
+                        class="form-btn-cancel text-center"
                     >
                         Cancel
                     </router-link>
                     <button
+                        v-if="!isEdit && currentStep > 1"
+                        type="button"
+                        class="form-btn-cancel"
+                        @click="prevStep"
+                    >
+                        Back
+                    </button>
+                    <button
+                        v-if="!isEdit && currentStep < 4"
+                        type="button"
+                        class="form-btn-submit"
+                        @click="nextStep"
+                    >
+                        Next
+                    </button>
+                    <button
+                        v-if="isEdit || currentStep === 4"
                         type="submit"
                         :disabled="loading"
-                        class="px-6 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm touch-manipulation"
+                        class="form-btn-submit"
                     >
                         <span v-if="loading" class="inline-flex items-center gap-2">
                             <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -388,7 +425,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
@@ -440,6 +477,133 @@ const quickAddExpectedDate = ref('');
 const quickAddProductIds = ref([]);
 const products = ref([]);
 const users = ref([]);
+const quickAddSectionRef = ref(null);
+const currentStep = ref(1);
+const createSteps = [
+    { id: 1, title: 'Basic' },
+    { id: 2, title: 'Remote & License' },
+    { id: 3, title: 'Address & Notes' },
+    { id: 4, title: 'Also Create' },
+];
+
+/** Product ids for quick-add, matching submit logic (checkboxes or first product fallback). */
+function getQuickAddProductIds() {
+    if (quickAddProductIds.value?.length) {
+        return quickAddProductIds.value;
+    }
+    if (products.value.length) {
+        return [products.value[0].id];
+    }
+    return [];
+}
+
+/**
+ * @param {number} step 1–4
+ * @returns {string|null} Error message or null if valid
+ */
+function validateStep(step) {
+    if (step === 1) {
+        if (!form.name?.trim()) {
+            return 'Customer name is required.';
+        }
+        if (!form.phone?.trim()) {
+            return 'Phone is required.';
+        }
+        return null;
+    }
+    if (step === 2 || step === 3) {
+        return null;
+    }
+    if (step === 4) {
+        if (!quickAddType.value) {
+            return null;
+        }
+        const prodIds = getQuickAddProductIds();
+        if (quickAddType.value === 'follow_up') {
+            if (!quickAddFollowUpAt.value) {
+                return 'Please set follow-up date and time.';
+            }
+            if (!prodIds.length) {
+                return 'Please select at least one product, or add products in the system.';
+            }
+        }
+        if (quickAddType.value === 'lead') {
+            if (!prodIds.length) {
+                return 'Please select at least one product, or add products in the system.';
+            }
+        }
+        if (quickAddType.value === 'appointment') {
+            if (!quickAddAssignedUserId.value) {
+                return 'Please select who will attend this appointment.';
+            }
+            if (!quickAddAppointmentDate.value || !quickAddAppointmentTime.value) {
+                return 'Please set appointment date and time.';
+            }
+            if (!prodIds.length) {
+                return 'Please select at least one product, or add products in the system.';
+            }
+        }
+        return null;
+    }
+    return null;
+}
+
+/** Run steps 1–4 for create flow; returns first failing step or null. */
+function validateAllStepsForCreate() {
+    for (let s = 1; s <= 4; s++) {
+        const msg = validateStep(s);
+        if (msg) {
+            return { step: s, message: msg };
+        }
+    }
+    return null;
+}
+
+function goToStep(stepId) {
+    if (isEdit.value) return;
+    if (stepId === currentStep.value) return;
+    if (stepId < currentStep.value) {
+        error.value = null;
+        currentStep.value = stepId;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+    }
+    for (let s = currentStep.value; s < stepId; s++) {
+        const msg = validateStep(s);
+        if (msg) {
+            error.value = msg;
+            toast.error(msg);
+            currentStep.value = s;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+    }
+    error.value = null;
+    currentStep.value = stepId;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function nextStep() {
+    const msg = validateStep(currentStep.value);
+    if (msg) {
+        error.value = msg;
+        toast.error(msg);
+        return;
+    }
+    error.value = null;
+    if (currentStep.value < 4) {
+        currentStep.value += 1;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+
+function prevStep() {
+    error.value = null;
+    if (currentStep.value > 1) {
+        currentStep.value -= 1;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
 
 function normalizeForWhatsApp(phone) {
     const n = (phone || '').replace(/\s/g, '');
@@ -508,8 +672,26 @@ const loadCustomer = async () => {
 };
 
 const handleSubmit = async () => {
-    loading.value = true;
     error.value = null;
+    if (isEdit.value) {
+        const msg = validateStep(1);
+        if (msg) {
+            error.value = msg;
+            toast.error(msg);
+            return;
+        }
+    } else {
+        const fail = validateAllStepsForCreate();
+        if (fail) {
+            error.value = fail.message;
+            currentStep.value = fail.step;
+            toast.error(fail.message);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+    }
+
+    loading.value = true;
     try {
         const payload = {
             ...form,
@@ -640,5 +822,14 @@ onMounted(async () => {
         tomorrow.setDate(tomorrow.getDate() + 1);
         quickAddAppointmentDate.value = tomorrow.toISOString().slice(0, 10);
     }
+});
+
+watch(quickAddType, async (type) => {
+    if (!type || isEdit.value) return;
+    if (currentStep.value !== 4) {
+        currentStep.value = 4;
+    }
+    await nextTick();
+    quickAddSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 </script>

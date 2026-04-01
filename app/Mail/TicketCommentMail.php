@@ -24,7 +24,7 @@ class TicketCommentMail extends Mailable
         public Ticket $ticket,
         public TicketMessage $ticketMessage,
     ) {
-        $this->ticket->loadMissing(['customer', 'creator', 'assignee', 'attachments']);
+        $this->ticket->loadMissing(['customer', 'creator', 'assignee', 'assignees', 'attachments']);
         $this->ticketMessage->loadMissing('user');
         $this->companyName = Setting::where('key', 'company_name')->first()?->value ?? config('app.name', 'CRM');
         $this->ticketUrl = CrmPublicUrl::ticket((int) $this->ticket->id);

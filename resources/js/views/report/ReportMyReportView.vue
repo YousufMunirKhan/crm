@@ -1,27 +1,26 @@
 <template>
-    <div class="w-full min-w-0 max-w-4xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 min-w-0">
-            <h1 class="text-xl sm:text-2xl font-bold text-slate-900">My Report</h1>
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-                <label class="text-sm text-slate-600 shrink-0">Month</label>
-                <select
-                    v-model="selectedMonth"
-                    @change="loadReport"
-                    class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                >
+    <ListingPageShell
+        title="My report"
+        subtitle="Your targets vs achievements for the month — same metrics as the team leaderboard."
+        :badge="myReportBadge"
+    >
+        <template #filters>
+            <div>
+                <label class="listing-label">Month</label>
+                <select v-model="selectedMonth" class="listing-input w-full sm:w-56" @change="loadReport">
                     <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
                 </select>
             </div>
-        </div>
+        </template>
 
-        <div v-if="loading" class="flex justify-center py-12">
+        <div v-if="loading" class="px-5 py-14 flex justify-center text-slate-500 text-sm">
             <svg class="animate-spin h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
         </div>
 
-        <template v-else-if="self">
+        <div v-else-if="self" class="px-4 sm:px-5 pb-5 space-y-4">
             <!-- Ranking badge -->
             <div
                 v-if="self.rank"
@@ -100,22 +99,27 @@
             <div v-if="!self.target_appointments && !self.target_sales && !self.target_revenue" class="text-sm text-slate-500 bg-slate-50 rounded-lg p-4">
                 No targets set for this month. Ask your admin to set targets in Employee Goals.
             </div>
-        </template>
-
-        <div v-else class="text-center py-12 text-slate-500">
-            Unable to load your report.
         </div>
-    </div>
+
+        <div v-else class="px-5 py-12 text-center text-slate-500 text-sm">Unable to load your report.</div>
+    </ListingPageShell>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
+import ListingPageShell from '@/components/ListingPageShell.vue';
 
 const selectedMonth = ref(new Date().toISOString().slice(0, 7));
 const loading = ref(false);
 const self = ref(null);
 const totalEmployeesWithTargets = ref(0);
+
+const myReportBadge = computed(() => {
+    if (loading.value || !self.value) return null;
+    if (self.value.rank != null) return `Rank #${self.value.rank}`;
+    return totalEmployeesWithTargets.value ? `${totalEmployeesWithTargets.value} in leaderboard` : null;
+});
 
 const monthOptions = (() => {
     const opts = [];

@@ -20,18 +20,19 @@
             </div>
             <form v-else @submit.prevent="handleSubmit" class="space-y-6">
                 <!-- Customer: Choose existing or Add new (overflow-visible so dropdown is not clipped) -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-visible">
-                    <div class="px-4 sm:px-6 py-4 border-b border-slate-200 bg-slate-50 rounded-t-xl">
-                        <h2 class="text-base font-semibold text-slate-900">Customer</h2>
+                <div class="form-card !overflow-visible rounded-t-xl">
+                    <div class="form-section-head-mint">
+                        <h2 class="form-section-title-mint">Customer</h2>
+                        <p class="form-section-desc-mint">Choose someone already in the CRM or add their details as you issue the invoice.</p>
                     </div>
-                    <div class="p-4 sm:p-6 space-y-4 overflow-visible">
+                    <div class="form-body space-y-4 overflow-visible">
                         <div class="flex flex-col sm:flex-row gap-3">
                             <label class="inline-flex items-center gap-2 cursor-pointer">
                                 <input
                                     v-model="customerMode"
                                     type="radio"
                                     value="existing"
-                                    class="rounded-full border-slate-300 text-slate-900 focus:ring-slate-500"
+                                    class="form-radio"
                                 />
                                 <span class="text-sm font-medium text-slate-700">Choose existing customer</span>
                             </label>
@@ -40,7 +41,7 @@
                                     v-model="customerMode"
                                     type="radio"
                                     value="new"
-                                    class="rounded-full border-slate-300 text-slate-900 focus:ring-slate-500"
+                                    class="form-radio"
                                 />
                                 <span class="text-sm font-medium text-slate-700">Add new customer</span>
                             </label>
@@ -48,13 +49,13 @@
 
                         <!-- Searchable customer select - dropdown in Teleport so it is never clipped -->
                         <div v-if="customerMode === 'existing'" class="space-y-1">
-                            <label class="block text-sm font-medium text-slate-700">Search & select customer *</label>
+                            <label class="form-label">Search & select customer *</label>
                             <div class="relative" ref="customerSelectRef">
                                 <input
                                     v-model="customerSearch"
                                     type="text"
                                     placeholder="Type name, phone or email..."
-                                    class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                    class="form-input"
                                     @focus="showCustomerDropdown = true; updateDropdownPosition()"
                                     @input="debounceCustomerSearch"
                                 />
@@ -119,50 +120,50 @@
                         <!-- New customer fields: name, phone, email, address, VAT -->
                         <div v-if="customerMode === 'new'" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="sm:col-span-2">
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+                                <label class="form-label">Name *</label>
                                 <input
                                     v-model="newCustomer.name"
                                     type="text"
                                     required
                                     placeholder="Customer name"
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Phone *</label>
+                                <label class="form-label">Phone *</label>
                                 <input
                                     v-model="newCustomer.phone"
                                     type="text"
                                     required
                                     placeholder="Phone"
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                                <label class="form-label">Email</label>
                                 <input
                                     v-model="newCustomer.email"
                                     type="email"
                                     placeholder="Email (optional)"
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                             <div class="sm:col-span-2">
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Address</label>
+                                <label class="form-label">Address</label>
                                 <input
                                     v-model="newCustomer.address"
                                     type="text"
                                     placeholder="Address (optional)"
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">VAT number</label>
+                                <label class="form-label">VAT number</label>
                                 <input
                                     v-model="newCustomer.vat_number"
                                     type="text"
                                     placeholder="VAT number (optional)"
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                         </div>
@@ -170,38 +171,39 @@
                 </div>
 
                 <!-- Invoice details -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="px-4 sm:px-6 py-4 border-b border-slate-200 bg-slate-50">
-                        <h2 class="text-base font-semibold text-slate-900">Invoice details</h2>
+                <div class="form-card">
+                    <div class="form-section-head">
+                        <h2 class="form-section-title">Invoice details</h2>
+                        <p class="form-section-desc">Dates and tax rate apply to this document only.</p>
                     </div>
-                    <div class="p-4 sm:p-6">
+                    <div class="form-body">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Invoice date *</label>
+                                <label class="form-label">Invoice date *</label>
                                 <input
                                     v-model="form.invoice_date"
                                     type="date"
                                     required
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Due date</label>
+                                <label class="form-label">Due date</label>
                                 <input
                                     v-model="form.due_date"
                                     type="date"
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">VAT rate (%)</label>
+                                <label class="form-label">VAT rate (%)</label>
                                 <input
                                     v-model.number="form.vat_rate"
                                     type="number"
                                     step="0.01"
                                     min="0"
                                     max="100"
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    class="form-input"
                                 />
                             </div>
                         </div>
@@ -209,18 +211,21 @@
                 </div>
 
                 <!-- Line items -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="px-4 sm:px-6 py-4 border-b border-slate-200 bg-slate-50 flex flex-wrap justify-between items-center gap-2">
-                        <h2 class="text-base font-semibold text-slate-900">Line items *</h2>
+                <div class="form-card">
+                    <div class="form-section-head flex flex-wrap justify-between items-center gap-2">
+                        <div>
+                            <h2 class="form-section-title">Line items *</h2>
+                            <p class="form-section-desc !mt-0.5">Search products or type a custom line.</p>
+                        </div>
                         <button
                             type="button"
                             @click="addItem"
-                            class="text-sm text-blue-600 hover:underline font-medium"
+                            class="text-sm font-semibold text-emerald-700 hover:text-emerald-900 shrink-0"
                         >
                             + Add item
                         </button>
                     </div>
-                    <div class="p-4 sm:p-6 overflow-x-auto">
+                    <div class="form-body overflow-x-auto">
                         <div class="space-y-3 min-w-[280px]">
                             <div
                                 v-for="(item, index) in form.items"
@@ -233,7 +238,7 @@
                                         type="text"
                                         placeholder="Search product or type new name..."
                                         required
-                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                        class="form-input"
                                         :ref="el => setProductInputRef(index, el)"
                                         @focus="openProductDropdown(index)"
                                         @input="debounceProductSearch(index)"
@@ -264,7 +269,7 @@
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    class="w-full text-left px-3 py-2.5 text-sm hover:bg-slate-50 border-t border-slate-200 text-blue-600 font-medium"
+                                                    class="w-full text-left px-3 py-2.5 text-sm hover:bg-violet-50 border-t border-slate-200 text-violet-700 font-medium"
                                                     @click="addNewProduct(index)"
                                                 >
                                                     + Add "{{ item.description.trim() }}" as new product
@@ -280,7 +285,7 @@
                                         min="1"
                                         placeholder="Qty"
                                         required
-                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                        class="form-input"
                                     />
                                 </div>
                                 <div class="sm:col-span-2">
@@ -291,7 +296,7 @@
                                         min="0"
                                         placeholder="Unit price"
                                         required
-                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                        class="form-input"
                                     />
                                 </div>
                                 <div class="sm:col-span-2 text-sm font-medium text-slate-700">
@@ -317,19 +322,16 @@
                     </div>
                 </div>
 
-                <p v-if="submitError" class="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{{ submitError }}</p>
+                <p v-if="submitError" class="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-100">{{ submitError }}</p>
 
-                <div class="flex flex-col-reverse sm:flex-row justify-end gap-3">
-                    <router-link
-                        to="/invoices"
-                        class="inline-flex justify-center px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
-                    >
+                <div class="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+                    <router-link to="/invoices" class="form-btn-cancel text-center">
                         Cancel
                     </router-link>
                     <button
                         type="submit"
                         :disabled="loading || !canSubmit"
-                        class="inline-flex justify-center px-4 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
+                        class="form-btn-submit"
                     >
                         {{ loading ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update invoice' : 'Create invoice') }}
                     </button>

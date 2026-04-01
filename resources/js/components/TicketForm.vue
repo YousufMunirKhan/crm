@@ -143,17 +143,18 @@
                         </select>
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Assign To</label>
-                        <select
-                            v-model="form.assigned_to"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        >
-                            <option value="">Unassigned</option>
-                            <option v-for="user in users" :key="user.id" :value="user.id">
+                    <div class="sm:col-span-2">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Assign to (one or more)</label>
+                        <div class="max-h-40 overflow-y-auto rounded-lg border border-slate-200 p-2 space-y-2 bg-slate-50/50">
+                            <label
+                                v-for="user in users"
+                                :key="user.id"
+                                class="flex items-center gap-2 text-sm text-slate-800 cursor-pointer"
+                            >
+                                <input v-model="form.assigned_user_ids" type="checkbox" :value="user.id" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30" />
                                 {{ user.name }}
-                            </option>
-                        </select>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -244,7 +245,7 @@ const form = ref({
     priority: 'medium',
     estimated_resolve_hours: null,
     status: 'open',
-    assigned_to: null,
+    assigned_user_ids: [],
 });
 
 const customers = ref([]);
@@ -294,13 +295,15 @@ onMounted(async () => {
             priority: props.ticket.priority,
             estimated_resolve_hours: props.ticket.estimated_resolve_hours ?? null,
             status: props.ticket.status,
-            assigned_to: props.ticket.assigned_to,
+            assigned_user_ids: [],
         };
 
         try {
             const { data } = await axios.get(`/api/tickets/${props.ticket.id}`);
             comments.value = data.messages || [];
             ticketAttachments.value = data.attachments ? [...data.attachments] : [];
+            const ids = (data.assignees || []).map((a) => a.id);
+            form.value.assigned_user_ids = ids.length ? ids : (data.assigned_to ? [data.assigned_to] : []);
         } catch (err) {
             console.error('Failed to load ticket comments:', err);
         }
@@ -342,7 +345,7 @@ const buildFormDataPayload = (payload) => {
     appendIf('priority', payload.priority);
     if (payload.customer_id) fd.append('customer_id', String(payload.customer_id));
     appendIf('customer_phone', payload.customer_phone);
-    if (payload.assigned_to) fd.append('assigned_to', String(payload.assigned_to));
+    (payload.assigned_user_ids || []).forEach((id) => fd.append('assigned_user_ids[]', String(id)));
     if (payload.estimated_resolve_hours != null && payload.estimated_resolve_hours !== '') {
         fd.append('estimated_resolve_hours', String(payload.estimated_resolve_hours));
     }
@@ -358,9 +361,6 @@ const handleSubmit = async () => {
         const payload = { ...form.value };
         if (!payload.customer_id) {
             delete payload.customer_id;
-        }
-        if (!payload.assigned_to) {
-            payload.assigned_to = null;
         }
         if (payload.estimated_resolve_hours === '' || payload.estimated_resolve_hours === undefined) {
             payload.estimated_resolve_hours = null;

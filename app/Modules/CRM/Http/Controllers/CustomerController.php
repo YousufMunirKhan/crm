@@ -28,7 +28,14 @@ class CustomerController extends Controller
 
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
 
-        $query = Customer::with(['leads', 'invoices', 'tickets', 'assignedUsers', 'creator']);
+        $query = Customer::with(['leads', 'invoices', 'tickets', 'assignedUsers', 'creator'])
+            ->addSelect([
+                'won_products_count' => LeadItem::query()
+                    ->selectRaw('COALESCE(SUM(lead_items.quantity), 0)')
+                    ->join('leads', 'leads.id', '=', 'lead_items.lead_id')
+                    ->whereColumn('leads.customer_id', 'customers.id')
+                    ->where('lead_items.status', LeadItem::STATUS_WON),
+            ]);
 
         // For sales agents: show only customers they created, assigned to them, assigned by them, or with their leads
         if ($isSalesAgent) {
@@ -131,6 +138,7 @@ class CustomerController extends Controller
             'leads.items.product',
             'invoices.items',
             'tickets.assignee',
+            'tickets.assignees',
             'communications',
             'assignedUsers.role',
             'assignments.user',

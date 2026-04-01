@@ -8,8 +8,14 @@
             <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl shadow-2xl p-4 border border-slate-700">
                 <div class="flex items-center gap-4">
                     <!-- App Icon -->
-                    <div class="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                        <span class="text-white font-bold text-lg">S&S</span>
+                    <div class="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden">
+                        <img
+                            v-if="branding.faviconUrl"
+                            :src="faviconDisplayUrl"
+                            alt=""
+                            class="w-full h-full object-cover"
+                        >
+                        <span v-else class="text-white font-bold text-lg">S&S</span>
                     </div>
 
                     <!-- Text -->
@@ -71,9 +77,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { usePwaStore } from '@/stores/pwa';
 import { useToastStore } from '@/stores/toast';
+import { useBrandingStore } from '@/stores/branding';
+import { absolutePublicUrl } from '@/utils/branding';
 import IOSInstallModal from './IOSInstallModal.vue';
 
 defineProps({
@@ -85,6 +93,9 @@ defineProps({
 
 const pwa = usePwaStore();
 const toast = useToastStore();
+const branding = useBrandingStore();
+
+const faviconDisplayUrl = computed(() => absolutePublicUrl(branding.faviconUrl));
 const installing = ref(false);
 const dismissed = ref(false);
 

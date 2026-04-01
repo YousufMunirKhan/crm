@@ -89,6 +89,52 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Favicon -->
+                    <div class="pt-6 border-t border-slate-200">
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Favicon</label>
+                        <p class="text-xs text-slate-500 mb-3">
+                            Shown in the browser tab, sidebar (if no logo), and PWA install prompt. Square PNG or ICO works best (32×32 or 64×64; max 1&nbsp;MB).
+                        </p>
+                        <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+                            <div class="w-16 h-16 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center bg-slate-50 shrink-0 overflow-hidden">
+                                <img
+                                    v-if="settings.favicon_url"
+                                    :src="settings.favicon_url"
+                                    alt=""
+                                    class="w-full h-full object-cover"
+                                >
+                                <span v-else class="text-slate-400 text-xs text-center px-1">No favicon</span>
+                            </div>
+                            <div class="space-y-3">
+                                <label class="block">
+                                    <span class="sr-only">Choose favicon</span>
+                                    <input
+                                        type="file"
+                                        ref="faviconInput"
+                                        @change="handleFaviconUpload"
+                                        accept=".ico,.png,.jpg,.jpeg,.gif,.svg,.webp,image/x-icon,image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
+                                        class="block w-full text-sm text-slate-500
+                                            file:mr-4 file:py-2 file:px-4
+                                            file:rounded-lg file:border-0
+                                            file:text-sm file:font-semibold
+                                            file:bg-slate-900 file:text-white
+                                            hover:file:bg-slate-800
+                                            file:cursor-pointer"
+                                    >
+                                </label>
+                                <button
+                                    v-if="settings.favicon_url"
+                                    type="button"
+                                    @click="deleteFavicon"
+                                    class="text-sm text-red-600 hover:text-red-700"
+                                >
+                                    Remove favicon
+                                </button>
+                                <p v-if="uploadingFavicon" class="text-sm text-blue-600">Uploading...</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -846,9 +892,11 @@ import { ref, reactive, onMounted } from 'vue';
 import axios from 'axios';
 import { usePwaStore } from '@/stores/pwa';
 import { useToastStore } from '@/stores/toast';
+import { useBrandingStore } from '@/stores/branding';
 
 const pwa = usePwaStore();
 const toast = useToastStore();
+const branding = useBrandingStore();
 
 const loading = ref(true);
 const saving = ref(false);
@@ -862,8 +910,10 @@ const whatsappCloudTestResult = ref(null);
 const savingFacebook = ref(false);
 const testingSmtp = ref(false);
 const uploadingLogo = ref(false);
+const uploadingFavicon = ref(false);
 const testEmail = ref('');
 const logoInput = ref(null);
+const faviconInput = ref(null);
 const webhookUrl = ref(`${window.location.origin}/api/whatsapp/webhook`);
 
 const activeSection = ref('branding');
@@ -891,6 +941,7 @@ const settings = reactive({
     company_vat: '',
     company_address: '',
     logo_url: '',
+    favicon_url: '',
     social_facebook_url: '',
     social_twitter_url: '',
     social_linkedin_url: '',
@@ -975,6 +1026,7 @@ const loadSettings = async () => {
         settings.company_vat = data.company_vat || '';
         settings.company_address = data.company_address || '';
         settings.logo_url = data.logo_url || '';
+        settings.favicon_url = data.favicon_url || '';
         settings.social_facebook_url = data.social_facebook_url || '';
         settings.social_twitter_url = data.social_twitter_url || '';
         settings.social_linkedin_url = data.social_linkedin_url || '';
@@ -1061,6 +1113,7 @@ const handleLogoUpload = async (event) => {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
         settings.logo_url = response.data.url;
+        await branding.loadPublic(true);
         toast.success('Logo uploaded successfully');
     } catch (error) {
         console.error('Failed to upload logo:', error);
@@ -1075,10 +1128,47 @@ const deleteLogo = async () => {
     try {
         await axios.delete('/api/settings/logo');
         settings.logo_url = '';
+        await branding.loadPublic(true);
         toast.success('Logo deleted');
     } catch (error) {
         console.error('Failed to delete logo:', error);
         toast.error('Failed to delete logo');
+    }
+};
+
+const handleFaviconUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    uploadingFavicon.value = true;
+    const formData = new FormData();
+    formData.append('favicon', file);
+
+    try {
+        const response = await axios.post('/api/settings/favicon', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        settings.favicon_url = response.data.url;
+        await branding.loadPublic(true);
+        toast.success('Favicon uploaded successfully');
+    } catch (error) {
+        console.error('Failed to upload favicon:', error);
+        toast.error(error.response?.data?.message || 'Failed to upload favicon');
+    } finally {
+        uploadingFavicon.value = false;
+        if (faviconInput.value) faviconInput.value.value = '';
+    }
+};
+
+const deleteFavicon = async () => {
+    try {
+        await axios.delete('/api/settings/favicon');
+        settings.favicon_url = '';
+        await branding.loadPublic(true);
+        toast.success('Favicon deleted');
+    } catch (error) {
+        console.error('Failed to delete favicon:', error);
+        toast.error('Failed to delete favicon');
     }
 };
 

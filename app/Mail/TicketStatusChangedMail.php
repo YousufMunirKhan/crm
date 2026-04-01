@@ -24,7 +24,7 @@ class TicketStatusChangedMail extends Mailable
         public string $previousStatus,
         public ?int $changedByUserId,
     ) {
-        $this->ticket->loadMissing(['customer', 'creator', 'assignee', 'attachments']);
+        $this->ticket->loadMissing(['customer', 'creator', 'assignee', 'assignees', 'attachments']);
         $this->companyName = Setting::where('key', 'company_name')->first()?->value ?? config('app.name', 'CRM');
         $this->ticketUrl = CrmPublicUrl::ticket((int) $this->ticket->id);
     }

@@ -1,30 +1,40 @@
 <template>
-    <div class="w-full min-w-0 max-w-4xl mx-auto p-3 sm:p-4 lg:p-6 space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
-            <div class="flex items-center gap-2 min-w-0">
-                <button
-                    @click="$router.back()"
-                    class="p-2 hover:bg-slate-100 rounded-lg transition touch-manipulation shrink-0"
-                >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                    </svg>
-                </button>
-                <h1 class="text-xl lg:text-2xl font-bold text-slate-900">
-                    {{ isSelfHrOnly ? 'Bank details & documents' : 'Edit Employee' }}
-                </h1>
+    <div class="min-h-screen bg-slate-50 w-full min-w-0">
+        <div class="w-full min-w-0 max-w-4xl mx-auto p-3 sm:p-4 lg:p-6 space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
+                <div class="flex items-center gap-2 min-w-0">
+                    <button
+                        @click="$router.back()"
+                        class="p-2 hover:bg-white rounded-xl border border-transparent hover:border-slate-200 transition touch-manipulation shrink-0"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                    <h1 class="text-xl lg:text-2xl font-bold text-slate-900">
+                        {{ isSelfHrOnly ? 'Bank details & documents' : 'Edit Employee' }}
+                    </h1>
+                </div>
             </div>
-        </div>
 
-        <div v-if="loading" class="text-center py-12 text-slate-500">
-            Loading...
-        </div>
+            <div v-if="loading" class="text-center py-12 text-slate-500">
+                Loading...
+            </div>
 
-        <form
-            v-else
-            class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-6 space-y-6 min-w-0"
-            @submit.prevent="handleSubmit"
-        >
+            <form
+                v-else
+                class="form-card min-w-0"
+                @submit.prevent="handleSubmit"
+            >
+                <div class="form-section-head-mint">
+                    <h2 class="form-section-title-mint text-lg lg:text-xl">
+                        {{ isSelfHrOnly ? 'Your HR profile' : 'Employee record' }}
+                    </h2>
+                    <p class="form-section-desc-mint">
+                        {{ isSelfHrOnly ? 'Update bank details and attachments below.' : 'Personal, job, and payroll-related fields in one place.' }}
+                    </p>
+                </div>
+                <div class="form-body space-y-8">
             <div
                 v-if="isSelfHrOnly"
                 class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"
@@ -38,63 +48,63 @@
 
             <!-- Personal details -->
             <div v-if="!isSelfHrOnly" class="space-y-4">
-                <h2 class="text-sm font-semibold text-slate-900">Personal details</h2>
+                <h2 class="form-section-title text-base">Personal details</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Full name *</label>
+                        <label class="form-label">Full name *</label>
                         <input
                             v-model="form.name"
                             type="text"
                             required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input"
                         />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Email *</label>
+                        <label class="form-label">Email *</label>
                         <input
                             v-model="form.email"
                             type="email"
                             required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input"
                         />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+                        <label class="form-label">Phone</label>
                         <input
                             v-model="form.phone"
                             type="text"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input"
                         />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Date of birth</label>
+                        <label class="form-label">Date of birth</label>
                         <input
                             v-model="form.date_of_birth"
                             type="date"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input"
                         />
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Address</label>
+                    <label class="form-label">Address</label>
                     <textarea
                         v-model="form.address"
                         rows="2"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                        class="form-input resize-none"
                     />
                 </div>
             </div>
 
             <!-- Job & access -->
-            <div v-if="!isSelfHrOnly" class="space-y-4">
-                <h2 class="text-sm font-semibold text-slate-900">Job & access</h2>
+            <div v-if="!isSelfHrOnly" class="space-y-4 border-t border-slate-100 pt-6">
+                <h2 class="form-section-title text-base">Job & access</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Role *</label>
+                        <label class="form-label">Role *</label>
                         <select
                             v-model="form.role_id"
                             required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input"
                         >
                             <option value="">Select role</option>
                             <option v-for="role in roles" :key="role.id" :value="role.id">
@@ -103,10 +113,10 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Employee type</label>
+                        <label class="form-label">Employee type</label>
                         <select
                             v-model="form.employee_type"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input"
                         >
                             <option value="">Select type</option>
                             <option value="field_worker">Field Worker</option>
@@ -115,18 +125,18 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Hire date</label>
+                        <label class="form-label">Hire date</label>
                         <input
                             v-model="form.hire_date"
                             type="date"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input"
                         />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                        <label class="form-label">Status</label>
                         <select
                             v-model="form.is_active"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input"
                         >
                             <option :value="true">Active</option>
                             <option :value="false">Inactive</option>
@@ -135,8 +145,8 @@
                 </div>
             </div>
 
-            <div v-if="canEditNavPerms" class="space-y-4 border border-slate-200 rounded-lg p-4 bg-slate-50">
-                <h2 class="text-sm font-semibold text-slate-900">Sidebar menu access</h2>
+            <div v-if="canEditNavPerms" class="space-y-4 border border-slate-200 rounded-xl p-4 bg-slate-50/80">
+                <h2 class="form-section-title text-base">Sidebar menu access</h2>
                 <p class="text-xs text-slate-600">
                     Leave this off for default role menu. Turn on to limit this user to selected sections.
                 </p>
@@ -144,7 +154,7 @@
                     <input
                         v-model="restrictMenu"
                         type="checkbox"
-                        class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        class="form-checkbox"
                     />
                     Limit sidebar to selected sections only
                 </label>
@@ -161,7 +171,7 @@
                         <input
                             v-model="sectionChecks[opt.key]"
                             type="checkbox"
-                            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            class="form-checkbox"
                         />
                         {{ opt.label }}
                     </label>
@@ -169,51 +179,51 @@
             </div>
 
             <!-- Bank details -->
-            <div class="space-y-4">
-                <h2 class="text-sm font-semibold text-slate-900">Bank details</h2>
+            <div class="space-y-4 border-t border-slate-100 pt-6">
+                <h2 class="form-section-title text-base">Bank details</h2>
                 <p class="text-xs text-slate-500">
                     These details are used for HR and salary purposes only.
                 </p>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Account holder name</label>
+                        <label class="form-label">Account holder name</label>
                         <input
                             v-model="form.bank_account_name"
                             type="text"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input"
                         />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Bank name</label>
+                        <label class="form-label">Bank name</label>
                         <input
                             v-model="form.bank_name"
                             type="text"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input"
                         />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Sort code</label>
+                        <label class="form-label">Sort code</label>
                         <input
                             v-model="form.bank_sort_code"
                             type="text"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input"
                         />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Account number</label>
+                        <label class="form-label">Account number</label>
                         <input
                             v-model="form.bank_account_number"
                             type="text"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input"
                         />
                     </div>
                 </div>
             </div>
 
             <!-- Documents: existing + new attachments -->
-            <div class="space-y-4">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-sm font-semibold text-slate-900">Attachments</h2>
+            <div class="space-y-4 border-t border-slate-100 pt-6">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <h2 class="form-section-title text-base">Attachments</h2>
                     <span class="text-xs text-slate-500">Existing files plus new ones you add here.</span>
                 </div>
 
@@ -234,7 +244,7 @@
                                 :href="doc.file_path"
                                 target="_blank"
                                 rel="noopener"
-                                class="text-blue-600 hover:underline"
+                                class="text-violet-600 hover:text-violet-800 font-medium"
                             >
                                 View
                             </a>
@@ -257,7 +267,7 @@
                         v-model="newDocName"
                         type="text"
                         placeholder="Attachment name"
-                        class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                        class="form-input"
                     />
                     <div>
                         <label
@@ -277,7 +287,7 @@
                     </div>
                     <button
                         type="button"
-                        class="px-3 py-2 text-xs bg-slate-900 text-white rounded-lg hover:bg-slate-800"
+                        class="px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-600/20 hover:bg-emerald-700"
                         @click="queueDocument"
                     >
                         Add
@@ -302,32 +312,35 @@
             </div>
 
             <!-- Password -->
-            <div v-if="!isSelfHrOnly" class="space-y-2">
-                <label class="block text-sm font-medium text-slate-700 mb-1">Password (leave blank to keep current)</label>
+            <div v-if="!isSelfHrOnly" class="space-y-2 border-t border-slate-100 pt-6">
+                <label class="form-label">Password (leave blank to keep current)</label>
                 <input
                     v-model="form.password"
                     type="password"
-                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    class="form-input max-w-md"
                 />
             </div>
 
-            <div class="flex justify-end gap-3 pt-2">
-                <button
-                    type="button"
-                    class="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
-                    @click="$router.back()"
-                >
-                    Cancel
-                </button>
-                <button
-                    type="submit"
-                    :disabled="saving"
-                    class="px-4 py-2 rounded-lg bg-slate-900 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
-                >
-                    {{ saving ? 'Saving...' : 'Save changes' }}
-                </button>
-            </div>
-        </form>
+                </div>
+
+                <div class="form-actions">
+                    <button
+                        type="button"
+                        class="form-btn-cancel"
+                        @click="$router.back()"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        :disabled="saving"
+                        class="form-btn-submit"
+                    >
+                        {{ saving ? 'Saving...' : 'Save changes' }}
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </template>
 

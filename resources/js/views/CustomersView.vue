@@ -1,54 +1,50 @@
 <template>
-    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-        <!-- Header: one list per URL (?type=prospect | ?type=customer), no tab switcher -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-                <h1 class="text-xl sm:text-2xl font-bold text-slate-900">{{ activeTab === 'prospect' ? 'Prospects' : 'Customers' }}</h1>
-                <p class="text-sm text-slate-500 mt-1">
-                    {{ pagination?.total || 0 }} {{ activeTab === 'prospect' ? 'prospects' : 'customers' }}
-                </p>
-                <p class="mt-2">
-                    <router-link
-                        v-if="activeTab === 'prospect'"
-                        :to="{ path: '/customers', query: { type: 'customer' } }"
-                        class="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                    >
-                        Go to Customers
-                    </router-link>
-                    <router-link
-                        v-else
-                        :to="{ path: '/customers', query: { type: 'prospect' } }"
-                        class="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                    >
-                        Go to Prospects
-                    </router-link>
-                </p>
-            </div>
-            <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+    <div class="w-full min-w-0">
+    <ListingPageShell
+        :title="customersPageTitle"
+        :subtitle="customersPageSubtitle"
+        :badge="customersBadge"
+    >
+        <template #actions>
+            <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-stretch sm:justify-end">
                 <button
+                    type="button"
                     @click="exportToCSV"
                     :disabled="exporting"
-                    class="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 text-sm disabled:opacity-50 touch-manipulation flex-1 min-w-[8rem] sm:flex-initial text-center"
+                    class="listing-btn-outline flex-1 min-w-[8rem] sm:flex-initial disabled:opacity-50"
                 >
                     {{ exporting ? 'Exporting...' : 'Export CSV' }}
                 </button>
-                <button
-                    @click="showImportModal = true"
-                    class="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 text-sm touch-manipulation flex-1 min-w-[8rem] sm:flex-initial text-center"
-                >
+                <button type="button" class="listing-btn-outline flex-1 min-w-[8rem] sm:flex-initial" @click="showImportModal = true">
                     Import
                 </button>
                 <router-link
                     :to="{ path: '/customers/add', query: { type: activeTab } }"
-                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 text-sm touch-manipulation flex-1 min-w-[8rem] sm:flex-initial text-center"
+                    class="listing-btn-accent flex-1 min-w-[8rem] sm:flex-initial text-center touch-manipulation"
                 >
-                    + {{ activeTab === 'prospect' ? 'Add Prospect' : 'Add Customer' }}
+                    + {{ activeTab === 'prospect' ? 'Add prospect' : 'Add customer' }}
                 </router-link>
             </div>
-        </div>
+        </template>
 
-        <!-- Filters Section -->
-        <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 min-w-0">
+        <template #filters>
+            <div class="space-y-4 min-w-0">
+                <p class="text-sm">
+                    <router-link
+                        v-if="activeTab === 'prospect'"
+                        :to="{ path: '/customers', query: { type: 'customer' } }"
+                        class="text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                        Go to Customers →
+                    </router-link>
+                    <router-link
+                        v-else
+                        :to="{ path: '/customers', query: { type: 'prospect' } }"
+                        class="text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                        Go to Prospects →
+                    </router-link>
+                </p>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
                 <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -65,15 +61,15 @@
             </div>
 
             <!-- Quick Search -->
-            <div class="relative">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="relative min-w-0 w-full">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
                     v-model="filters.search"
                     type="text"
-                    placeholder="Quick search by name, business name, phone, email, city, or postcode..."
-                    class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Search name, business, phone, email, city…"
+                    class="w-full min-w-0 max-w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 box-border"
                     @input="handleSearch"
                 />
             </div>
@@ -210,10 +206,11 @@
                     </button>
                 </span>
             </div>
-        </div>
+            </div>
+        </template>
 
         <!-- Loading State -->
-        <div v-if="loading" class="bg-white rounded-xl shadow-sm p-12 text-center">
+        <div v-if="loading" class="px-5 py-16 text-center text-slate-500">
             <div class="inline-flex items-center gap-2 text-slate-500">
                 <svg class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -224,7 +221,7 @@
         </div>
 
         <!-- Empty State -->
-        <div v-else-if="customers.length === 0" class="bg-white rounded-xl shadow-sm p-12 text-center">
+        <div v-else-if="customers.length === 0" class="px-5 py-12 text-center">
             <div class="text-slate-400 mb-4">
                 <svg class="mx-auto h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -237,32 +234,35 @@
             <router-link
                 v-if="!hasActiveFilters"
                 :to="{ path: '/customers/add', query: { type: activeTab } }"
-                class="inline-block px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
+                class="listing-btn-accent inline-flex px-6 py-3 touch-manipulation"
             >
                 + Add Your First {{ activeTab === 'prospect' ? 'Prospect' : 'Customer' }}
             </router-link>
             <button
                 v-else
+                type="button"
                 @click="clearFilters"
-                class="px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+                class="listing-btn-outline px-6 py-3"
             >
                 Clear Filters
             </button>
         </div>
 
-        <!-- Customers Table -->
-        <div v-else class="bg-white rounded-xl shadow-sm overflow-hidden min-w-0">
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[1000px]">
+        <!-- Customers Table (lg+); card list below lg — avoids broken table-fixed on narrow widths -->
+        <div v-else class="overflow-hidden min-w-0">
+            <div class="hidden lg:block w-full overflow-x-auto">
+                <table class="w-full min-w-[860px] table-auto">
                     <thead class="bg-slate-50 border-b border-slate-200">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Customer</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Business name</th>
+                            <th class="hidden xl:table-cell px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Business name</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Contact</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Location</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Created By</th>
+                            <th class="hidden lg:table-cell px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Location</th>
+                            <th class="hidden lg:table-cell px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Created By</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Assigned</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Stats</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                {{ activeTab === 'prospect' ? 'Leads' : 'Products Won' }}
+                            </th>
                             <th class="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
@@ -272,58 +272,58 @@
                             :key="customer.id" 
                             class="hover:bg-slate-50 transition-colors"
                         >
-                            <td class="px-6 py-4">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm">
+                            <td class="px-6 py-4 min-w-0 max-w-[14rem]">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm">
                                         {{ getInitials(customer.name) }}
                                     </div>
-                                    <div>
+                                    <div class="min-w-0">
                                         <router-link
                                             :to="`/customers/${customer.id}`"
-                                            class="font-medium text-slate-900 hover:text-blue-600"
+                                            class="font-medium text-slate-900 hover:text-blue-600 block truncate"
                                         >
                                             {{ customer.name }}
                                         </router-link>
-                                        <div v-if="customer.vat_number" class="text-xs text-slate-500">
+                                        <div v-if="customer.vat_number" class="text-xs text-slate-500 truncate">
                                             VAT: {{ customer.vat_number }}
                                         </div>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4">
-                                <span v-if="customer.business_name" class="text-sm text-slate-900">{{ customer.business_name }}</span>
+                            <td class="hidden xl:table-cell px-6 py-4 min-w-0 max-w-[10rem]">
+                                <span v-if="customer.business_name" class="text-sm text-slate-900 break-words">{{ customer.business_name }}</span>
                                 <span v-else class="text-slate-400 text-sm">—</span>
                             </td>
-                            <td class="px-6 py-4">
+                            <td class="px-6 py-4 min-w-0 max-w-[12rem]">
                                 <div class="space-y-1">
-                                    <div class="flex items-center gap-2 text-sm text-slate-900">
-                                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div class="flex items-center gap-2 text-sm text-slate-900 min-w-0">
+                                        <svg class="w-4 h-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                                         </svg>
-                                        {{ customer.phone || '-' }}
+                                        <span class="truncate">{{ customer.phone || '-' }}</span>
                                     </div>
-                                    <div v-if="customer.email" class="flex items-center gap-2 text-sm text-slate-600">
-                                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div v-if="customer.email" class="flex items-center gap-2 text-sm text-slate-600 min-w-0">
+                                        <svg class="w-4 h-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                         </svg>
-                                        {{ customer.email }}
+                                        <span class="truncate">{{ customer.email }}</span>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4">
+                            <td class="hidden lg:table-cell px-6 py-4 min-w-0">
                                 <div v-if="customer.city || customer.postcode" class="space-y-1">
-                                    <div v-if="customer.city" class="text-sm text-slate-900">{{ customer.city }}</div>
+                                    <div v-if="customer.city" class="text-sm text-slate-900 break-words">{{ customer.city }}</div>
                                     <div v-if="customer.postcode" class="text-xs text-slate-500 font-mono">{{ customer.postcode }}</div>
                                 </div>
                                 <span v-else class="text-slate-400 text-sm">-</span>
                             </td>
-                            <td class="px-6 py-4">
+                            <td class="hidden lg:table-cell px-6 py-4">
                                 <span v-if="customer.creator" class="inline-flex items-center px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
                                     {{ customer.creator.name }}
                                 </span>
                                 <span v-else class="text-slate-400 text-xs">-</span>
                             </td>
-                            <td class="px-6 py-4">
+                            <td class="px-6 py-4 min-w-0 max-w-[10rem]">
                                 <div v-if="customer.assigned_users && customer.assigned_users.length > 0" class="flex flex-wrap gap-1">
                                     <span
                                         v-for="user in customer.assigned_users.slice(0, 2)"
@@ -341,24 +341,13 @@
                                 </div>
                                 <span v-else class="text-slate-400 text-xs">Unassigned</span>
                             </td>
-                            <td class="px-6 py-4">
-                                <div class="flex gap-3 text-xs">
-                                    <div class="text-center">
-                                        <div class="font-semibold text-slate-900">{{ customer.leads?.length || 0 }}</div>
-                                        <div class="text-slate-500">Leads</div>
-                                    </div>
-                                    <div class="text-center">
-                                        <div class="font-semibold text-slate-900">{{ customer.invoices?.length || 0 }}</div>
-                                        <div class="text-slate-500">Invoices</div>
-                                    </div>
-                                    <div class="text-center">
-                                        <div class="font-semibold text-slate-900">{{ customer.tickets?.length || 0 }}</div>
-                                        <div class="text-slate-500">Tickets</div>
-                                    </div>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                                    {{ activeTab === 'prospect' ? (customer.leads?.length || 0) : (customer.won_products_count || 0) }}
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-right">
-                                <div class="flex justify-end gap-2">
+                            <td class="px-6 py-4 text-right whitespace-nowrap">
+                                <div class="flex flex-wrap justify-end gap-1 sm:gap-2">
                                     <router-link
                                         :to="`/customers/${customer.id}`"
                                         class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -402,111 +391,110 @@
                     </tbody>
                 </table>
             </div>
-
-            <!-- Pagination -->
-            <div v-if="pagination && pagination.last_page > 1" class="px-4 sm:px-6 py-4 border-t border-slate-200 bg-slate-50">
-                <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
-                    <div class="text-sm text-slate-600 text-center sm:text-left min-w-0">
-                        Showing {{ ((pagination.current_page - 1) * pagination.per_page) + 1 }} 
-                        to {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} 
-                        of {{ pagination.total }} customers
-                    </div>
-                    <div class="flex flex-wrap items-center justify-center sm:justify-end gap-2">
-                        <button
-                            @click="loadCustomers(1)"
-                            :disabled="pagination.current_page === 1"
-                            class="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+            <div class="lg:hidden px-3 pb-4 space-y-3 min-w-0">
+                <div
+                    v-for="customer in customers"
+                    :key="`mobile-${customer.id}`"
+                    class="rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.04] p-4 space-y-3 min-w-0"
+                >
+                    <div class="flex items-start justify-between gap-3 min-w-0">
+                        <router-link
+                            :to="`/customers/${customer.id}`"
+                            class="font-semibold text-slate-900 hover:text-blue-600 break-words min-w-0 flex-1"
                         >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                            </svg>
-                        </button>
-                        <button
-                            @click="loadCustomers(pagination.current_page - 1)"
-                            :disabled="pagination.current_page === 1"
-                            class="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                            </svg>
-                        </button>
-                        
-                        <div class="flex items-center gap-1">
-                            <template v-for="page in visiblePages" :key="page">
-                                <button
-                                    v-if="page !== '...'"
-                                    @click="loadCustomers(page)"
-                                    :class="[
-                                        'w-10 h-10 rounded-lg text-sm font-medium transition-colors touch-manipulation',
-                                        page === pagination.current_page
-                                            ? 'bg-slate-900 text-white'
-                                            : 'border border-slate-300 hover:bg-white text-slate-700'
-                                    ]"
-                                >
-                                    {{ page }}
-                                </button>
-                                <span v-else class="px-2 text-slate-400">...</span>
-                            </template>
+                            {{ customer.name }}
+                        </router-link>
+                        <div class="shrink-0 inline-flex flex-col items-end gap-1">
+                            <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                {{ activeTab === 'prospect' ? 'Leads' : 'Won' }}
+                            </span>
+                            <div class="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold tabular-nums">
+                                {{ activeTab === 'prospect' ? (customer.leads?.length || 0) : (customer.won_products_count || 0) }}
+                            </div>
                         </div>
-
-                        <button
-                            @click="loadCustomers(pagination.current_page + 1)"
-                            :disabled="pagination.current_page === pagination.last_page"
-                            class="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                            </svg>
-                        </button>
-                        <button
-                            @click="loadCustomers(pagination.last_page)"
-                            :disabled="pagination.current_page === pagination.last_page"
-                            class="p-2 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                            </svg>
-                        </button>
-
-                        <select
-                            v-model="perPage"
-                            @change="changePerPage"
-                            class="ml-4 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option :value="15">15 per page</option>
-                            <option :value="25">25 per page</option>
-                            <option :value="50">50 per page</option>
-                            <option :value="100">100 per page</option>
-                        </select>
+                    </div>
+                    <div v-if="customer.business_name" class="text-sm text-slate-600 break-words">
+                        {{ customer.business_name }}
+                    </div>
+                    <div class="text-sm text-slate-600 space-y-1">
+                        <div class="break-words"><span class="text-slate-500">Phone:</span> {{ customer.phone || '—' }}</div>
+                        <div v-if="customer.email" class="break-all"><span class="text-slate-500">Email:</span> {{ customer.email }}</div>
+                    </div>
+                    <div class="text-sm text-slate-600 break-words">
+                        {{ customer.city || '—' }}<span v-if="customer.postcode"> · {{ customer.postcode }}</span>
+                    </div>
+                    <div v-if="customer.creator" class="text-xs">
+                        <span class="text-slate-500">Created by </span>
+                        <span class="font-medium text-green-800 bg-green-50 px-2 py-0.5 rounded">{{ customer.creator.name }}</span>
+                    </div>
+                    <div class="text-sm text-slate-700">
+                        <span class="text-slate-500 text-xs uppercase tracking-wide font-semibold">Assigned</span>
+                        <div class="mt-1 flex flex-wrap gap-1">
+                            <template v-if="customer.assigned_users && customer.assigned_users.length">
+                                <span
+                                    v-for="user in customer.assigned_users"
+                                    :key="user.id"
+                                    class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium"
+                                >
+                                    {{ user.name }}
+                                </span>
+                            </template>
+                            <span v-else class="text-slate-400 text-xs">Unassigned</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-x-4 gap-y-2 pt-1 border-t border-slate-100">
+                        <router-link :to="`/customers/${customer.id}`" class="listing-link-edit">View</router-link>
+                        <button type="button" class="text-purple-600 hover:text-purple-800 font-medium text-sm" @click="openAssignmentModal(customer)">Assign</button>
+                        <router-link :to="`/customers/${customer.id}/edit`" class="listing-link-edit">Edit</router-link>
+                        <button type="button" class="listing-link-delete" @click="openDeleteConfirm(customer)">Delete</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Delete Confirmation Modal -->
-        <DeleteConfirm
-            v-if="showDeleteConfirm"
-            title="Delete Customer"
-            :message="`Are you sure you want to delete ${customerToDelete?.name}? This will also delete all associated leads, tickets, and invoices.`"
-            :loading="deleting"
-            @confirm="confirmDelete"
-            @cancel="closeDeleteConfirm"
-        />
+        <template #pagination>
+            <div v-if="pagination && customers.length && !loading" class="border-t border-slate-100">
+                <div class="px-5 sm:px-6 py-3 flex flex-wrap justify-end items-center gap-3 bg-slate-50/50">
+                    <span class="text-xs font-medium text-slate-600">Rows per page</span>
+                    <select v-model="perPage" class="listing-input w-auto min-w-[9rem]" @change="changePerPage">
+                        <option :value="15">15 per page</option>
+                        <option :value="25">25 per page</option>
+                        <option :value="50">50 per page</option>
+                        <option :value="100">100 per page</option>
+                    </select>
+                </div>
+                <Pagination
+                    :pagination="pagination"
+                    embedded
+                    :result-label="activeTab === 'prospect' ? 'prospects' : 'customers'"
+                    :singular-label="activeTab === 'prospect' ? 'prospect' : 'customer'"
+                    @page-change="loadCustomers"
+                />
+            </div>
+        </template>
+    </ListingPageShell>
 
-        <!-- Import Modal -->
-        <ImportModal
-            v-if="showImportModal"
-            @close="showImportModal = false"
-            @imported="handleImportComplete"
-        />
+    <DeleteConfirm
+        v-if="showDeleteConfirm"
+        title="Delete Customer"
+        :message="`Are you sure you want to delete ${customerToDelete?.name}? This will also delete all associated leads, tickets, and invoices.`"
+        :loading="deleting"
+        @confirm="confirmDelete"
+        @cancel="closeDeleteConfirm"
+    />
 
-        <!-- Assignment Modal -->
-        <CustomerAssignmentModal
-            v-if="showAssignmentModal && customerToAssign"
-            :customer="customerToAssign"
-            @close="closeAssignmentModal"
-            @assigned="handleAssignmentComplete"
-        />
+    <ImportModal
+        v-if="showImportModal"
+        @close="showImportModal = false"
+        @imported="handleImportComplete"
+    />
+
+    <CustomerAssignmentModal
+        v-if="showAssignmentModal && customerToAssign"
+        :customer="customerToAssign"
+        @close="closeAssignmentModal"
+        @assigned="handleAssignmentComplete"
+    />
     </div>
 </template>
 
@@ -517,6 +505,8 @@ import axios from 'axios';
 import DeleteConfirm from '@/components/DeleteConfirm.vue';
 import ImportModal from '@/components/ImportModal.vue';
 import CustomerAssignmentModal from '@/components/CustomerAssignmentModal.vue';
+import ListingPageShell from '@/components/ListingPageShell.vue';
+import Pagination from '@/components/Pagination.vue';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
 import { useToastStore } from '@/stores/toast';
 
@@ -579,29 +569,17 @@ const activeFilterTags = computed(() => {
     return tags;
 });
 
-const visiblePages = computed(() => {
-    if (!pagination.value) return [];
-    const current = pagination.value.current_page;
-    const last = pagination.value.last_page;
-    const pages = [];
+const customersPageTitle = computed(() => (activeTab.value === 'prospect' ? 'Prospects' : 'Customers'));
 
-    if (last <= 7) {
-        for (let i = 1; i <= last; i++) pages.push(i);
-    } else {
-        pages.push(1);
-        if (current > 3) pages.push('...');
-        
-        const start = Math.max(2, current - 1);
-        const end = Math.min(last - 1, current + 1);
-        
-        for (let i = start; i <= end; i++) pages.push(i);
-        
-        if (current < last - 2) pages.push('...');
-        pages.push(last);
-    }
-    
-    return pages;
-});
+const customersPageSubtitle = computed(() =>
+    activeTab.value === 'prospect'
+        ? 'Pipeline contacts before conversion — search, filter, and hand off to Customers when won.'
+        : 'Converted accounts and ongoing relationships — switch to Prospects for open pipeline.',
+);
+
+const customersBadge = computed(() =>
+    pagination.value?.total != null ? `${pagination.value.total} Total` : null,
+);
 
 const getInitials = (name) => {
     if (!name) return '?';

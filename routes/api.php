@@ -239,6 +239,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Logo upload
     Route::post('/settings/logo', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'uploadLogo']);
     Route::delete('/settings/logo', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'deleteLogo']);
+    Route::post('/settings/favicon', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'uploadFavicon']);
+    Route::delete('/settings/favicon', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'deleteFavicon']);
     
     // Integration settings
     Route::put('/settings/smtp', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateSmtp']);

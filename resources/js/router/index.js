@@ -86,6 +86,18 @@ const routes = [
         meta: { requiresAuth: true, title: 'Tickets' },
     },
     {
+        path: '/tickets/create',
+        name: 'ticket-create',
+        component: () => import('@/views/TicketCreateView.vue'),
+        meta: { requiresAuth: true, title: 'Create Ticket' },
+    },
+    {
+        path: '/tickets/:id/edit',
+        name: 'ticket-edit',
+        component: () => import('@/views/TicketEditView.vue'),
+        meta: { requiresAuth: true, title: 'Edit Ticket' },
+    },
+    {
         path: '/tickets/:id',
         name: 'ticket-detail',
         component: () => import('@/views/TicketDetailView.vue'),
@@ -184,16 +196,28 @@ const routes = [
         meta: { requiresAuth: true, title: 'Salary Reports', roles: ['Admin', 'Manager', 'System Admin'] },
     },
     {
-        path: '/expenses',
-        name: 'expenses',
-        component: () => import('@/views/ExpensesView.vue'),
-        meta: { requiresAuth: true, title: 'Expense Management', roles: ['Admin', 'Manager'] },
-    },
-    {
         path: '/expenses/monthly-report',
         name: 'expenses-monthly-report',
         component: () => import('@/views/ExpensesMonthlyReportView.vue'),
         meta: { requiresAuth: true, title: 'Monthly Expense Report', roles: ['Admin', 'Manager'] },
+    },
+    {
+        path: '/expenses/create',
+        name: 'expense-create',
+        component: () => import('@/views/ExpenseFormView.vue'),
+        meta: { requiresAuth: true, title: 'Add Expense', roles: ['Admin', 'Manager'] },
+    },
+    {
+        path: '/expenses/:id/edit',
+        name: 'expense-edit',
+        component: () => import('@/views/ExpenseFormView.vue'),
+        meta: { requiresAuth: true, title: 'Edit Expense', roles: ['Admin', 'Manager'] },
+    },
+    {
+        path: '/expenses',
+        name: 'expenses',
+        component: () => import('@/views/ExpensesView.vue'),
+        meta: { requiresAuth: true, title: 'Expense Management', roles: ['Admin', 'Manager'] },
     },
     {
         path: '/products',

@@ -21,7 +21,7 @@ class SettingsController extends Controller
      */
     public function publicSettings()
     {
-        $publicKeys = ['logo_url', 'company_name', 'company_registration_no', 'company_vat', 'company_phone', 'company_address', 'company_email', 'company_website', 'pwa_enabled', 'social_facebook_url', 'social_twitter_url', 'social_linkedin_url', 'social_instagram_url', 'social_tiktok_url'];
+        $publicKeys = ['logo_url', 'favicon_url', 'company_name', 'company_registration_no', 'company_vat', 'company_phone', 'company_address', 'company_email', 'company_website', 'pwa_enabled', 'social_facebook_url', 'social_twitter_url', 'social_linkedin_url', 'social_instagram_url', 'social_tiktok_url'];
         $settings = Setting::whereIn('key', $publicKeys)->pluck('value', 'key');
         return response()->json($settings);
     }
@@ -92,6 +92,59 @@ class SettingsController extends Controller
         }
 
         return response()->json(['message' => 'Logo deleted successfully']);
+    }
+
+    /**
+     * Upload site favicon (browser tab, PWA install prompt). Stored like logo under public disk.
+     */
+    public function uploadFavicon(Request $request)
+    {
+        $request->validate([
+            'favicon' => ['required', 'file', 'max:1024'],
+        ]);
+
+        $file = $request->file('favicon');
+        $ext = strtolower($file->getClientOriginalExtension() ?: '');
+        $allowed = ['ico', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'];
+        if (! in_array($ext, $allowed, true)) {
+            return response()->json([
+                'message' => 'Invalid file type. Use ICO, PNG, JPG, GIF, SVG, or WebP.',
+            ], 422);
+        }
+
+        $old = Setting::where('key', 'favicon_url')->first();
+        if ($old && $old->value) {
+            $oldPath = str_replace('/storage/', '', $old->value);
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        $path = $file->store('favicons', 'public');
+        $url = '/storage/'.$path;
+
+        Setting::updateOrCreate(
+            ['key' => 'favicon_url'],
+            ['value' => $url]
+        );
+
+        return response()->json([
+            'message' => 'Favicon uploaded successfully',
+            'url' => $url,
+        ]);
+    }
+
+    /**
+     * Delete custom favicon (browser falls back to default icons in HTML).
+     */
+    public function deleteFavicon()
+    {
+        $row = Setting::where('key', 'favicon_url')->first();
+        if ($row && $row->value) {
+            $path = str_replace('/storage/', '', $row->value);
+            Storage::disk('public')->delete($path);
+            $row->delete();
+        }
+
+        return response()->json(['message' => 'Favicon deleted successfully']);
     }
 
     /**

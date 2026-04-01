@@ -1,87 +1,61 @@
 <template>
-    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
-            <div class="min-w-0">
-                <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Salary Reports</h1>
-                <p class="text-sm text-slate-600 mt-1">View and export salary reports by month and employee</p>
-            </div>
+    <ListingPageShell
+        title="Salary reports"
+        subtitle="Aggregate payslips by month and employee — export matches the current filter set."
+        :badge="salaryReportsBadge"
+    >
+        <template #actions>
             <button
-                @click="exportReport"
+                type="button"
                 :disabled="loading"
-                class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 touch-manipulation w-full sm:w-auto"
+                class="listing-btn-primary w-full sm:w-auto disabled:opacity-50"
+                @click="exportReport"
             >
-                <span>📥</span>
                 Export CSV
             </button>
-        </div>
+        </template>
 
-        <!-- Filters -->
-        <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <template #filters>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">From Month</label>
-                    <input
-                        v-model="filters.from_month"
-                        type="month"
-                        class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
+                    <label class="listing-label">From month</label>
+                    <input v-model="filters.from_month" type="month" class="listing-input" />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">To Month</label>
-                    <input
-                        v-model="filters.to_month"
-                        type="month"
-                        class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
+                    <label class="listing-label">To month</label>
+                    <input v-model="filters.to_month" type="month" class="listing-input" />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Employee</label>
-                    <select
-                        v-model="filters.user_id"
-                        class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="">All Employees</option>
+                    <label class="listing-label">Employee</label>
+                    <select v-model="filters.user_id" class="listing-input">
+                        <option value="">All employees</option>
                         <option v-for="user in users" :key="user.id" :value="user.id">
                             {{ user.name }} ({{ user.role?.name || 'N/A' }})
                         </option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Currency</label>
-                    <select
-                        v-model="filters.currency"
-                        class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="">All Currencies</option>
+                    <label class="listing-label">Currency</label>
+                    <select v-model="filters.currency" class="listing-input">
+                        <option value="">All currencies</option>
                         <option value="GBP">GBP (£)</option>
                         <option value="PKR">PKR (Rs)</option>
                     </select>
                 </div>
             </div>
-            <div class="mt-4 flex gap-3">
-                <button
-                    @click="loadReport"
-                    :disabled="loading"
-                    class="px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
-                >
-                    {{ loading ? 'Loading...' : 'Generate Report' }}
+            <div class="mt-4 flex flex-wrap gap-2">
+                <button type="button" :disabled="loading" class="listing-btn-primary disabled:opacity-50" @click="loadReport">
+                    {{ loading ? 'Loading…' : 'Generate report' }}
                 </button>
-                <button
-                    @click="resetFilters"
-                    class="px-6 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
-                >
-                    Reset
-                </button>
+                <button type="button" class="listing-btn-outline" @click="resetFilters">Reset</button>
             </div>
-        </div>
+        </template>
 
-        <!-- Loading State -->
-        <div v-if="loading" class="flex justify-center py-12">
+        <div v-if="loading" class="px-5 py-14 flex justify-center">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
         </div>
 
-        <!-- Summary Cards -->
-        <div v-if="report && !loading" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div v-if="report && !loading" class="grid grid-cols-1 md:grid-cols-4 gap-4 px-3 sm:px-5">
             <div class="bg-white rounded-xl shadow-sm p-6">
                 <div class="text-sm text-slate-600 mb-1">Total Salaries</div>
                 <div class="text-2xl font-bold text-slate-900">{{ report.summary.total_salaries }}</div>
@@ -100,8 +74,7 @@
             </div>
         </div>
 
-        <!-- Monthly Breakdown -->
-        <div v-if="report && !loading" class="bg-white rounded-xl shadow-sm p-6">
+        <div v-if="report && !loading" class="mx-3 sm:mx-5 mb-4 rounded-xl border border-slate-200 bg-slate-50/30 p-5 sm:p-6">
             <h2 class="text-lg font-semibold text-slate-900 mb-4">Monthly Breakdown</h2>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -172,8 +145,7 @@
             </div>
         </div>
 
-        <!-- Detailed Salary List -->
-        <div v-if="report && !loading" class="bg-white rounded-xl shadow-sm p-6">
+        <div v-if="report && !loading" class="mx-3 sm:mx-5 mb-4 rounded-xl border border-slate-200 bg-slate-50/30 p-5 sm:p-6">
             <h2 class="text-lg font-semibold text-slate-900 mb-4">Detailed Salary List</h2>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -218,13 +190,14 @@
                 </table>
             </div>
         </div>
-    </div>
+    </ListingPageShell>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
+import ListingPageShell from '@/components/ListingPageShell.vue';
 
 const toast = useToastStore();
 const loading = ref(false);
@@ -236,6 +209,12 @@ const filters = ref({
     to_month: '',
     user_id: '',
     currency: '',
+});
+
+const salaryReportsBadge = computed(() => {
+    if (loading.value || !report.value?.summary?.total_salaries) return null;
+    const n = report.value.summary.total_salaries;
+    return `${n} ${n === 1 ? 'slip' : 'slips'}`;
 });
 
 const loadUsers = async () => {

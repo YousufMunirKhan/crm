@@ -1,98 +1,81 @@
 <template>
-    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-        <div class="flex flex-col gap-4">
-            <div class="flex items-start justify-between gap-4">
+    <ListingPageShell
+        title="Target vs achievement"
+        subtitle="Monthly targets and performance by employee — summary reflects appointment totals for the selected month."
+        :badge="targetAchievementBadge"
+    >
+        <template #filters>
+            <div class="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
                 <div>
-                    <h1 class="text-2xl font-bold text-slate-900">Target vs Achievement</h1>
-                    <p class="text-sm text-slate-600 mt-1">Track monthly targets and performance by employee.</p>
+                    <label class="listing-label">Month</label>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="listing-btn-outline px-3 py-2" title="Previous month" @click="shiftMonth(-1)">‹</button>
+                        <select v-model="selectedMonth" class="listing-input flex-1 min-w-[10rem]" @change="loadData">
+                            <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
+                        </select>
+                        <button
+                            type="button"
+                            class="listing-btn-outline px-3 py-2"
+                            title="Next month"
+                            :disabled="selectedMonth === monthOptions[0]?.value"
+                            @click="shiftMonth(1)"
+                        >
+                            ›
+                        </button>
+                    </div>
                 </div>
             </div>
+        </template>
 
-            <!-- Summary card -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div class="flex items-center gap-4">
-                        <div
-                            class="w-16 h-16 rounded-full grid place-items-center"
-                            :style="ringStyle(overallPercent)"
-                            aria-label="Overall progress"
-                        >
-                            <div class="w-12 h-12 bg-white rounded-full grid place-items-center text-lg font-bold text-slate-900">
-                                {{ overallPercent }}%
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-x-6 gap-y-2">
-                            <div>
-                                <div class="text-sm text-slate-500">Total Target</div>
-                                <div class="text-lg font-semibold text-slate-900">{{ totalTarget }}</div>
-                            </div>
-                            <div>
-                                <div class="text-sm text-slate-500">Total Achieved</div>
-                                <div class="text-lg font-semibold text-slate-900">{{ totalAchieved }}</div>
-                            </div>
-                            <div class="col-span-2">
-                                <div class="text-sm text-slate-500">Overall</div>
-                                <div class="text-sm font-semibold text-slate-900">{{ overallPercent }}%</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm text-slate-600">Month</span>
-                        <div class="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5">
-                            <button
-                                type="button"
-                                class="w-8 h-8 rounded-lg hover:bg-white border border-transparent hover:border-slate-200 text-slate-600"
-                                @click="shiftMonth(-1)"
-                                title="Previous month"
-                            >
-                                ‹
-                            </button>
-                            <select
-                                v-model="selectedMonth"
-                                @change="loadData"
-                                class="bg-transparent text-sm font-medium text-slate-800 focus:outline-none"
-                            >
-                                <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
-                            </select>
-                            <button
-                                type="button"
-                                class="w-8 h-8 rounded-lg hover:bg-white border border-transparent hover:border-slate-200 text-slate-600"
-                                @click="shiftMonth(1)"
-                                title="Next month"
-                                :disabled="selectedMonth === monthOptions[0]?.value"
-                            >
-                                ›
-                            </button>
-                        </div>
+        <div class="mx-3 sm:mx-5 mb-4 rounded-2xl border border-slate-200 bg-slate-50/40 p-4 sm:p-5">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div
+                    class="w-16 h-16 rounded-full grid place-items-center shrink-0"
+                    :style="ringStyle(overallPercent)"
+                    aria-label="Overall progress"
+                >
+                    <div class="w-12 h-12 bg-white rounded-full grid place-items-center text-lg font-bold text-slate-900">
+                        {{ overallPercent }}%
                     </div>
                 </div>
-
-                <div class="mt-4">
-                    <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                            class="h-2.5 rounded-full bg-gradient-to-r from-blue-600 via-emerald-500 to-emerald-500"
-                            :style="{ width: `${overallPercent}%` }"
-                        />
+                <div class="grid grid-cols-2 gap-x-6 gap-y-2 flex-1">
+                    <div>
+                        <div class="text-sm text-slate-500">Total target</div>
+                        <div class="text-lg font-semibold text-slate-900">{{ totalTarget }}</div>
                     </div>
+                    <div>
+                        <div class="text-sm text-slate-500">Total achieved</div>
+                        <div class="text-lg font-semibold text-slate-900">{{ totalAchieved }}</div>
+                    </div>
+                    <div class="col-span-2">
+                        <div class="text-sm text-slate-500">Overall</div>
+                        <div class="text-sm font-semibold text-slate-900">{{ overallPercent }}%</div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                        class="h-2.5 rounded-full bg-gradient-to-r from-blue-600 via-emerald-500 to-emerald-500"
+                        :style="{ width: `${overallPercent}%` }"
+                    />
                 </div>
             </div>
         </div>
 
-        <div v-if="loading" class="flex justify-center py-12">
+        <div v-if="loading" class="px-5 py-14 flex justify-center">
             <svg class="animate-spin h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
         </div>
 
-        <div v-else-if="data.length === 0" class="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center text-slate-500">
+        <div v-else-if="data.length === 0" class="px-5 py-12 text-center text-slate-500 text-sm">
             No employees with targets for this month. Set targets in
-            <router-link to="/employees/goals" class="text-blue-600 hover:underline">Employee Goals</router-link>.
+            <router-link to="/employees/goals" class="text-blue-600 hover:underline">Employee goals</router-link>.
         </div>
 
-        <div v-else class="space-y-6">
+        <div v-else class="space-y-6 px-3 pb-4 sm:px-5">
             <!-- Appointments board -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div class="px-4 sm:px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -206,12 +189,13 @@
                 </div>
             </div>
         </div>
-    </div>
+    </ListingPageShell>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
+import ListingPageShell from '@/components/ListingPageShell.vue';
 
 const formatMonth = (date) => {
     const d = date instanceof Date ? date : new Date(date);
@@ -223,6 +207,12 @@ const formatMonth = (date) => {
 const selectedMonth = ref(formatMonth(new Date()));
 const loading = ref(false);
 const data = ref([]);
+
+const targetAchievementBadge = computed(() => {
+    if (loading.value || !data.value.length) return null;
+    const n = data.value.length;
+    return `${n} ${n === 1 ? 'employee' : 'employees'}`;
+});
 
 const monthOptions = (() => {
     const opts = [];

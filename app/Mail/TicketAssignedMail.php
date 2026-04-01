@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Models\User;
 use App\Modules\Settings\Models\Setting;
 use App\Modules\Ticket\Models\Ticket;
 use App\Services\CrmPublicUrl;
@@ -19,9 +20,12 @@ class TicketAssignedMail extends Mailable
 
     public readonly string $ticketUrl;
 
-    public function __construct(public Ticket $ticket)
-    {
-        $this->ticket->loadMissing(['customer', 'creator', 'assignee', 'attachments']);
+    public function __construct(
+        public Ticket $ticket,
+        public ?User $recipientUser = null,
+    ) {
+        $this->ticket->loadMissing(['customer', 'creator', 'assignee', 'assignees', 'attachments']);
+        $this->recipientUser = $recipientUser ?? $ticket->assignee;
         $this->companyName = Setting::where('key', 'company_name')->first()?->value ?? config('app.name', 'CRM');
         $this->ticketUrl = CrmPublicUrl::ticket((int) $this->ticket->id);
     }
@@ -44,6 +48,7 @@ class TicketAssignedMail extends Mailable
             view: 'emails.ticket-assigned',
             with: [
                 'ticket' => $this->ticket,
+                'recipientUser' => $this->recipientUser,
                 'companyName' => $this->companyName,
                 'ticketUrl' => $this->ticketUrl,
                 'logoUrl' => $logoUrl,

@@ -1,36 +1,30 @@
 <template>
-    <div class="w-full min-w-0 max-w-6xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Today's Report</h1>
-                <p class="text-sm text-slate-600 mt-1">View all team activities, follow-ups, leads & attendance for any day</p>
+    <ListingPageShell
+        title="Today's report"
+        subtitle="Team activities, follow-ups, leads, and attendance for any day you pick."
+        :badge="reportBadge"
+    >
+        <template #actions>
+            <button
+                v-if="canGenerateReport"
+                type="button"
+                :disabled="generatingReport"
+                class="listing-btn-primary w-full sm:w-auto disabled:opacity-50"
+                @click="generateReport"
+            >
+                {{ generatingReport ? 'Generating…' : 'Generate report (GPT)' }}
+            </button>
+        </template>
+
+        <template #filters>
+            <div class="flex flex-col sm:flex-row flex-wrap gap-3 sm:items-end">
+                <div>
+                    <label class="listing-label">Date</label>
+                    <input v-model="selectedDate" type="date" class="listing-input w-full sm:w-44" @change="loadReport" />
+                </div>
+                <button v-if="selectedDate !== todayStr" type="button" class="listing-btn-outline" @click="goToToday">Today</button>
             </div>
-            <div class="flex flex-wrap items-center gap-3">
-                <label class="text-sm font-medium text-slate-700">Date:</label>
-                <input
-                    v-model="selectedDate"
-                    type="date"
-                    @change="loadReport"
-                    class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                    v-if="selectedDate !== todayStr"
-                    @click="goToToday"
-                    class="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
-                >
-                    Today
-                </button>
-                <button
-                    v-if="canGenerateReport"
-                    type="button"
-                    @click="generateReport"
-                    :disabled="generatingReport"
-                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium"
-                >
-                    {{ generatingReport ? 'Generating...' : 'Generate report' }}
-                </button>
-            </div>
-        </div>
+        </template>
 
         <!-- GPT-generated report -->
         <div v-if="generatedReport" class="space-y-4">
@@ -128,7 +122,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </ListingPageShell>
 </template>
 
 <script setup>
@@ -136,6 +130,7 @@ import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
+import ListingPageShell from '@/components/ListingPageShell.vue';
 
 const toast = useToastStore();
 const auth = useAuthStore();
@@ -152,6 +147,12 @@ const canGenerateReport = computed(() => {
 });
 
 const todayStr = computed(() => new Date().toISOString().slice(0, 10));
+
+const reportBadge = computed(() => {
+    if (!report.value?.report?.length) return null;
+    const n = report.value.report.length;
+    return `${n} team ${n === 1 ? 'member' : 'members'}`;
+});
 
 const formatTime = (d) => {
     if (!d) return '';

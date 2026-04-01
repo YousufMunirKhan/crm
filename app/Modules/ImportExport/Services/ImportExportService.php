@@ -123,7 +123,7 @@ class ImportExportService
             'customers' => Customer::query(),
             'leads' => Lead::with(['customer', 'assignee']),
             'invoices' => Invoice::with(['customer', 'items']),
-            'tickets' => Ticket::with(['customer', 'assignee']),
+            'tickets' => Ticket::with(['customer', 'assignee', 'assignees']),
             default => throw new \InvalidArgumentException("Unknown export type: {$type}"),
         };
 

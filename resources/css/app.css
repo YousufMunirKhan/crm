@@ -10,3 +10,135 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* Shared listing UI: violet primary + emerald “add” accent (see design tokens) */
+@layer components {
+    .listing-label {
+        @apply block text-xs font-semibold text-slate-600 mb-1.5 tracking-wide;
+    }
+    /** Full-width fields; comfortable tap targets on mobile */
+    .listing-input {
+        @apply w-full min-h-[42px] px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900 placeholder:text-slate-400
+            shadow-sm shadow-slate-900/[0.03]
+            focus:outline-none focus:ring-2 focus:ring-violet-500/25 focus:border-violet-500 focus:bg-white transition-colors;
+    }
+    /** Main action: violet (e.g. Filter, Apply, Export, Generate) */
+    .listing-btn-primary {
+        @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[42px] rounded-xl text-white text-sm font-semibold
+            bg-[#7C3AED] shadow-md shadow-[#7C3AED]/25 hover:bg-[#6d28d9] active:bg-[#5b21b6]
+            transition-colors disabled:opacity-50 disabled:pointer-events-none;
+    }
+    /** Positive / create (e.g. + Add Product, + Add Customer) */
+    .listing-btn-accent {
+        @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[42px] rounded-xl text-white text-sm font-semibold
+            bg-emerald-600 shadow-md shadow-emerald-600/25 hover:bg-emerald-700 active:bg-emerald-800
+            transition-colors disabled:opacity-50 disabled:pointer-events-none;
+    }
+    .listing-btn-outline {
+        @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[42px] rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold
+            shadow-sm shadow-slate-900/[0.04] hover:bg-slate-50 hover:border-slate-300 transition-colors;
+    }
+    /** Use on the element wrapping filter fields + buttons for responsive rows */
+    .listing-filters-row {
+        @apply flex flex-col gap-3 w-full min-w-0 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-3 sm:gap-y-3;
+    }
+    .listing-thead {
+        @apply bg-slate-50/90;
+    }
+    .listing-th {
+        @apply px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider;
+    }
+    .listing-td {
+        @apply px-5 py-4 text-sm text-slate-700 border-b border-slate-100;
+    }
+    .listing-td-strong {
+        @apply px-5 py-4 text-sm font-semibold text-slate-800 border-b border-slate-100;
+    }
+    .listing-row {
+        @apply hover:bg-slate-50/60 transition-colors;
+    }
+    .listing-badge-active {
+        @apply inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-inset ring-emerald-100/80;
+    }
+    .listing-badge-inactive {
+        @apply inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-100/80;
+    }
+    .listing-link-edit {
+        @apply text-[#7C3AED] hover:text-[#5b21b6] font-medium text-sm;
+    }
+    .listing-link-delete {
+        @apply text-red-600 hover:text-red-800 font-medium text-sm;
+    }
+
+    /**
+     * Full-page / modal forms (mint section headers, emerald primary submit, violet field focus — same family as listings).
+     */
+    .form-label {
+        @apply block text-xs font-semibold text-slate-600 mb-1.5 tracking-wide;
+    }
+    .form-input {
+        @apply w-full min-h-[42px] px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900 placeholder:text-slate-400
+            shadow-sm shadow-slate-900/[0.03]
+            focus:outline-none focus:ring-2 focus:ring-violet-500/25 focus:border-violet-500 focus:bg-white transition-colors;
+    }
+    .form-textarea {
+        @apply w-full min-h-[5.5rem] px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900 placeholder:text-slate-400
+            shadow-sm shadow-slate-900/[0.03] resize-y
+            focus:outline-none focus:ring-2 focus:ring-violet-500/25 focus:border-violet-500 focus:bg-white transition-colors;
+    }
+    .form-card {
+        @apply bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden;
+    }
+    /** Default section bar (invoice-style) */
+    .form-section-head {
+        @apply px-4 sm:px-6 py-4 border-b border-slate-200 bg-slate-50/90;
+    }
+    /** Hero strip — “Create …” title row (horizontal mint gradient + neutral divider) */
+    .form-section-head-mint {
+        @apply px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-green-50 to-emerald-50;
+    }
+    .form-section-title {
+        @apply text-base sm:text-lg font-semibold text-slate-900 tracking-tight;
+    }
+    .form-section-title-mint {
+        @apply text-base sm:text-lg font-bold text-slate-900 tracking-tight;
+    }
+    .form-section-desc {
+        @apply text-sm text-slate-600 mt-1 max-w-3xl leading-relaxed;
+    }
+    .form-section-desc-mint {
+        @apply text-sm font-normal text-slate-500 mt-1 max-w-3xl leading-relaxed;
+    }
+    .form-body {
+        @apply p-4 sm:p-6 lg:p-8;
+    }
+    .form-actions {
+        @apply px-4 sm:px-6 lg:px-8 py-4 bg-slate-50 border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-end gap-3;
+    }
+    .form-btn-submit {
+        @apply inline-flex items-center justify-center gap-2 px-6 py-2.5 min-h-[44px] rounded-xl text-white text-sm font-semibold
+            bg-emerald-600 shadow-md shadow-emerald-600/25 hover:bg-emerald-700 active:bg-emerald-800
+            transition-colors disabled:opacity-50 disabled:pointer-events-none w-full sm:w-auto touch-manipulation;
+    }
+    .form-btn-cancel {
+        @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[42px] rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold
+            shadow-sm shadow-slate-900/[0.04] hover:bg-slate-50 hover:border-slate-300 transition-colors
+            w-full sm:w-auto touch-manipulation;
+    }
+    .form-checkbox {
+        @apply rounded border-slate-300 text-emerald-600 focus:ring-2 focus:ring-emerald-500/30 focus:ring-offset-0;
+    }
+    .form-radio {
+        @apply rounded-full border-slate-300 text-emerald-600 focus:ring-2 focus:ring-emerald-500/30;
+    }
+    /** Sidebar tips / callouts */
+    .form-tip-panel {
+        @apply rounded-xl border border-emerald-200/80 overflow-hidden bg-white shadow-sm shadow-slate-900/[0.04];
+    }
+    .form-tip-panel-head {
+        @apply px-4 py-3 bg-emerald-600 text-white text-sm font-semibold;
+    }
+    .form-tip-panel-body {
+        @apply px-4 py-3 bg-emerald-50/80 text-sm text-emerald-950/90 space-y-2;
+    }
+}

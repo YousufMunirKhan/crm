@@ -1,7 +1,7 @@
 <template>
-    <div class="min-h-screen bg-slate-50 w-full min-w-0 overflow-x-hidden">
+    <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 w-full min-w-0 overflow-x-hidden">
         <!-- Top Navigation Bar -->
-        <header class="bg-white border-b border-slate-200 sticky top-0 z-20">
+        <header class="bg-gradient-to-r from-emerald-50/90 via-white to-teal-50/75 border-b border-slate-200/70 sticky top-0 z-20 backdrop-blur-sm">
             <div class="px-4 sm:px-6 py-3 sm:py-4">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 min-w-0">
@@ -13,7 +13,7 @@
                             {{ customerTypeLabel === 'Customer' ? 'Back to Customers' : 'Back to Prospects' }}
                         </router-link>
                         <nav class="text-base sm:text-sm font-semibold sm:font-normal text-slate-600 flex items-center gap-1 flex-wrap">
-                            <router-link to="/" class="hover:text-slate-900">Dashboard</router-link>
+                            <router-link to="/" class="text-teal-600 hover:text-teal-700 font-medium">Dashboard</router-link>
                             <span class="text-slate-300">/</span>
                             <router-link :to="customersListRoute" class="hover:text-slate-900">{{ customerTypeLabel === 'Customer' ? 'Customers' : 'Prospects' }}</router-link>
                             <span class="text-slate-300">/</span>
@@ -29,7 +29,7 @@
                         </router-link>
                         <button
                             @click="logout"
-                            class="px-3 sm:px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 touch-manipulation flex-1 sm:flex-initial min-w-[8rem]"
+                            class="px-3 sm:px-4 py-2 text-sm bg-[#7C3AED] text-white rounded-lg hover:bg-[#6d28d9] shadow-sm shadow-violet-600/25 touch-manipulation flex-1 sm:flex-initial min-w-[8rem] font-medium"
                         >
                             Logout
                         </button>

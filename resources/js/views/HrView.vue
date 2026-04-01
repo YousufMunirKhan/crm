@@ -1,68 +1,68 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 lg:p-6 space-y-4 lg:space-y-6">
-        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <h1 class="text-xl lg:text-2xl font-bold text-slate-900">HR Management</h1>
-            <!-- Check In/Out buttons only for non-admin -->
-            <div v-if="!isAdmin" class="flex gap-2">
-                <button
-                    v-if="!checkedIn"
-                    @click="checkIn"
-                    class="flex-1 sm:flex-none px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-base"
-                >
-                    Check In
-                </button>
-                <button
-                    v-else
-                    @click="checkOut"
-                    class="flex-1 sm:flex-none px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-base"
-                >
-                    Check Out
-                </button>
-            </div>
+    <div class="w-full min-w-0">
+        <div v-if="isAdmin" class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 lg:py-6 space-y-4">
+            <h1 class="text-xl lg:text-2xl font-bold text-slate-800 tracking-tight">HR management</h1>
+            <router-view />
         </div>
 
-        <!-- Admin View: Employee Listing via router-view -->
-        <router-view v-if="isAdmin" />
-
-        <!-- Non-Admin View: Only their own attendance -->
-        <template v-else>
-            <div class="bg-white rounded-xl shadow-sm p-4 lg:p-6">
-                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-                    <h3 class="text-lg font-semibold text-slate-900">My Attendance</h3>
+        <ListingPageShell
+            v-else
+            title="My attendance"
+            subtitle="Check in when you start and check out when you finish — hours sync for payroll."
+            :badge="attendanceShellBadge"
+        >
+            <template #actions>
+                <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-stretch sm:justify-end">
                     <button
-                        @click="exportAttendance"
-                        class="w-full sm:w-auto px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700"
+                        v-if="!checkedIn"
+                        type="button"
+                        class="inline-flex flex-1 sm:flex-none items-center justify-center px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
+                        @click="checkIn"
                     >
-                        Export CSV
+                        Check in
                     </button>
-                </div>
-                <div v-if="attendanceList.length === 0" class="text-center py-8 text-slate-400 text-sm">
-                    No attendance records found
-                </div>
-                <div v-else class="space-y-3">
-                    <div
-                        v-for="attendance in attendanceList"
-                        :key="attendance.id"
-                        class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-50 rounded-lg gap-2"
+                    <button
+                        v-else
+                        type="button"
+                        class="inline-flex flex-1 sm:flex-none items-center justify-center px-4 py-2.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+                        @click="checkOut"
                     >
-                        <div class="flex-1">
-                            <div class="font-medium text-slate-900">{{ formatDate(attendance.date) }}</div>
-                            <div class="text-xs text-slate-500">
-                                {{ formatTime(attendance.check_in_at) }} - {{ attendance.check_out_at ? formatTime(attendance.check_out_at) : 'In Progress' }}
-                            </div>
-                        </div>
-                        <div class="text-sm font-medium text-slate-700">
-                            {{ parseFloat(attendance.work_hours || 0).toFixed(2) }}h
+                        Check out
+                    </button>
+                    <button type="button" class="listing-btn-outline flex-1 sm:flex-initial" @click="exportAttendance">Export CSV</button>
+                </div>
+            </template>
+
+            <div v-if="attendanceList.length === 0" class="px-5 py-12 text-center text-slate-500 text-sm">
+                No attendance records found
+            </div>
+            <div v-else class="space-y-3 px-3 pb-2 sm:px-5">
+                <div
+                    v-for="attendance in attendanceList"
+                    :key="attendance.id"
+                    class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-xl border border-slate-200 bg-slate-50/40 gap-2"
+                >
+                    <div class="flex-1">
+                        <div class="font-medium text-slate-900">{{ formatDate(attendance.date) }}</div>
+                        <div class="text-xs text-slate-500">
+                            {{ formatTime(attendance.check_in_at) }} – {{ attendance.check_out_at ? formatTime(attendance.check_out_at) : 'In progress' }}
                         </div>
                     </div>
+                    <div class="text-sm font-semibold text-slate-700">{{ parseFloat(attendance.work_hours || 0).toFixed(2) }}h</div>
                 </div>
+            </div>
+
+            <template #pagination>
                 <Pagination
                     v-if="attendancePagination"
                     :pagination="attendancePagination"
+                    embedded
+                    result-label="records"
+                    singular-label="record"
                     @page-change="loadAttendance"
                 />
-            </div>
-        </template>
+            </template>
+        </ListingPageShell>
 
         <!-- Salary Form Modal -->
         <div
@@ -258,6 +258,7 @@
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import Pagination from '@/components/Pagination.vue';
+import ListingPageShell from '@/components/ListingPageShell.vue';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
@@ -268,6 +269,13 @@ const auth = useAuthStore();
 const isAdmin = computed(() => {
     const role = auth.user?.role?.name;
     return role === 'Admin' || role === 'Manager' || role === 'System Admin';
+});
+
+const attendanceShellBadge = computed(() => {
+    if (isAdmin.value) return null;
+    const t = attendancePagination.value?.total;
+    if (t == null || t === 0) return null;
+    return `${t} ${t === 1 ? 'record' : 'records'}`;
 });
 
 const checkedIn = ref(false);

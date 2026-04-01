@@ -20,15 +20,18 @@ class TicketController extends Controller
         $user = auth()->user();
         $isAdmin = $user->isRole('Admin') || $user->isRole('Manager') || $user->isRole('System Admin');
 
-        $query = Ticket::with(['customer', 'assignee', 'creator'])
+        $query = Ticket::with(['customer', 'assignee', 'assignees', 'creator'])
             ->withCount(['messages', 'attachments'])
             ->where('source', 'crm');
 
-        // Non-admin users: only see tickets they created or are assigned to
+        // Non-admin: creator, legacy assignee, or anyone in multi-assign list
         if (!$isAdmin) {
             $query->where(function ($q) use ($user) {
                 $q->where('created_by', $user->id)
-                  ->orWhere('assigned_to', $user->id);
+                    ->orWhere('assigned_to', $user->id)
+                    ->orWhereHas('assignees', function ($q2) use ($user) {
+                        $q2->where('users.id', $user->id);
+                    });
             });
         }
 
@@ -41,7 +44,13 @@ class TicketController extends Controller
         }
 
         if ($request->has('assigned_to')) {
-            $query->where('assigned_to', $request->assigned_to);
+            $aid = (int) $request->assigned_to;
+            $query->where(function ($q) use ($aid) {
+                $q->where('assigned_to', $aid)
+                    ->orWhereHas('assignees', function ($q2) use ($aid) {
+                        $q2->where('users.id', $aid);
+                    });
+            });
         }
 
         if ($request->has('customer_id')) {
@@ -56,7 +65,7 @@ class TicketController extends Controller
 
     public function show($id)
     {
-        $ticket = Ticket::with(['customer', 'assignee', 'creator', 'messages.user', 'attachments'])
+        $ticket = Ticket::with(['customer', 'assignee', 'assignees', 'creator', 'messages.user', 'attachments'])
             ->findOrFail($id);
 
         $this->authorizeTicketAccess($ticket);
@@ -74,6 +83,8 @@ class TicketController extends Controller
             'reference_url' => ['nullable', 'string', 'max:2048'],
             'priority' => ['nullable', 'in:low,medium,high,urgent'],
             'assigned_to' => ['nullable', 'exists:users,id'],
+            'assigned_user_ids' => ['nullable', 'array'],
+            'assigned_user_ids.*' => ['integer', 'exists:users,id'],
             'estimated_resolve_hours' => ['nullable', 'integer', 'min:1', 'max:8760'],
             'attachments' => ['nullable', 'array', 'max:20'],
             'attachments.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx,csv,txt'],
@@ -91,7 +102,7 @@ class TicketController extends Controller
         // Broadcast notification
         event(new \App\Events\NewTicketCreated($ticket));
 
-        return response()->json($ticket->load(['customer', 'assignee', 'creator', 'attachments']), 201);
+        return response()->json($ticket->load(['customer', 'assignee', 'assignees', 'creator', 'attachments']), 201);
     }
 
     public function update(Request $request, $id)
@@ -104,13 +115,28 @@ class TicketController extends Controller
             'subject' => ['sometimes', 'string'],
             'description' => ['nullable', 'string'],
             'reference_url' => ['nullable', 'string', 'max:2048'],
+            'customer_id' => ['nullable', 'exists:customers,id'],
             'priority' => ['sometimes', 'in:low,medium,high,urgent'],
             'status' => ['sometimes', 'in:open,in_progress,on_hold,resolved,closed'],
             'assigned_to' => ['nullable', 'exists:users,id'],
+            'assigned_user_ids' => ['sometimes', 'nullable', 'array'],
+            'assigned_user_ids.*' => ['integer', 'exists:users,id'],
             'estimated_resolve_hours' => ['nullable', 'integer', 'min:1', 'max:8760'],
         ]);
 
-        $previousAssigned = $ticket->assigned_to;
+        $previousAssigneeIds = $ticket->assignees()->pluck('users.id')->sort()->values()->all();
+
+        $newAssigneeIds = null;
+        if (array_key_exists('assigned_user_ids', $data)) {
+            $newAssigneeIds = array_values(array_unique(array_filter(array_map('intval', $data['assigned_user_ids'] ?? []))));
+            unset($data['assigned_user_ids']);
+        } elseif (array_key_exists('assigned_to', $data)) {
+            $newAssigneeIds = $data['assigned_to'] ? [(int) $data['assigned_to']] : [];
+        }
+        if (array_key_exists('assigned_to', $data)) {
+            unset($data['assigned_to']);
+        }
+
         $previousStatus = $ticket->status;
 
         if (array_key_exists('status', $data)) {
@@ -132,21 +158,28 @@ class TicketController extends Controller
 
         $ticket->update($data);
 
-        if (array_key_exists('assigned_to', $data) && $ticket->assigned_to) {
-            if ((int) $ticket->assigned_to !== (int) ($previousAssigned ?? 0)) {
-                $this->ticketService->notifyAssigned($ticket->fresh(['customer', 'creator', 'assignee', 'attachments']));
+        if ($newAssigneeIds !== null) {
+            $ticket->assignees()->sync($newAssigneeIds);
+            $ticket->assigned_to = $newAssigneeIds[0] ?? null;
+            $ticket->save();
+            $added = array_values(array_diff($newAssigneeIds, $previousAssigneeIds));
+            if (count($added) > 0) {
+                $this->ticketService->notifyAssigned(
+                    $ticket->fresh(['customer', 'creator', 'assignees', 'attachments']),
+                    $added
+                );
             }
         }
 
         if (array_key_exists('status', $data) && $previousStatus !== $ticket->status) {
             $this->ticketService->notifyStatusChanged(
-                $ticket->fresh(['customer', 'creator', 'assignee', 'attachments']),
+                $ticket->fresh(['customer', 'creator', 'assignee', 'assignees', 'attachments']),
                 $previousStatus,
                 auth()->id()
             );
         }
 
-        return response()->json($ticket->load(['customer', 'assignee', 'creator', 'attachments']));
+        return response()->json($ticket->load(['customer', 'assignee', 'assignees', 'creator', 'attachments']));
     }
 
     public function destroy($id)
@@ -193,7 +226,7 @@ class TicketController extends Controller
         }
         $this->ticketService->saveUploadedAttachments($ticket, $files);
 
-        return response()->json($ticket->fresh(['customer', 'assignee', 'creator', 'attachments']));
+        return response()->json($ticket->fresh(['customer', 'assignee', 'assignees', 'creator', 'attachments']));
     }
 
     public function destroyAttachment(Request $request, $id, $attachmentId)
@@ -227,6 +260,10 @@ class TicketController extends Controller
         }
 
         if ($ticket->created_by === $user->id || $ticket->assigned_to === $user->id) {
+            return;
+        }
+
+        if ($ticket->assignees()->where('users.id', $user->id)->exists()) {
             return;
         }
 

@@ -1,33 +1,29 @@
 <template>
-    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Leads</h1>
-            </div>
-            <div class="flex flex-wrap items-stretch sm:items-center gap-3 w-full sm:w-auto min-w-0">
-                <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto min-w-0">
-                    <label class="text-sm font-medium text-slate-700 shrink-0">From</label>
-                    <input
-                        v-model="filters.from"
-                        type="date"
-                        class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+    <ListingPageShell
+        title="Leads report"
+        :subtitle="leadsListSubtitle"
+        :badge="leadsListBadge"
+    >
+        <template #actions>
+            <button type="button" class="listing-btn-outline w-full sm:w-auto" :disabled="!leads.length" @click="exportCsv">
+                Export CSV
+            </button>
+        </template>
+
+        <template #filters>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 lg:gap-4 items-end">
+                <div class="sm:col-span-1 lg:col-span-2">
+                    <label class="listing-label">From</label>
+                    <input v-model="filters.from" type="date" class="listing-input" />
                 </div>
-                <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto min-w-0">
-                    <label class="text-sm font-medium text-slate-700 shrink-0">To</label>
-                    <input
-                        v-model="filters.to"
-                        type="date"
-                        class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                <div class="sm:col-span-1 lg:col-span-2">
+                    <label class="listing-label">To</label>
+                    <input v-model="filters.to" type="date" class="listing-input" />
                 </div>
-                <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto min-w-0">
-                    <label class="text-sm font-medium text-slate-700 shrink-0">Stage</label>
-                    <select
-                        v-model="filters.stage"
-                        class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="">All</option>
+                <div class="sm:col-span-1 lg:col-span-2">
+                    <label class="listing-label">Stage</label>
+                    <select v-model="filters.stage" class="listing-input">
+                        <option value="">All stages</option>
                         <option value="follow_up">Follow-up</option>
                         <option value="lead">Lead</option>
                         <option value="hot_lead">Hot Lead</option>
@@ -35,163 +31,79 @@
                         <option value="lost">Lost</option>
                     </select>
                 </div>
-                <div v-if="isAdmin" class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto min-w-0">
-                    <label class="text-sm font-medium text-slate-700 shrink-0">Employee</label>
-                    <select
-                        v-model="filters.assigned_to"
-                        class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="">All</option>
+                <div v-if="isAdmin" class="sm:col-span-1 lg:col-span-3">
+                    <label class="listing-label">Employee</label>
+                    <select v-model="filters.assigned_to" class="listing-input">
+                        <option value="">All employees</option>
                         <option v-for="emp in employees" :key="emp.id" :value="emp.id">
                             {{ emp.name }}
                         </option>
                     </select>
                 </div>
-                <button
-                    @click="loadLeads(1)"
-                    class="px-3 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 touch-manipulation w-full sm:w-auto"
-                >
-                    Apply
-                </button>
-                <button
-                    @click="exportCsv"
-                    :disabled="!leads.length"
-                    class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 touch-manipulation w-full sm:w-auto"
-                >
-                    Export CSV
-                </button>
+                <div class="sm:col-span-2 lg:col-span-3 flex gap-2">
+                    <button type="button" class="listing-btn-primary w-full sm:w-auto" @click="loadLeads(1)">Filter</button>
+                </div>
             </div>
-        </div>
+        </template>
 
-        <div v-if="loading" class="text-center py-12 text-slate-500">Loading...</div>
+        <div v-if="loading" class="px-5 py-14 text-center text-slate-500 text-sm">Loading…</div>
 
-        <div v-else-if="!leads.length" class="bg-white rounded-xl shadow-sm p-8 text-center text-slate-500">
+        <div v-else-if="!leads.length" class="px-5 py-12 text-center text-slate-500 text-sm">
             No leads found for this period.
         </div>
 
-        <div v-else class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-w-0">
+        <template v-else>
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[1000px]">
-                    <thead class="bg-slate-50 border-b border-slate-200">
+                    <thead class="listing-thead">
                         <tr>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Created
-                            </th>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Customer
-                            </th>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Products
-                            </th>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Stage
-                            </th>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Assignee
-                            </th>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Source
-                            </th>
-                            <th class="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Value (£)
-                            </th>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Next Follow-up
-                            </th>
+                            <th class="listing-th">Created</th>
+                            <th class="listing-th">Customer</th>
+                            <th class="listing-th">Products</th>
+                            <th class="listing-th">Stage</th>
+                            <th class="listing-th">Assignee</th>
+                            <th class="listing-th">Source</th>
+                            <th class="listing-th text-right">Value (£)</th>
+                            <th class="listing-th">Next follow-up</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <tr
-                            v-for="lead in leads"
-                            :key="lead.id"
-                            class="hover:bg-slate-50 transition-colors"
-                        >
-                            <td class="px-4 sm:px-6 py-3 text-sm text-slate-900">
-                                {{ formatDate(lead.created_at) }}
-                            </td>
-                            <td class="px-4 sm:px-6 py-3 text-sm">
-                                <router-link
-                                    :to="`/customers/${lead.customer_id}`"
-                                    class="text-slate-900 font-medium hover:text-blue-600"
-                                >
+                    <tbody>
+                        <tr v-for="lead in leads" :key="lead.id" class="listing-row">
+                            <td class="listing-td text-slate-800">{{ formatDate(lead.created_at) }}</td>
+                            <td class="listing-td">
+                                <router-link :to="`/customers/${lead.customer_id}`" class="listing-link-edit font-semibold">
                                     {{ lead.customer?.name || '—' }}
                                 </router-link>
                             </td>
-                            <td class="px-4 sm:px-6 py-3 text-sm text-slate-600 max-w-xs">
-                                <span class="block truncate" :title="productNames(lead)">
-                                    {{ productNames(lead) || '—' }}
-                                </span>
+                            <td class="listing-td max-w-xs">
+                                <span class="block truncate" :title="productNames(lead)">{{ productNames(lead) || '—' }}</span>
                             </td>
-                            <td class="px-4 sm:px-6 py-3 text-xs">
-                                <span
-                                    class="inline-flex px-2 py-1 rounded-full font-medium whitespace-nowrap"
-                                    :class="stageClass(lead.stage)"
-                                >
+                            <td class="listing-td">
+                                <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium" :class="stageClass(lead.stage)">
                                     {{ formatStage(lead.stage) }}
                                 </span>
                             </td>
-                            <td class="px-4 sm:px-6 py-3 text-sm text-slate-600">
-                                {{ lead.assignee?.name || '—' }}
-                            </td>
-                            <td class="px-4 sm:px-6 py-3 text-sm text-slate-600">
-                                {{ lead.source || '—' }}
-                            </td>
-                            <td class="px-4 sm:px-6 py-3 text-sm text-right text-slate-900">
-                                £{{ formatNumber(getLeadValue(lead)) }}
-                            </td>
-                            <td class="px-4 sm:px-6 py-3 text-sm text-slate-600">
-                                {{ formatDateTime(lead.next_follow_up_at) || '—' }}
-                            </td>
+                            <td class="listing-td">{{ lead.assignee?.name || '—' }}</td>
+                            <td class="listing-td">{{ lead.source || '—' }}</td>
+                            <td class="listing-td text-right font-semibold text-slate-800">£{{ formatNumber(getLeadValue(lead)) }}</td>
+                            <td class="listing-td text-slate-600">{{ formatDateTime(lead.next_follow_up_at) || '—' }}</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
+        </template>
 
-            <!-- Simple pagination -->
-            <div
-                v-if="pagination && (pagination.last_page > 1)"
-                class="px-4 sm:px-6 py-3 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-slate-600"
-            >
-                <div>
-                    Showing
-                    {{ (pagination.current_page - 1) * pagination.per_page + 1 }}
-                    –
-                    {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }}
-                    of {{ pagination.total }} leads
-                </div>
-                <div class="flex items-center gap-2">
-                    <button
-                        @click="loadLeads(1)"
-                        :disabled="pagination.current_page === 1"
-                        class="px-2 py-1 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50"
-                    >
-                        « First
-                    </button>
-                    <button
-                        @click="loadLeads(pagination.current_page - 1)"
-                        :disabled="pagination.current_page === 1"
-                        class="px-2 py-1 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50"
-                    >
-                        ‹ Prev
-                    </button>
-                    <button
-                        @click="loadLeads(pagination.current_page + 1)"
-                        :disabled="pagination.current_page === pagination.last_page"
-                        class="px-2 py-1 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50"
-                    >
-                        Next ›
-                    </button>
-                    <button
-                        @click="loadLeads(pagination.last_page)"
-                        :disabled="pagination.current_page === pagination.last_page"
-                        class="px-2 py-1 border border-slate-300 rounded-lg hover:bg-white disabled:opacity-50"
-                    >
-                        Last »
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+        <template #pagination>
+            <Pagination
+                v-if="pagination && leads.length"
+                :pagination="pagination"
+                embedded
+                result-label="leads"
+                singular-label="lead"
+                @page-change="loadLeads"
+            />
+        </template>
+    </ListingPageShell>
 </template>
 
 <script setup>
@@ -200,6 +112,8 @@ import { useRoute } from 'vue-router';
 import axios from 'axios';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
 import { useAuthStore } from '@/stores/auth';
+import ListingPageShell from '@/components/ListingPageShell.vue';
+import Pagination from '@/components/Pagination.vue';
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -232,6 +146,15 @@ const stageLabel = computed(() => {
     };
     return map[filters.value.stage] || filters.value.stage;
 });
+
+const leadsListSubtitle = computed(() => {
+    const base = 'Slice the pipeline by date range, stage, and (for admins) assignee — export matches to CSV.';
+    return stageLabel.value ? `${base} View: ${stageLabel.value}.` : base;
+});
+
+const leadsListBadge = computed(() =>
+    pagination.value?.total != null ? `${pagination.value.total} Total` : null,
+);
 
 function formatDate(iso) {
     if (!iso) return '—';

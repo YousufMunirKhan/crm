@@ -25,6 +25,12 @@
                         <p class="text-base sm:text-lg text-slate-700 mt-0.5 break-words">{{ ticket.subject }}</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
+                        <router-link
+                            :to="`/tickets/${ticket.id}/edit`"
+                            class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 shadow-sm"
+                        >
+                            Edit ticket
+                        </router-link>
                         <span
                             class="px-3 py-1 rounded-lg text-sm font-medium"
                             :class="getStatusClass(ticket.status)"
@@ -75,7 +81,7 @@
                 </div>
 
                 <!-- Details Card -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-6">
                     <div class="px-4 sm:px-6 py-4 border-b border-slate-200 bg-slate-50">
                         <h2 class="text-base font-semibold text-slate-900">Ticket Details</h2>
                     </div>
@@ -95,8 +101,13 @@
                                 </div>
                             </div>
                             <div>
-                                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Assigned To</span>
-                                <div class="mt-0.5 text-slate-900">{{ ticket.assignee?.name || 'Unassigned' }}</div>
+                                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Assigned</span>
+                                <div class="mt-0.5 text-slate-900">
+                                    <template v-if="ticket.assignees && ticket.assignees.length">
+                                        {{ ticket.assignees.map((a) => a.name).join(', ') }}
+                                    </template>
+                                    <template v-else>{{ ticket.assignee?.name || 'Unassigned' }}</template>
+                                </div>
                             </div>
                             <div>
                                 <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Created By</span>
@@ -183,8 +194,8 @@
                         </div>
 
                         <!-- Quick edit: Status & Assign -->
-                        <div class="mt-4 pt-4 border-t border-slate-200 flex flex-wrap items-end gap-3">
-                            <div class="min-w-[140px]">
+                        <div class="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
+                            <div class="w-full max-w-md">
                                 <label class="block text-xs font-medium text-slate-500 mb-1">Status</label>
                                 <select
                                     v-model="editStatus"
@@ -198,23 +209,39 @@
                                     <option value="closed">Closed</option>
                                 </select>
                             </div>
-                            <div class="min-w-[180px]">
-                                <label class="block text-xs font-medium text-slate-500 mb-1">Assign To</label>
-                                <select
-                                    v-model="editAssignedTo"
-                                    @change="updateTicketField('assigned_to')"
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                                >
-                                    <option :value="null">Unassigned</option>
-                                    <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
-                                </select>
+                            <div v-if="isStaffAdmin" class="w-full min-w-0">
+                                <label class="block text-xs font-medium text-slate-500 mb-1">Assignees</label>
+                                <div class="max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 space-y-1.5">
+                                    <label
+                                        v-for="u in users"
+                                        :key="u.id"
+                                        class="flex items-center gap-2 text-sm text-slate-800 cursor-pointer"
+                                    >
+                                        <input
+                                            v-model="editAssigneeIds"
+                                            type="checkbox"
+                                            :value="Number(u.id)"
+                                            class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
+                                        />
+                                        {{ u.name }}
+                                    </label>
+                                </div>
+                                <div class="mt-3 flex flex-wrap items-center gap-2">
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition-colors"
+                                        @click="saveAssignees"
+                                    >
+                                        Save assignees
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Comments -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200">
                     <div class="px-4 sm:px-6 py-4 border-b border-slate-200 bg-slate-50">
                         <h2 class="text-base font-semibold text-slate-900">Comments</h2>
                         <p class="text-sm text-slate-500 mt-0.5">{{ (ticket.messages || []).length }} comment(s)</p>
@@ -247,28 +274,58 @@
                             </div>
                         </div>
                         <!-- Add comment -->
-                        <div class="border-t border-slate-200 pt-4">
+                        <div class="border-t border-slate-200 pt-4 pb-1">
                             <label class="block text-sm font-medium text-slate-700 mb-2">Add a comment</label>
-                            <p v-if="isStaffAdmin" class="text-xs text-slate-500 mb-2">Assignee and ticket creator are emailed when you post (unless they wrote the comment). Internal notes are labelled in email.</p>
+                            <p class="text-xs text-slate-500 mb-2">
+                                Assignees and the ticket creator are notified by email, except the person who posted the comment.
+                                <span v-if="isStaffAdmin"> Internal notes are not emailed.</span>
+                            </p>
+
+                            <div
+                                v-if="newCommentInternal && isStaffAdmin"
+                                class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950"
+                            >
+                                <strong>Internal note:</strong> no email will be sent for this comment.
+                            </div>
+                            <div
+                                v-else-if="commentRecipientRows.length > 0"
+                                class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800"
+                            >
+                                <div class="font-semibold text-slate-900 mb-1">Email will be sent to:</div>
+                                <ul class="space-y-1 list-none">
+                                    <li v-for="row in commentRecipientRows" :key="row.email" class="break-all">
+                                        <span class="font-medium">{{ row.name }}</span>
+                                        <span class="text-slate-600"> — {{ row.email }}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div
+                                v-else-if="!newCommentInternal || !isStaffAdmin"
+                                class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950"
+                            >
+                                No other recipients with a valid email on file (you may be the only assignee, or profiles lack email). The system may still use the admin notification address from
+                                <strong>Settings</strong> if no one else qualifies.
+                            </div>
+
                             <textarea
                                 v-model="newComment"
                                 rows="4"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 resize-none"
+                                class="w-full min-h-[7.5rem] px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 resize-y"
                                 placeholder="Write your comment..."
                             />
-                            <label v-if="isStaffAdmin" class="mt-2 flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                            <label v-if="isStaffAdmin" class="mt-3 flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                                 <input v-model="newCommentInternal" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
-                                Internal note
+                                Internal note (no email)
                             </label>
-                            <p v-if="commentError" class="text-sm text-red-600 mt-1">{{ commentError }}</p>
-                            <div class="mt-3 flex justify-end">
+                            <p v-if="commentError" class="text-sm text-red-600 mt-2">{{ commentError }}</p>
+                            <div class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-4">
                                 <button
                                     type="button"
                                     :disabled="commentSending || !newComment.trim()"
                                     @click="addComment"
-                                    class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    class="w-full sm:w-auto shrink-0 inline-flex justify-center px-5 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                                 >
-                                    {{ commentSending ? 'Sending...' : 'Post Comment' }}
+                                    {{ commentSending ? 'Sending…' : 'Post comment' }}
                                 </button>
                             </div>
                         </div>
@@ -303,7 +360,7 @@ const newComment = ref('');
 const commentSending = ref(false);
 const commentError = ref(null);
 const editStatus = ref('open');
-const editAssignedTo = ref(null);
+const editAssigneeIds = ref([]);
 const newCommentInternal = ref(false);
 const detailPendingAttachmentFiles = ref([]);
 const detailAttachmentUploading = ref(false);
@@ -317,6 +374,46 @@ const isStaffAdmin = computed(() => {
 const sortedMessages = computed(() => {
     const list = ticket.value?.messages || [];
     return [...list].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+});
+
+/** Matches server comment recipients: assignees + assigned_to + creator, excluding current user; requires valid email. */
+const commentRecipientRows = computed(() => {
+    if (!ticket.value || newCommentInternal.value) {
+        return [];
+    }
+    const myId = auth.user?.id != null ? Number(auth.user.id) : null;
+    const seen = new Set();
+    const rows = [];
+
+    const pushUser = (u) => {
+        if (!u || !u.email || typeof u.email !== 'string') return;
+        const email = u.email.trim();
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+        const uid = u.id != null ? Number(u.id) : null;
+        if (myId !== null && uid === myId) return;
+        const key = email.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        rows.push({ name: u.name || email, email });
+    };
+
+    (ticket.value.assignees || []).forEach(pushUser);
+
+    const aid = ticket.value.assigned_to != null ? Number(ticket.value.assigned_to) : null;
+    if (aid) {
+        const fromAssignees = (ticket.value.assignees || []).find((a) => Number(a.id) === aid);
+        if (fromAssignees) {
+            pushUser(fromAssignees);
+        } else {
+            pushUser(ticket.value.assignee);
+            const u = users.value.find((x) => Number(x.id) === aid);
+            pushUser(u);
+        }
+    }
+
+    pushUser(ticket.value.creator);
+
+    return rows;
 });
 
 function getStatusLabel(status) {
@@ -395,7 +492,7 @@ async function loadTicket() {
             attachments: data.attachments || [],
         };
         editStatus.value = data.status;
-        editAssignedTo.value = data.assigned_to ?? null;
+        editAssigneeIds.value = (data.assignees || []).map((a) => Number(a.id));
     } catch (err) {
         if (err.response?.status === 403) {
             error.value = 'You do not have access to this ticket.';
@@ -422,7 +519,7 @@ async function loadUsers() {
 async function updateTicketField(field) {
     if (!ticket.value) return;
     try {
-        const payload = field === 'status' ? { status: editStatus.value } : { assigned_to: editAssignedTo.value };
+        const payload = { status: editStatus.value };
         const { data } = await axios.put(`/api/tickets/${ticket.value.id}`, payload);
         ticket.value = {
             ...ticket.value,
@@ -431,10 +528,28 @@ async function updateTicketField(field) {
             messages: ticket.value.messages,
         };
         if (field === 'status') editStatus.value = data.status;
-        if (field === 'assigned_to') editAssignedTo.value = data.assigned_to ?? null;
         toast.success('Ticket updated');
     } catch (err) {
         toast.error(err.response?.data?.message || 'Failed to update');
+    }
+}
+
+async function saveAssignees() {
+    if (!ticket.value) return;
+    try {
+        const { data } = await axios.put(`/api/tickets/${ticket.value.id}`, {
+            assigned_user_ids: editAssigneeIds.value,
+        });
+        ticket.value = {
+            ...ticket.value,
+            ...data,
+            attachments: data.attachments ?? ticket.value.attachments ?? [],
+            messages: ticket.value.messages,
+        };
+        editAssigneeIds.value = (data.assignees || []).map((a) => Number(a.id));
+        toast.success('Assignees updated');
+    } catch (err) {
+        toast.error(err.response?.data?.message || 'Failed to update assignees');
     }
 }
 

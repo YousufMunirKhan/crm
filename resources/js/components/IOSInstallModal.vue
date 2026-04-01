@@ -20,8 +20,14 @@
                         </button>
 
                         <!-- App Icon -->
-                        <div class="w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl">
-                            <span class="text-blue-500 font-bold text-2xl">S&S</span>
+                        <div class="w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl overflow-hidden">
+                            <img
+                                v-if="branding.faviconUrl"
+                                :src="faviconDisplayUrl"
+                                alt=""
+                                class="w-full h-full object-cover"
+                            >
+                            <span v-else class="text-blue-500 font-bold text-2xl">S&S</span>
                         </div>
 
                         <h2 class="text-xl font-bold text-slate-900">Install CRM App</h2>
@@ -100,6 +106,10 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
+import { useBrandingStore } from '@/stores/branding';
+import { absolutePublicUrl } from '@/utils/branding';
+
 defineProps({
     visible: {
         type: Boolean,
@@ -108,6 +118,9 @@ defineProps({
 });
 
 defineEmits(['close']);
+
+const branding = useBrandingStore();
+const faviconDisplayUrl = computed(() => absolutePublicUrl(branding.faviconUrl));
 </script>
 
 <style scoped>

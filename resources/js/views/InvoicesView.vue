@@ -1,241 +1,222 @@
 <template>
-    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Invoices</h1>
-            <router-link
-                to="/invoices/create"
-                class="inline-flex justify-center px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors touch-manipulation w-full sm:w-auto text-center"
-            >
-                + Create Invoice
+    <ListingPageShell
+        title="Invoices"
+        subtitle="Create, filter, and send invoices — totals reflect the current filter set."
+        :badge="invoicesBadge"
+    >
+        <template #actions>
+            <router-link to="/invoices/create" class="listing-btn-accent w-full sm:w-auto text-center touch-manipulation">
+                + Create invoice
             </router-link>
-        </div>
+        </template>
 
-        <!-- Filters Section -->
-        <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 md:p-6 min-w-0">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
-                <h2 class="text-lg font-semibold text-slate-900">Filters</h2>
-                <button
-                    @click="showFilters = !showFilters"
-                    class="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1 touch-manipulation self-start sm:self-auto"
-                >
-                    <svg class="w-4 h-4" :class="{ 'rotate-180': showFilters }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                    {{ showFilters ? 'Hide' : 'Show' }} Filters
-                </button>
-            </div>
-
-            <div v-show="showFilters" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Search</label>
-                    <input
-                        v-model="filters.search"
-                        type="text"
-                        placeholder="Invoice # or Customer..."
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        @input="debounceSearch"
-                    />
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
-                    <select
-                        v-model="filters.status"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        @change="applyFilters"
+        <template #filters>
+            <div class="space-y-4">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 class="text-sm font-semibold text-slate-700">Filters</h2>
+                    <button
+                        type="button"
+                        @click="showFilters = !showFilters"
+                        class="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 touch-manipulation self-start sm:self-auto font-medium"
                     >
-                        <option value="">All Statuses</option>
-                        <option value="draft">Draft</option>
-                        <option value="sent">Sent</option>
-                        <option value="partially_paid">Partially Paid</option>
-                        <option value="paid">Paid</option>
-                        <option value="overdue">Overdue</option>
-                    </select>
-                </div>
-                <div v-if="isAdmin">
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Created By</label>
-                    <select
-                        v-model="filters.created_by"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        @change="applyFilters"
-                    >
-                        <option value="">All Users</option>
-                        <option v-for="user in users" :key="user.id" :value="user.id">
-                            {{ user.name }}
-                        </option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Customer</label>
-                    <select
-                        v-model="filters.customer_id"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        @change="applyFilters"
-                    >
-                        <option value="">All Customers</option>
-                        <option v-for="customer in customers" :key="customer.id" :value="customer.id">
-                            {{ customer.name }}
-                        </option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">From Date</label>
-                    <input
-                        v-model="filters.from_date"
-                        type="date"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        @change="applyFilters"
-                    />
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">To Date</label>
-                    <input
-                        v-model="filters.to_date"
-                        type="date"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        @change="applyFilters"
-                    />
-                </div>
-            </div>
-
-            <div v-if="hasActiveFilters" class="mt-4 flex flex-wrap gap-2">
-                <span
-                    v-for="(value, key) in activeFilterTags"
-                    :key="key"
-                    class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs"
-                >
-                    {{ key }}: {{ value }}
-                    <button @click="removeFilter(key)" class="hover:text-blue-600">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': showFilters }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
+                        {{ showFilters ? 'Hide' : 'Show' }} filters
                     </button>
-                </span>
-            </div>
+                </div>
 
-            <div v-if="showFilters" class="flex justify-end gap-2 mt-4">
-                <button
-                    @click="clearFilters"
-                    class="px-4 py-2 text-sm text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50"
-                >
-                    Clear Filters
-                </button>
+                <div v-show="showFilters" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label class="listing-label">Search</label>
+                        <input
+                            v-model="filters.search"
+                            type="text"
+                            placeholder="Invoice # or customer..."
+                            class="listing-input"
+                            @input="debounceSearch"
+                        />
+                    </div>
+                    <div>
+                        <label class="listing-label">Status</label>
+                        <select v-model="filters.status" class="listing-input" @change="applyFilters">
+                            <option value="">All statuses</option>
+                            <option value="draft">Draft</option>
+                            <option value="sent">Sent</option>
+                            <option value="partially_paid">Partially Paid</option>
+                            <option value="paid">Paid</option>
+                            <option value="overdue">Overdue</option>
+                        </select>
+                    </div>
+                    <div v-if="isAdmin">
+                        <label class="listing-label">Created by</label>
+                        <select v-model="filters.created_by" class="listing-input" @change="applyFilters">
+                            <option value="">All users</option>
+                            <option v-for="user in users" :key="user.id" :value="user.id">
+                                {{ user.name }}
+                            </option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="listing-label">Customer</label>
+                        <select v-model="filters.customer_id" class="listing-input" @change="applyFilters">
+                            <option value="">All customers</option>
+                            <option v-for="customer in customers" :key="customer.id" :value="customer.id">
+                                {{ customer.name }}
+                            </option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="listing-label">From date</label>
+                        <input v-model="filters.from_date" type="date" class="listing-input" @change="applyFilters" />
+                    </div>
+                    <div>
+                        <label class="listing-label">To date</label>
+                        <input v-model="filters.to_date" type="date" class="listing-input" @change="applyFilters" />
+                    </div>
+                    <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
+                        <button type="button" class="listing-btn-primary" @click="applyFilters">Apply</button>
+                        <button type="button" class="listing-btn-outline" @click="clearFilters">Clear</button>
+                    </div>
+                </div>
+
+                <div v-if="hasActiveFilters" class="flex flex-wrap gap-2">
+                    <span
+                        v-for="(value, key) in activeFilterTags"
+                        :key="key"
+                        class="inline-flex items-center gap-1 px-2.5 py-1 bg-sky-50 text-sky-900 rounded-full text-xs font-medium ring-1 ring-sky-100"
+                    >
+                        {{ key }}: {{ value }}
+                        <button type="button" @click="removeFilter(key)" class="hover:text-sky-700">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </span>
+                </div>
+            </div>
+        </template>
+
+        <template v-if="summary" #toolbar>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="rounded-xl border border-slate-100 bg-slate-50/50 p-4 min-w-0">
+                    <div class="text-xs font-medium text-slate-500 uppercase tracking-wide">Total invoices</div>
+                    <div class="text-xl font-bold text-slate-900 mt-1 tabular-nums">{{ summary.total || 0 }}</div>
+                </div>
+                <div class="rounded-xl border border-slate-100 bg-slate-50/50 p-4 min-w-0">
+                    <div class="text-xs font-medium text-slate-500 uppercase tracking-wide">Total amount</div>
+                    <div class="text-xl font-bold text-slate-900 mt-1 tabular-nums break-words">£{{ formatNumber(summary.total_amount || 0) }}</div>
+                </div>
+            </div>
+        </template>
+
+        <div class="hidden md:block overflow-x-auto">
+            <table class="w-full min-w-[720px]">
+                <thead class="listing-thead">
+                    <tr>
+                        <th class="listing-th">Invoice #</th>
+                        <th class="listing-th">Customer</th>
+                        <th class="listing-th">Date</th>
+                        <th class="listing-th">Total</th>
+                        <th class="listing-th">Status</th>
+                        <th class="listing-th">Created By</th>
+                        <th class="listing-th">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-if="loading">
+                        <td colspan="7" class="listing-td text-center text-slate-500 py-10">Loading invoices...</td>
+                    </tr>
+                    <tr v-else-if="invoices.length === 0">
+                        <td colspan="7" class="listing-td text-center text-slate-500 py-10">No invoices found</td>
+                    </tr>
+                    <tr v-for="invoice in invoices" :key="invoice.id" class="listing-row">
+                        <td class="listing-td-strong">{{ invoice.invoice_number }}</td>
+                        <td class="listing-td">{{ invoice.customer?.name || '—' }}</td>
+                        <td class="listing-td text-slate-600">{{ formatDate(invoice.invoice_date) }}</td>
+                        <td class="listing-td font-semibold text-slate-900">£{{ formatNumber(invoice.total) }}</td>
+                        <td class="listing-td">
+                            <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium" :class="getStatusClass(invoice.status)">
+                                {{ formatStatus(invoice.status) }}
+                            </span>
+                        </td>
+                        <td class="listing-td text-slate-600">{{ invoice.creator?.name || '—' }}</td>
+                        <td class="listing-td">
+                            <div class="flex flex-wrap gap-x-3 gap-y-1">
+                                <button type="button" class="text-indigo-600 hover:text-indigo-800 font-medium text-sm" @click="openSendEmail(invoice)">
+                                    Send email
+                                </button>
+                                <router-link :to="`/invoices/${invoice.id}/edit`" class="listing-link-edit">Edit</router-link>
+                                <button type="button" class="listing-link-edit" @click="generatePDF(invoice.id)">PDF</button>
+                                <button type="button" class="listing-link-delete" @click="openDeleteConfirm(invoice)">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div v-if="!loading && invoices.length" class="md:hidden space-y-3 px-3 pb-3">
+            <div
+                v-for="invoice in invoices"
+                :key="`mobile-${invoice.id}`"
+                class="rounded-xl border border-slate-200 bg-slate-50/40 p-4 space-y-2"
+            >
+                <div class="flex items-start justify-between gap-2">
+                    <div class="text-sm font-semibold text-slate-900">{{ invoice.invoice_number }}</div>
+                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium" :class="getStatusClass(invoice.status)">
+                        {{ formatStatus(invoice.status) }}
+                    </span>
+                </div>
+                <div class="text-sm text-slate-600">Customer: {{ invoice.customer?.name || '—' }}</div>
+                <div class="text-sm text-slate-600">Date: {{ formatDate(invoice.invoice_date) }}</div>
+                <div class="text-sm font-semibold text-slate-900">Total: £{{ formatNumber(invoice.total) }}</div>
+                <div class="text-sm text-slate-600">Created By: {{ invoice.creator?.name || '—' }}</div>
+                <div class="flex flex-wrap gap-3 pt-1">
+                    <button type="button" class="text-indigo-600 hover:text-indigo-800 font-medium text-sm" @click="openSendEmail(invoice)">Send email</button>
+                    <router-link :to="`/invoices/${invoice.id}/edit`" class="listing-link-edit">Edit</router-link>
+                    <button type="button" class="listing-link-edit" @click="generatePDF(invoice.id)">PDF</button>
+                    <button type="button" class="listing-link-delete" @click="openDeleteConfirm(invoice)">Delete</button>
+                </div>
             </div>
         </div>
 
-        <!-- Summary Cards -->
-        <div v-if="summary" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 min-w-0">
-                <div class="text-sm text-slate-600">Total Invoices</div>
-                <div class="text-xl sm:text-2xl font-bold text-slate-900 mt-1 tabular-nums">{{ summary.total || 0 }}</div>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 min-w-0">
-                <div class="text-sm text-slate-600">Total Amount</div>
-                <div class="text-xl sm:text-2xl font-bold text-slate-900 mt-1 tabular-nums break-words">£{{ formatNumber(summary.total_amount || 0) }}</div>
-            </div>
-        </div>
+        <template #pagination>
+            <Pagination
+                v-if="pagination"
+                :pagination="pagination"
+                embedded
+                result-label="invoices"
+                singular-label="invoice"
+                @page-change="loadInvoices"
+            />
+        </template>
+    </ListingPageShell>
 
-        <!-- Invoices Table -->
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden min-w-0">
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Invoice #</th>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Customer</th>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Date</th>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Total</th>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Status</th>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Created By</th>
-                            <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200">
-                        <tr v-if="loading" class="text-center">
-                            <td colspan="7" class="px-6 py-8 text-slate-500">Loading invoices...</td>
-                        </tr>
-                        <tr v-else-if="invoices.length === 0" class="text-center">
-                            <td colspan="7" class="px-6 py-8 text-slate-500">No invoices found</td>
-                        </tr>
-                        <tr v-for="invoice in invoices" :key="invoice.id" class="hover:bg-slate-50">
-                            <td class="px-4 md:px-6 py-4 text-sm font-medium text-slate-900">{{ invoice.invoice_number }}</td>
-                            <td class="px-4 md:px-6 py-4 text-sm text-slate-900">{{ invoice.customer?.name || '-' }}</td>
-                            <td class="px-4 md:px-6 py-4 text-sm text-slate-600">{{ formatDate(invoice.invoice_date) }}</td>
-                            <td class="px-4 md:px-6 py-4 text-sm font-medium text-slate-900">£{{ formatNumber(invoice.total) }}</td>
-                            <td class="px-4 md:px-6 py-4 text-sm">
-                                <span class="px-2 py-1 rounded text-xs font-medium" :class="getStatusClass(invoice.status)">
-                                    {{ formatStatus(invoice.status) }}
-                                </span>
-                            </td>
-                            <td class="px-4 md:px-6 py-4 text-sm text-slate-600">{{ invoice.creator?.name || '-' }}</td>
-                            <td class="px-4 md:px-6 py-4 text-sm">
-                                <div class="flex flex-wrap gap-2">
-                                    <button
-                                        @click="openSendEmail(invoice)"
-                                        class="text-indigo-600 hover:text-indigo-700 hover:underline text-xs"
-                                    >
-                                        Send email
-                                    </button>
-                                    <router-link
-                                        :to="`/invoices/${invoice.id}/edit`"
-                                        class="text-green-600 hover:text-green-700 hover:underline text-xs"
-                                    >
-                                        Edit
-                                    </router-link>
-                                    <button
-                                        @click="generatePDF(invoice.id)"
-                                        class="text-blue-600 hover:text-blue-700 hover:underline text-xs"
-                                    >
-                                        PDF
-                                    </button>
-                                    <button
-                                        @click="openDeleteConfirm(invoice)"
-                                        class="text-red-600 hover:text-red-700 hover:underline text-xs"
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <InvoiceSendEmailModal
+        v-if="showSendEmailModal"
+        :invoice="invoiceToSendEmail"
+        :logo-url="publicSettings.logo_url"
+        :company-name="publicSettings.company_name"
+        @close="closeSendEmail"
+        @sent="handleEmailSent"
+    />
 
-        <!-- Pagination -->
-        <Pagination
-            v-if="pagination && pagination.last_page > 1"
-            :pagination="pagination"
-            @page-change="loadInvoices"
-        />
+    <InvoiceForm
+        v-if="showForm"
+        :invoice="selectedInvoice"
+        @close="closeForm"
+        @saved="handleSaved"
+    />
 
-        <!-- Send Invoice Email Modal -->
-        <InvoiceSendEmailModal
-            v-if="showSendEmailModal"
-            :invoice="invoiceToSendEmail"
-            :logo-url="publicSettings.logo_url"
-            :company-name="publicSettings.company_name"
-            @close="closeSendEmail"
-            @sent="handleEmailSent"
-        />
-
-        <!-- Invoice Form Modal -->
-        <InvoiceForm
-            v-if="showForm"
-            :invoice="selectedInvoice"
-            @close="closeForm"
-            @saved="handleSaved"
-        />
-
-        <!-- Delete Confirmation Modal -->
-        <DeleteConfirm
-            v-if="showDeleteConfirm"
-            title="Delete Invoice"
-            :message="`Are you sure you want to delete invoice ${invoiceToDelete?.invoice_number}?`"
-            :loading="deleting"
-            @confirm="confirmDelete"
-            @cancel="closeDeleteConfirm"
-        />
-    </div>
+    <DeleteConfirm
+        v-if="showDeleteConfirm"
+        title="Delete Invoice"
+        :message="`Are you sure you want to delete invoice ${invoiceToDelete?.invoice_number}?`"
+        :loading="deleting"
+        @confirm="confirmDelete"
+        @cancel="closeDeleteConfirm"
+    />
 </template>
 
 <script setup>
@@ -245,6 +226,7 @@ import InvoiceForm from '@/components/InvoiceForm.vue';
 import InvoiceSendEmailModal from '@/components/InvoiceSendEmailModal.vue';
 import DeleteConfirm from '@/components/DeleteConfirm.vue';
 import Pagination from '@/components/Pagination.vue';
+import ListingPageShell from '@/components/ListingPageShell.vue';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
 
@@ -278,6 +260,10 @@ const invoiceToDelete = ref(null);
 const deleting = ref(false);
 const loading = ref(false);
 let searchTimeout = null;
+
+const invoicesBadge = computed(() =>
+    pagination.value?.total != null ? `${pagination.value.total} Total` : null,
+);
 
 const formatNumber = (num) => {
     return new Intl.NumberFormat('en-GB').format(num || 0);

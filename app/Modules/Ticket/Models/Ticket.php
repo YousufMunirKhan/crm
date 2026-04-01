@@ -5,6 +5,7 @@ namespace App\Modules\Ticket\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Traits\HasAuditLog;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Ticket extends Model
@@ -61,6 +62,13 @@ class Ticket extends Model
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'assigned_to');
+    }
+
+    /** All users assigned to this ticket (multi-assign). Legacy {@see $assigned_to} is kept as the first assignee for exports. */
+    public function assignees(): BelongsToMany
+    {
+        return $this->belongsToMany(\App\Models\User::class, 'ticket_assignees')
+            ->withTimestamps();
     }
 
     public function messages(): HasMany

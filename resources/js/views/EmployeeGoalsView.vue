@@ -1,95 +1,67 @@
 <template>
-    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <ListingPageShell
+        title="Employee goals"
+        subtitle="Set monthly targets for appointments and sales, and see what each employee achieved."
+        :badge="goalsBadge"
+    >
+        <template #filters>
             <div>
-                <h1 class="text-2xl font-bold text-slate-900">Employee Goals</h1>
-                <p class="text-sm text-slate-500 mt-1">
-                    Set monthly targets for appointments and sales, and see what each employee achieved.
-                </p>
+                <label class="listing-label">Month</label>
+                <input v-model="selectedMonth" type="month" class="listing-input w-full sm:w-48" @change="loadData" />
             </div>
-            <div class="flex flex-wrap gap-3 items-stretch sm:items-center w-full sm:w-auto">
-                <input
-                    v-model="selectedMonth"
-                    type="month"
-                    class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                    @change="loadData"
-                />
-            </div>
-        </div>
+        </template>
 
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden min-w-0">
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[800px]">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wide">Employee</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wide">Appointments (Target / Achieved)</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wide">Sales (Target / Achieved)</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wide">Revenue (Target / Won)</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wide">Progress</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wide">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200">
-                        <tr v-if="loading">
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
-                                Loading...
-                            </td>
-                        </tr>
-                        <tr v-else-if="rows.length === 0">
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">
-                                No employees found for this month.
-                            </td>
-                        </tr>
-                        <tr
-                            v-for="row in rows"
-                            :key="row.user_id"
-                            class="hover:bg-slate-50"
-                        >
-                            <td class="px-4 py-3 text-sm">
-                                <div class="font-medium text-slate-900">
-                                    {{ row.user?.name || 'Employee' }}
+        <div class="overflow-x-auto min-w-0">
+            <table class="w-full min-w-[800px]">
+                <thead class="listing-thead">
+                    <tr>
+                        <th class="listing-th">Employee</th>
+                        <th class="listing-th">Appointments (target / achieved)</th>
+                        <th class="listing-th">Sales (target / achieved)</th>
+                        <th class="listing-th">Revenue (target / won)</th>
+                        <th class="listing-th">Progress</th>
+                        <th class="listing-th">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-if="loading">
+                        <td colspan="6" class="listing-td text-center text-slate-500 py-10">Loading…</td>
+                    </tr>
+                    <tr v-else-if="rows.length === 0">
+                        <td colspan="6" class="listing-td text-center text-slate-500 py-10">No employees found for this month.</td>
+                    </tr>
+                    <tr v-for="row in rows" :key="row.user_id" class="listing-row">
+                        <td class="listing-td">
+                            <div class="font-medium text-slate-900">{{ row.user?.name || 'Employee' }}</div>
+                            <div class="text-xs text-slate-500">{{ row.user?.role?.name || '—' }}</div>
+                        </td>
+                        <td class="listing-td">{{ row.target_appointments }} / {{ row.achieved_appointments }}</td>
+                        <td class="listing-td">{{ row.target_sales }} / {{ row.achieved_sales }}</td>
+                        <td class="listing-td">£{{ formatNumber(row.target_revenue) }} / £{{ formatNumber(row.achieved_revenue) }}</td>
+                        <td class="listing-td">
+                            <div class="w-40">
+                                <div class="flex justify-between text-xs text-slate-500 mb-1">
+                                    <span>{{ row.appointment_progress }}%</span>
+                                    <span>Appointments</span>
                                 </div>
-                                <div class="text-xs text-slate-500">
-                                    {{ row.user?.role?.name || '—' }}
+                                <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                                    <div
+                                        class="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
+                                        :style="{ width: `${row.appointment_progress}%` }"
+                                    ></div>
                                 </div>
-                            </td>
-                            <td class="px-4 py-3 text-sm text-slate-700">
-                                {{ row.target_appointments }} / {{ row.achieved_appointments }}
-                            </td>
-                            <td class="px-4 py-3 text-sm text-slate-700">
-                                {{ row.target_sales }} / {{ row.achieved_sales }}
-                            </td>
-                            <td class="px-4 py-3 text-sm text-slate-700">
-                                £{{ formatNumber(row.target_revenue) }} / £{{ formatNumber(row.achieved_revenue) }}
-                            </td>
-                            <td class="px-4 py-3 text-sm">
-                                <div class="w-40">
-                                    <div class="flex justify-between text-xs text-slate-500 mb-1">
-                                        <span>{{ row.appointment_progress }}%</span>
-                                        <span>Appointments</span>
-                                    </div>
-                                    <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                                        <div
-                                            class="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
-                                            :style="{ width: `${row.appointment_progress}%` }"
-                                        ></div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3 text-sm">
-                                <button
-                                    class="px-3 py-1 text-xs rounded-lg bg-slate-900 text-white hover:bg-slate-800"
-                                    @click="openEdit(row)"
-                                >
-                                    Set / Edit Goals
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                            </div>
+                        </td>
+                        <td class="listing-td">
+                            <button type="button" class="listing-btn-primary text-xs py-1.5 px-3" @click="openEdit(row)">
+                                Set / edit goals
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
+    </ListingPageShell>
 
         <!-- Edit goals modal -->
         <div
@@ -166,7 +138,6 @@
                 </div>
             </div>
         </div>
-    </div>
 </template>
 
 <script setup>
@@ -174,6 +145,7 @@ import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { useRoute } from 'vue-router';
 import { useToastStore } from '@/stores/toast';
+import ListingPageShell from '@/components/ListingPageShell.vue';
 
 const route = useRoute();
 const toast = useToastStore();
@@ -193,6 +165,12 @@ const editForm = ref({
 const selectedEmployeeId = computed(() => {
     // Optional ?employee_id= or coming from /hr/employees/:id/goals in future
     return route.query.employee_id ? Number(route.query.employee_id) : null;
+});
+
+const goalsBadge = computed(() => {
+    if (loading.value) return null;
+    const n = rows.value.length;
+    return n ? `${n} ${n === 1 ? 'employee' : 'employees'}` : null;
 });
 
 const formatNumber = (num) => {

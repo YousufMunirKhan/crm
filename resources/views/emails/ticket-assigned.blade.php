@@ -28,7 +28,7 @@
             <h1>You’ve been assigned a ticket</h1>
         </div>
         <div class="content">
-            <p>Hello {{ $ticket->assignee->name ?? 'there' }},</p>
+            <p>Hello {{ $recipientUser->name ?? 'there' }},</p>
             <p><strong>{{ $ticket->ticket_number }}</strong> has been assigned to you. Full details are below.</p>
 
             <div class="highlight">

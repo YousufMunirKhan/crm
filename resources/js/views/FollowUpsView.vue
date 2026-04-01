@@ -1,102 +1,65 @@
 <template>
-    <div class="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Follow-ups</h1>
-            </div>
-            <div class="flex flex-wrap items-center gap-3">
-                <div class="flex items-center gap-2">
-                    <label class="text-sm font-medium text-slate-700">From</label>
-                    <input
-                        v-model="fromDate"
-                        type="date"
-                        class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </div>
-                <div class="flex items-center gap-2">
-                    <label class="text-sm font-medium text-slate-700">To</label>
-                    <input
-                        v-model="toDate"
-                        type="date"
-                        class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </div>
-                <button
-                    @click="setToday"
-                    class="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
-                >
-                    Today
-                </button>
-                <button
-                    @click="setThisWeek"
-                    class="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
-                >
-                    This week
-                </button>
-                <button
-                    @click="loadFollowUps"
-                    class="px-3 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800"
-                >
-                    Apply
-                </button>
-                <button
-                    @click="exportCsv"
-                    :disabled="!followUps.length"
-                    class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50"
-                >
-                    Export CSV
-                </button>
-            </div>
-        </div>
+    <ListingPageShell
+        title="Follow-ups"
+        subtitle="Scheduled next actions by date range — expand rows on desktop for full notes; export for calling lists."
+        :badge="followUpsBadge"
+    >
+        <template #actions>
+            <button type="button" class="listing-btn-outline w-full sm:w-auto" :disabled="!followUps.length" @click="exportCsv">
+                Export CSV
+            </button>
+        </template>
 
-        <div v-if="loading" class="text-center py-12 text-slate-500">Loading...</div>
+        <template #filters>
+            <div class="listing-filters-row">
+                <div>
+                    <label class="listing-label">From</label>
+                    <input v-model="fromDate" type="date" class="listing-input w-full sm:w-40" />
+                </div>
+                <div>
+                    <label class="listing-label">To</label>
+                    <input v-model="toDate" type="date" class="listing-input w-full sm:w-40" />
+                </div>
+                <button type="button" class="listing-btn-outline" @click="setToday">Today</button>
+                <button type="button" class="listing-btn-outline" @click="setThisWeek">This week</button>
+                <button type="button" class="listing-btn-primary" @click="loadFollowUps">Filter</button>
+            </div>
+        </template>
 
-        <div v-else-if="!followUps.length" class="bg-white rounded-xl shadow-sm p-8 text-center text-slate-500">
+        <div v-if="loading" class="px-5 py-14 text-center text-slate-500 text-sm">Loading…</div>
+
+        <div v-else-if="!followUps.length" class="px-5 py-12 text-center text-slate-500 text-sm">
             No follow-ups for this period.
         </div>
 
         <!-- Desktop / tablet table -->
-        <div v-else class="hidden sm:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div v-else class="hidden sm:block overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[900px]">
-                    <thead class="bg-slate-50 border-b border-slate-200">
+                    <thead class="listing-thead">
                         <tr>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Date
-                            </th>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Time
-                            </th>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Customer
-                            </th>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Products
-                            </th>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Stage
-                            </th>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Assignee
-                            </th>
-                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                Latest note
-                            </th>
+                            <th class="listing-th">Date</th>
+                            <th class="listing-th">Time</th>
+                            <th class="listing-th">Customer</th>
+                            <th class="listing-th">Products</th>
+                            <th class="listing-th">Stage</th>
+                            <th class="listing-th">Assignee</th>
+                            <th class="listing-th">Latest note</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody>
                         <template v-for="fu in followUps" :key="fu.id">
                             <tr
-                                class="hover:bg-slate-50 transition-colors cursor-pointer"
+                                class="listing-row cursor-pointer"
                                 @click="toggleExpanded(fu.id)"
                             >
-                                <td class="px-4 sm:px-6 py-3 text-sm text-slate-900">
+                                <td class="listing-td-strong">
                                     {{ formatDate(fu.next_follow_up_date) }}
                                 </td>
-                                <td class="px-4 sm:px-6 py-3 text-sm text-slate-600">
+                                <td class="listing-td text-slate-600">
                                     {{ fu.next_follow_up_time || '—' }}
                                 </td>
-                                <td class="px-4 sm:px-6 py-3 text-sm">
+                                <td class="listing-td">
                                     <router-link
                                         v-if="fu.customer_id"
                                         :to="`/customers/${fu.customer_id}`"
@@ -108,10 +71,10 @@
                                         {{ fu.customer?.name || '—' }}
                                     </span>
                                 </td>
-                                <td class="px-4 sm:px-6 py-3 text-sm text-slate-600">
+                                <td class="listing-td">
                                     {{ fu.products || '—' }}
                                 </td>
-                                <td class="px-4 sm:px-6 py-3 text-xs">
+                                <td class="listing-td">
                                 <span
                                     class="inline-flex px-2 py-1 rounded-full font-medium whitespace-nowrap"
                                     :class="stageClass(fu.stage)"
@@ -119,10 +82,10 @@
                                     {{ formatStage(fu.stage) }}
                                 </span>
                                 </td>
-                                <td class="px-4 sm:px-6 py-3 text-sm text-slate-600">
+                                <td class="listing-td">
                                     {{ fu.assignee?.name || '—' }}
                                 </td>
-                                <td class="px-4 sm:px-6 py-3 text-sm text-slate-600 max-w-xs">
+                                <td class="listing-td max-w-xs">
                                     <div class="flex items-center gap-2">
                                         <span class="block truncate flex-1" :title="fu.latest_note || ''">
                                             {{ fu.latest_note || '—' }}
@@ -159,11 +122,11 @@
         </div>
 
         <!-- Mobile cards -->
-        <div v-if="followUps.length" class="sm:hidden space-y-3">
+        <div v-if="followUps.length" class="sm:hidden space-y-3 px-3 pb-3">
             <div
                 v-for="fu in followUps"
                 :key="fu.id"
-                class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-2"
+                class="rounded-xl border border-slate-200 bg-slate-50/40 p-4 space-y-2"
             >
                 <div class="flex justify-between items-start gap-2">
                     <div>
@@ -212,13 +175,14 @@
                 </div>
             </div>
         </div>
-    </div>
+    </ListingPageShell>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
+import ListingPageShell from '@/components/ListingPageShell.vue';
 
 const loading = ref(true);
 const followUps = ref([]);
@@ -230,6 +194,10 @@ const todayStr = computed(() => {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 });
+
+const followUpsBadge = computed(() =>
+    !loading.value && followUps.value.length ? `${followUps.value.length} Total` : null,
+);
 
 function setToday() {
     fromDate.value = todayStr.value;

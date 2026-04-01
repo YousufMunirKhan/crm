@@ -7,7 +7,7 @@
         <title>{{ config('app.name', 'Switch & Save CRM') }}</title>
         
         <!-- PWA Meta Tags -->
-        <meta name="theme-color" content="#0f172a">
+        <meta name="theme-color" content="#2563eb">
         <meta name="description" content="Customer Relationship Management System">
         
         <!-- PWA Manifest -->
@@ -29,12 +29,12 @@
         <link rel="shortcut icon" href="/favicon.ico">
         
         <!-- Microsoft Tiles -->
-        <meta name="msapplication-TileColor" content="#0f172a">
+        <meta name="msapplication-TileColor" content="#2563eb">
         <meta name="msapplication-TileImage" content="/icons/icon-192x192.svg">
         
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="bg-slate-50">
+    <body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
         <div id="app"></div>
     </body>
 </html>
