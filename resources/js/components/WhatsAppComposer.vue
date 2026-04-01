@@ -195,7 +195,9 @@ async function sendMessage() {
         await loadWindowStatus();
         emit('sent');
     } catch (err) {
-        error.value = err.response?.data?.message || 'Failed to send WhatsApp message';
+        const d = err.response?.data;
+        const hint = d?.hint ? ` ${d.hint}` : '';
+        error.value = (d?.message || 'Failed to send WhatsApp message') + hint;
     } finally {
         sending.value = false;
     }

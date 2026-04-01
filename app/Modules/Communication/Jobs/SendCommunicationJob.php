@@ -50,7 +50,7 @@ class SendCommunicationJob implements ShouldQueue
             $payload = is_array($communication->provider_payload) ? $communication->provider_payload : [];
             $payload['send_error'] = $e->getMessage();
             if ($communication->channel === 'whatsapp') {
-                $payload['send_error_friendly'] = self::whatsappFriendlyError($e->getMessage());
+                $payload['send_error_friendly'] = self::whatsappMetaUserHint($e->getMessage());
             }
             $communication->update([
                 'status' => 'failed',
@@ -61,12 +61,19 @@ class SendCommunicationJob implements ShouldQueue
 
     /**
      * Plain-language hint for CRM users when Meta rejects a send (not “customer must allow the app”).
+     * Used by queued sends and by CommunicationController for immediate sends.
      */
-    private static function whatsappFriendlyError(string $message): string
+    public static function whatsappMetaUserHint(string $message): string
     {
         $m = strtolower($message);
         if (str_contains($m, 'credentials not configured')) {
             return 'WhatsApp is not fully connected on the server (missing Meta phone number ID or access token). An admin should check .env / settings.';
+        }
+        if (
+            (str_contains($m, 'code=10') || str_contains($m, '#10)'))
+            && str_contains($m, 'permission')
+        ) {
+            return 'Meta blocked this action for your app/token (error 10 = missing permission). Fix in Meta Business / Developer: generate a token with WhatsApp permissions for this Business (whatsapp_business_messaging, whatsapp_business_management), use the same WABA and phone number ID as in CRM, and if the app is still in Development add the customer number under WhatsApp → API setup test list—or go Live with Advanced Access. Then paste a fresh token into CRM and try again.';
         }
         if (str_contains($m, 'template') || str_contains($m, '131047') || str_contains($m, 're-engagement') || str_contains($m, 'outside the 24')) {
             return 'WhatsApp lets you send a normal typed message once this person has recently messaged your business number. For the very first outreach, Meta requires an approved business template (created in Meta Business Suite), then the CRM can send it.';

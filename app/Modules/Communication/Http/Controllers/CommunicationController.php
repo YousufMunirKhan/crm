@@ -4,6 +4,7 @@ namespace App\Modules\Communication\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Communication\Models\Communication;
+use App\Modules\Communication\Jobs\SendCommunicationJob;
 use App\Modules\Communication\Services\CommunicationService;
 use App\Modules\Communication\Services\ConversationWindowService;
 use App\Modules\Communication\Services\WhatsAppServiceV2;
@@ -114,6 +115,7 @@ class CommunicationController extends Controller
             } catch (\Exception $e) {
                 return response()->json([
                     'message' => 'Failed to send WhatsApp message: ' . $e->getMessage(),
+                    'hint' => SendCommunicationJob::whatsappMetaUserHint($e->getMessage()),
                 ], 500);
             }
         }
