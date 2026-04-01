@@ -1,5 +1,7 @@
 # Email Management – Specification
 
+**Related:** For how HTML templates are rendered and for the full **merge tag** reference (dynamic fields in subject/body), see **[Email templates: HTML & merge tags](./EMAIL_TEMPLATE_HTML_AND_MERGE_TAGS.md)**.
+
 ## Tables (where data is saved)
 
 - **Filter-based sends:** Recipients come from `customers` (filtered by audience/products). Each send is logged in **`sent_communications`** (recipient_email, template_id, subject, content, status, sent_at, sent_by, customer_id).

@@ -165,9 +165,16 @@ class HrController extends Controller
 
         $month = $request->input('month') ?: now()->format('Y-m');
 
-        $targets = EmployeeTarget::with('user.role')
-            ->where('month', $month)
-            ->get();
+        $query = EmployeeTarget::with('user.role')
+            ->where('month', $month);
+
+        $user = auth()->user();
+        $canViewAll = $user->isRole('Admin') || $user->isRole('System Admin') || $user->isRole('Manager');
+        if (!$canViewAll) {
+            $query->where('user_id', $user->id);
+        }
+
+        $targets = $query->get();
 
         return response()->json([
             'month' => $month,

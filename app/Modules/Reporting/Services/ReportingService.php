@@ -222,10 +222,18 @@ class ReportingService
             $to = isset($filters['to']) ? Carbon::parse($filters['to'])->endOfDay() : now()->endOfDay();
         }
 
-        $agents = User::where('is_active', true)
-            ->whereHas('role', function ($q) {
-                $q->whereIn('name', ['Sales', 'CallAgent', 'Support']);
-            })->get()->map(function ($agent) use ($from, $to) {
+        if (!empty($filters['agent_id'])) {
+            // Single-user view (e.g. employee dashboard): include any active user, not only sales roles
+            $agentsQuery = User::where('is_active', true)
+                ->where('id', (int) $filters['agent_id']);
+        } else {
+            $agentsQuery = User::where('is_active', true)
+                ->whereHas('role', function ($q) {
+                    $q->whereIn('name', ['Sales', 'CallAgent', 'Support']);
+                });
+        }
+
+        $agents = $agentsQuery->get()->map(function ($agent) use ($from, $to) {
             $leads = $agent->leads()->whereBetween('created_at', [$from, $to])->with('items')->get();
 
             // Count won products (primary sales metric)

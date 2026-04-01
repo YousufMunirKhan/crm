@@ -50,7 +50,7 @@ A complete production-grade enterprise CRM platform built with Laravel 11 and Vu
 
 ### 4. Unified Communication Engine
 - WhatsApp (Meta Cloud API ready)
-- Email (SMTP)
+- Email (SMTP) — HTML templates and merge tags: [docs/EMAIL_TEMPLATE_HTML_AND_MERGE_TAGS.md](docs/EMAIL_TEMPLATE_HTML_AND_MERGE_TAGS.md)
 - SMS (provider integration ready)
 - Unified timeline view
 - Delivery status tracking

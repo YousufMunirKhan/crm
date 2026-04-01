@@ -12,19 +12,35 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
+    private function userCanViewOrganizationDashboard(?\App\Models\User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        return $user->isRole('Admin') || $user->isRole('System Admin') || $user->isRole('Manager');
+    }
+
     /**
-     * Get admin dashboard data (all data)
+     * Dashboard: organization-wide for Admin / System Admin / Manager; everyone else sees only their pipeline.
      */
     public function index(Request $request)
     {
+        $authUser = $request->user()?->loadMissing('role');
+        $canViewAll = $this->userCanViewOrganizationDashboard($authUser);
+
+        // Non-privileged users cannot spoof agent_id — always scope to themselves
+        $agentId = $canViewAll
+            ? ($request->filled('agent_id') ? (int) $request->agent_id : null)
+            : ($authUser?->id);
+
         // Get filter parameters
-        $fromDate = $request->has('from') 
-            ? Carbon::parse($request->from)->startOfDay() 
+        $fromDate = $request->has('from')
+            ? Carbon::parse($request->from)->startOfDay()
             : now()->startOfMonth();
-        $toDate = $request->has('to') 
-            ? Carbon::parse($request->to)->endOfDay() 
+        $toDate = $request->has('to')
+            ? Carbon::parse($request->to)->endOfDay()
             : now()->endOfDay();
-        $agentId = $request->agent_id;
 
         // Date filters for comparisons
         $today = now()->startOfDay();
@@ -34,7 +50,6 @@ class DashboardController extends Controller
         // Base query with filters
         $leadQuery = Lead::query();
         
-        // Apply agent filter if provided
         if ($agentId) {
             $leadQuery->where(function ($q) use ($agentId) {
                 $q->where('assigned_to', $agentId)
@@ -200,13 +215,47 @@ class DashboardController extends Controller
             ->pluck('count', 'source')
             ->toArray();
 
-        // Total invoices count
-        $totalInvoices = Invoice::count();
+        // Total **customers** / invoices — scoped when viewing a single agent (or self)
+        if ($agentId) {
+            $totalCustomers = Customer::where('type', Customer::TYPE_CUSTOMER)
+                ->where(function ($q) use ($agentId) {
+                    $q->whereHas('assignedUsers', function ($sub) use ($agentId) {
+                        $sub->where('user_id', $agentId);
+                    })->orWhereHas('leads', function ($sub) use ($agentId) {
+                        $sub->where('assigned_to', $agentId);
+                    });
+                })
+                ->count();
+            $totalInvoices = Invoice::whereHas('customer', function ($q) use ($agentId) {
+                $q->whereHas('assignedUsers', function ($sub) use ($agentId) {
+                    $sub->where('user_id', $agentId);
+                })->orWhereHas('leads', function ($sub) use ($agentId) {
+                    $sub->where('assigned_to', $agentId);
+                });
+            })->count();
+        } else {
+            $totalCustomers = Customer::where('type', Customer::TYPE_CUSTOMER)->count();
+            $totalInvoices = Invoice::count();
+        }
 
-        // Total **customers** count (exclude prospects)
-        $totalCustomers = Customer::where('type', \App\Modules\CRM\Models\Customer::TYPE_CUSTOMER)->count();
+        $leadsByMonth = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $mStart = now()->copy()->subMonths($i)->startOfMonth();
+            $mEnd = now()->copy()->subMonths($i)->endOfMonth();
+            $leadsByMonth[] = [
+                'label' => $mStart->format('M'),
+                'key' => $mStart->format('Y-m'),
+                'total' => (clone $leadQuery)->whereBetween('created_at', [$mStart, $mEnd])->count(),
+                'won' => (clone $leadQuery)->whereBetween('created_at', [$mStart, $mEnd])->where('stage', 'won')->count(),
+            ];
+        }
 
         return response()->json([
+            'meta' => [
+                'viewer_scope' => $canViewAll ? 'organization' : 'self',
+                'effective_agent_id' => $agentId,
+                'can_filter_employees' => $canViewAll,
+            ],
             'stats' => [
                 'filtered' => [
                     'leads' => $filteredLeads,
@@ -241,6 +290,9 @@ class DashboardController extends Controller
             'total_invoices' => $totalInvoices,
             'lead_sources' => $leadSources,
             'pipeline' => $pipeline,
+            'charts' => [
+                'leads_by_month' => $leadsByMonth,
+            ],
             'filters' => [
                 'from' => $fromDate->toDateString(),
                 'to' => $toDate->toDateString(),

@@ -2,9 +2,24 @@
     <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
         <!-- Header -->
         <div class="flex justify-between items-center">
-            <div>
+            <div class="min-w-0 flex-1">
                 <h1 class="text-2xl font-bold text-slate-900">Templates</h1>
                 <p class="text-sm text-slate-600 mt-1">Manage email, SMS, and WhatsApp templates</p>
+                <p v-if="activeTab === 'email'" class="text-sm text-slate-600 mt-2 max-w-xl leading-relaxed">
+                    <a
+                        href="/downloads/email-merge-tags-guide.md"
+                        download="CRM-Email-Merge-Tags-and-Placeholders.md"
+                        class="inline-flex items-center gap-1.5 font-medium text-blue-700 hover:text-blue-900 underline decoration-blue-300 underline-offset-2"
+                    >
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Email merge tags &amp; placeholders guide
+                    </a>
+                    <span class="text-slate-500 font-normal">
+                        — download: every placeholder, what it becomes, HTML snippets, and a copy-paste block for AI tools.
+                    </span>
+                </p>
             </div>
             <div class="flex gap-3">
                 <button
@@ -16,6 +31,17 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                     Send Email
+                </button>
+                <button
+                    v-if="activeTab === 'email'"
+                    type="button"
+                    @click="showHtmlImport = true"
+                    class="px-4 py-2 border border-slate-300 text-slate-800 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Import HTML
                 </button>
                 <button
                     v-if="activeTab !== 'assignments'"
@@ -308,11 +334,10 @@
         </div>
 
         <!-- Modals -->
-        <TemplateBuilder
-            v-if="showBuilder && activeTab === 'email'"
-            :template="editingTemplate"
-            @close="showBuilder = false"
-            @saved="handleTemplateSaved"
+        <EmailHtmlImportModal
+            v-if="showHtmlImport"
+            @close="showHtmlImport = false"
+            @imported="handleHtmlImported"
         />
 
         <SmsTemplateModal
@@ -338,15 +363,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
-import TemplateBuilder from '@/components/TemplateBuilder.vue';
+import EmailHtmlImportModal from '@/components/EmailHtmlImportModal.vue';
 import SendEmailModal from '@/components/SendEmailModal.vue';
 import SmsTemplateModal from '@/components/SmsTemplateModal.vue';
 import WhatsappTemplateModal from '@/components/WhatsappTemplateModal.vue';
 
 const toast = useToastStore();
+const route = useRoute();
+const router = useRouter();
 
 const activeTab = ref('email');
 const loading = ref(true);
@@ -354,7 +382,7 @@ const templates = ref([]);
 const emailTemplates = ref([]);
 const smsTemplates = ref([]);
 const whatsappTemplates = ref([]);
-const showBuilder = ref(false);
+const showHtmlImport = ref(false);
 const showSmsModal = ref(false);
 const showWhatsappModal = ref(false);
 const showSendModal = ref(false);
@@ -366,6 +394,16 @@ const tabs = [
     { id: 'whatsapp', name: 'WhatsApp Templates', icon: '💬' },
     { id: 'assignments', name: 'Template Assignments', icon: '⚙️' },
 ];
+
+watch(
+    () => route.query.tab,
+    (tab) => {
+        if (typeof tab === 'string' && tabs.some((t) => t.id === tab)) {
+            activeTab.value = tab;
+            loadTemplates();
+        }
+    }
+);
 
 const functionTypes = [
     'appointment',
@@ -460,14 +498,20 @@ const saveAssignment = async (functionType, templateType, templateId) => {
     }
 };
 
+const handleHtmlImported = (template) => {
+    showHtmlImport.value = false;
+    loadTemplates();
+    if (template?.id) {
+        router.push({ name: 'email-template-edit', params: { id: String(template.id) } });
+    }
+};
+
 const openCreateModal = () => {
-    editingTemplate.value = null;
-    showBuilder.value = true;
+    router.push({ name: 'email-template-new' });
 };
 
 const editTemplate = (template) => {
-    editingTemplate.value = template;
-    showBuilder.value = true;
+    router.push({ name: 'email-template-edit', params: { id: String(template.id) } });
 };
 
 const openCreateSmsModal = () => {

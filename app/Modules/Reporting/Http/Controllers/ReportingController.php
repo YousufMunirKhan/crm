@@ -78,7 +78,12 @@ class ReportingController extends Controller
 
     public function agents(Request $request)
     {
+        $user = auth()->user();
         $filters = $request->only(['from', 'to', 'month', 'agent_id']);
+        $canViewAll = $user->isRole('Admin') || $user->isRole('System Admin') || $user->isRole('Manager');
+        if (!$canViewAll) {
+            $filters['agent_id'] = $user->id;
+        }
         $data = $this->reportingService->getAgentPerformance($filters);
 
         return response()->json($data);

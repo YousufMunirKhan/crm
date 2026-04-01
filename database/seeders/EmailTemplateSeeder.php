@@ -9,49 +9,35 @@ class EmailTemplateSeeder extends Seeder
 {
     public function run(): void
     {
+        $welcomeHtmlPath = resource_path('email-templates/welcome-rich.partial.html');
+        $welcomeHtml = is_file($welcomeHtmlPath)
+            ? file_get_contents($welcomeHtmlPath)
+            : '<p>Welcome {{first_name}} — add resources/email-templates/welcome-rich.partial.html and re-seed.</p>';
+
         $templates = [
             [
                 'name' => 'Welcome Email',
                 'category' => 'welcome',
-                'subject' => 'Welcome to {{company_name}}!',
-                'description' => 'A warm welcome email for new customers',
+                'subject' => 'Welcome to {{company_name}}, {{first_name}}!',
+                'description' => 'Branded Switch & Save welcome email (logo from Settings, links from company & social URLs)',
                 'content' => [
+                    'skip_brand_footer' => true,
+                    'preview_line' => 'Smart solutions to grow your business — book your free demo',
                     'sections' => [
                         [
-                            'type' => 'header',
+                            'type' => 'raw_html',
                             'content' => [
-                                'logo' => '',
-                                'text' => 'Welcome!',
-                            ],
-                        ],
-                        [
-                            'type' => 'text',
-                            'content' => [
-                                'text' => 'Hello {{customer_name}},',
-                            ],
-                        ],
-                        [
-                            'type' => 'text',
-                            'content' => [
-                                'text' => 'We are thrilled to welcome you to {{company_name}}! Thank you for choosing us.',
-                            ],
-                        ],
-                        [
-                            'type' => 'button',
-                            'content' => [
-                                'text' => 'Get Started',
-                                'url' => '#',
-                            ],
-                        ],
-                        [
-                            'type' => 'footer',
-                            'content' => [
-                                'text' => '© {{company_name}}',
+                                'html' => $welcomeHtml,
                             ],
                         ],
                     ],
                 ],
-                'variables' => ['customer_name', 'company_name'],
+                'variables' => [
+                    'first_name', 'customer_name', 'company_name', 'company_phone', 'company_website',
+                    'app_url', 'header_logo_url', 'email_welcome_dir_url', 'logo_src',
+                    'social_facebook_url', 'social_linkedin_url', 'social_instagram_url', 'social_tiktok_url',
+                    'current_year', 'unsubscribe_url',
+                ],
                 'is_active' => true,
                 'is_prebuilt' => true,
             ],

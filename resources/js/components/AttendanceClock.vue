@@ -1,14 +1,15 @@
 <template>
-    <div class="bg-white rounded-xl shadow-sm p-4 md:p-6">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-slate-900">Attendance</h3>
+    <div class="min-w-0 overflow-hidden rounded-xl bg-white p-4 shadow-sm md:p-6">
+        <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h3 class="text-base font-semibold text-slate-900 sm:text-lg">Attendance</h3>
             <div class="flex items-center gap-2">
-                <div class="text-sm text-slate-500">{{ currentDate }}</div>
+                <div class="text-xs text-slate-500 sm:text-sm">{{ currentDate }}</div>
                 <button
                     @click="refreshStatus"
                     :disabled="loading"
-                    class="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                    class="min-h-9 min-w-9 inline-flex items-center justify-center rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 touch-manipulation"
                     title="Refresh"
+                    type="button"
                 >
                     <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -23,8 +24,8 @@
 
         <div v-else class="space-y-4">
             <!-- Status Display -->
-            <div class="flex items-center gap-4 p-4 rounded-lg" :class="statusBgClass">
-                <div class="w-12 h-12 rounded-full flex items-center justify-center" :class="statusIconClass">
+            <div class="flex min-w-0 items-center gap-3 rounded-lg p-3 sm:gap-4 sm:p-4" :class="statusBgClass">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12" :class="statusIconClass">
                     <svg v-if="status.checked_in && !status.checked_out" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>
@@ -35,8 +36,8 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <div>
-                    <div class="font-semibold text-slate-900">{{ statusText }}</div>
+                <div class="min-w-0 flex-1">
+                    <div class="font-semibold text-slate-900 break-words">{{ statusText }}</div>
                     <div v-if="status.check_in_time" class="text-sm text-slate-600">
                         Check-in: {{ formatTime(status.check_in_time) }}
                     </div>
@@ -52,7 +53,7 @@
                     v-if="!status.checked_in"
                     @click="checkIn"
                     :disabled="actionLoading"
-                    class="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    class="min-h-11 flex-1 rounded-lg bg-green-600 px-4 py-3 font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
                 >
                     <span v-if="actionLoading">Processing...</span>
                     <span v-else>🕐 Time In</span>
@@ -61,7 +62,7 @@
                     v-else-if="!status.checked_out"
                     @click="checkOut"
                     :disabled="actionLoading"
-                    class="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    class="min-h-11 flex-1 rounded-lg bg-red-600 px-4 py-3 font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
                 >
                     <span v-if="actionLoading">Processing...</span>
                     <span v-else>🕐 Time Out</span>

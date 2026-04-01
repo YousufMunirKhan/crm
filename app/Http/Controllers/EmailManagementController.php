@@ -913,6 +913,44 @@ class EmailManagementController extends Controller
         $customerProducts = implode(', ', array_keys($customerProductNames));
 
         $unsubscribeUrl = config('app.url') . '/unsubscribe?email=' . urlencode($customer->email ?? '');
+        $extra = \App\Modules\Settings\Models\Setting::whereIn('key', [
+            'company_website', 'logo_url',
+            'social_facebook_url', 'social_linkedin_url', 'social_instagram_url', 'social_tiktok_url',
+        ])->pluck('value', 'key');
+        $settings = $settings->merge($extra);
+        $appUrl = rtrim((string) config('app.url'), '/');
+        $rawLogo = trim((string) ($settings['logo_url'] ?? ''));
+        $logoSrc = '';
+        if ($rawLogo !== '') {
+            $logoSrc = $rawLogo;
+            if (! str_starts_with($logoSrc, 'http')) {
+                if (($logoSrc[0] ?? '') !== '/') {
+                    $logoSrc = '/' . $logoSrc;
+                }
+                $logoSrc = $appUrl . $logoSrc;
+            }
+        }
+
+        $welcomeLogoPath = public_path('images/email/welcome/main-logo.png');
+        $defaultWelcomeLogoUrl = is_file($welcomeLogoPath)
+            ? asset('images/email/welcome/main-logo.png')
+            : '';
+
+        if ($defaultWelcomeLogoUrl !== '') {
+            $headerLogoUrl = $defaultWelcomeLogoUrl;
+        } elseif ($logoSrc !== '') {
+            $headerLogoUrl = $logoSrc;
+        } else {
+            $headerLogoUrl = $appUrl . '/images/email/welcome/main-logo.png';
+        }
+
+        $welcomeSlash = $defaultWelcomeLogoUrl !== '' ? strrpos($defaultWelcomeLogoUrl, '/') : false;
+        $emailWelcomeDirUrl = $welcomeSlash !== false
+            ? substr($defaultWelcomeLogoUrl, 0, $welcomeSlash)
+            : ($appUrl . '/images/email/welcome');
+
+        $text = (string) $text;
+
         return str_replace(
             [
                 '{{customer_name}}',
@@ -925,6 +963,16 @@ class EmailManagementController extends Controller
                 '{{prospect_products}}',
                 '{{customer_products}}',
                 '{{unsubscribe_url}}',
+                '{{app_url}}',
+                '{{logo_src}}',
+                '{{header_logo_url}}',
+                '{{email_welcome_dir_url}}',
+                '{{company_website}}',
+                '{{social_facebook_url}}',
+                '{{social_linkedin_url}}',
+                '{{social_instagram_url}}',
+                '{{social_tiktok_url}}',
+                '{{current_year}}',
             ],
             [
                 $customer->name ?? '',
@@ -937,9 +985,32 @@ class EmailManagementController extends Controller
                 $prospectProducts ?: '—',
                 $customerProducts ?: '—',
                 $unsubscribeUrl,
+                $appUrl,
+                $logoSrc,
+                $headerLogoUrl,
+                $emailWelcomeDirUrl,
+                $this->mergeTagOutboundUrl($settings['company_website'] ?? ''),
+                $this->mergeTagOutboundUrl($settings['social_facebook_url'] ?? ''),
+                $this->mergeTagOutboundUrl($settings['social_linkedin_url'] ?? ''),
+                $this->mergeTagOutboundUrl($settings['social_instagram_url'] ?? ''),
+                $this->mergeTagOutboundUrl($settings['social_tiktok_url'] ?? ''),
+                (string) now()->year,
             ],
             $text
         );
+    }
+
+    private function mergeTagOutboundUrl(?string $url): string
+    {
+        $u = trim((string) $url);
+        if ($u === '') {
+            return '#';
+        }
+        if (! preg_match('#^https?://#i', $u)) {
+            $u = 'https://' . $u;
+        }
+
+        return $u;
     }
 
     private function buildBrandFooter(string $unsubscribeUrl, bool $hasCustomFooter = false): string
@@ -1005,7 +1076,7 @@ class EmailManagementController extends Controller
 /* Base: iOS, Android, Gmail, Apple Mail, Samsung */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { margin: 0 !important; padding: 0 !important; width: 100% !important; overflow-x: hidden !important; -webkit-text-size-adjust: 100%; }
-img { max-width: 100% !important; height: auto !important; display: block !important; border: 0; -ms-interpolation-mode: bicubic; }
+img { max-width: 100% !important; height: auto !important; border: 0; vertical-align: middle; -ms-interpolation-mode: bicubic; }
 a { text-decoration: none; -webkit-tap-highlight-color: rgba(2, 132, 199, 0.2); }
 table { border-collapse: collapse; mso-table-lspace: 0; mso-table-rspace: 0; }
 @media only screen and (max-width: 620px) {
@@ -1017,6 +1088,8 @@ table { border-collapse: collapse; mso-table-lspace: 0; mso-table-rspace: 0; }
   .fluid-padding { padding: 12px 15px !important; }
   .btn-block { display: block !important; width: 100% !important; min-height: 44px !important; text-align: center !important; padding: 14px 20px !important; box-sizing: border-box !important; }
   .header-txt { font-size: 22px !important; }
+  .welcome-three-col > tbody > tr > td { display: block !important; width: 100% !important; max-width: 100% !important; padding: 6px 0 !important; box-sizing: border-box !important; }
+  .welcome-offer-row > tbody > tr > td { display: block !important; width: 100% !important; max-width: 100% !important; text-align: center !important; padding: 10px 0 !important; box-sizing: border-box !important; }
 }
 </style>';
         $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"><meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Email</title>' . $responsiveStyles . '</head><body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,Arial,sans-serif;line-height:1.6;color:#333;width:100%;-webkit-text-size-adjust:100%;overflow-x:hidden;">';
@@ -1036,7 +1109,9 @@ table { border-collapse: collapse; mso-table-lspace: 0; mso-table-rspace: 0; }
             }
             $html .= $this->renderSection($section, $customer);
         }
-        $html .= $this->buildBrandFooter($unsubscribeUrl, $hasCustomFooter);
+        if (empty($template->content['skip_brand_footer'])) {
+            $html .= $this->buildBrandFooter($unsubscribeUrl, $hasCustomFooter);
+        }
         $html .= '</div></body></html>';
         return $html;
     }
@@ -1061,6 +1136,8 @@ table { border-collapse: collapse; mso-table-lspace: 0; mso-table-rspace: 0; }
     {
         $content = $section['content'] ?? [];
         switch ($section['type'] ?? '') {
+            case 'raw_html':
+                return $this->replaceVariables($content['html'] ?? '', $customer);
             case 'header':
                 $logoUrl = $content['logo'] ?? null;
                 if (empty($logoUrl)) {

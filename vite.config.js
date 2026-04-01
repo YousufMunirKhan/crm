@@ -29,4 +29,7 @@ export default defineConfig({
             ignored: ['**/storage/framework/views/**'],
         },
     },
+    optimizeDeps: {
+        include: ['grapesjs', 'grapesjs-preset-newsletter'],
+    },
 });

@@ -244,6 +244,18 @@ const routes = [
         meta: { requiresAuth: true, title: 'Employee Goals', roles: ['Admin', 'Manager', 'System Admin'] },
     },
     {
+        path: '/templates/email/new',
+        name: 'email-template-new',
+        component: () => import('@/views/EmailTemplateEditPage.vue'),
+        meta: { requiresAuth: true, title: 'New Email Template', roles: ['Admin', 'System Admin'] },
+    },
+    {
+        path: '/templates/email/:id(\\d+)/edit',
+        name: 'email-template-edit',
+        component: () => import('@/views/EmailTemplateEditPage.vue'),
+        meta: { requiresAuth: true, title: 'Edit Email Template', roles: ['Admin', 'System Admin'] },
+    },
+    {
         path: '/templates',
         name: 'templates',
         component: () => import('@/views/TemplatesView.vue'),

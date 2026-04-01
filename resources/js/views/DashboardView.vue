@@ -1,11 +1,30 @@
 <template>
-    <div class="max-w-7xl mx-auto w-full min-w-0 p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+    <div class="max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden box-border px-3 pb-6 sm:px-4 md:px-6 space-y-5 sm:space-y-8">
+        <!-- Welcome -->
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+            <div class="min-w-0">
+                <h1 class="text-xl font-semibold text-slate-900 tracking-tight sm:text-2xl md:text-3xl break-words">
+                    Welcome back, {{ welcomeName }}
+                </h1>
+                <p class="text-xs text-slate-500 mt-1.5 sm:text-sm leading-relaxed">
+                    Here’s what’s happening with your pipeline today.
+                </p>
+            </div>
+        </div>
+
+        <div
+            v-if="isSelfDashboardScope"
+            class="rounded-xl border border-sky-200 bg-sky-50/80 px-3 py-2.5 text-xs text-sky-900 leading-relaxed sm:px-4 sm:py-3 sm:text-sm"
+        >
+            You’re viewing <strong>your</strong> opportunities, customers, and activity. Admins and managers see the full organization on this screen.
+        </div>
+
         <!-- Filters for Admin: compact on mobile, full row on desktop -->
-        <div v-if="isAdmin" class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden">
+        <div v-if="canUseOrgDashboardFilters" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <button
                 type="button"
                 @click="filtersOpen = !filtersOpen"
-                class="md:hidden w-full flex items-center justify-between px-4 py-3 text-left text-slate-700 hover:bg-slate-50 transition-colors"
+                class="md:hidden w-full min-h-12 flex items-center justify-between px-4 py-3 text-left text-slate-700 hover:bg-slate-50 transition-colors touch-manipulation active:bg-slate-50"
             >
                 <span class="flex items-center gap-2">
                     <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -26,7 +45,7 @@
                             <input
                                 v-model="filters.from"
                                 type="date"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                class="w-full min-h-11 px-3 py-2 border border-slate-300 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             />
                         </div>
                         <div class="sm:col-span-1 lg:col-span-3">
@@ -34,16 +53,16 @@
                             <input
                                 v-model="filters.to"
                                 type="date"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                class="w-full min-h-11 px-3 py-2 border border-slate-300 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             />
                         </div>
                         <div class="sm:col-span-1 lg:col-span-3">
-                            <label class="block text-xs font-medium text-slate-500 mb-1">Employee</label>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">User</label>
                             <select
                                 v-model="filters.employee_id"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                class="w-full min-h-11 px-3 py-2 border border-slate-200 rounded-xl text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50"
                             >
-                                <option value="">All Employees</option>
+                                <option value="">All users</option>
                                 <option v-for="emp in employees" :key="emp.id" :value="emp.id">
                                     {{ emp.name }}
                                 </option>
@@ -53,7 +72,7 @@
                             <button
                                 @click="loadDashboard"
                                 :disabled="loading"
-                                class="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50 inline-flex items-center justify-center gap-2 order-2 sm:order-1"
+                                class="flex-1 min-h-11 px-4 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50 inline-flex items-center justify-center gap-2 order-2 sm:order-1 touch-manipulation"
                             >
                                 <svg v-if="loading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -63,7 +82,7 @@
                             </button>
                             <button
                                 @click="resetFilters"
-                                class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 order-1 sm:order-2"
+                                class="min-h-11 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 order-1 sm:order-2 touch-manipulation"
                             >
                                 Reset
                             </button>
@@ -88,65 +107,65 @@
         <!-- Attendance Clock for non-admin -->
         <AttendanceClock />
 
-        <!-- Main Stats Cards -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <!-- Main KPIs — clean cards (1 col phone, 2 col tablet, 4 desktop) -->
+        <div class="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div
-                class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-3 sm:p-5 text-white cursor-pointer hover:shadow-xl transition-transform transform hover:-translate-y-0.5 min-w-0"
+                class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 cursor-pointer hover:shadow-md transition-shadow min-w-0"
                 @click="goToTotalLeadsListing"
             >
-                <div class="flex items-start sm:items-center justify-between gap-2 min-w-0">
+                <div class="flex items-start justify-between gap-2 sm:gap-3">
                     <div class="min-w-0 flex-1">
-                        <div class="text-blue-100 text-xs sm:text-sm font-medium leading-tight">Total Leads</div>
-                        <div class="text-2xl sm:text-3xl font-bold mt-0.5 sm:mt-1 tabular-nums">{{ dashboardData.total_leads || 0 }}</div>
-                        <div class="text-blue-200 text-[10px] sm:text-xs mt-1 sm:mt-2 line-clamp-2">{{ filterPeriodLabel }}</div>
+                        <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide sm:text-xs">Active opportunities</p>
+                        <p class="text-2xl font-semibold text-slate-900 tabular-nums mt-1 sm:text-3xl">{{ dashboardData.total_leads || 0 }}</p>
+                        <p class="text-xs text-slate-400 mt-2 line-clamp-2">{{ filterPeriodLabel }}</p>
                     </div>
-                    <div class="bg-blue-400/30 p-2 sm:p-3 rounded-lg shrink-0">
-                        <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0 sm:w-11 sm:h-11">
+                        <svg class="w-5 h-5 text-indigo-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg p-3 sm:p-5 text-white min-w-0">
-                <div class="flex items-start sm:items-center justify-between gap-2 min-w-0">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 min-w-0">
+                <div class="flex items-start justify-between gap-2 sm:gap-3">
                     <div class="min-w-0 flex-1">
-                        <div class="text-emerald-100 text-xs sm:text-sm font-medium leading-tight">Revenue</div>
-                        <div class="text-2xl sm:text-3xl font-bold mt-0.5 sm:mt-1 tabular-nums break-words">£{{ formatNumber(dashboardData.revenue || 0) }}</div>
-                        <div class="text-emerald-200 text-[10px] sm:text-xs mt-1 sm:mt-2 line-clamp-2">{{ filterPeriodLabel }}</div>
+                        <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide sm:text-xs">Revenue</p>
+                        <p class="text-xl font-semibold text-slate-900 tabular-nums mt-1 break-all sm:break-words sm:text-2xl md:text-3xl">£{{ formatNumber(dashboardData.revenue || 0) }}</p>
+                        <p class="text-xs text-slate-400 mt-2 line-clamp-2">{{ filterPeriodLabel }}</p>
                     </div>
-                    <div class="bg-emerald-400/30 p-2 sm:p-3 rounded-lg shrink-0">
-                        <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0 sm:w-11 sm:h-11">
+                        <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-gradient-to-br from-violet-500 to-violet-600 rounded-xl shadow-lg p-3 sm:p-5 text-white min-w-0">
-                <div class="flex items-start sm:items-center justify-between gap-2 min-w-0">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 min-w-0">
+                <div class="flex items-start justify-between gap-2 sm:gap-3">
                     <div class="min-w-0 flex-1">
-                        <div class="text-violet-100 text-xs sm:text-sm font-medium leading-tight">Pipeline Value</div>
-                        <div class="text-2xl sm:text-3xl font-bold mt-0.5 sm:mt-1 tabular-nums break-words">£{{ formatNumber(dashboardData.pipeline_value || 0) }}</div>
-                        <div class="text-violet-200 text-[10px] sm:text-xs mt-1 sm:mt-2">Active deals</div>
+                        <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide sm:text-xs">Pipeline value</p>
+                        <p class="text-xl font-semibold text-slate-900 tabular-nums mt-1 break-all sm:break-words sm:text-2xl md:text-3xl">£{{ formatNumber(dashboardData.pipeline_value || 0) }}</p>
+                        <p class="text-xs text-slate-400 mt-2">Open stages</p>
                     </div>
-                    <div class="bg-violet-400/30 p-2 sm:p-3 rounded-lg shrink-0">
-                        <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center shrink-0 sm:w-11 sm:h-11">
+                        <svg class="w-5 h-5 text-violet-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg p-3 sm:p-5 text-white min-w-0">
-                <div class="flex items-start sm:items-center justify-between gap-2 min-w-0">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 min-w-0">
+                <div class="flex items-start justify-between gap-2 sm:gap-3">
                     <div class="min-w-0 flex-1">
-                        <div class="text-amber-100 text-xs sm:text-sm font-medium leading-tight">Conversion Rate</div>
-                        <div class="text-2xl sm:text-3xl font-bold mt-0.5 sm:mt-1 tabular-nums">{{ dashboardData.conversion_rate || 0 }}%</div>
-                        <div class="text-amber-200 text-[10px] sm:text-xs mt-1 sm:mt-2">Won / Total</div>
+                        <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide sm:text-xs">Win rate</p>
+                        <p class="text-2xl font-semibold text-slate-900 tabular-nums mt-1 sm:text-3xl">{{ dashboardData.conversion_rate || 0 }}%</p>
+                        <p class="text-xs text-slate-400 mt-2">Won / total</p>
                     </div>
-                    <div class="bg-amber-400/30 p-2 sm:p-3 rounded-lg shrink-0">
-                        <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 sm:w-11 sm:h-11">
+                        <svg class="w-5 h-5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                         </svg>
                     </div>
@@ -154,8 +173,59 @@
             </div>
         </div>
 
+        <!-- Trends + stage mix -->
+        <div v-if="chartLeadsByMonth.length" class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 md:p-6 min-w-0">
+                <h3 class="text-sm font-semibold text-slate-900 mb-3 sm:mb-4">Opportunities by month</h3>
+                <div class="overflow-x-auto overscroll-x-contain -mx-1 px-1 pb-1 sm:mx-0 sm:px-0">
+                    <div class="flex items-end justify-between gap-1.5 h-36 min-w-[300px] sm:min-w-0 sm:h-40 sm:gap-2">
+                        <div
+                            v-for="m in chartLeadsByMonth"
+                            :key="m.key"
+                            class="flex min-w-0 flex-1 flex-col items-center gap-1 sm:gap-2"
+                        >
+                            <div class="flex h-24 w-full flex-col justify-end overflow-hidden rounded-t-lg bg-slate-50 sm:h-28">
+                                <div
+                                    class="w-full min-h-[4px] rounded-t-lg bg-gradient-to-t from-indigo-600 to-indigo-400 transition-all"
+                                    :style="{ height: `${chartBarHeightPercent(m.total)}%` }"
+                                />
+                            </div>
+                            <span class="text-[9px] font-medium text-slate-500 sm:text-xs">{{ m.label }}</span>
+                            <span class="text-[10px] tabular-nums text-slate-400 sm:text-xs">{{ m.total }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex min-w-0 flex-col rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-5 md:p-6">
+                <h3 class="text-sm font-semibold text-slate-900 mb-3 sm:mb-4">Stage mix</h3>
+                <div class="flex flex-col items-center gap-4 sm:flex-row sm:justify-center sm:gap-6">
+                    <div class="relative h-32 w-32 shrink-0 sm:h-36 sm:w-36">
+                        <div
+                            class="w-full h-full rounded-full"
+                            :style="{ background: pipelineDonutGradient }"
+                        />
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div class="flex h-[52%] w-[52%] flex-col items-center justify-center rounded-full bg-white shadow-inner">
+                                <span class="text-base font-bold text-slate-900 sm:text-lg">{{ pipelineTotalCount }}</span>
+                                <span class="text-[9px] uppercase text-slate-500 sm:text-[10px]">Total</span>
+                            </div>
+                        </div>
+                    </div>
+                    <ul class="w-full max-w-sm space-y-2 text-xs sm:mt-0 sm:max-w-none sm:flex-1">
+                    <li v-for="seg in pipelineLegend" :key="seg.key" class="flex items-center justify-between gap-2">
+                        <span class="flex items-center gap-2 min-w-0">
+                            <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: seg.color }" />
+                            <span class="text-slate-600 truncate">{{ seg.label }}</span>
+                        </span>
+                        <span class="font-medium tabular-nums text-slate-900">{{ seg.count }}</span>
+                    </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
         <!-- Secondary Stats Row -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div class="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
             <div
                 class="bg-white rounded-xl shadow-sm p-3 sm:p-4 border-l-4 border-blue-500 cursor-pointer hover:bg-blue-50 transition-colors min-w-0"
                 @click="goToLeadsListing('follow_up')"
@@ -187,10 +257,10 @@
         </div>
 
         <!-- Products Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-5 flex items-center gap-3 sm:gap-4 min-w-0">
-                <div class="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
-                    <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+            <div class="flex min-w-0 items-center gap-3 rounded-xl bg-white p-4 shadow-sm sm:gap-4 sm:p-5">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-100 sm:h-14 sm:w-14">
+                    <svg class="h-6 w-6 text-green-600 sm:h-7 sm:w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
@@ -199,9 +269,9 @@
                     <div class="text-xl sm:text-2xl font-bold text-green-600 tabular-nums">{{ productStats.won || 0 }}</div>
                 </div>
             </div>
-            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-5 flex items-center gap-3 sm:gap-4 min-w-0">
-                <div class="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center">
-                    <svg class="w-7 h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex min-w-0 items-center gap-3 rounded-xl bg-white p-4 shadow-sm sm:gap-4 sm:p-5">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100 sm:h-14 sm:w-14">
+                    <svg class="h-6 w-6 text-red-600 sm:h-7 sm:w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
@@ -210,9 +280,9 @@
                     <div class="text-xl sm:text-2xl font-bold text-red-600 tabular-nums">{{ productStats.lost || 0 }}</div>
                 </div>
             </div>
-            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-5 flex items-center gap-3 sm:gap-4 min-w-0">
-                <div class="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center">
-                    <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex min-w-0 items-center gap-3 rounded-xl bg-white p-4 shadow-sm sm:gap-4 sm:p-5">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 sm:h-14 sm:w-14">
+                    <svg class="h-6 w-6 text-amber-600 sm:h-7 sm:w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
@@ -223,46 +293,87 @@
             </div>
         </div>
 
-        <!-- Monthly #1 Spotlight (visible to everyone, hidden when no activity) -->
-        <div
-            v-if="monthlyTopPerformer"
-            class="bg-gradient-to-r from-amber-50 via-white to-emerald-50 border border-amber-100 rounded-2xl shadow-sm p-4 sm:p-5 md:p-6 min-w-0"
-        >
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 min-w-0">
-                <div class="flex items-center gap-3 sm:gap-4 min-w-0">
-                    <div class="w-12 h-12 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-lg">
-                        1
-                    </div>
-                    <div>
-                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold mb-2">
-                            🏅 Top Performer of the Month
+        <!-- Performer of the month + their targets (always shown; calendar month from reporting API) -->
+        <div class="min-w-0 rounded-2xl border border-amber-100 bg-gradient-to-r from-amber-50 via-white to-emerald-50 p-4 shadow-sm sm:p-5 md:p-6">
+            <template v-if="monthlyTopPerformer">
+                <div class="flex min-w-0 flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div class="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-500 text-base font-bold text-white sm:h-12 sm:w-12 sm:text-lg">
+                            1
                         </div>
-                        <div class="text-xl font-bold text-slate-900">{{ monthlyTopPerformer.name }}</div>
-                        <div class="text-sm text-slate-600">
-                            {{ monthlyTopPerformer.leads_count || 0 }} leads •
-                            {{ monthlyTopPerformer.won_products || monthlyTopPerformer.won_count || 0 }} won
+                        <div class="min-w-0 flex-1">
+                            <div class="mb-2 inline-flex max-w-full flex-wrap items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-semibold text-amber-800 sm:gap-2 sm:px-3 sm:text-xs">
+                                {{ isSelfDashboardScope ? 'Your performance this month' : 'Top performer of the month' }}
+                            </div>
+                            <div class="text-lg font-bold text-slate-900 break-words sm:text-xl">{{ monthlyTopPerformer.name }}</div>
+                            <div class="text-sm text-slate-600">
+                                {{ monthlyTopPerformer.leads_count || 0 }} leads •
+                                {{ monthlyTopPerformer.won_products || monthlyTopPerformer.won_count || 0 }} won
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-center w-full md:max-w-md md:ml-auto">
+                        <div class="px-3 py-2 bg-white rounded-lg border border-slate-100 min-w-0">
+                            <div class="text-xs text-slate-500">Revenue</div>
+                            <div class="text-sm font-bold text-emerald-600 break-words">£{{ formatNumber(monthlyTopPerformer.revenue || 0) }}</div>
+                        </div>
+                        <div class="px-3 py-2 bg-white rounded-lg border border-slate-100">
+                            <div class="text-xs text-slate-500">Sales won</div>
+                            <div class="text-sm font-bold text-slate-900">{{ monthlyTopPerformer.won_products || monthlyTopPerformer.won_count || 0 }}</div>
+                        </div>
+                        <div class="px-3 py-2 bg-white rounded-lg border border-slate-100">
+                            <div class="text-xs text-slate-500">Conversion</div>
+                            <div class="text-sm font-bold text-slate-900">{{ monthlyTopPerformer.conversion_rate || 0 }}%</div>
                         </div>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-center w-full md:max-w-md md:ml-auto">
-                    <div class="px-3 py-2 bg-white rounded-lg border border-slate-100 min-w-0">
-                        <div class="text-xs text-slate-500">Revenue</div>
-                        <div class="text-sm font-bold text-emerald-600 break-words">£{{ formatNumber(monthlyTopPerformer.revenue || 0) }}</div>
+                <div class="mt-5 pt-5 border-t border-amber-100/80">
+                    <h4 class="text-sm font-semibold text-slate-800 mb-3">Their targets (this month)</h4>
+                    <div v-if="performerMonthTarget" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="rounded-xl bg-white/80 border border-slate-100 p-3">
+                            <div class="text-xs text-slate-500">Appointments</div>
+                            <div class="text-sm font-semibold text-slate-900 tabular-nums">
+                                {{ performerMonthTarget.achieved_appointments }} / {{ performerMonthTarget.target_appointments || 0 }}
+                            </div>
+                            <div class="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                <div
+                                    class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
+                                    :style="{ width: `${performerMonthTarget.appointment_progress}%` }"
+                                />
+                            </div>
+                        </div>
+                        <div class="rounded-xl bg-white/80 border border-slate-100 p-3">
+                            <div class="text-xs text-slate-500">Sales</div>
+                            <div class="text-sm font-semibold text-slate-900 tabular-nums">
+                                {{ performerMonthTarget.achieved_sales }} / {{ performerMonthTarget.target_sales || 0 }}
+                            </div>
+                        </div>
+                        <div class="rounded-xl bg-white/80 border border-slate-100 p-3">
+                            <div class="text-xs text-slate-500">Won value vs target</div>
+                            <div class="text-sm font-semibold text-slate-900 break-words">
+                                £{{ formatNumber(performerMonthTarget.achieved_revenue) }}
+                                <span v-if="num(performerMonthTarget.target_revenue) > 0" class="text-slate-500 font-normal">
+                                    / £{{ formatNumber(performerMonthTarget.target_revenue) }}
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="px-3 py-2 bg-white rounded-lg border border-slate-100">
-                        <div class="text-xs text-slate-500">Sales Won</div>
-                        <div class="text-sm font-bold text-slate-900">{{ monthlyTopPerformer.won_products || monthlyTopPerformer.won_count || 0 }}</div>
-                    </div>
-                    <div class="px-3 py-2 bg-white rounded-lg border border-slate-100">
-                        <div class="text-xs text-slate-500">Conversion</div>
-                        <div class="text-sm font-bold text-slate-900">{{ monthlyTopPerformer.conversion_rate || 0 }}%</div>
+                    <div v-else class="text-sm text-slate-600 rounded-xl bg-white/60 border border-slate-100 p-4">
+                        <p class="font-medium text-slate-800">No formal targets set</p>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Activity this month: {{ monthlyTopPerformer.appointments_count || 0 }} appointments logged.
+                        </p>
                     </div>
                 </div>
+            </template>
+            <div v-else class="text-center py-6 text-slate-600">
+                <p class="font-medium text-slate-800">No performer data for this month</p>
+                <p class="text-sm text-slate-500 mt-1">There are no active sales users with activity in the selected scope yet.</p>
             </div>
         </div>
 
-        <!-- Today's Follow-ups & Top Performers -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Today's Follow-ups & appointments -->
+        <div class="space-y-6">
             <!-- Today's Follow-ups -->
             <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
@@ -299,17 +410,17 @@
                                 {{ formatTime(followUp.next_follow_up_at) }}
                             </div>
                         </div>
-                        <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
+                        <div class="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
                             <button
                                 @click="openActivityModal(followUp)"
-                                class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 px-2 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-opacity touch-manipulation"
+                                class="min-h-10 flex-1 rounded-md bg-green-600 px-3 py-2 text-xs font-medium text-white opacity-100 transition-opacity hover:bg-green-700 touch-manipulation sm:flex-none sm:px-2 sm:py-1.5 sm:opacity-0 sm:group-hover:opacity-100"
                             >
                                 Log
                             </button>
                             <router-link
                                 v-if="followUp.customer_id"
                                 :to="`/customers/${followUp.customer_id}`"
-                                class="px-2 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 touch-manipulation"
+                                class="flex min-h-10 flex-1 items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 touch-manipulation sm:min-h-0 sm:flex-none sm:px-2 sm:py-1.5"
                             >
                                 View
                             </router-link>
@@ -318,79 +429,8 @@
                 </div>
             </div>
 
-            <!-- Top Performers -->
+            <!-- Today's Appointments -->
             <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
-                    <h3 class="text-base sm:text-lg font-semibold text-slate-900">🏆 Top Performers</h3>
-                    <span class="text-xs sm:text-sm text-slate-500">This Month</span>
-                </div>
-                <div v-if="topPerformers.length === 0" class="text-center py-8 text-slate-400">
-                    No performance data available
-                </div>
-                <div v-else class="space-y-4">
-                    <div
-                        v-for="(performer, index) in topPerformers"
-                        :key="performer.id"
-                        class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4"
-                    >
-                        <div
-                            class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shrink-0"
-                            :class="{
-                                'bg-yellow-500': index === 0,
-                                'bg-slate-400': index === 1,
-                                'bg-amber-600': index === 2,
-                                'bg-slate-300': index > 2
-                            }"
-                        >
-                            {{ index + 1 }}
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="font-medium text-slate-900 truncate">{{ performer.name }}</div>
-                            <div class="text-xs text-slate-500">{{ performer.leads_count }} leads • {{ performer.won_count }} won</div>
-                        </div>
-                        <div class="text-left sm:text-right sm:ml-auto shrink-0">
-                            <div class="font-bold text-green-600">£{{ formatNumber(performer.revenue) }}</div>
-                            <div class="text-xs text-slate-500">{{ performer.conversion_rate }}% conv.</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="mt-6 border-t border-slate-100 pt-4" v-if="employeeTargets.length && isAdmin">
-                    <h4 class="text-sm font-semibold text-slate-800 mb-3">Targets vs Achievements (this month)</h4>
-                    <div class="space-y-3 max-h-64 overflow-y-auto">
-                        <div
-                            v-for="t in employeeTargets"
-                            :key="t.user_id"
-                            class="flex flex-col gap-1 p-3 rounded-lg bg-slate-50"
-                        >
-                            <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                <div class="font-medium text-slate-900 truncate min-w-0">
-                                    {{ t.user?.name || 'Employee' }}
-                                </div>
-                                <div class="text-xs text-slate-500 sm:ml-2 shrink-0">
-                                    {{ t.achieved_appointments }} / {{ t.target_appointments || 0 }} appointments
-                                </div>
-                            </div>
-                            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                                <div
-                                    class="h-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
-                                    :style="{ width: `${t.appointment_progress}%` }"
-                                ></div>
-                            </div>
-                            <div class="flex items-center justify-between text-xs text-slate-600 mt-1">
-                                <div>
-                                    Sales: {{ t.achieved_sales }} / {{ t.target_sales || 0 }}
-                                </div>
-                                <div>
-                                    Won value: £{{ formatNumber(t.achieved_revenue) }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Today's Appointments (full width row) -->
-            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 lg:col-span-2 min-w-0">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
                     <h3 class="text-base sm:text-lg font-semibold text-slate-900">📆 Today's Appointments</h3>
                     <span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium shrink-0 self-start sm:self-auto">
@@ -424,61 +464,22 @@
                             <div class="text-sm text-slate-600 mt-0.5">{{ apt.description || 'Appointment' }}</div>
                             <div class="text-xs text-slate-500 mt-1">{{ apt.appointment_time || '10:00' }}</div>
                         </div>
-                        <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
+                        <div class="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
                             <button
                                 v-if="apt.lead_id"
                                 @click="openCompleteForAppointment(apt)"
-                                class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 px-2 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-opacity touch-manipulation"
+                                class="min-h-10 flex-1 rounded-md bg-green-600 px-3 py-2 text-xs font-medium text-white opacity-100 transition-opacity hover:bg-green-700 touch-manipulation sm:flex-none sm:px-2 sm:py-1.5 sm:opacity-0 sm:group-hover:opacity-100"
                             >
                                 Complete
                             </button>
                             <router-link
                                 v-if="apt.customer_id"
                                 :to="`/customers/${apt.customer_id}`"
-                                class="px-2 py-1.5 text-xs bg-amber-600 text-white rounded hover:bg-amber-700 touch-manipulation"
+                                class="flex min-h-10 flex-1 items-center justify-center rounded-md bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700 touch-manipulation sm:min-h-0 sm:flex-none sm:px-2 sm:py-1.5"
                             >
                                 View
                             </router-link>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- My Targets (any role with a target set, no revenue shown) -->
-        <div
-            v-if="myTarget"
-            class="bg-white rounded-xl shadow-sm p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 min-w-0"
-        >
-            <div class="min-w-0">
-                <h3 class="text-base sm:text-lg font-semibold text-slate-900">🎯 My Targets (this month)</h3>
-                <p class="text-xs text-slate-500 mt-1">
-                    Set by your admin. Achievements are calculated automatically from your appointments and won sales.
-                </p>
-            </div>
-            <div class="flex flex-col sm:flex-row gap-4 sm:items-center w-full sm:w-auto">
-                <div>
-                    <div class="text-xs text-slate-500 uppercase tracking-wide">Appointments</div>
-                    <div class="text-sm font-medium text-slate-900">
-                        {{ myTarget.achieved_appointments }} / {{ myTarget.target_appointments || 0 }}
-                    </div>
-                </div>
-                <div>
-                    <div class="text-xs text-slate-500 uppercase tracking-wide">Sales</div>
-                    <div class="text-sm font-medium text-slate-900">
-                        {{ myTarget.achieved_sales }} / {{ myTarget.target_sales || 0 }}
-                    </div>
-                </div>
-                <div class="w-full sm:w-40">
-                    <div class="flex justify-between text-xs text-slate-500 mb-1">
-                        <span>Progress</span>
-                        <span>{{ myTarget.appointment_progress }}%</span>
-                    </div>
-                    <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                        <div
-                            class="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
-                            :style="{ width: `${myTarget.appointment_progress}%` }"
-                        ></div>
                     </div>
                 </div>
             </div>
@@ -546,21 +547,23 @@
                                 <span class="text-xs text-slate-500">{{ lead.source || '-' }}</span>
                             </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 sm:justify-end">
+                        <div class="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
                             <div class="text-sm font-medium text-slate-700 tabular-nums">£{{ formatNumber(getLeadValue(lead)) }}</div>
-                            <button
-                                @click="openActivityModal(lead)"
-                                class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 px-2 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-opacity touch-manipulation"
-                            >
-                                Log
-                            </button>
-                            <router-link
-                                v-if="lead.customer_id"
-                                :to="`/customers/${lead.customer_id}`"
-                                class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 px-2 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-opacity touch-manipulation"
-                            >
-                                View
-                            </router-link>
+                            <div class="flex w-full gap-2 sm:w-auto sm:justify-end">
+                                <button
+                                    @click="openActivityModal(lead)"
+                                    class="min-h-10 flex-1 rounded-md bg-green-600 px-3 py-2 text-xs font-medium text-white opacity-100 transition-opacity hover:bg-green-700 touch-manipulation sm:min-h-0 sm:flex-none sm:px-2 sm:py-1.5 sm:opacity-0 sm:group-hover:opacity-100"
+                                >
+                                    Log
+                                </button>
+                                <router-link
+                                    v-if="lead.customer_id"
+                                    :to="`/customers/${lead.customer_id}`"
+                                    class="flex min-h-10 flex-1 items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 touch-manipulation sm:min-h-0 sm:flex-none sm:px-2 sm:py-1.5 sm:opacity-0 sm:group-hover:opacity-100"
+                                >
+                                    View
+                                </router-link>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -568,7 +571,7 @@
         </div>
 
         <!-- Quick Stats Row -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div class="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
             <div
                 class="bg-white rounded-xl shadow-sm p-3 sm:p-5 cursor-pointer hover:bg-blue-50 transition-colors min-w-0"
                 @click="router.push({ path: '/customers', query: { type: 'customer' } })"
@@ -681,12 +684,12 @@
         />
 
         <!-- Complete Follow-up / Appointment Modal -->
-        <div v-if="showCompleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-                <div class="p-6 border-b border-slate-200">
-                    <h3 class="text-xl font-semibold text-slate-900">Complete Follow-up / Appointment</h3>
+        <div v-if="showCompleteModal" class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+            <div class="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white shadow-xl sm:rounded-xl">
+                <div class="border-b border-slate-200 p-4 sm:p-6">
+                    <h3 class="text-lg font-semibold text-slate-900 sm:text-xl">Complete Follow-up / Appointment</h3>
                 </div>
-                <form @submit.prevent="completeFollowUp" class="p-6 space-y-4">
+                <form @submit.prevent="completeFollowUp" class="space-y-4 p-4 sm:p-6">
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-2">Remarks / Notes *</label>
                         <textarea
@@ -720,11 +723,11 @@
                             class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
-                    <div class="flex justify-end gap-3 pt-4">
-                        <button type="button" @click="closeCompleteModal" :disabled="completingFollowUp" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                    <div class="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end sm:gap-3">
+                        <button type="button" @click="closeCompleteModal" :disabled="completingFollowUp" class="min-h-11 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-slate-700 hover:bg-slate-50 disabled:opacity-50 touch-manipulation sm:w-auto">
                             Cancel
                         </button>
-                        <button type="submit" :disabled="completingFollowUp" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
+                        <button type="submit" :disabled="completingFollowUp" class="min-h-11 w-full rounded-lg bg-green-600 px-4 py-2.5 text-white hover:bg-green-700 disabled:opacity-50 touch-manipulation sm:w-auto">
                             {{ completingFollowUp ? 'Saving...' : 'Complete' }}
                         </button>
                     </div>
@@ -751,15 +754,69 @@ const isAdmin = computed(() => {
     const role = auth.user?.role?.name;
     return role === 'Admin' || role === 'System Admin';
 });
+const isManager = computed(() => auth.user?.role?.name === 'Manager');
+/** Admin, System Admin, and Manager can filter the org dashboard; everyone else is self-scoped on the API. */
+const canUseOrgDashboardFilters = computed(() => isAdmin.value || isManager.value);
+
+const dashboardMeta = ref({});
+const chartLeadsByMonth = ref([]);
+
+const welcomeName = computed(() => {
+    const n = user.value?.name?.trim();
+    if (!n) return 'there';
+    return n.split(/\s+/)[0];
+});
+
+const isSelfDashboardScope = computed(() => dashboardMeta.value.viewer_scope === 'self');
 
 const loading = ref(false);
 const dashboardData = ref({});
 const pipelineStats = ref({});
+
+const PIPELINE_DONUT_SEGMENTS = [
+    { key: 'follow_up', label: 'Follow up', color: '#3b82f6' },
+    { key: 'lead', label: 'Lead', color: '#eab308' },
+    { key: 'hot_lead', label: 'Hot lead', color: '#f97316' },
+    { key: 'quotation', label: 'Quotation', color: '#a855f7' },
+    { key: 'won', label: 'Won', color: '#22c55e' },
+    { key: 'lost', label: 'Lost', color: '#ef4444' },
+];
+
+const pipelineLegend = computed(() =>
+    PIPELINE_DONUT_SEGMENTS.map((seg) => ({
+        ...seg,
+        count: num(pipelineStats.value[seg.key]),
+    }))
+);
+
+const pipelineTotalCount = computed(() => pipelineLegend.value.reduce((s, seg) => s + seg.count, 0));
+
+const pipelineDonutGradient = computed(() => {
+    const total = pipelineTotalCount.value;
+    if (total <= 0) return 'conic-gradient(#e2e8f0 0deg 360deg)';
+    let angle = 0;
+    const parts = [];
+    for (const seg of pipelineLegend.value) {
+        const c = seg.count;
+        if (c <= 0) continue;
+        const deg = (c / total) * 360;
+        const start = angle;
+        angle += deg;
+        parts.push(`${seg.color} ${start}deg ${angle}deg`);
+    }
+    return parts.length ? `conic-gradient(${parts.join(', ')})` : 'conic-gradient(#e2e8f0 0deg 360deg)';
+});
+
+function chartBarHeightPercent(total) {
+    const rows = chartLeadsByMonth.value;
+    if (!rows.length) return 0;
+    const m = Math.max(...rows.map((r) => num(r.total)), 1);
+    return Math.max(8, Math.round((num(total) / m) * 100));
+}
 const productStats = ref({});
 const recentLeads = ref([]);
 const todayFollowUps = ref([]);
 const todayAppointments = ref([]);
-const topPerformers = ref([]);
 const monthlyTopPerformer = ref(null);
 const leadSources = ref({});
 const quickStats = ref({});
@@ -777,20 +834,15 @@ const completeForm = ref({
 });
 const employees = ref([]);
 const employeeTargets = ref([]);
-const myTarget = computed(() => {
-    if (!user.value) return null;
-    return employeeTargets.value.find((t) => t.user_id === user.value.id) || null;
+
+const performerMonthTarget = computed(() => {
+    const p = monthlyTopPerformer.value;
+    if (!p) return null;
+    const id = Number(p.id);
+    return employeeTargets.value.find((t) => Number(t.user_id) === id) || null;
 });
 
-// Filters for admin — default today/tomorrow set on mount so they're always current
-function getDefaultFilterDates() {
-    const now = new Date();
-    const from = now.toISOString().split('T')[0];
-    const next = new Date(now);
-    next.setDate(next.getDate() + 1);
-    const to = next.toISOString().split('T')[0];
-    return { from, to };
-}
+// Filters for org roles: leave from/to empty by default so KPIs use full month (API startOfMonth → endOfDay).
 const filters = ref({
     from: '',
     to: '',
@@ -813,7 +865,7 @@ const formatFilterDate = (dateStr) => {
 };
 
 const filterPeriodLabel = computed(() => {
-    if (isAdmin.value && (filters.value.from || filters.value.to || filters.value.employee_id)) {
+    if (canUseOrgDashboardFilters.value && (filters.value.from || filters.value.to || filters.value.employee_id)) {
         const parts = [];
         if (filters.value.from && filters.value.to) {
             const from = new Date(filters.value.from).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -883,13 +935,10 @@ const loadEmployees = async () => {
 };
 
 const resetFilters = () => {
-    const now = new Date();
-    const nextDay = new Date(now);
-    nextDay.setDate(nextDay.getDate() + 1);
     filters.value = {
-        from: now.toISOString().split('T')[0],
-        to: nextDay.toISOString().split('T')[0],
-        employee_id: ''
+        from: '',
+        to: '',
+        employee_id: '',
     };
     loadDashboard();
 };
@@ -932,9 +981,12 @@ const loadDashboard = async () => {
         ]);
 
         const data = dashboardRes.data;
+
+        dashboardMeta.value = data.meta || {};
+        chartLeadsByMonth.value = data.charts?.leads_by_month || [];
         
         // Use filtered stats if admin has applied filters, otherwise use monthly
-        const hasFilters = isAdmin.value && (filters.value.from || filters.value.to || filters.value.employee_id);
+        const hasFilters = canUseOrgDashboardFilters.value && (filters.value.from || filters.value.to || filters.value.employee_id);
         const statsSource = hasFilters && data.stats?.filtered ? data.stats.filtered : data.stats?.monthly;
         const totalOpportunities =
             (statsSource && typeof statsSource.total_opportunities === 'number')
@@ -991,7 +1043,20 @@ const loadDashboard = async () => {
                 if (num(b.revenue) !== num(a.revenue)) return num(b.revenue) - num(a.revenue);
                 return num(b.leads_count) - num(a.leads_count);
             });
-        monthlyTopPerformer.value = performanceCandidates[0] || null;
+        let spotlight = performanceCandidates[0] || null;
+        if (!spotlight && agents.length === 1) {
+            spotlight = agents[0];
+        }
+        if (!spotlight && agents.length > 0) {
+            spotlight = [...agents].sort((a, b) => {
+                const bWon = Math.max(num(b.won_products), num(b.won_count), num(b.won_leads));
+                const aWon = Math.max(num(a.won_products), num(a.won_count), num(a.won_leads));
+                if (bWon !== aWon) return bWon - aWon;
+                if (num(b.revenue) !== num(a.revenue)) return num(b.revenue) - num(a.revenue);
+                return num(b.leads_count) - num(a.leads_count);
+            })[0];
+        }
+        monthlyTopPerformer.value = spotlight;
 
         quickStats.value = {
             total_customers: data.all_customers || 0,
@@ -1000,18 +1065,6 @@ const loadDashboard = async () => {
             // Active agents = agents who actually handled at least one lead in the period
             active_agents: activeAgents,
         };
-
-        // Top performers: must match on-screen stats — only if they have won sales or revenue (£).
-        // (Leads alone do not count; avoids "1 lead • 0 won £0" clutter.)
-        topPerformers.value = agents
-            .filter((a) => {
-                const wonProducts = num(a.won_count) || num(a.won_products);
-                const wonLeads = num(a.won_leads);
-                const revenue = num(a.revenue);
-                return wonProducts > 0 || wonLeads > 0 || revenue > 0;
-            })
-            .sort((a, b) => num(b.revenue) - num(a.revenue))
-            .slice(0, 5);
 
         // Employee targets / achievement board (current month)
         // Only include: (1) users with at least one non-zero target for this month, or
@@ -1181,10 +1234,7 @@ onMounted(async () => {
         await auth.bootstrap();
     }
     // Default filter dates to today and tomorrow (so they're always current when opening dashboard)
-    if (isAdmin.value) {
-        const { from, to } = getDefaultFilterDates();
-        filters.value.from = from;
-        filters.value.to = to;
+    if (canUseOrgDashboardFilters.value) {
         loadEmployees();
     }
     loadDashboard();

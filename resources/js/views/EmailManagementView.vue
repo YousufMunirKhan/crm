@@ -239,9 +239,13 @@
                         </div>
                         <div class="p-4">
                             <p class="text-sm text-slate-600 mb-2"><strong>Subject:</strong> {{ preview.subject }}</p>
-                            <div
-                                class="border border-slate-200 rounded-lg p-4 bg-white text-sm overflow-auto max-h-80"
-                                v-html="preview.content"
+                            <p class="text-xs text-slate-500 mb-2">Visual preview (full HTML document loads in frame — same as recipients see).</p>
+                            <iframe
+                                v-if="preview.content"
+                                class="w-full min-h-[520px] border border-slate-200 rounded-lg bg-white"
+                                title="Email preview"
+                                sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                                :srcdoc="preview.content"
                             />
                         </div>
                     </div>
@@ -338,7 +342,13 @@
                         </div>
                         <div class="p-4">
                             <p class="text-sm text-slate-600 mb-2"><strong>Subject:</strong> {{ datePreview.subject }}</p>
-                            <div class="border border-slate-200 rounded-lg p-4 bg-white text-sm overflow-auto max-h-60" v-html="datePreview.content" />
+                            <iframe
+                                v-if="datePreview.content"
+                                class="w-full min-h-[480px] border border-slate-200 rounded-lg bg-white"
+                                title="Email preview"
+                                sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                                :srcdoc="datePreview.content"
+                            />
                         </div>
                     </div>
 

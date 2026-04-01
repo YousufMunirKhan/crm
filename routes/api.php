@@ -278,6 +278,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('email-templates')->group(function () {
         Route::get('/', [\App\Http\Controllers\EmailTemplateController::class, 'index']);
         Route::post('/test-send', [\App\Http\Controllers\EmailTemplateController::class, 'testSend']);
+        Route::post('/preview-html', [\App\Http\Controllers\EmailTemplateController::class, 'previewHtml']);
+        Route::get('/merge-tags', [\App\Http\Controllers\EmailTemplateController::class, 'mergeTagsReference']);
+        Route::post('/import-html', [\App\Http\Controllers\EmailTemplateController::class, 'importFromHtml']);
         Route::post('/', [\App\Http\Controllers\EmailTemplateController::class, 'store']);
         Route::get('/{id}', [\App\Http\Controllers\EmailTemplateController::class, 'show']);
         Route::put('/{id}', [\App\Http\Controllers\EmailTemplateController::class, 'update']);

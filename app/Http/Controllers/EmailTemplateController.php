@@ -117,6 +117,158 @@ class EmailTemplateController extends Controller
         }
     }
 
+    /**
+     * Return fully rendered HTML (same as sent email) for iframe preview in the template builder.
+     */
+    public function previewHtml(Request $request)
+    {
+        $this->checkAdmin();
+        $request->validate([
+            'content' => ['required', 'array'],
+            'content.sections' => ['required', 'array'],
+        ]);
+
+        $sampleCustomer = $this->getSampleCustomerForTestSend();
+        $virtualTemplate = (object) [
+            'content' => $request->content,
+        ];
+        $html = $this->renderTemplate($virtualTemplate, $sampleCustomer);
+
+        return response()->json(['html' => $html]);
+    }
+
+    /**
+     * Merge tags supported in raw HTML (and subject). Same tokens replaceVariables() replaces when sending.
+     */
+    public function mergeTagsReference()
+    {
+        $this->checkAdmin();
+
+        return response()->json([
+            'tags' => $this->emailMergeTagDefinitions(),
+            'html_examples' => [
+                'logo' => '<img src="{{header_logo_url}}" alt="Logo" width="200" style="display:block;max-width:200px;height:auto;">',
+                'logo_settings_only' => '<img src="{{logo_src}}" alt="Logo" width="200" style="display:block;">',
+                'website_link' => '<a href="{{company_website}}">Visit our website</a>',
+                'facebook' => '<a href="{{social_facebook_url}}">Facebook</a>',
+                'linkedin' => '<a href="{{social_linkedin_url}}">LinkedIn</a>',
+                'instagram' => '<a href="{{social_instagram_url}}">Instagram</a>',
+                'tiktok' => '<a href="{{social_tiktok_url}}">TikTok</a>',
+                'greeting' => '<p>Hello {{first_name}},</p>',
+                'unsubscribe' => '<a href="{{unsubscribe_url}}">Unsubscribe</a>',
+                'image_from_public_folder' => '<img src="{{email_welcome_dir_url}}/your-file.png" alt="" width="120">',
+            ],
+        ]);
+    }
+
+    /**
+     * Create an email template from an uploaded .html / .htm file (stored as one raw_html section).
+     */
+    public function importFromHtml(Request $request)
+    {
+        $this->checkAdmin();
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'category' => ['required', 'string', 'max:100'],
+            'subject' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'preview_line' => ['nullable', 'string', 'max:500'],
+            'html_file' => ['required', 'file', 'max:6144'],
+        ]);
+
+        $file = $request->file('html_file');
+        $ext = strtolower($file->getClientOriginalExtension() ?: '');
+        if (! in_array($ext, ['html', 'htm', 'txt'], true)) {
+            return response()->json(['message' => 'File must be .html, .htm, or .txt'], 422);
+        }
+
+        $raw = file_get_contents($file->getRealPath());
+        if ($raw === false || trim($raw) === '') {
+            return response()->json(['message' => 'HTML file is empty'], 422);
+        }
+
+        $html = $this->normalizeImportedHtml($raw, $request->boolean('extract_body', true));
+        if ($html === '') {
+            return response()->json(['message' => 'No usable HTML after import (check &lt;body&gt; or file content)'], 422);
+        }
+
+        $template = EmailTemplate::create([
+            'name' => $data['name'],
+            'category' => $data['category'],
+            'subject' => $data['subject'],
+            'description' => $data['description'] ?? 'Imported from HTML file',
+            'content' => [
+                'skip_brand_footer' => $request->boolean('skip_brand_footer', true),
+                'preview_line' => $data['preview_line'] ?? '',
+                'sections' => [
+                    [
+                        'type' => 'raw_html',
+                        'content' => [
+                            'html' => $html,
+                        ],
+                    ],
+                ],
+            ],
+            'variables' => $this->variableKeysFromMergeDefinitions(),
+            'is_active' => true,
+            'is_prebuilt' => false,
+            'created_by' => auth()->id(),
+        ]);
+
+        return response()->json($template->load('creator'), 201);
+    }
+
+    /**
+     * @return array<int, array{group: string, tag: string, description: string, example: string}>
+     */
+    private function emailMergeTagDefinitions(): array
+    {
+        return [
+            ['group' => 'Recipient', 'tag' => '{{first_name}}', 'description' => 'First name (from contact name)', 'example' => 'Jane'],
+            ['group' => 'Recipient', 'tag' => '{{customer_name}}', 'description' => 'Full name', 'example' => 'Jane Smith'],
+            ['group' => 'Recipient', 'tag' => '{{customer_email}}', 'description' => 'Email address', 'example' => 'jane@example.com'],
+            ['group' => 'Recipient', 'tag' => '{{customer_phone}}', 'description' => 'Phone number', 'example' => '+44 7700 900000'],
+            ['group' => 'Recipient', 'tag' => '{{prospect_products}}', 'description' => 'Comma-separated products (prospect pipeline)', 'example' => 'Card Machine'],
+            ['group' => 'Recipient', 'tag' => '{{customer_products}}', 'description' => 'Comma-separated owned/won products', 'example' => 'EPOS'],
+            ['group' => 'Company (Settings)', 'tag' => '{{company_name}}', 'description' => 'Company name', 'example' => 'Switch & Save'],
+            ['group' => 'Company (Settings)', 'tag' => '{{company_phone}}', 'description' => 'Main phone', 'example' => '0333 038 9707'],
+            ['group' => 'Company (Settings)', 'tag' => '{{company_address}}', 'description' => 'Address (multiline ok)', 'example' => '1 High St'],
+            ['group' => 'Company (Settings)', 'tag' => '{{company_website}}', 'description' => 'Website URL (https added if missing)', 'example' => 'https://switch-and-save.uk'],
+            ['group' => 'Logo & images', 'tag' => '{{header_logo_url}}', 'description' => 'Header logo: uses public/images/email/welcome/main-logo.png when that file exists; otherwise Settings logo; else constructed URL. For Settings-only use {{logo_src}}.', 'example' => 'https://…/images/email/welcome/main-logo.png'],
+            ['group' => 'Logo & images', 'tag' => '{{logo_src}}', 'description' => 'Settings logo URL only (empty if not set)', 'example' => 'https://…/logo.png'],
+            ['group' => 'Logo & images', 'tag' => '{{email_welcome_dir_url}}', 'description' => 'Base URL for files in public/images/email/welcome/ (partner strip, icons)', 'example' => 'https://…/images/email/welcome'],
+            ['group' => 'Logo & images', 'tag' => '{{app_url}}', 'description' => 'Application base URL (no trailing slash)', 'example' => 'https://crm.example.com'],
+            ['group' => 'Social (Settings)', 'tag' => '{{social_facebook_url}}', 'description' => 'Facebook profile/page URL (# if empty)', 'example' => 'https://facebook.com/…'],
+            ['group' => 'Social (Settings)', 'tag' => '{{social_linkedin_url}}', 'description' => 'LinkedIn URL (# if empty)', 'example' => 'https://linkedin.com/…'],
+            ['group' => 'Social (Settings)', 'tag' => '{{social_instagram_url}}', 'description' => 'Instagram URL (# if empty)', 'example' => 'https://instagram.com/…'],
+            ['group' => 'Social (Settings)', 'tag' => '{{social_tiktok_url}}', 'description' => 'TikTok URL (# if empty)', 'example' => 'https://tiktok.com/…'],
+            ['group' => 'Legal & footer', 'tag' => '{{unsubscribe_url}}', 'description' => 'Marketing unsubscribe link for this recipient', 'example' => 'https://…/unsubscribe?email=…'],
+            ['group' => 'Legal & footer', 'tag' => '{{current_year}}', 'description' => 'Current year', 'example' => '2026'],
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function variableKeysFromMergeDefinitions(): array
+    {
+        return array_values(array_unique(array_map(function (array $row) {
+            return str_replace(['{{', '}}'], '', $row['tag']);
+        }, $this->emailMergeTagDefinitions())));
+    }
+
+    private function normalizeImportedHtml(string $raw, bool $extractBody): string
+    {
+        $raw = (string) $raw;
+        $raw = preg_replace('/^\xEF\xBB\xBF/', '', $raw) ?? $raw;
+        $raw = preg_replace('#<script\b[^>]*>.*?</script>#is', '', $raw) ?? $raw;
+        if ($extractBody && preg_match('/<body[^>]*>(.*)<\/body>/is', $raw, $m)) {
+            return trim($m[1]);
+        }
+
+        return trim($raw);
+    }
+
     private function getSampleCustomerForTestSend()
     {
         $customer = \App\Modules\CRM\Models\Customer::with(['leads.items.product', 'leads.product'])
@@ -278,9 +430,19 @@ class EmailTemplateController extends Controller
         ]);
 
         $path = $request->file('image')->store('email-templates', 'public');
-        $url = '/storage/' . $path;
+        $url = '/storage/'.$path;
+        // Use the request host so thumbnails work when APP_URL differs (e.g. Laragon *.test vs localhost).
+        $base = rtrim($request->getSchemeAndHttpHost(), '/');
+        if ($base === '') {
+            $base = rtrim((string) config('app.url'), '/');
+        }
+        $absolute = $base.$url;
 
-        return response()->json(['url' => $url]);
+        // `url` for legacy Vue callers; `data` for GrapesJS Asset Manager (autoAdd)
+        return response()->json([
+            'url' => $url,
+            'data' => [$absolute],
+        ]);
     }
 
     private function replaceVariables($text, $customer)
@@ -312,6 +474,46 @@ class EmailTemplateController extends Controller
         $customerProducts = implode(', ', array_keys($customerProductNames));
 
         $unsubscribeUrl = config('app.url') . '/unsubscribe?email=' . urlencode($customer->email ?? '');
+        $extra = \App\Modules\Settings\Models\Setting::whereIn('key', [
+            'company_website', 'logo_url',
+            'social_facebook_url', 'social_linkedin_url', 'social_instagram_url', 'social_tiktok_url',
+        ])->pluck('value', 'key');
+        $settings = $settings->merge($extra);
+        $appUrl = rtrim((string) config('app.url'), '/');
+        $rawLogo = trim((string) ($settings['logo_url'] ?? ''));
+        $logoSrc = '';
+        if ($rawLogo !== '') {
+            $logoSrc = $rawLogo;
+            if (! str_starts_with($logoSrc, 'http')) {
+                if (($logoSrc[0] ?? '') !== '/') {
+                    $logoSrc = '/' . $logoSrc;
+                }
+                $logoSrc = $appUrl . $logoSrc;
+            }
+        }
+
+        $welcomeLogoPath = public_path('images/email/welcome/main-logo.png');
+        $defaultWelcomeLogoUrl = is_file($welcomeLogoPath)
+            ? asset('images/email/welcome/main-logo.png')
+            : '';
+
+        // Prefer bundled public/images/email/welcome/main-logo.png when it exists so a bad Settings → logo URL
+        // does not hide the header logo in welcome-style templates. Use {{logo_src}} for Settings-only.
+        if ($defaultWelcomeLogoUrl !== '') {
+            $headerLogoUrl = $defaultWelcomeLogoUrl;
+        } elseif ($logoSrc !== '') {
+            $headerLogoUrl = $logoSrc;
+        } else {
+            $headerLogoUrl = $appUrl . '/images/email/welcome/main-logo.png';
+        }
+
+        $welcomeSlash = $defaultWelcomeLogoUrl !== '' ? strrpos($defaultWelcomeLogoUrl, '/') : false;
+        $emailWelcomeDirUrl = $welcomeSlash !== false
+            ? substr($defaultWelcomeLogoUrl, 0, $welcomeSlash)
+            : ($appUrl . '/images/email/welcome');
+
+        $text = (string) $text;
+
         return str_replace(
             [
                 '{{customer_name}}',
@@ -324,6 +526,16 @@ class EmailTemplateController extends Controller
                 '{{prospect_products}}',
                 '{{customer_products}}',
                 '{{unsubscribe_url}}',
+                '{{app_url}}',
+                '{{logo_src}}',
+                '{{header_logo_url}}',
+                '{{email_welcome_dir_url}}',
+                '{{company_website}}',
+                '{{social_facebook_url}}',
+                '{{social_linkedin_url}}',
+                '{{social_instagram_url}}',
+                '{{social_tiktok_url}}',
+                '{{current_year}}',
             ],
             [
                 $customer->name ?? '',
@@ -336,9 +548,32 @@ class EmailTemplateController extends Controller
                 $prospectProducts,
                 $customerProducts,
                 $unsubscribeUrl,
+                $appUrl,
+                $logoSrc,
+                $headerLogoUrl,
+                $emailWelcomeDirUrl,
+                $this->mergeTagOutboundUrl($settings['company_website'] ?? ''),
+                $this->mergeTagOutboundUrl($settings['social_facebook_url'] ?? ''),
+                $this->mergeTagOutboundUrl($settings['social_linkedin_url'] ?? ''),
+                $this->mergeTagOutboundUrl($settings['social_instagram_url'] ?? ''),
+                $this->mergeTagOutboundUrl($settings['social_tiktok_url'] ?? ''),
+                (string) now()->year,
             ],
             $text
         );
+    }
+
+    private function mergeTagOutboundUrl(?string $url): string
+    {
+        $u = trim((string) $url);
+        if ($u === '') {
+            return '#';
+        }
+        if (! preg_match('#^https?://#i', $u)) {
+            $u = 'https://' . $u;
+        }
+
+        return $u;
     }
 
     private function renderTemplate($template, $customer)
@@ -350,7 +585,9 @@ class EmailTemplateController extends Controller
 /* Base: works on iOS, Android, Gmail, Apple Mail, Samsung */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { margin: 0 !important; padding: 0 !important; width: 100% !important; overflow-x: hidden !important; -webkit-text-size-adjust: 100%; }
-img { max-width: 100% !important; height: auto !important; display: block !important; border: 0; -ms-interpolation-mode: bicubic; }
+/* Do not force display:block on all images — it breaks horizontal icon rows in imported HTML (social links).
+   Table-based layouts still work; builder sections set their own img styles where needed. */
+img { max-width: 100% !important; height: auto !important; border: 0; vertical-align: middle; -ms-interpolation-mode: bicubic; }
 a { text-decoration: none; -webkit-tap-highlight-color: rgba(2, 132, 199, 0.2); }
 table { border-collapse: collapse; mso-table-lspace: 0; mso-table-rspace: 0; }
 /* Mobile: iOS & Android */
@@ -363,6 +600,8 @@ table { border-collapse: collapse; mso-table-lspace: 0; mso-table-rspace: 0; }
   .fluid-padding { padding: 12px 15px !important; }
   .btn-block { display: block !important; width: 100% !important; min-height: 44px !important; text-align: center !important; padding: 14px 20px !important; box-sizing: border-box !important; }
   .header-txt { font-size: 22px !important; }
+  .welcome-three-col > tbody > tr > td { display: block !important; width: 100% !important; max-width: 100% !important; padding: 6px 0 !important; box-sizing: border-box !important; }
+  .welcome-offer-row > tbody > tr > td { display: block !important; width: 100% !important; max-width: 100% !important; text-align: center !important; padding: 10px 0 !important; box-sizing: border-box !important; }
 }
 </style>';
         $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"><meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Email</title>' . $responsiveStyles . '</head><body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,Arial,sans-serif;line-height:1.6;color:#333;width:100%;-webkit-text-size-adjust:100%;overflow-x:hidden;">';
@@ -382,7 +621,9 @@ table { border-collapse: collapse; mso-table-lspace: 0; mso-table-rspace: 0; }
             }
             $html .= $this->renderSection($section, $customer, $unsubscribeUrl);
         }
-        $html .= $this->buildBrandFooter($unsubscribeUrl, $hasCustomFooter);
+        if (empty($template->content['skip_brand_footer'])) {
+            $html .= $this->buildBrandFooter($unsubscribeUrl, $hasCustomFooter);
+        }
         $html .= '</div></body></html>';
         return $html;
     }
@@ -464,6 +705,10 @@ table { border-collapse: collapse; mso-table-lspace: 0; mso-table-rspace: 0; }
         $content = $section['content'] ?? [];
 
         switch ($section['type']) {
+            case 'raw_html':
+                $html .= $this->replaceVariables($content['html'] ?? '', $customer);
+                break;
+
             case 'header':
                 $logoUrl = $content['logo'] ?? null;
                 if (empty($logoUrl)) {

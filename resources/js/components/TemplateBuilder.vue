@@ -1,19 +1,33 @@
 <template>
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col">
+    <div :class="builderOuterClass">
+        <div :class="builderInnerClass">
             <!-- Header -->
-            <div class="p-6 border-b border-slate-200 flex items-center justify-between">
+            <div class="p-4 sm:p-6 border-b border-slate-200 flex flex-wrap items-start justify-between gap-3 shrink-0">
                 <div>
                     <h2 class="text-xl font-semibold text-slate-900">
                         {{ template?.id ? 'Edit Template' : 'Create New Template' }}
                     </h2>
                     <p class="text-sm text-slate-500 mt-1">Build responsive email templates</p>
                 </div>
-                <button @click="$emit('close')" class="text-slate-400 hover:text-slate-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+                <div class="flex items-center gap-2 shrink-0">
+                    <RouterLink
+                        v-if="layout === 'page'"
+                        :to="{ name: 'templates', query: { tab: 'email' } }"
+                        class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
+                    >
+                        ← Back to templates
+                    </RouterLink>
+                    <button
+                        v-else
+                        type="button"
+                        class="text-slate-400 hover:text-slate-600 p-1"
+                        @click="$emit('close')"
+                    >
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <!-- Main Content -->
@@ -77,11 +91,25 @@
                             />
                             <p class="text-xs text-slate-500 mt-1">Text shown next to subject in inbox (Gmail, Outlook, etc.)</p>
                         </div>
+                        <div class="flex items-start gap-2">
+                            <input
+                                id="skip-brand-footer"
+                                v-model="form.content.skip_brand_footer"
+                                type="checkbox"
+                                class="mt-1 rounded border-slate-300"
+                            />
+                            <label for="skip-brand-footer" class="text-sm text-slate-700 cursor-pointer">
+                                Skip default CRM footer (use when your HTML already includes unsubscribe and company block)
+                            </label>
+                        </div>
                     </div>
 
                     <!-- Available Sections -->
                     <div class="flex-1 overflow-y-auto p-4">
                         <h3 class="text-sm font-semibold text-slate-900 mb-3">Add Section</h3>
+                        <p class="text-[11px] text-slate-500 mb-2 leading-snug">
+                            Add <strong>Custom HTML</strong>, then use <strong>Edit with visual builder</strong> at the top (or in that block).
+                        </p>
                         <div class="space-y-2">
                             <button
                                 v-for="sectionType in availableSections"
@@ -168,11 +196,11 @@
                     </div>
                 </div>
 
-                <!-- Center - Template Builder -->
-                <div class="flex-1 flex flex-col overflow-hidden">
+                <!-- Center - Template Builder (scroll whole pane so tall live preview + sections stay reachable) -->
+                <div class="flex-1 flex flex-col min-h-0 overflow-y-auto">
                     <!-- Preview Toggle -->
-                    <div class="p-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-                        <div class="flex gap-2">
+                    <div class="p-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 bg-slate-50">
+                        <div class="flex flex-wrap gap-2 items-center">
                             <button
                                 @click="previewMode = 'desktop'"
                                 :class="previewMode === 'desktop' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700'"
@@ -187,21 +215,75 @@
                             >
                                 📱 Mobile
                             </button>
+                            <button
+                                v-if="hasRawHtmlSection"
+                                type="button"
+                                class="px-3 py-1.5 text-sm rounded-lg border border-violet-300 bg-violet-50 text-violet-900 font-medium hover:bg-violet-100 transition-colors"
+                                @click="openVisualBuilderModal"
+                            >
+                                🎨 Edit with visual builder
+                            </button>
                         </div>
                         <button
                             @click="loadPrebuiltTemplate"
-                            class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
+                            class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 shrink-0"
                         >
                             📋 Load Pre-built
                         </button>
                     </div>
 
+                    <!-- Full HTML email preview (iframe — avoids broken v-html when body is a complete HTML document) -->
+                    <div
+                        v-if="hasRawHtmlSection"
+                        class="border-b border-slate-200 bg-slate-800 shrink-0"
+                        :class="previewMode === 'mobile' ? 'p-2' : 'p-3'"
+                    >
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <span class="text-xs font-medium text-slate-300">Live preview — same render as sent email (sample data)</span>
+                            <button
+                                type="button"
+                                class="text-xs text-blue-400 hover:text-blue-300 shrink-0"
+                                @click="runLivePreview"
+                            >
+                                Refresh
+                            </button>
+                        </div>
+                        <div
+                            :class="previewMode === 'mobile' ? 'max-w-sm mx-auto' : 'max-w-3xl mx-auto'"
+                            class="rounded-lg border border-slate-600 bg-white shadow-inner overflow-hidden"
+                        >
+                            <iframe
+                                v-if="livePreviewSrcdoc"
+                                ref="previewIframeRef"
+                                class="w-full min-h-[400px] bg-white border-0 block rounded-b-lg"
+                                :style="{ height: livePreviewIframeHeight }"
+                                title="Email preview"
+                                sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                                :srcdoc="livePreviewSrcdoc"
+                                @load="onLivePreviewIframeLoad"
+                            />
+                            <div v-else-if="livePreviewLoading" class="p-8 text-center text-sm text-slate-500 bg-white">
+                                Loading preview…
+                            </div>
+                            <div v-else-if="livePreviewError" class="p-4 text-sm text-red-600 bg-white">
+                                {{ livePreviewError }}
+                            </div>
+                            <div v-else class="p-4 text-xs text-slate-500 bg-white">
+                                Add HTML in the section below or wait for preview to load.
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Template Canvas -->
-                    <div class="flex-1 overflow-y-auto bg-slate-100 p-6">
+                    <div class="flex-1 min-h-0 overflow-y-auto bg-slate-100 p-6">
                         <div
                             :class="[
-                                'bg-white mx-auto shadow-lg',
-                                previewMode === 'mobile' ? 'max-w-sm' : 'max-w-2xl'
+                                'bg-white mx-auto shadow-lg min-w-0',
+                                previewMode === 'mobile'
+                                    ? 'max-w-sm'
+                                    : hasRawHtmlSection
+                                      ? 'max-w-6xl w-full'
+                                      : 'max-w-2xl',
                             ]"
                         >
                             <!-- Template Sections -->
@@ -407,6 +489,30 @@
                                             {{companyName}} | Company No: {{companyRegNo}} | VAT: {{companyVat}}
                                         </div>
                                     </div>
+
+                                    <!-- Raw HTML: code here; visual editing opens from top toolbar -->
+                                    <div v-if="section.type === 'raw_html'" class="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <p class="text-xs text-slate-600 font-medium">Custom HTML</p>
+                                            <button
+                                                type="button"
+                                                class="text-xs font-medium px-3 py-1.5 rounded-lg border border-violet-300 bg-violet-50 text-violet-900 hover:bg-violet-100"
+                                                @click.stop="selectedSectionIndex = index; openVisualBuilderModal()"
+                                            >
+                                                🎨 Open visual builder
+                                            </button>
+                                        </div>
+                                        <textarea
+                                            v-model="section.content.html"
+                                            rows="14"
+                                            class="w-full font-mono text-xs border border-slate-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white resize-y min-h-[200px]"
+                                            placeholder="HTML body fragment (merge tags like {{first_name}}). Use “Edit with visual builder” at the top for drag-and-drop."
+                                            @click.stop="selectedSectionIndex = index"
+                                        />
+                                        <p class="text-xs text-slate-500">
+                                            Tables and preset blocks are responsive for email (≈600px max width, mobile styles from the newsletter preset). Export HTML from the visual builder to back up or re-import elsewhere.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -415,9 +521,10 @@
             </div>
 
             <!-- Footer Actions -->
-            <div class="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div class="p-4 sm:p-6 border-t border-slate-200 flex flex-wrap justify-end gap-3 shrink-0">
                 <button
-                    @click="$emit('close')"
+                    type="button"
+                    @click="handleBuilderCancel"
                     class="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                 >
                     Cancel
@@ -469,6 +576,126 @@
             </div>
         </div>
 
+        <!-- Visual email builder: true full viewport (above app chrome) -->
+        <div
+            v-if="showVisualBuilderModal"
+            class="fixed inset-0 z-[200] flex flex-col bg-white"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="visual-builder-title"
+        >
+            <div class="flex flex-wrap items-center gap-2 p-3 sm:p-4 border-b border-slate-200 shrink-0 bg-white shadow-sm">
+                    <h3 id="visual-builder-title" class="text-base font-semibold text-slate-900">
+                        Visual email builder
+                    </h3>
+                    <select
+                        v-if="rawHtmlSectionIndices.length > 1"
+                        :value="String(visualBuilderTargetIndex)"
+                        class="text-sm border border-slate-300 rounded-lg px-2 py-1.5 bg-white max-w-[220px]"
+                        @change="onVisualBuilderTargetSelect($event)"
+                    >
+                        <option v-for="i in rawHtmlSectionIndices" :key="i" :value="String(i)">
+                            Custom HTML block {{ rawHtmlSectionIndices.indexOf(i) + 1 }}
+                        </option>
+                    </select>
+                    <div class="flex flex-wrap gap-2 ml-auto items-center">
+                        <button
+                            type="button"
+                            class="px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
+                            @click="pasteHtmlOpen = !pasteHtmlOpen"
+                        >
+                            {{ pasteHtmlOpen ? 'Hide paste' : 'Paste HTML' }}
+                        </button>
+                        <button
+                            type="button"
+                            class="px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
+                            @click="triggerImportHtmlFile"
+                        >
+                            Import .html file
+                        </button>
+                        <input
+                            ref="importHtmlInputRef"
+                            type="file"
+                            accept=".html,.htm,.txt,text/html"
+                            class="hidden"
+                            @change="onImportHtmlFile"
+                        />
+                        <button
+                            type="button"
+                            class="px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
+                            @click="exportVisualBuilderHtml"
+                        >
+                            Export .html
+                        </button>
+                        <button
+                            type="button"
+                            class="px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
+                            @click="copyVisualBuilderHtml"
+                        >
+                            Copy HTML
+                        </button>
+                        <button
+                            type="button"
+                            class="px-3 py-1.5 text-xs sm:text-sm rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
+                            @click="cancelVisualBuilderModal"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            class="px-3 py-1.5 text-xs sm:text-sm rounded-lg bg-slate-900 text-white hover:bg-slate-800 font-medium"
+                            @click="applyVisualBuilderModal"
+                        >
+                            Save to template
+                        </button>
+                        <button
+                            type="button"
+                            class="p-2 rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 lg:ml-1"
+                            title="Close visual builder"
+                            aria-label="Close visual builder"
+                            @click="cancelVisualBuilderModal"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div v-if="pasteHtmlOpen" class="px-3 py-2 border-b border-slate-100 bg-slate-50 shrink-0 space-y-2">
+                    <label class="block text-xs font-medium text-slate-600">Paste full HTML or body fragment — replaces the canvas</label>
+                    <textarea
+                        v-model="pasteHtmlBuffer"
+                        rows="5"
+                        class="w-full font-mono text-xs border border-slate-300 rounded-lg px-2 py-2"
+                        placeholder="&lt;table&gt;… or full &lt;html&gt;…"
+                    />
+                    <button
+                        type="button"
+                        class="px-3 py-1.5 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-700"
+                        @click="applyPasteHtml"
+                    >
+                        Replace canvas from paste
+                    </button>
+                </div>
+                <div class="flex-1 min-h-0 overflow-hidden flex flex-col p-0">
+                    <EmailVisualEditor
+                        v-if="showVisualBuilderModal && visualBuilderTargetIndex >= 0"
+                        :key="`vb-${visualBuilderModalKey}`"
+                        ref="visualEditorRef"
+                        v-model="visualBuilderDraft"
+                        compact
+                        :canvas-height="visualBuilderCanvasHeight"
+                        class="h-full min-h-0 flex-1 flex flex-col"
+                    />
+                </div>
+                <p class="text-[11px] text-slate-500 px-3 py-2 border-t border-slate-200 bg-slate-50 shrink-0">
+                    Save to template applies HTML (inlined when possible). For images, select the image on the canvas → open <strong>Images</strong> / <strong>Assets</strong> on the right → upload (merge tags like
+                    <code v-pre class="text-[10px]">{{header_logo_url}}</code>
+                    stay in saved HTML until you replace the src).
+                    Use <strong>Save Template</strong> on the edit page to store on the server.
+                </p>
+        </div>
+
         <!-- Image Upload Modal -->
         <div v-if="showImageUpload" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
             <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
@@ -492,9 +719,24 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick, defineAsyncComponent, h } from 'vue';
 import axios from 'axios';
+import { RouterLink, useRouter } from 'vue-router';
 import { useToastStore } from '@/stores/toast';
+
+const EmailVisualEditor = defineAsyncComponent({
+    loader: () => import('./EmailVisualEditor.vue'),
+    delay: 80,
+    loadingComponent: {
+        render() {
+            return h(
+                'div',
+                { class: 'text-sm text-slate-500 p-6 text-center border border-dashed border-slate-300 rounded-lg' },
+                'Loading visual editor…'
+            );
+        },
+    },
+});
 
 const toast = useToastStore();
 
@@ -503,9 +745,40 @@ const props = defineProps({
         type: Object,
         default: null,
     },
+    /** `modal` = centered overlay (legacy). `page` = full route view under app layout. */
+    layout: {
+        type: String,
+        default: 'modal',
+        validator: (v) => ['modal', 'page'].includes(v),
+    },
 });
 
 const emit = defineEmits(['close', 'saved']);
+
+const router = useRouter();
+
+const builderOuterClass = computed(() =>
+    props.layout === 'modal'
+        ? 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+        : 'w-full flex flex-col flex-1 min-h-[calc(100dvh-9rem)]'
+);
+
+const builderInnerClass = computed(() =>
+    props.layout === 'modal'
+        ? 'bg-white rounded-xl shadow-xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col'
+        : 'flex flex-col flex-1 min-h-0 w-full border border-slate-200 rounded-xl bg-white shadow-sm overflow-hidden'
+);
+
+/** GrapesJS height inside full-screen visual builder */
+const visualBuilderCanvasHeight = computed(() => 'calc(100dvh - 10.5rem)');
+
+function handleBuilderCancel() {
+    if (props.layout === 'page') {
+        router.push({ name: 'templates', query: { tab: 'email' } });
+    } else {
+        emit('close');
+    }
+}
 
 const saving = ref(false);
 const previewMode = ref('desktop');
@@ -519,6 +792,200 @@ const uploadingImage = ref(false);
 const imageInput = ref(null);
 const currentImageEdit = ref({ sectionIndex: null, field: null });
 
+const livePreviewSrcdoc = ref('');
+const livePreviewLoading = ref(false);
+const livePreviewError = ref('');
+const previewIframeRef = ref(null);
+/** Full email height inside iframe (was fixed 560px / 640px, which clipped long templates). */
+const livePreviewIframeHeight = ref('520px');
+let livePreviewDebounce = null;
+let previewIframeResizeTimers = [];
+
+/** Full-screen GrapesJS modal */
+const showVisualBuilderModal = ref(false);
+const visualBuilderDraft = ref('');
+const visualBuilderTargetIndex = ref(-1);
+const visualBuilderModalKey = ref(0);
+/** Snapshot of each Custom HTML block when modal opened (Cancel restores all). */
+const visualBuilderSnapshots = ref({});
+const visualEditorRef = ref(null);
+const importHtmlInputRef = ref(null);
+const pasteHtmlOpen = ref(false);
+const pasteHtmlBuffer = ref('');
+
+const rawHtmlSectionIndices = computed(() =>
+    form.content.sections.map((s, i) => (s.type === 'raw_html' ? i : -1)).filter((i) => i >= 0)
+);
+
+function resolveRawHtmlTargetIndex() {
+    const sections = form.content.sections;
+    const sel = selectedSectionIndex.value;
+    if (sel != null && sections[sel]?.type === 'raw_html') {
+        return sel;
+    }
+    return sections.findIndex((s) => s.type === 'raw_html');
+}
+
+function flushVisualBuilderToSection() {
+    const idx = visualBuilderTargetIndex.value;
+    if (idx < 0 || !showVisualBuilderModal.value) {
+        return;
+    }
+    const section = form.content.sections[idx];
+    if (!section || section.type !== 'raw_html') {
+        return;
+    }
+    const html = visualEditorRef.value?.exportHtml?.() ?? visualBuilderDraft.value;
+    section.content.html = html;
+}
+
+function openVisualBuilderModal() {
+    const idx = resolveRawHtmlTargetIndex();
+    if (idx < 0) {
+        toast.error('Add a Custom HTML section first (left sidebar).');
+        return;
+    }
+    const snaps = {};
+    rawHtmlSectionIndices.value.forEach((i) => {
+        snaps[i] = form.content.sections[i].content?.html ?? '';
+    });
+    visualBuilderSnapshots.value = snaps;
+    visualBuilderTargetIndex.value = idx;
+    visualBuilderDraft.value = form.content.sections[idx].content?.html ?? '';
+    pasteHtmlOpen.value = false;
+    pasteHtmlBuffer.value = '';
+    showVisualBuilderModal.value = true;
+    visualBuilderModalKey.value += 1;
+}
+
+function onVisualBuilderTargetSelect(ev) {
+    const newIdx = Number(ev.target?.value);
+    if (Number.isNaN(newIdx) || newIdx < 0) {
+        return;
+    }
+    flushVisualBuilderToSection();
+    visualBuilderTargetIndex.value = newIdx;
+    visualBuilderDraft.value = form.content.sections[newIdx].content?.html ?? '';
+    visualBuilderModalKey.value += 1;
+}
+
+function cancelVisualBuilderModal() {
+    const snaps = visualBuilderSnapshots.value || {};
+    Object.keys(snaps).forEach((k) => {
+        const i = Number(k);
+        const section = form.content.sections[i];
+        if (section?.type === 'raw_html') {
+            section.content.html = snaps[k];
+        }
+    });
+    showVisualBuilderModal.value = false;
+    scheduleLivePreview();
+}
+
+function applyVisualBuilderModal() {
+    flushVisualBuilderToSection();
+    showVisualBuilderModal.value = false;
+    scheduleLivePreview();
+    toast.success('HTML saved to this template. Use Save Template to store on the server.');
+}
+
+function exportVisualBuilderHtml() {
+    const html = visualEditorRef.value?.exportHtml?.() ?? visualBuilderDraft.value;
+    const safeName = String(form.name || 'email-template').replace(/[^\w\-]+/g, '-').slice(0, 80) || 'email-template';
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeName}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('HTML downloaded');
+}
+
+async function copyVisualBuilderHtml() {
+    const html = visualEditorRef.value?.exportHtml?.() ?? visualBuilderDraft.value;
+    try {
+        await navigator.clipboard.writeText(html);
+        toast.success('HTML copied to clipboard');
+    } catch {
+        toast.error('Clipboard blocked — use Export .html instead');
+    }
+}
+
+function triggerImportHtmlFile() {
+    importHtmlInputRef.value?.click();
+}
+
+function onImportHtmlFile(ev) {
+    const file = ev.target?.files?.[0];
+    ev.target.value = '';
+    if (!file) {
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+        const text = String(reader.result || '');
+        visualBuilderDraft.value = text;
+        nextTick(() => visualEditorRef.value?.loadHtml?.(text));
+        toast.success('HTML loaded into the editor');
+    };
+    reader.onerror = () => toast.error('Could not read file');
+    reader.readAsText(file);
+}
+
+function applyPasteHtml() {
+    const text = pasteHtmlBuffer.value || '';
+    visualBuilderDraft.value = text;
+    nextTick(() => visualEditorRef.value?.loadHtml?.(text));
+    pasteHtmlOpen.value = false;
+    toast.success('Canvas updated from paste');
+}
+
+function clearPreviewIframeResizeTimers() {
+    previewIframeResizeTimers.forEach((id) => clearTimeout(id));
+    previewIframeResizeTimers = [];
+}
+
+/**
+ * Match iframe height to rendered document so the full template is visible when you scroll this pane.
+ * Re-run briefly after load so images (e.g. partner strip) can affect height.
+ */
+function onLivePreviewIframeLoad() {
+    const iframe = previewIframeRef.value;
+    if (!iframe || !livePreviewSrcdoc.value) {
+        return;
+    }
+    try {
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!doc?.body) {
+            return;
+        }
+        const h = Math.max(
+            doc.documentElement?.scrollHeight || 0,
+            doc.body?.scrollHeight || 0,
+            400
+        );
+        const capped = Math.min(h + 32, 20000);
+        livePreviewIframeHeight.value = `${capped}px`;
+    } catch {
+        livePreviewIframeHeight.value = previewMode.value === 'mobile' ? '720px' : '600px';
+    }
+}
+
+function scheduleLivePreviewIframeResize() {
+    clearPreviewIframeResizeTimers();
+    nextTick(() => {
+        onLivePreviewIframeLoad();
+        previewIframeResizeTimers = [200, 600, 1600].map((ms) =>
+            setTimeout(onLivePreviewIframeLoad, ms)
+        );
+    });
+}
+
+const hasRawHtmlSection = computed(() =>
+    (form.content.sections || []).some((s) => s.type === 'raw_html')
+);
+
 const companyName = computed(() => 'Switch & Save');
 const companyRegNo = computed(() => '15051352');
 const companyVat = computed(() => 'GB50915794');
@@ -530,6 +997,7 @@ const availableSections = [
     { type: 'button', label: 'Button', icon: '🔘' },
     { type: 'two_column', label: 'Two Columns', icon: '📊' },
     { type: 'footer', label: 'Footer', icon: '📄' },
+    { type: 'raw_html', label: 'Custom HTML', icon: '🧩' },
 ];
 
 const availableVariables = [
@@ -542,6 +1010,17 @@ const availableVariables = [
     '{{company_name}}',
     '{{company_phone}}',
     '{{company_address}}',
+    '{{company_website}}',
+    '{{app_url}}',
+    '{{header_logo_url}}',
+    '{{email_welcome_dir_url}}',
+    '{{logo_src}}',
+    '{{social_facebook_url}}',
+    '{{social_linkedin_url}}',
+    '{{social_instagram_url}}',
+    '{{social_tiktok_url}}',
+    '{{current_year}}',
+    '{{unsubscribe_url}}',
     '{{lead_id}}',
     '{{product_name}}',
 ];
@@ -554,6 +1033,7 @@ const form = reactive({
     content: {
         sections: [],
         preview_line: '',
+        skip_brand_footer: false,
     },
 });
 
@@ -625,6 +1105,8 @@ function normalizeSectionContent(section) {
                 ({ text: b.text ?? '', font_family: b.font_family ?? '', font_size: b.font_size ?? '', font_color: b.font_color ?? '' })
             );
         }
+    } else if (section.type === 'raw_html') {
+        section.content = { html: section.content?.html ?? '' };
     } else if (hasStyleSupport(section)) {
         section.content = { font_family: '', font_size: '', font_color: '', ...section.content };
     }
@@ -640,8 +1122,66 @@ if (props.template) {
     const content = props.template.content || { sections: [] };
     content.sections = (content.sections || []).map(normalizeSectionContent);
     content.preview_line = content.preview_line ?? '';
+    content.skip_brand_footer = Boolean(content.skip_brand_footer);
     form.content = content;
 }
+
+function scheduleLivePreview() {
+    if (!hasRawHtmlSection.value) {
+        livePreviewSrcdoc.value = '';
+        livePreviewError.value = '';
+        livePreviewLoading.value = false;
+        return;
+    }
+    clearTimeout(livePreviewDebounce);
+    livePreviewDebounce = setTimeout(runLivePreview, 450);
+}
+
+async function runLivePreview() {
+    if (!hasRawHtmlSection.value) {
+        livePreviewSrcdoc.value = '';
+        return;
+    }
+    livePreviewLoading.value = true;
+    livePreviewError.value = '';
+    try {
+        const { data } = await axios.post('/api/email-templates/preview-html', { content: form.content });
+        livePreviewSrcdoc.value = typeof data.html === 'string' ? data.html : '';
+    } catch (error) {
+        livePreviewSrcdoc.value = '';
+        livePreviewError.value =
+            error.response?.data?.message || error.message || 'Could not load preview';
+    } finally {
+        livePreviewLoading.value = false;
+        scheduleLivePreviewIframeResize();
+    }
+}
+
+watch(
+    () => form.content,
+    () => scheduleLivePreview(),
+    { deep: true }
+);
+
+watch([livePreviewSrcdoc, previewMode], () => {
+    livePreviewIframeHeight.value = previewMode.value === 'mobile' ? '560px' : '480px';
+    scheduleLivePreviewIframeResize();
+});
+
+onMounted(() => {
+    scheduleLivePreview();
+    nextTick(() => {
+        const idx = form.content.sections.findIndex((s) => s.type === 'raw_html');
+        if (idx >= 0 && selectedSectionIndex.value == null) {
+            selectedSectionIndex.value = idx;
+        }
+    });
+});
+
+onUnmounted(() => {
+    clearTimeout(livePreviewDebounce);
+    clearPreviewIframeResizeTimers();
+});
 
 const addSection = (type) => {
     const section = {
@@ -662,6 +1202,7 @@ const getDefaultSectionContent = (type) => {
         button: { text: 'Click Here', url: '#', ...styleDefaults },
         two_column: { left_text: '', right_text: '', ...styleDefaults },
         footer: { text: '', ...styleDefaults },
+        raw_html: { html: '' },
     };
     return defaults[type] || {};
 };
@@ -739,6 +1280,15 @@ const insertVariable = (variable) => {
     if (section.type === 'text' && section.content?.blocks) {
         const idx = 0;
         section.content.blocks[idx].text += (section.content.blocks[idx].text ? ' ' : '') + variable + ' ';
+    } else if (section.type === 'raw_html' && section.content) {
+        const selIdx = selectedSectionIndex.value;
+        const cur = section.content.html || '';
+        const sep = cur.length && !/\s$/.test(cur) ? ' ' : '';
+        const next = cur + sep + variable + ' ';
+        section.content.html = next;
+        if (showVisualBuilderModal.value && visualBuilderTargetIndex.value === selIdx) {
+            nextTick(() => visualEditorRef.value?.loadHtml?.(next));
+        }
     }
 };
 
@@ -822,7 +1372,11 @@ const saveTemplate = async () => {
             toast.success('Template created successfully');
         }
         emit('saved');
-        emit('close');
+        if (props.layout === 'page') {
+            router.push({ name: 'templates', query: { tab: 'email' } });
+        } else {
+            emit('close');
+        }
     } catch (error) {
         console.error('Failed to save template:', error);
         toast.error(error.response?.data?.message || 'Failed to save template');
