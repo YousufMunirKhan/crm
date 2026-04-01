@@ -47,8 +47,38 @@ class SendCommunicationJob implements ShouldQueue
                 'communication_id' => $communication->id,
                 'error' => $e->getMessage(),
             ]);
-            $communication->update(['status' => 'failed']);
+            $payload = is_array($communication->provider_payload) ? $communication->provider_payload : [];
+            $payload['send_error'] = $e->getMessage();
+            if ($communication->channel === 'whatsapp') {
+                $payload['send_error_friendly'] = self::whatsappFriendlyError($e->getMessage());
+            }
+            $communication->update([
+                'status' => 'failed',
+                'provider_payload' => $payload,
+            ]);
         }
+    }
+
+    /**
+     * Plain-language hint for CRM users when Meta rejects a send (not “customer must allow the app”).
+     */
+    private static function whatsappFriendlyError(string $message): string
+    {
+        $m = strtolower($message);
+        if (str_contains($m, 'credentials not configured')) {
+            return 'WhatsApp is not fully connected on the server (missing Meta phone number ID or access token). An admin should check .env / settings.';
+        }
+        if (str_contains($m, 'template') || str_contains($m, '131047') || str_contains($m, 're-engagement') || str_contains($m, 'outside the 24')) {
+            return 'WhatsApp lets you send a normal typed message once this person has recently messaged your business number. For the very first outreach, Meta requires an approved business template (created in Meta Business Suite), then the CRM can send it.';
+        }
+        if (str_contains($m, 'not in') && (str_contains($m, 'allow') || str_contains($m, 'whitelist'))) {
+            return 'This number may not be on Meta’s test allow list (sandbox). Add it in Meta Developer → WhatsApp → API setup, or use a production app.';
+        }
+        if (str_contains($m, 'invalid') && str_contains($m, 'oauth')) {
+            return 'Meta rejected the access token. An admin should renew the WhatsApp access token in Meta and update server settings.';
+        }
+
+        return 'WhatsApp could not send. Check the number includes country code (e.g. 447…). If it still fails, see the server log or ask an admin to verify the Meta app and token.';
     }
 
     private function sendEmail(Communication $communication): void
@@ -64,20 +94,35 @@ class SendCommunicationJob implements ShouldQueue
     private function sendWhatsApp(Communication $communication): void
     {
         try {
-            $whatsappService = app(\App\Modules\Communication\Services\WhatsAppService::class);
-            
-            // Get phone number from options or customer
-            $toNumber = $this->options['to_number'] 
-                ?? $communication->customer->whatsapp_number 
-                ?? $communication->customer->phone;
+            $whatsappService = app(\App\Modules\Communication\Services\WhatsAppServiceV2::class);
+            $customer = $communication->customer;
+            if (!$customer) {
+                throw new \Exception('Customer not found for WhatsApp communication.');
+            }
 
-            $result = $whatsappService->sendMessage(
-                $toNumber,
-                $communication->message,
-                null,
-                $communication->media_url,
-                $communication->media_type
-            );
+            if (!empty($communication->media_url)) {
+                throw new \Exception('Media sending is not enabled in the unified WhatsApp V2 flow yet.');
+            }
+
+            $templateName = trim((string) ($this->options['template_name'] ?? ''));
+            if ($templateName !== '') {
+                $waMessage = $whatsappService->sendTemplateMessage(
+                    $customer,
+                    $templateName,
+                    $this->options['template_params'] ?? [],
+                    $this->options['language'] ?? 'en_US',
+                );
+                $result = [
+                    'message_id' => $waMessage->meta_wamid,
+                    'response' => $waMessage->meta_payload_json,
+                ];
+            } else {
+                $waMessage = $whatsappService->sendTextMessage($customer, $communication->message);
+                $result = [
+                    'message_id' => $waMessage->meta_wamid,
+                    'response' => $waMessage->meta_payload_json,
+                ];
+            }
 
             // Update communication with provider response
             $communication->update([

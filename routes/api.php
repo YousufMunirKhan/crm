@@ -26,7 +26,7 @@ Route::post('/auth/reset-password', [\App\Http\Controllers\Auth\PasswordResetCon
 // Customer Portal (public)
 Route::post('/portal/login', [\App\Http\Controllers\CustomerPortalController::class, 'login']);
 
-Route::post('/webhooks/whatsapp', [WebhookController::class, 'whatsapp']);
+// Legacy WhatsApp webhook endpoint removed. Use /api/whatsapp/webhook only.
 Route::post('/webhooks/email', [WebhookController::class, 'email']);
 Route::post('/webhooks/sms', [WebhookController::class, 'sms']);
 
@@ -150,6 +150,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Messages
         Route::post('/messages/send-text', [\App\Modules\Communication\Http\Controllers\WhatsAppMessageController::class, 'sendText']);
         Route::post('/messages/send-template', [\App\Modules\Communication\Http\Controllers\WhatsAppMessageController::class, 'sendTemplate']);
+        Route::get('/customers/{customerId}/window-status', [\App\Modules\Communication\Http\Controllers\WhatsAppMessageController::class, 'windowStatus']);
         Route::get('/conversations', [\App\Modules\Communication\Http\Controllers\WhatsAppMessageController::class, 'conversations']);
         Route::get('/conversations/{id}/messages', [\App\Modules\Communication\Http\Controllers\WhatsAppMessageController::class, 'conversationMessages']);
     });
@@ -247,7 +248,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/settings/smtp/test', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'testSmtp']);
     Route::put('/settings/sms', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateSms']);
     Route::post('/settings/sms/test', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'testSms']);
-    Route::put('/settings/whatsapp', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateWhatsapp']);
     Route::put('/settings/facebook', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateFacebook']);
 
     // Email Management (filter, export, preview, send bulk, report)

@@ -22,6 +22,32 @@ class WhatsAppMessageController extends Controller
     private WhatsAppServiceV2 $whatsappService;
     private ConversationWindowService $windowService;
 
+    public function windowStatus($customerId)
+    {
+        $customer = Customer::findOrFail($customerId);
+        $phone = $customer->whatsapp_number ?? $customer->phone;
+
+        if (!$phone) {
+            return response()->json([
+                'has_phone' => false,
+                'within_window' => false,
+                'message' => 'Customer has no WhatsApp number.',
+            ]);
+        }
+
+        $phoneE164 = $this->windowService->formatToE164($phone);
+        $withinWindow = $this->windowService->isWithinWindow($customer, $phoneE164);
+
+        return response()->json([
+            'has_phone' => true,
+            'phone_e164' => $phoneE164,
+            'within_window' => $withinWindow,
+            'message' => $withinWindow
+                ? 'Customer is within the 24-hour WhatsApp session window.'
+                : 'Outside 24-hour window. Use approved template.',
+        ]);
+    }
+
     public function sendText(Request $request)
     {
         $data = $request->validate([

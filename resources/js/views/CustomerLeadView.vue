@@ -443,7 +443,7 @@
             <!-- Send Messages: Email, SMS, WhatsApp (template + send + log) -->
             <div class="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 sm:p-6 mb-4 sm:mb-6">
                 <h2 class="text-base font-semibold text-slate-800 mb-4 pb-2 border-b border-slate-200">Send messages</h2>
-                <p class="text-sm text-slate-500 mb-4">Choose a template (or write your own), then send. All sent messages are logged below.</p>
+                <p class="text-sm text-slate-500 mb-4">Send from the CRM like a normal business message; everything is logged below. WhatsApp uses Meta’s rules in the background (failed sends show a short explanation in the log).</p>
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <EmailComposer
                         v-if="customer"

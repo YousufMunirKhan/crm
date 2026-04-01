@@ -1,8 +1,9 @@
 <template>
     <div class="bg-slate-50/80 rounded-xl border border-slate-200 p-4 sm:p-5">
-        <h3 class="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
-            <span class="text-emerald-600">💬</span> WhatsApp
-        </h3>
+        <h3 class="text-base font-semibold text-slate-800 mb-2">WhatsApp</h3>
+        <p class="text-xs text-slate-500 mb-3 leading-relaxed">
+            You are messaging the customer directly from your connected business WhatsApp number. There is no extra “permission” step in the CRM—if Meta blocks a send, it is their platform rule (see the log hint on failed rows).
+        </p>
 
         <div class="mb-3">
             <label class="block text-xs font-medium text-slate-600 mb-1">WhatsApp number</label>
@@ -14,15 +15,19 @@
             />
         </div>
 
-        <!-- Template choice (reuse message templates for WhatsApp body) -->
+        <div class="mb-3 rounded-lg border px-3 py-2 text-xs" :class="withinWindow ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'">
+            {{ windowStatusMessage }}
+        </div>
+
+        <!-- Meta-approved WhatsApp template -->
         <div class="mb-3">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Message template</label>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Approved WhatsApp template</label>
             <select
                 v-model="selectedTemplateId"
                 class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 @change="onTemplateSelect"
             >
-                <option value="">— Write your own —</option>
+                <option value="">— No template (normal text) —</option>
                 <option v-for="t in messageTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
             </select>
         </div>
@@ -37,12 +42,12 @@
                 placeholder="Type your WhatsApp message..."
             />
         </div>
-        <p v-else class="mb-3 text-sm text-slate-500">Message will be sent from the selected template. Switch to "Write your own" to type a custom message.</p>
+        <p v-else class="mb-3 text-sm text-slate-500">This will send as an approved template message.</p>
 
         <div class="flex flex-wrap gap-2 mb-4">
             <button
                 @click="sendMessage"
-                :disabled="sending || (!selectedTemplateId && !message?.trim())"
+                :disabled="sending || (!selectedTemplateId && !message?.trim()) || (!withinWindow && !selectedTemplateId)"
                 class="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
             >
                 {{ sending ? 'Sending...' : 'Send WhatsApp' }}
@@ -64,6 +69,9 @@
                 >
                     <div class="text-slate-800 line-clamp-2">{{ log.message || '(No message)' }}</div>
                     <div class="text-xs text-slate-500 mt-0.5">{{ formatLogDate(log.created_at) }} · {{ log.status }}</div>
+                    <p v-if="log.status === 'failed' && log.failure_hint" class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-2">
+                        {{ log.failure_hint }}
+                    </p>
                 </li>
             </ul>
         </div>
@@ -90,15 +98,19 @@ const sending = ref(false);
 const savingNumber = ref(false);
 const error = ref(null);
 const messageTemplates = ref([]);
+const withinWindow = ref(true);
+const windowStatusMessage = ref('Checking WhatsApp window...');
 
 onMounted(() => {
     whatsappNumber.value = props.customer?.whatsapp_number || props.customer?.phone || '';
     loadTemplates();
+    loadWindowStatus();
 });
 
 watch(() => props.customer, (newCustomer) => {
     if (newCustomer) {
         whatsappNumber.value = newCustomer.whatsapp_number || newCustomer.phone || '';
+        loadWindowStatus();
     }
 }, { deep: true });
 
@@ -110,21 +122,30 @@ function formatLogDate(iso) {
 
 async function loadTemplates() {
     try {
-        const { data } = await axios.get('/api/message-templates-for-sending');
-        messageTemplates.value = data || [];
+        const { data } = await axios.get('/api/whatsapp/templates', {
+            params: { status: 'APPROVED', per_page: 200 },
+        });
+        messageTemplates.value = data?.data || [];
     } catch (_) {
         messageTemplates.value = [];
     }
 }
 
 function onTemplateSelect() {
-    if (!selectedTemplateId.value) {
-        message.value = '';
-        return;
-    }
-    const t = messageTemplates.value.find(x => x.id == selectedTemplateId.value);
-    if (t && t.message) {
-        message.value = t.message;
+    // Template messages are rendered by Meta; no local body preview required.
+}
+
+async function loadWindowStatus() {
+    if (!props.customer?.id) return;
+    try {
+        const { data } = await axios.get(`/api/whatsapp/customers/${props.customer.id}/window-status`);
+        withinWindow.value = !!data?.within_window;
+        windowStatusMessage.value = data?.message || (withinWindow.value
+            ? 'Customer is within 24-hour session.'
+            : 'Outside 24-hour window. Use approved template.');
+    } catch (_) {
+        withinWindow.value = true;
+        windowStatusMessage.value = 'Unable to verify 24-hour window right now.';
     }
 }
 
@@ -148,22 +169,30 @@ async function saveWhatsAppNumber() {
 }
 
 async function sendMessage() {
-    if (!message.value.trim()) {
+    if (!selectedTemplateId.value && !message.value.trim()) {
         error.value = 'Please enter a message';
+        return;
+    }
+    if (!withinWindow.value && !selectedTemplateId.value) {
+        error.value = 'Outside 24-hour window. Select an approved WhatsApp template.';
         return;
     }
     sending.value = true;
     error.value = null;
     try {
+        const selectedTemplate = messageTemplates.value.find((x) => x.id == selectedTemplateId.value);
         await axios.post('/api/communications', {
             customer_id: props.customer.id,
             lead_id: props.leadId,
             channel: 'whatsapp',
-            message: message.value.trim(),
+            message: selectedTemplateId.value ? null : message.value.trim(),
             to_number: whatsappNumber.value.trim() || undefined,
+            template_name: selectedTemplate?.name || undefined,
+            language: selectedTemplate?.language || undefined,
         });
         message.value = '';
         selectedTemplateId.value = '';
+        await loadWindowStatus();
         emit('sent');
     } catch (err) {
         error.value = err.response?.data?.message || 'Failed to send WhatsApp message';

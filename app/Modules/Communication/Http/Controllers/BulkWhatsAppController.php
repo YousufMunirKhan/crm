@@ -5,8 +5,8 @@ namespace App\Modules\Communication\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Communication\Models\WhatsAppCampaign;
 use App\Modules\Communication\Models\Communication;
-use App\Modules\Communication\Services\WhatsAppService;
 use App\Modules\Communication\Services\CommunicationService;
+use App\Modules\Communication\Services\WhatsAppServiceV2;
 use App\Modules\CRM\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 class BulkWhatsAppController extends Controller
 {
     public function __construct(
-        private WhatsAppService $whatsappService,
+        private WhatsAppServiceV2 $whatsappService,
         private CommunicationService $communicationService
     ) {}
 
@@ -151,17 +151,20 @@ class BulkWhatsAppController extends Controller
                 ]);
 
                 // Send message
-                $result = $this->whatsappService->sendMessage(
-                    $whatsappNumber,
-                    $data['message'],
-                    null,
-                    $mediaUrl ? url($mediaUrl) : null,
-                    $mediaType
-                );
+                if ($mediaUrl) {
+                    $wa = $this->whatsappService->sendMediaMessage(
+                        $customer,
+                        $mediaType,
+                        url($mediaUrl),
+                        $data['message']
+                    );
+                } else {
+                    $wa = $this->whatsappService->sendTextMessage($customer, $data['message']);
+                }
 
                 $communication->update([
                     'status' => 'sent',
-                    'provider_payload' => $result['response'] ?? null,
+                    'provider_payload' => $wa->meta_payload_json ?? null,
                 ]);
 
                 $results[] = [
@@ -346,17 +349,20 @@ class BulkWhatsAppController extends Controller
 
                     // Send message - convert relative URL to absolute
                     $fullMediaUrl = $campaign->media_url ? (str_starts_with($campaign->media_url, 'http') ? $campaign->media_url : url($campaign->media_url)) : null;
-                    $result = $this->whatsappService->sendMessage(
-                        $whatsappNumber,
-                        $campaign->message,
-                        null,
-                        $fullMediaUrl,
-                        $campaign->media_type
-                    );
+                    if ($fullMediaUrl) {
+                        $wa = $this->whatsappService->sendMediaMessage(
+                            $customer,
+                            $campaign->media_type,
+                            $fullMediaUrl,
+                            $campaign->message
+                        );
+                    } else {
+                        $wa = $this->whatsappService->sendTextMessage($customer, $campaign->message);
+                    }
 
                     $communication->update([
                         'status' => 'sent',
-                        'provider_payload' => $result['response'] ?? null,
+                        'provider_payload' => $wa->meta_payload_json ?? null,
                     ]);
 
                     $sentCount++;

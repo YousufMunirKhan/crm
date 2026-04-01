@@ -549,89 +549,10 @@
             <div v-show="activeSection === 'whatsapp'" class="bg-white rounded-xl shadow-sm p-6">
                 <div class="flex items-center gap-3 mb-6">
                     <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-                        <span class="text-lg">💬</span>
-                    </div>
-                    <div>
-                        <h2 class="text-lg font-semibold text-slate-900">WhatsApp Settings</h2>
-                        <p class="text-sm text-slate-500">Configure WhatsApp Business API</p>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="sm:col-span-2">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">WhatsApp Provider</label>
-                        <select
-                            v-model="whatsappSettings.whatsapp_provider"
-                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">Select Provider</option>
-                            <option value="twilio">Twilio</option>
-                            <option value="360dialog">360dialog</option>
-                            <option value="wati">WATI</option>
-                            <option value="other">Other / Direct Meta API</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Phone Number ID</label>
-                        <input
-                            v-model="whatsappSettings.whatsapp_phone_id"
-                            type="text"
-                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Phone Number ID from Meta"
-                        >
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Business Account ID</label>
-                        <input
-                            v-model="whatsappSettings.whatsapp_business_id"
-                            type="text"
-                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="WhatsApp Business Account ID"
-                        >
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Access Token</label>
-                        <input
-                            v-model="whatsappSettings.whatsapp_access_token"
-                            type="password"
-                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="••••••••"
-                        >
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">API Key</label>
-                        <input
-                            v-model="whatsappSettings.whatsapp_api_key"
-                            type="password"
-                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="••••••••"
-                        >
-                    </div>
-                </div>
-
-                <div class="mt-6 flex justify-end">
-                    <button
-                        @click="saveWhatsappSettings"
-                        :disabled="savingWhatsapp"
-                        class="px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
-                    >
-                        {{ savingWhatsapp ? 'Saving...' : 'Save WhatsApp Settings' }}
-                    </button>
-                </div>
-            </div>
-
-            <!-- WhatsApp Cloud API Section -->
-            <div v-show="activeSection === 'whatsapp-cloud'" class="bg-white rounded-xl shadow-sm p-6">
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
                         <span class="text-lg">☁️</span>
                     </div>
                     <div>
-                        <h2 class="text-lg font-semibold text-slate-900">WhatsApp Cloud API Settings</h2>
+                        <h2 class="text-lg font-semibold text-slate-900">WhatsApp Settings</h2>
                         <p class="text-sm text-slate-500">Configure Meta WhatsApp Business Cloud API</p>
                     </div>
                 </div>
@@ -643,7 +564,7 @@
                 <div v-else class="space-y-4">
                     <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                         <p class="text-sm text-blue-800">
-                            <strong>Note:</strong> This is the new WhatsApp Cloud API integration. Configure your Meta Business credentials here.
+                            <strong>Note:</strong> This is the single WhatsApp integration used by CRM sends and webhooks.
                             <br>
                             <span class="text-xs">Webhook URL: <code class="bg-blue-100 px-2 py-1 rounded">{{ webhookUrl }}</code></span>
                         </p>
@@ -902,7 +823,6 @@ const loading = ref(true);
 const saving = ref(false);
 const savingSmtp = ref(false);
 const savingSms = ref(false);
-const savingWhatsapp = ref(false);
 const savingWhatsappCloud = ref(false);
 const testingWhatsappCloud = ref(false);
 const whatsappCloudLoading = ref(false);
@@ -923,8 +843,7 @@ const sections = [
     { id: 'company', name: 'Company', icon: '🏢' },
     { id: 'email', name: 'Email/SMTP', icon: '📧' },
     { id: 'sms', name: 'SMS', icon: '📱' },
-    { id: 'whatsapp', name: 'WhatsApp (Legacy)', icon: '💬' },
-    { id: 'whatsapp-cloud', name: 'WhatsApp Cloud API', icon: '☁️' },
+    { id: 'whatsapp', name: 'WhatsApp', icon: '💬' },
     { id: 'facebook', name: 'Facebook', icon: '📘' },
     { id: 'pwa', name: 'PWA', icon: '📲' },
 ];
@@ -976,14 +895,6 @@ const smsSettings = reactive({
 
 const testSmsPhone = ref('');
 const testingSms = ref(false);
-
-const whatsappSettings = reactive({
-    whatsapp_provider: '',
-    whatsapp_api_key: '',
-    whatsapp_phone_id: '',
-    whatsapp_business_id: '',
-    whatsapp_access_token: '',
-});
 
 const whatsappCloudSettings = reactive({
     waba_id: '',
@@ -1051,13 +962,6 @@ const loadSettings = async () => {
         smsSettings.sms_secret_key = data.sms_secret_key || '';
         smsSettings.sms_sender_name = data.sms_sender_name || 'EPOS';
         smsSettings.sms_default_message = data.sms_default_message || '';
-        
-        // WhatsApp settings
-        whatsappSettings.whatsapp_provider = data.whatsapp_provider || '';
-        whatsappSettings.whatsapp_api_key = data.whatsapp_api_key || '';
-        whatsappSettings.whatsapp_phone_id = data.whatsapp_phone_id || '';
-        whatsappSettings.whatsapp_business_id = data.whatsapp_business_id || '';
-        whatsappSettings.whatsapp_access_token = data.whatsapp_access_token || '';
         
         // Facebook settings
         facebookSettings.facebook_app_id = data.facebook_app_id || '';
@@ -1282,19 +1186,6 @@ const testSmsConnection = async () => {
         toast.error(error.response?.data?.message || 'Failed to send test SMS');
     } finally {
         testingSms.value = false;
-    }
-};
-
-const saveWhatsappSettings = async () => {
-    savingWhatsapp.value = true;
-    try {
-        await axios.put('/api/settings/whatsapp', whatsappSettings);
-        toast.success('WhatsApp settings saved');
-    } catch (error) {
-        console.error('Failed to save WhatsApp settings:', error);
-        toast.error('Failed to save WhatsApp settings');
-    } finally {
-        savingWhatsapp.value = false;
     }
 };
 

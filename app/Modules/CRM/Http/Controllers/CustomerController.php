@@ -499,6 +499,7 @@ class CustomerController extends Controller
                     'subject' => $c->provider_payload['subject'] ?? null,
                     'message' => $c->message,
                     'status' => $c->status,
+                    'failure_hint' => $c->provider_payload['send_error_friendly'] ?? null,
                     'created_at' => $c->created_at->toIso8601String(),
                 ];
             });

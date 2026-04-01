@@ -144,6 +144,77 @@ class WhatsAppServiceV2
     }
 
     /**
+     * Send media message (image/video/document) with optional caption.
+     */
+    public function sendMediaMessage(
+        Customer $customer,
+        string $mediaType,
+        string $mediaUrl,
+        ?string $caption = null
+    ): WhatsAppMessage {
+        $settings = WhatsAppSetting::getActive();
+        if (!$settings || !$settings->is_enabled) {
+            throw new \Exception('WhatsApp is not enabled or configured');
+        }
+
+        $allowedTypes = ['image', 'video', 'document'];
+        if (!in_array($mediaType, $allowedTypes, true)) {
+            throw new \Exception('Unsupported media type for WhatsApp: ' . $mediaType);
+        }
+
+        $phoneE164 = $this->windowService->formatToE164(
+            $customer->whatsapp_number ?? $customer->phone
+        );
+        $conversation = $this->windowService->getOrCreateConversation($customer, $phoneE164);
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'to' => $phoneE164,
+            'type' => $mediaType,
+            $mediaType => [
+                'link' => $mediaUrl,
+            ],
+        ];
+
+        if ($caption) {
+            $payload[$mediaType]['caption'] = $caption;
+        }
+
+        $this->client->setAccessToken($settings->access_token);
+        $this->client->setGraphVersion($settings->graph_version);
+        $response = $this->client->sendMessage($settings->phone_number_id, $payload);
+
+        $whatsappMessage = WhatsAppMessage::create([
+            'conversation_id' => $conversation->id,
+            'direction' => 'OUT',
+            'to_e164' => $phoneE164,
+            'from_e164' => $settings->phone_number_id,
+            'type' => $mediaType,
+            'body_text' => $caption,
+            'meta_wamid' => $response['messages'][0]['id'] ?? null,
+            'status' => 'sent',
+            'meta_payload_json' => $response,
+        ]);
+
+        $this->windowService->updateWindowAfterOutbound($phoneE164, $customer);
+
+        return $whatsappMessage;
+    }
+
+    public function getAddPhoneNumberInfo(string $phone): array
+    {
+        $formatted = ltrim($this->windowService->formatToE164($phone), '+');
+        $appId = env('WHATSAPP_APP_ID', '968377435537226');
+        $addUrl = "https://developers.facebook.com/apps/{$appId}/whatsapp-business/cloud-api/get-started";
+
+        return [
+            'formatted_number' => $formatted,
+            'add_url' => $addUrl,
+            'instructions' => "Add this number ({$formatted}) to Meta Business Account allowed list",
+        ];
+    }
+
+    /**
      * Handle inbound message from webhook
      */
     public function handleInboundMessage(array $webhookData): ?WhatsAppMessage
