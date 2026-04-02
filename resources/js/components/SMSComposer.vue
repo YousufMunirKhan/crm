@@ -98,14 +98,19 @@ const savingNumber = ref(false);
 const error = ref(null);
 const messageTemplates = ref([]);
 
+function defaultSmsDestination(c) {
+    if (!c) return '';
+    return (c.sms_number || c.phone || c.whatsapp_number || '').trim();
+}
+
 onMounted(() => {
-    smsNumber.value = props.customer?.sms_number || props.customer?.phone || '';
+    smsNumber.value = defaultSmsDestination(props.customer);
     loadTemplates();
 });
 
 watch(() => props.customer, (newCustomer) => {
     if (newCustomer) {
-        smsNumber.value = newCustomer.sms_number || newCustomer.phone || '';
+        smsNumber.value = defaultSmsDestination(newCustomer);
     }
 }, { deep: true });
 

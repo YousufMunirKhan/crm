@@ -127,11 +127,24 @@ class CommunicationController extends Controller
             return response()->json(['message' => 'Message is required.'], 422);
         }
 
+        if ($data['channel'] === 'sms') {
+            $toOverride = trim((string) ($data['to_number'] ?? ''));
+            $hasDestination = $toOverride !== ''
+                || trim((string) ($customer->sms_number ?? '')) !== ''
+                || trim((string) ($customer->phone ?? '')) !== ''
+                || trim((string) ($customer->whatsapp_number ?? '')) !== '';
+            if (!$hasDestination) {
+                return response()->json([
+                    'message' => 'No number to send SMS to. Add phone, SMS number, or WhatsApp number on the customer, or enter a number in the SMS number field.',
+                ], 422);
+            }
+        }
+
         $options = [];
-        if ($data['channel'] === 'whatsapp' && !empty($data['to_number'])) {
-            $options['to_number'] = $data['to_number'];
-        } elseif ($data['channel'] === 'sms' && !empty($data['to_number'])) {
-            $options['to_number'] = $data['to_number'];
+        if ($data['channel'] === 'whatsapp' && trim((string) ($data['to_number'] ?? '')) !== '') {
+            $options['to_number'] = trim((string) $data['to_number']);
+        } elseif ($data['channel'] === 'sms' && trim((string) ($data['to_number'] ?? '')) !== '') {
+            $options['to_number'] = trim((string) $data['to_number']);
         } elseif ($data['channel'] === 'email' && !empty($data['to_email'])) {
             $options['to_email'] = $data['to_email'];
         }

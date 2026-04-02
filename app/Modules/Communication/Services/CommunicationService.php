@@ -6,7 +6,7 @@ use App\Modules\Communication\Models\Communication;
 use App\Modules\CRM\Models\Customer;
 use App\Modules\CRM\Models\Lead;
 use App\Modules\Communication\Jobs\SendCommunicationJob;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Bus;
 
 class CommunicationService
 {
@@ -28,10 +28,16 @@ class CommunicationService
             'provider_payload' => $options ?: null,
         ]);
 
-        // Dispatch async job to send via provider
-        dispatch(new SendCommunicationJob($communication->id, $options));
+        $job = new SendCommunicationJob($communication->id, $options);
+        // Default: run synchronously so messages are not stuck "pending" without `php artisan queue:work`.
+        // Set COMMUNICATION_QUEUE_ASYNC=true in .env and run a queue worker if you prefer async sends.
+        if (filter_var(env('COMMUNICATION_QUEUE_ASYNC', false), FILTER_VALIDATE_BOOLEAN)) {
+            dispatch($job);
+        } else {
+            Bus::dispatchSync($job);
+        }
 
-        return $communication;
+        return $communication->fresh();
     }
 
     public function handleInbound(array $data, string $channel): ?Communication

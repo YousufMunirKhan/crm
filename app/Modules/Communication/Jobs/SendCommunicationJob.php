@@ -43,7 +43,11 @@ class SendCommunicationJob implements ShouldQueue
                     break;
             }
 
-            $communication->update(['status' => 'sent']);
+            // Email leaves status as pending until here. SMS/WhatsApp often set status + payload inside the sender.
+            $communication->refresh();
+            if ($communication->status === 'pending') {
+                $communication->update(['status' => 'sent']);
+            }
         } catch (\Exception $e) {
             Log::error('Communication send failed', [
                 'communication_id' => $communication->id,
@@ -165,15 +169,32 @@ class SendCommunicationJob implements ShouldQueue
         try {
             $smsService = app(\App\Services\SmsService::class);
             
-            // Get phone number from options or customer
-            $phoneNumber = $this->options['to_number'] 
-                ?? $communication->customer->phone;
+            // Prefer explicit override, then SMS field, main phone, then WhatsApp (often the only mobile stored).
+            $cust = $communication->customer;
+            $toOverride = $this->options['to_number'] ?? null;
+            if (is_string($toOverride)) {
+                $toOverride = trim($toOverride);
+            }
+            if ($toOverride === '') {
+                $toOverride = null;
+            }
+            $phoneNumber = $toOverride
+                ?? $cust->sms_number
+                ?? $cust->phone
+                ?? $cust->whatsapp_number;
 
-            if (!$phoneNumber) {
+            if (!$phoneNumber || !is_string($phoneNumber) || trim($phoneNumber) === '') {
                 Log::warning('SMS skipped — no phone number', [
-                    'communication_id' => $communication->id
+                    'communication_id' => $communication->id,
                 ]);
-                $communication->update(['status' => 'failed']);
+                $communication->update([
+                    'status' => 'failed',
+                    'provider_payload' => array_merge(
+                        is_array($communication->provider_payload) ? $communication->provider_payload : [],
+                        ['send_error' => 'No SMS or mobile number on the customer. Add sms_number, phone, or whatsapp_number, or enter a number when sending.']
+                    ),
+                ]);
+
                 return;
             }
 
