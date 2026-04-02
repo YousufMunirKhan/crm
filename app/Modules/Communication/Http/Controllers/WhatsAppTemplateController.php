@@ -4,6 +4,8 @@ namespace App\Modules\Communication\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Communication\Exceptions\WhatsAppGraphApiException;
+use App\Modules\CRM\Models\Customer;
+use App\Modules\CRM\Models\Lead;
 use App\Modules\Communication\Models\WhatsAppTemplate;
 use App\Modules\Communication\Services\WhatsAppServiceV2;
 use App\Modules\Communication\Services\WhatsAppTemplateService;
@@ -56,6 +58,23 @@ class WhatsAppTemplateController extends Controller
         return response()->json($template);
     }
 
+    /**
+     * Which named parameters this template expects + CRM-suggested values for a customer (optional).
+     */
+    public function parameterHints(Request $request, $id, WhatsAppServiceV2 $whatsAppServiceV2)
+    {
+        $template = WhatsAppTemplate::findOrFail($id);
+        $request->validate([
+            'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
+            'lead_id' => ['nullable', 'integer', 'exists:leads,id'],
+        ]);
+
+        $customer = $request->filled('customer_id') ? Customer::find($request->integer('customer_id')) : null;
+        $lead = $request->filled('lead_id') ? Lead::find($request->integer('lead_id')) : null;
+
+        return response()->json($whatsAppServiceV2->getParameterHintsForTemplate($template, $customer, $lead));
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -100,14 +119,21 @@ class WhatsAppTemplateController extends Controller
             'template_params' => ['nullable', 'array'],
             'language' => ['nullable', 'string', 'max:32'],
             'sample_to' => ['nullable', 'string', 'max:32'],
+            'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
+            'lead_id' => ['nullable', 'integer', 'exists:leads,id'],
         ]);
 
         try {
+            $mergeCustomer = !empty($data['customer_id']) ? Customer::find($data['customer_id']) : null;
+            $mergeLead = ($mergeCustomer && !empty($data['lead_id'])) ? Lead::find($data['lead_id']) : null;
+
             $preview = $whatsAppServiceV2->previewTemplatePayload(
                 $data['template_name'],
                 $data['template_params'] ?? [],
                 $data['language'] ?? null,
                 $data['sample_to'] ?? null,
+                $mergeCustomer,
+                $mergeLead
             );
 
             return response()->json($preview);

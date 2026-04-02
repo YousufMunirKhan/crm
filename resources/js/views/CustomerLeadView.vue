@@ -468,6 +468,7 @@
                         :logs="communicationLogs.whatsapp"
                         @sent="handleMessageSent"
                         @saved="handleContactSaved"
+                        @refresh-logs="loadCommunicationLogsOnly"
                     />
                 </div>
             </div>
@@ -542,7 +543,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { useAuthStore } from '@/stores/auth';
@@ -582,6 +583,38 @@ const completeForm = ref({
 });
 const showAssignmentModal = ref(false);
 const communicationLogs = ref({ emails: [], sms: [], whatsapp: [] });
+
+/** Refetch only message logs (lightweight) — used for WhatsApp replies without full page reload */
+const loadCommunicationLogsOnly = async () => {
+    if (!route.params.id) {
+        return;
+    }
+    try {
+        const logsRes = await axios.get(`/api/customers/${route.params.id}/communication-logs`);
+        communicationLogs.value = logsRes.data || { emails: [], sms: [], whatsapp: [] };
+    } catch {
+        communicationLogs.value = { emails: [], sms: [], whatsapp: [] };
+    }
+};
+
+let communicationLogsPollTimer = null;
+
+function scheduleCommunicationLogsPolling() {
+    if (communicationLogsPollTimer) {
+        clearInterval(communicationLogsPollTimer);
+    }
+    communicationLogsPollTimer = setInterval(() => {
+        if (document.visibilityState === 'visible' && route.params.id) {
+            loadCommunicationLogsOnly();
+        }
+    }, 20000);
+}
+
+function onVisibilityRefreshLogs() {
+    if (document.visibilityState === 'visible' && route.params.id) {
+        loadCommunicationLogsOnly();
+    }
+}
 
 // Close Item Modal
 const showCloseItemModal = ref(false);
@@ -810,12 +843,7 @@ const loadData = async () => {
             invoices.value = data.invoices || [];
             timeline.value = data.timeline || [];
             appointments.value = data.appointments || [];
-            try {
-                const logsRes = await axios.get(`/api/customers/${route.params.id}/communication-logs`);
-                communicationLogs.value = logsRes.data || { emails: [], sms: [], whatsapp: [] };
-            } catch (_) {
-                communicationLogs.value = { emails: [], sms: [], whatsapp: [] };
-            }
+            await loadCommunicationLogsOnly();
         
         // Use customer_has_items and next_products from the response if available
         if (data.customer_has_items) {
@@ -898,5 +926,27 @@ const logout = () => {
     auth.logout();
 };
 
-onMounted(loadData);
+onMounted(async () => {
+    await loadData();
+    document.addEventListener('visibilitychange', onVisibilityRefreshLogs);
+    scheduleCommunicationLogsPolling();
+});
+
+watch(
+    () => route.params.id,
+    (newId, oldId) => {
+        if (newId && newId !== oldId) {
+            loadCommunicationLogsOnly();
+            scheduleCommunicationLogsPolling();
+        }
+    }
+);
+
+onUnmounted(() => {
+    document.removeEventListener('visibilitychange', onVisibilityRefreshLogs);
+    if (communicationLogsPollTimer) {
+        clearInterval(communicationLogsPollTimer);
+        communicationLogsPollTimer = null;
+    }
+});
 </script>

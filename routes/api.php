@@ -144,6 +144,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/templates', [\App\Modules\Communication\Http\Controllers\WhatsAppTemplateController::class, 'index']);
         Route::post('/templates', [\App\Modules\Communication\Http\Controllers\WhatsAppTemplateController::class, 'store']);
         Route::post('/templates/preview', [\App\Modules\Communication\Http\Controllers\WhatsAppTemplateController::class, 'preview']);
+        Route::get('/templates/{id}/parameter-hints', [\App\Modules\Communication\Http\Controllers\WhatsAppTemplateController::class, 'parameterHints']);
         Route::get('/templates/{id}', [\App\Modules\Communication\Http\Controllers\WhatsAppTemplateController::class, 'show']);
         Route::post('/templates/{id}/resubmit', [\App\Modules\Communication\Http\Controllers\WhatsAppTemplateController::class, 'resubmit']);
         Route::post('/templates/sync', [\App\Modules\Communication\Http\Controllers\WhatsAppTemplateController::class, 'sync']);

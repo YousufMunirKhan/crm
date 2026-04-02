@@ -2,9 +2,9 @@
     <div class="bg-slate-50/80 rounded-xl border border-slate-200 p-4 sm:p-5">
         <h3 class="text-base font-semibold text-slate-800 mb-2">WhatsApp</h3>
         <p class="text-xs text-slate-500 mb-3 leading-relaxed">
-            Outbound sends use your connected business number. <strong>Replies</strong> from the customer appear in the log below once Meta delivers webhooks to
+            Outbound sends use your connected business number. <strong>Replies</strong> show below as <span class="text-sky-800 font-medium">Received</span> once Meta posts to your
             <code class="text-[11px] bg-slate-100 px-1 rounded">/api/whatsapp/webhook</code>
-            (HTTPS, verify token in Settings → WhatsApp).
+            (HTTPS). This page refreshes the log every ~20s while open, when you return to the tab, or when you click Refresh.
         </p>
 
         <div class="mb-3">
@@ -27,7 +27,6 @@
             <select
                 v-model="selectedTemplateId"
                 class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                @change="onTemplateSelect"
             >
                 <option value="">— No template (normal text) —</option>
                 <option v-for="t in messageTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
@@ -45,6 +44,34 @@
             />
         </div>
         <p v-else class="mb-3 text-sm text-slate-500">This will send as an approved template message.</p>
+
+        <div
+            v-if="selectedTemplateId && templateHints?.uses_named_parameters && namedKeysCombined.length"
+            class="mb-3 rounded-lg border border-amber-100 bg-amber-50/80 p-3 space-y-2"
+        >
+            <div class="text-xs font-medium text-amber-900">Template variables (CRM auto-fills from customer — override if needed)</div>
+            <div
+                v-for="key in namedKeysCombined"
+                :key="key"
+                class="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-2 items-center text-xs"
+            >
+                <label class="text-slate-600 font-mono truncate sm:text-right sm:pr-2" :title="key">{{ key }}</label>
+                <input
+                    v-model="templateParamValues[key]"
+                    type="text"
+                    class="sm:col-span-2 w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm"
+                    :placeholder="templateHints?.suggested_template_params?.[key] || '—'"
+                    @input="onTemplateParamInput"
+                >
+            </div>
+        </div>
+        <p
+            v-else-if="selectedTemplateId && templateHints?.uses_named_parameters && !namedKeysCombined.length"
+            class="mb-3 text-xs text-slate-600 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+        >
+            Named template variables are filled from the customer automatically (e.g. <span class="font-mono">name</span> → customer name).
+            If Meta didn’t return variable names, run <strong>Sync from Meta</strong> on WhatsApp Templates. You can still send — defaults apply in the background.
+        </p>
 
         <div
             v-if="selectedTemplateId && (templatePreview || templatePreviewError)"
@@ -95,7 +122,16 @@
 
         <!-- WhatsApp log (outbound + inbound from webhook) -->
         <div v-if="logs && logs.length > 0" class="mt-4 pt-4 border-t border-slate-200">
-            <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">WhatsApp messages</h4>
+            <div class="flex items-center justify-between gap-2 mb-2">
+                <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide">WhatsApp messages</h4>
+                <button
+                    type="button"
+                    class="text-xs font-medium text-emerald-700 hover:text-emerald-900 underline decoration-emerald-600/50"
+                    @click="refreshLogs"
+                >
+                    Refresh log
+                </button>
+            </div>
             <ul class="space-y-2 max-h-56 overflow-y-auto">
                 <li
                     v-for="log in logs"
@@ -132,12 +168,21 @@
                 </li>
             </ul>
         </div>
-        <p v-else class="text-xs text-slate-500 mt-4 pt-4 border-t border-slate-200">No WhatsApp messages logged yet (replies need the Meta webhook configured).</p>
+        <div v-else class="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between gap-2">
+            <p class="text-xs text-slate-500">No WhatsApp messages logged yet — replies need the Meta webhook. Stay on this page or click refresh.</p>
+            <button
+                type="button"
+                class="shrink-0 text-xs font-medium text-emerald-700 hover:text-emerald-900 underline"
+                @click="refreshLogs"
+            >
+                Refresh
+            </button>
+        </div>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
 
 const props = defineProps({
@@ -146,7 +191,11 @@ const props = defineProps({
     logs: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(['sent', 'saved']);
+const emit = defineEmits(['sent', 'saved', 'refreshLogs']);
+
+function refreshLogs() {
+    emit('refreshLogs');
+}
 
 const whatsappNumber = ref('');
 const message = ref('');
@@ -160,6 +209,21 @@ const withinWindow = ref(true);
 const windowStatusMessage = ref('Checking WhatsApp window...');
 const templatePreview = ref(null);
 const templatePreviewError = ref(null);
+const templateHints = ref(null);
+const templateParamValues = ref({});
+
+const namedKeysCombined = computed(() => {
+    const h = templateHints.value;
+    if (!h) return [];
+    const a = [...(h.header_named_keys || []), ...(h.body_named_keys || [])];
+    return [...new Set(a)];
+});
+
+let previewDebounce = null;
+function onTemplateParamInput() {
+    if (previewDebounce) clearTimeout(previewDebounce);
+    previewDebounce = setTimeout(() => loadTemplatePreview(), 400);
+}
 
 onMounted(() => {
     whatsappNumber.value = props.customer?.whatsapp_number || props.customer?.phone || '';
@@ -174,8 +238,23 @@ watch(() => props.customer, (newCustomer) => {
     }
 }, { deep: true });
 
-watch([selectedTemplateId, () => whatsappNumber.value], () => {
-    loadTemplatePreview();
+watch(() => props.leadId, async () => {
+    if (selectedTemplateId.value) {
+        await loadTemplateHints();
+        await loadTemplatePreview();
+    }
+});
+
+watch([selectedTemplateId, () => whatsappNumber.value], async () => {
+    if (selectedTemplateId.value) {
+        await loadTemplateHints();
+        await loadTemplatePreview();
+    } else {
+        templateHints.value = null;
+        templateParamValues.value = {};
+        templatePreview.value = null;
+        templatePreviewError.value = null;
+    }
 });
 
 function formatLogDate(iso) {
@@ -190,9 +269,45 @@ async function loadTemplates() {
             params: { status: 'APPROVED', per_page: 200 },
         });
         messageTemplates.value = data?.data || [];
+        if (selectedTemplateId.value) {
+            await loadTemplateHints();
+        }
         await loadTemplatePreview();
     } catch (_) {
         messageTemplates.value = [];
+    }
+}
+
+async function loadTemplateHints() {
+    templateHints.value = null;
+    templateParamValues.value = {};
+    if (!selectedTemplateId.value || !props.customer?.id) {
+        return;
+    }
+    const t = messageTemplates.value.find((x) => x.id == selectedTemplateId.value);
+    if (!t?.id) {
+        return;
+    }
+    try {
+        const params = new URLSearchParams();
+        params.set('customer_id', String(props.customer.id));
+        if (props.leadId) {
+            params.set('lead_id', String(props.leadId));
+        }
+        const { data } = await axios.get(`/api/whatsapp/templates/${t.id}/parameter-hints?${params.toString()}`);
+        templateHints.value = data;
+        const keys = [
+            ...new Set([...(data.header_named_keys || []), ...(data.body_named_keys || [])]),
+        ];
+        const merged = { ...(data.suggested_template_params || {}) };
+        keys.forEach((k) => {
+            if (merged[k] === undefined || merged[k] === null) {
+                merged[k] = '';
+            }
+        });
+        templateParamValues.value = merged;
+    } catch {
+        templateHints.value = null;
     }
 }
 
@@ -209,9 +324,11 @@ async function loadTemplatePreview() {
     try {
         const { data } = await axios.post('/api/whatsapp/templates/preview', {
             template_name: t.name,
-            template_params: [],
+            template_params: { ...templateParamValues.value },
             language: t.language || undefined,
             sample_to: whatsappNumber.value?.trim() || undefined,
+            customer_id: props.customer.id,
+            lead_id: props.leadId || undefined,
         });
         templatePreview.value = data;
     } catch (err) {
@@ -219,9 +336,6 @@ async function loadTemplatePreview() {
     }
 }
 
-function onTemplateSelect() {
-    loadTemplatePreview();
-}
 
 async function loadWindowStatus() {
     if (!props.customer?.id) return;
@@ -272,17 +386,20 @@ async function sendMessage() {
         const selectedTemplate = messageTemplates.value.find((x) => x.id == selectedTemplateId.value);
         await axios.post('/api/communications', {
             customer_id: props.customer.id,
-            lead_id: props.leadId,
+            lead_id: props.leadId || undefined,
             channel: 'whatsapp',
             message: selectedTemplateId.value ? null : message.value.trim(),
             to_number: whatsappNumber.value.trim() || undefined,
             template_name: selectedTemplate?.name || undefined,
             language: selectedTemplate?.language || undefined,
+            ...(selectedTemplateId.value ? { template_params: { ...templateParamValues.value } } : {}),
         });
         message.value = '';
         selectedTemplateId.value = '';
         templatePreview.value = null;
         templatePreviewError.value = null;
+        templateHints.value = null;
+        templateParamValues.value = {};
         await loadWindowStatus();
         emit('sent');
     } catch (err) {

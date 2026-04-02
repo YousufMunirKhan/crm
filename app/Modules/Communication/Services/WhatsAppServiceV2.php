@@ -9,6 +9,7 @@ use App\Modules\Communication\Models\WhatsAppMessage;
 use App\Modules\Communication\Models\WhatsAppSetting;
 use App\Modules\Communication\Models\WhatsAppTemplate;
 use App\Modules\CRM\Models\Customer;
+use App\Modules\CRM\Models\Lead;
 use Illuminate\Support\Facades\Log;
 
 class WhatsAppServiceV2
@@ -236,7 +237,7 @@ class WhatsAppServiceV2
             if (!is_array($entry)) {
                 continue;
             }
-            $pname = $entry['param_name'] ?? $entry['name'] ?? null;
+            $pname = $entry['param_name'] ?? $entry['parameter_name'] ?? $entry['name'] ?? null;
             if ($pname === null || $pname === '') {
                 continue;
             }
@@ -356,9 +357,21 @@ class WhatsAppServiceV2
         string $templateName,
         array $templateParams = [],
         ?string $languageOverride = null,
-        ?string $sampleTo = null
+        ?string $sampleTo = null,
+        ?Customer $mergeFromCustomer = null,
+        ?Lead $mergeFromLead = null
     ): array {
         $templateModel = WhatsAppTemplate::where('name', $templateName)->firstOrFail();
+
+        $effectiveParams = $templateParams;
+        if ($mergeFromCustomer) {
+            $effectiveParams = $this->prepareTemplateParamsForSend(
+                $templateModel,
+                $mergeFromCustomer,
+                $mergeFromLead,
+                $templateParams
+            );
+        }
 
         $lang = $languageOverride ?: $templateModel->language ?: 'en_US';
         $componentsJson = is_array($templateModel->components_json) ? $templateModel->components_json : [];
@@ -368,7 +381,7 @@ class WhatsAppServiceV2
             ? $this->windowService->formatToE164($sampleTo)
             : '447000000000';
 
-        $queue = array_values($templateParams);
+        $queue = array_values($effectiveParams);
         $byType = [];
         foreach ($componentsJson as $c) {
             $t = strtoupper((string) ($c['type'] ?? ''));
@@ -385,7 +398,7 @@ class WhatsAppServiceV2
                 $headerPreview = '[' . $fmt . ' header — media is sent separately by Meta]';
             } else {
                 $ht = (string) ($h['text'] ?? '');
-                $hp = $this->buildHeaderParametersForSend($h, $templateParams, $queue, $parameterFormat);
+                $hp = $this->buildHeaderParametersForSend($h, $effectiveParams, $queue, $parameterFormat);
                 if ($hp !== null && $hp !== [] && $ht !== '') {
                     $headerPreview = $this->interpolateTemplateText($ht, $hp);
                 } else {
@@ -398,7 +411,7 @@ class WhatsAppServiceV2
         if (isset($byType['BODY'])) {
             $b = $byType['BODY'];
             $bt = (string) ($b['text'] ?? '');
-            $bp = $this->buildBodyParametersForSend($b, $templateParams, $queue, $parameterFormat);
+            $bp = $this->buildBodyParametersForSend($b, $effectiveParams, $queue, $parameterFormat);
             if ($bp !== null && $bp !== [] && $bt !== '') {
                 $bodyPreview = $this->interpolateTemplateText($bt, $bp);
             } else {
@@ -406,7 +419,7 @@ class WhatsAppServiceV2
             }
         }
 
-        $components = $this->buildTemplateComponentsForSend($componentsJson, $templateParams, $parameterFormat);
+        $components = $this->buildTemplateComponentsForSend($componentsJson, $effectiveParams, $parameterFormat);
 
         $templateBlock = [
             'name' => $templateName,
@@ -451,10 +464,240 @@ class WhatsAppServiceV2
             'header_preview' => $headerPreview,
             'body_preview' => $bodyPreview,
             'graph_payload' => $graphPayload,
+            'resolved_template_params' => $effectiveParams,
+            'crm_defaults_note' => $mergeFromCustomer
+                ? 'Values include CRM defaults for named parameters; your request template_params override the same keys.'
+                : 'Pass customer_id (and optional lead_id) to preview with the same CRM auto-fill used on send.',
             'url_button_dynamic_note' => $urlButtonVars
                 ? 'This template has URL buttons with {{variables}}. Remaining template_params values are consumed in button order after body/header — include them in template_params in the same order the CRM send uses.'
                 : null,
         ];
+    }
+
+    /**
+     * Common Meta variable names → customer/lead fields. Keys are lower-case friendly; matching is case-insensitive at send time.
+     *
+     * @return array<string, string>
+     */
+    public function buildCrmDefaultTemplateParams(Customer $customer, ?Lead $lead = null): array
+    {
+        $name = trim((string) ($customer->name ?? ''));
+        $parts = preg_split('/\s+/u', $name, -1, PREG_SPLIT_NO_EMPTY);
+        $first = $parts[0] ?? '';
+        $last = count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : '';
+
+        $phone = trim((string) ($customer->whatsapp_number ?? $customer->phone ?? ''));
+
+        $out = [
+            'name' => $name,
+            'customer_name' => $name,
+            'full_name' => $name,
+            'first_name' => $first,
+            'last_name' => $last,
+            'business_name' => trim((string) ($customer->business_name ?? '')),
+            'company' => trim((string) ($customer->business_name ?? '')),
+            'company_name' => trim((string) ($customer->business_name ?? '')),
+            'phone' => $phone,
+            'whatsapp' => $phone,
+            'mobile' => $phone,
+            'email' => trim((string) ($customer->email ?? '')),
+            'city' => trim((string) ($customer->city ?? '')),
+            'postcode' => trim((string) ($customer->postcode ?? '')),
+            'address' => trim((string) ($customer->address ?? '')),
+            'owner_name' => trim((string) ($customer->owner_name ?? '')),
+            'vat_number' => trim((string) ($customer->vat_number ?? '')),
+        ];
+
+        if ($lead) {
+            $lead->loadMissing('product');
+            $out['lead_source'] = trim((string) ($lead->source ?? ''));
+            $out['product_name'] = trim((string) ($lead->product->name ?? ''));
+            $out['pipeline_value'] = $lead->pipeline_value !== null ? (string) $lead->pipeline_value : '';
+        }
+
+        return $out;
+    }
+
+    public function templateExpectsNamedBodyParams(WhatsAppTemplate $tm): bool
+    {
+        if (strtoupper((string) ($tm->parameter_format ?? '')) === 'NAMED') {
+            return true;
+        }
+        if (strtoupper((string) ($tm->parameter_format ?? '')) === 'POSITIONAL') {
+            return false;
+        }
+
+        $components = is_array($tm->components_json) ? $tm->components_json : [];
+        foreach ($components as $c) {
+            if (strtoupper((string) ($c['type'] ?? '')) !== 'BODY') {
+                continue;
+            }
+            $example = $c['example'] ?? [];
+            if (!empty($example['body_text_named_params']) && is_array($example['body_text_named_params'])) {
+                return true;
+            }
+            $text = (string) ($c['text'] ?? '');
+            if ($text !== '' && preg_match_all('/\{\{([^}]+)\}\}/', $text, $m)) {
+                foreach ($m[1] as $ph) {
+                    if (!preg_match('/^\d+$/', trim((string) $ph))) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<int|string, mixed>  $userParams
+     * @return array<int|string, mixed>
+     */
+    public function prepareTemplateParamsForSend(
+        WhatsAppTemplate $templateModel,
+        Customer $customer,
+        ?Lead $lead,
+        array $userParams
+    ): array {
+        if (!$this->templateExpectsNamedBodyParams($templateModel)) {
+            return $userParams;
+        }
+
+        return array_merge($this->buildCrmDefaultTemplateParams($customer, $lead), $userParams);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getParameterHintsForTemplate(
+        WhatsAppTemplate $template,
+        ?Customer $customer = null,
+        ?Lead $lead = null
+    ): array {
+        $bodyKeys = $this->listBodyNamedParameterKeys($template);
+        $headerKeys = $this->listHeaderNamedParameterKeys($template);
+        $suggested = [];
+        if ($customer && ($bodyKeys !== [] || $headerKeys !== [] || $this->templateExpectsNamedBodyParams($template))) {
+            $suggested = $this->prepareTemplateParamsForSend($template, $customer, $lead, []);
+        }
+
+        return [
+            'template_name' => $template->name,
+            'language' => $template->language,
+            'parameter_format' => $template->parameter_format,
+            'uses_named_parameters' => $this->templateExpectsNamedBodyParams($template),
+            'body_named_keys' => $bodyKeys,
+            'header_named_keys' => $headerKeys,
+            'suggested_template_params' => $suggested,
+            'discoverable_crm_keys' => [
+                'name', 'customer_name', 'full_name', 'first_name', 'last_name',
+                'business_name', 'company', 'company_name',
+                'phone', 'whatsapp', 'mobile',
+                'email', 'city', 'postcode', 'address', 'owner_name', 'vat_number',
+                'lead_source', 'product_name', 'pipeline_value',
+            ],
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function listBodyNamedParameterKeys(WhatsAppTemplate $tm): array
+    {
+        $components = is_array($tm->components_json) ? $tm->components_json : [];
+        $fmt = $tm->parameter_format ? strtoupper($tm->parameter_format) : null;
+
+        foreach ($components as $c) {
+            if (strtoupper((string) ($c['type'] ?? '')) !== 'BODY') {
+                continue;
+            }
+
+            $keys = [];
+            if ($fmt !== 'POSITIONAL') {
+                $rows = $c['example']['body_text_named_params'] ?? null;
+                if (is_array($rows)) {
+                    foreach ($rows as $row) {
+                        if (!is_array($row)) {
+                            continue;
+                        }
+                        $p = $row['param_name'] ?? $row['parameter_name'] ?? $row['name'] ?? null;
+                        if ($p !== null && $p !== '') {
+                            $keys[] = (string) $p;
+                        }
+                    }
+                }
+            }
+
+            if ($keys !== []) {
+                return array_values(array_unique($keys));
+            }
+
+            $text = (string) ($c['text'] ?? '');
+            if ($text !== '' && preg_match_all('/\{\{([^}]+)\}\}/', $text, $m)) {
+                foreach ($m[1] as $ph) {
+                    $ph = trim((string) $ph);
+                    if ($ph !== '' && !preg_match('/^\d+$/', $ph)) {
+                        $keys[] = $ph;
+                    }
+                }
+            }
+
+            return array_values(array_unique($keys));
+        }
+
+        return [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function listHeaderNamedParameterKeys(WhatsAppTemplate $tm): array
+    {
+        $components = is_array($tm->components_json) ? $tm->components_json : [];
+        $fmt = $tm->parameter_format ? strtoupper($tm->parameter_format) : null;
+
+        foreach ($components as $c) {
+            if (strtoupper((string) ($c['type'] ?? '')) !== 'HEADER') {
+                continue;
+            }
+            if (strtoupper((string) ($c['format'] ?? 'TEXT')) !== 'TEXT') {
+                return [];
+            }
+
+            $keys = [];
+            if ($fmt !== 'POSITIONAL') {
+                $rows = $c['example']['header_text_named_params'] ?? null;
+                if (is_array($rows)) {
+                    foreach ($rows as $row) {
+                        if (!is_array($row)) {
+                            continue;
+                        }
+                        $p = $row['param_name'] ?? $row['parameter_name'] ?? $row['name'] ?? null;
+                        if ($p !== null && $p !== '') {
+                            $keys[] = (string) $p;
+                        }
+                    }
+                }
+            }
+
+            if ($keys !== []) {
+                return array_values(array_unique($keys));
+            }
+
+            $text = (string) ($c['text'] ?? '');
+            if ($text !== '' && preg_match_all('/\{\{([^}]+)\}\}/', $text, $m)) {
+                foreach ($m[1] as $ph) {
+                    $ph = trim((string) $ph);
+                    if ($ph !== '' && !preg_match('/^\d+$/', $ph)) {
+                        $keys[] = $ph;
+                    }
+                }
+            }
+
+            return array_values(array_unique($keys));
+        }
+
+        return [];
     }
 
     /**
@@ -464,7 +707,8 @@ class WhatsAppServiceV2
         Customer $customer,
         string $templateName,
         array $templateParams = [],
-        ?string $language = 'en_US'
+        ?string $language = 'en_US',
+        ?Lead $lead = null
     ): WhatsAppMessage {
         $settings = WhatsAppSetting::getActive();
         if (!$settings || !$settings->is_enabled) {
@@ -481,9 +725,14 @@ class WhatsAppServiceV2
         $lang = $templateModel?->language ?: $language ?: 'en_US';
         $componentsJson = is_array($templateModel?->components_json) ? $templateModel->components_json : null;
 
+        $resolvedParams = $templateParams;
+        if ($templateModel) {
+            $resolvedParams = $this->prepareTemplateParamsForSend($templateModel, $customer, $lead, $templateParams);
+        }
+
         $components = $this->buildTemplateComponentsForSend(
             $componentsJson,
-            $templateParams,
+            $resolvedParams,
             $templateModel?->parameter_format
         );
 
@@ -516,7 +765,7 @@ class WhatsAppServiceV2
             'from_e164' => $settings->phone_number_id,
             'type' => 'template',
             'template_name' => $templateName,
-            'template_params_json' => $templateParams,
+            'template_params_json' => $resolvedParams,
             'meta_wamid' => $response['messages'][0]['id'] ?? null,
             'status' => 'sent',
             'meta_payload_json' => $response,

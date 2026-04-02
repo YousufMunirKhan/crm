@@ -3,6 +3,7 @@
 namespace App\Modules\Communication\Jobs;
 
 use App\Modules\Communication\Exceptions\WhatsAppGraphApiException;
+use App\Modules\CRM\Models\Lead;
 use App\Modules\Communication\Models\Communication;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -120,11 +121,13 @@ class SendCommunicationJob implements ShouldQueue
 
             $templateName = trim((string) ($this->options['template_name'] ?? ''));
             if ($templateName !== '') {
+                $lead = $communication->lead_id ? Lead::find($communication->lead_id) : null;
                 $waMessage = $whatsappService->sendTemplateMessage(
                     $customer,
                     $templateName,
                     $this->options['template_params'] ?? [],
                     $this->options['language'] ?? 'en_US',
+                    $lead
                 );
                 $result = [
                     'message_id' => $waMessage->meta_wamid,

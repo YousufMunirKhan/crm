@@ -11,6 +11,7 @@ use App\Modules\Communication\Support\WhatsAppApiErrorResponse;
 use App\Modules\Communication\Services\ConversationWindowService;
 use App\Modules\Communication\Services\WhatsAppServiceV2;
 use App\Modules\CRM\Models\Customer;
+use App\Modules\CRM\Models\Lead;
 use Illuminate\Http\Request;
 
 class WhatsAppMessageController extends Controller
@@ -85,6 +86,7 @@ class WhatsAppMessageController extends Controller
     {
         $data = $request->validate([
             'customer_id' => ['required', 'exists:customers,id'],
+            'lead_id' => ['nullable', 'exists:leads,id'],
             'template_name' => ['required', 'string'],
             'template_params' => ['nullable', 'array'],
             'language' => ['nullable', 'string'],
@@ -94,6 +96,7 @@ class WhatsAppMessageController extends Controller
         $data['language'] = $data['language'] ?? 'en_US';
 
         $customer = Customer::findOrFail($data['customer_id']);
+        $lead = isset($data['lead_id']) ? Lead::findOrFail($data['lead_id']) : null;
 
         // Verify template exists and is approved
         $template = WhatsAppTemplate::where('name', $data['template_name'])
@@ -111,7 +114,8 @@ class WhatsAppMessageController extends Controller
                 $customer,
                 $data['template_name'],
                 $data['template_params'] ?? [],
-                $data['language'] ?? 'en_US'
+                $data['language'] ?? 'en_US',
+                $lead
             );
 
             return response()->json([

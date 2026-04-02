@@ -89,7 +89,8 @@ class CommunicationController extends Controller
                         $customer,
                         $templateName,
                         $data['template_params'] ?? [],
-                        $data['language'] ?? 'en_US'
+                        $data['language'] ?? 'en_US',
+                        $lead
                     );
                     $storedMessage = '[Template] ' . $templateName;
                 } else {
