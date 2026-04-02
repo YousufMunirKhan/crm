@@ -44,6 +44,27 @@
         </div>
         <p v-else class="mb-3 text-sm text-slate-500">This will send as an approved template message.</p>
 
+        <div
+            v-if="selectedTemplateId && (templatePreview || templatePreviewError)"
+            class="mb-3 rounded-lg border border-slate-200 bg-white p-3 text-xs space-y-2"
+        >
+            <div class="font-semibold text-slate-700">What the CRM sends (preview)</div>
+            <p v-if="templatePreviewError" class="text-amber-700">{{ templatePreviewError }}</p>
+            <template v-else-if="templatePreview">
+                <p class="text-slate-500">{{ templatePreview.sample_to_note }}</p>
+                <div v-if="templatePreview.header_preview" class="text-slate-600">
+                    <span class="text-slate-400">Header:</span> {{ templatePreview.header_preview }}
+                </div>
+                <div class="rounded-md bg-emerald-50 border border-emerald-100 px-2 py-2 text-slate-900 whitespace-pre-wrap">
+                    {{ templatePreview.body_preview || '—' }}
+                </div>
+                <details class="text-slate-500">
+                    <summary class="cursor-pointer text-slate-600">Exact Graph JSON</summary>
+                    <pre class="mt-1 p-2 bg-slate-900 text-emerald-100 rounded text-[10px] overflow-x-auto max-h-40">{{ JSON.stringify(templatePreview.graph_payload, null, 2) }}</pre>
+                </details>
+            </template>
+        </div>
+
         <div class="flex flex-wrap gap-2 mb-4">
             <button
                 @click="sendMessage"
@@ -126,6 +147,8 @@ const metaError = ref(null);
 const messageTemplates = ref([]);
 const withinWindow = ref(true);
 const windowStatusMessage = ref('Checking WhatsApp window...');
+const templatePreview = ref(null);
+const templatePreviewError = ref(null);
 
 onMounted(() => {
     whatsappNumber.value = props.customer?.whatsapp_number || props.customer?.phone || '';
@@ -140,6 +163,10 @@ watch(() => props.customer, (newCustomer) => {
     }
 }, { deep: true });
 
+watch([selectedTemplateId, () => whatsappNumber.value], () => {
+    loadTemplatePreview();
+});
+
 function formatLogDate(iso) {
     if (!iso) return '—';
     const d = new Date(iso);
@@ -152,13 +179,37 @@ async function loadTemplates() {
             params: { status: 'APPROVED', per_page: 200 },
         });
         messageTemplates.value = data?.data || [];
+        await loadTemplatePreview();
     } catch (_) {
         messageTemplates.value = [];
     }
 }
 
+async function loadTemplatePreview() {
+    templatePreview.value = null;
+    templatePreviewError.value = null;
+    if (!selectedTemplateId.value) {
+        return;
+    }
+    const t = messageTemplates.value.find((x) => x.id == selectedTemplateId.value);
+    if (!t?.name) {
+        return;
+    }
+    try {
+        const { data } = await axios.post('/api/whatsapp/templates/preview', {
+            template_name: t.name,
+            template_params: [],
+            language: t.language || undefined,
+            sample_to: whatsappNumber.value?.trim() || undefined,
+        });
+        templatePreview.value = data;
+    } catch (err) {
+        templatePreviewError.value = err.response?.data?.message || 'Could not load template preview';
+    }
+}
+
 function onTemplateSelect() {
-    // Template messages are rendered by Meta; no local body preview required.
+    loadTemplatePreview();
 }
 
 async function loadWindowStatus() {
@@ -219,6 +270,8 @@ async function sendMessage() {
         });
         message.value = '';
         selectedTemplateId.value = '';
+        templatePreview.value = null;
+        templatePreviewError.value = null;
         await loadWindowStatus();
         emit('sent');
     } catch (err) {

@@ -3,9 +3,13 @@
 namespace App\Modules\Communication\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Communication\Exceptions\WhatsAppGraphApiException;
 use App\Modules\Communication\Models\WhatsAppTemplate;
+use App\Modules\Communication\Services\WhatsAppServiceV2;
 use App\Modules\Communication\Services\WhatsAppTemplateService;
+use App\Modules\Communication\Support\WhatsAppApiErrorResponse;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class WhatsAppTemplateController extends Controller
 {
@@ -68,9 +72,50 @@ class WhatsAppTemplateController extends Controller
         // Set default language if not provided
         $data['language'] = $data['language'] ?? 'en_US';
 
-        $template = $this->templateService->createTemplate($data);
+        try {
+            $template = $this->templateService->createTemplate($data);
 
-        return response()->json($template, 201);
+            return response()->json($template, 201);
+        } catch (WhatsAppGraphApiException $e) {
+            $body = WhatsAppApiErrorResponse::fromThrowable($e, 'Meta rejected template creation');
+
+            return response()->json(array_merge($body, [
+                'template' => WhatsAppTemplate::where('name', $data['name'])->first(),
+            ]), 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'template' => WhatsAppTemplate::where('name', $data['name'])->first(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Preview the exact Graph API message payload and filled body/header the CRM would send.
+     */
+    public function preview(Request $request, WhatsAppServiceV2 $whatsAppServiceV2)
+    {
+        $data = $request->validate([
+            'template_name' => ['required', 'string', 'max:512'],
+            'template_params' => ['nullable', 'array'],
+            'language' => ['nullable', 'string', 'max:32'],
+            'sample_to' => ['nullable', 'string', 'max:32'],
+        ]);
+
+        try {
+            $preview = $whatsAppServiceV2->previewTemplatePayload(
+                $data['template_name'],
+                $data['template_params'] ?? [],
+                $data['language'] ?? null,
+                $data['sample_to'] ?? null,
+            );
+
+            return response()->json($preview);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Template not found in CRM. Sync templates from Meta or create it here first.',
+            ], 404);
+        }
     }
 
     public function resubmit($id)

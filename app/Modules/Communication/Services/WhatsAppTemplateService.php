@@ -36,6 +36,45 @@ class WhatsAppTemplateService
     }
 
     /**
+     * Meta requires example text for BODY variables. Adds body_text examples for {{1}}, {{2}}, …
+     *
+     * @param  array<int, array<string, mixed>>  $components
+     * @return array<int, array<string, mixed>>
+     */
+    public function enrichComponentsWithVariableExamples(array $components): array
+    {
+        $out = [];
+        foreach ($components as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            if (strtoupper((string) ($c['type'] ?? '')) !== 'BODY') {
+                $out[] = $c;
+
+                continue;
+            }
+
+            $text = (string) ($c['text'] ?? '');
+            if ($text === '' || !preg_match_all('/\{\{(\d+)\}\}/', $text, $m)) {
+                $out[] = $c;
+
+                continue;
+            }
+
+            $nums = array_unique(array_map('intval', $m[1]));
+            sort($nums, SORT_NUMERIC);
+            $row = [];
+            foreach ($nums as $n) {
+                $row[] = 'Sample_' . $n;
+            }
+            $c['example'] = ['body_text' => [$row]];
+            $out[] = $c;
+        }
+
+        return $out;
+    }
+
+    /**
      * Create template locally and submit to Meta
      */
     public function createTemplate(array $data): WhatsAppTemplate
@@ -45,7 +84,7 @@ class WhatsAppTemplateService
             throw new \Exception('WhatsApp is not enabled or WABA ID not configured');
         }
 
-        $components = $data['components'] ?? [];
+        $components = $this->enrichComponentsWithVariableExamples($data['components'] ?? []);
 
         // Create template locally
         $template = WhatsAppTemplate::create([
@@ -81,7 +120,10 @@ class WhatsAppTemplateService
                 'template_id' => $template->id,
                 'error' => $e->getMessage(),
             ]);
-            // Template remains in PENDING status
+            $template->update([
+                'rejection_reason' => $e->getMessage(),
+            ]);
+            throw $e;
         }
 
         return $template;

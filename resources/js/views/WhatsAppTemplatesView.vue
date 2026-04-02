@@ -3,7 +3,9 @@
         <div class="flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold text-slate-900">WhatsApp Templates</h1>
-                <p class="text-sm text-slate-600 mt-1">Manage WhatsApp message templates for Meta Cloud API</p>
+                <p class="text-sm text-slate-600 mt-1">
+                    Create templates here (submitted to Meta for approval) or sync from Meta. Use <strong>View</strong> to see the exact JSON payload the CRM sends when messaging.
+                </p>
             </div>
             <div class="flex gap-3">
                 <button
@@ -158,7 +160,20 @@
                             class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Hello {{1}}, welcome to our service!"
                         ></textarea>
-                        <p class="text-xs text-slate-500 mt-1">Use {{1}}, {{2}}, etc. for variables</p>
+                        <p class="text-xs text-slate-500 mt-1" v-pre>
+                            Use {{1}}, {{2}} for variables — the CRM adds sample examples for Meta automatically. Named fields (e.g. {{name}}) are better created in Meta Business Suite, then sync here.
+                        </p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Footer (optional)</label>
+                        <input
+                            v-model="newTemplate.footerText"
+                            type="text"
+                            maxlength="60"
+                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Reply STOP to opt out"
+                        >
+                        <p class="text-xs text-slate-500 mt-1">Max 60 characters — no variables in footer.</p>
                     </div>
                 </div>
                 <div class="p-6 border-t border-slate-200 flex justify-end gap-3">
@@ -175,6 +190,88 @@
                     >
                         {{ creating ? 'Creating...' : 'Create Template' }}
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- View / Preview modal -->
+        <div v-if="viewingTemplate" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[92vh] overflow-y-auto">
+                <div class="p-6 border-b border-slate-200 flex justify-between items-start gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900">{{ viewingTemplate.name }}</h2>
+                        <p class="text-sm text-slate-500 mt-1">
+                            {{ viewingTemplate.status }} · {{ viewingTemplate.language }} · {{ viewingTemplate.category }}
+                        </p>
+                    </div>
+                    <button type="button" class="text-slate-500 hover:text-slate-800 text-2xl leading-none" @click="closeViewModal" aria-label="Close">×</button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <p class="text-sm text-slate-600">
+                        Below is what this CRM builds for Meta’s <code class="text-xs bg-slate-100 px-1 rounded">/messages</code> call.
+                        Adjust sample variables and recipient, then refresh preview.
+                    </p>
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Sample “to” number (E.164, optional)</label>
+                            <input
+                                v-model="previewSampleTo"
+                                type="text"
+                                class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                                placeholder="447700900123"
+                                @change="runPreview"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Parameter format (from sync)</label>
+                            <div class="text-sm text-slate-800 py-2">{{ viewingTemplate.parameter_format || '—' }}</div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">
+                            <span v-pre>template_params</span> (JSON: <span v-pre>["val1","val2"]</span> for positional, or <span v-pre>{"name":"x"}</span> for named)
+                        </label>
+                        <textarea
+                            v-model="previewParamsJson"
+                            rows="3"
+                            class="w-full px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg"
+                            placeholder='["Alice","Tuesday"] or {"customer_name":"Alice"}'
+                            @keydown.ctrl.enter="runPreview"
+                        ></textarea>
+                    </div>
+                    <button
+                        type="button"
+                        class="px-4 py-2 bg-slate-900 text-white text-sm rounded-lg hover:bg-slate-800 disabled:opacity-50"
+                        :disabled="previewLoading"
+                        @click="runPreview"
+                    >
+                        {{ previewLoading ? 'Loading…' : 'Refresh preview' }}
+                    </button>
+                    <div v-if="previewError" class="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{{ previewError }}</div>
+                    <div v-if="previewResult" class="space-y-4 border-t border-slate-200 pt-4">
+                        <p class="text-xs text-slate-500">{{ previewResult.sample_to_note }}</p>
+                        <div v-if="previewResult.header_preview" class="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                            <div class="text-xs font-semibold text-slate-500 uppercase mb-1">Header preview</div>
+                            <div class="text-sm text-slate-900 whitespace-pre-wrap">{{ previewResult.header_preview }}</div>
+                        </div>
+                        <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-3">
+                            <div class="text-xs font-semibold text-emerald-800 uppercase mb-1">Body preview (as filled by CRM)</div>
+                            <div class="text-sm text-slate-900 whitespace-pre-wrap">{{ previewResult.body_preview || '(no body text)' }}</div>
+                        </div>
+                        <div v-if="previewResult.url_button_dynamic_note" class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded p-2">
+                            {{ previewResult.url_button_dynamic_note }}
+                        </div>
+                        <details open class="text-sm">
+                            <summary class="cursor-pointer font-medium text-slate-700">graph_payload (exact JSON)</summary>
+                            <pre class="mt-2 p-3 bg-slate-900 text-emerald-100 text-xs rounded-lg overflow-x-auto whitespace-pre-wrap break-all">{{ JSON.stringify(previewResult.graph_payload, null, 2) }}</pre>
+                        </details>
+                    </div>
+                    <div v-if="viewingTemplate.components_json?.length" class="border-t border-slate-200 pt-4">
+                        <details class="text-sm">
+                            <summary class="cursor-pointer font-medium text-slate-700">Stored components (from CRM / Meta sync)</summary>
+                            <pre class="mt-2 p-3 bg-slate-50 text-xs rounded-lg overflow-x-auto whitespace-pre-wrap break-all">{{ JSON.stringify(viewingTemplate.components_json, null, 2) }}</pre>
+                        </details>
+                    </div>
                 </div>
             </div>
         </div>
@@ -204,7 +301,24 @@ const newTemplate = reactive({
     category: 'TRANSACTIONAL',
     language: 'en_US',
     bodyText: '',
+    footerText: '',
 });
+
+const viewingTemplate = ref(null);
+const previewParamsJson = ref('[]');
+const previewSampleTo = ref('');
+const previewResult = ref(null);
+const previewLoading = ref(false);
+const previewError = ref(null);
+
+function slugTemplateName(raw) {
+    return raw
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_]+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+}
 
 const loadTemplates = async () => {
     loading.value = true;
@@ -241,40 +355,61 @@ const syncTemplates = async () => {
 };
 
 const createTemplate = async () => {
-    if (!newTemplate.name || !newTemplate.bodyText) {
-        toast.error('Please fill in all required fields');
+    if (!newTemplate.name?.trim() || !newTemplate.bodyText?.trim()) {
+        toast.error('Please fill in name and body');
+        return;
+    }
+
+    const name = slugTemplateName(newTemplate.name);
+    if (!name) {
+        toast.error('Template name must contain letters or numbers (use underscores)');
         return;
     }
 
     creating.value = true;
     try {
-        // Build components array for Meta API
         const components = [
             {
                 type: 'BODY',
-                text: newTemplate.bodyText,
-            }
+                text: newTemplate.bodyText.trim(),
+            },
         ];
+        if (newTemplate.footerText?.trim()) {
+            components.push({
+                type: 'FOOTER',
+                text: newTemplate.footerText.trim().slice(0, 60),
+            });
+        }
 
         await axios.post('/api/whatsapp/templates', {
-            name: newTemplate.name,
+            name,
             category: newTemplate.category,
             language: newTemplate.language,
-            components: components,
+            components,
         });
 
-        toast.success('Template created and submitted to Meta');
+        toast.success('Template saved and submitted to Meta (pending approval)');
         showCreateModal.value = false;
         Object.assign(newTemplate, {
             name: '',
             category: 'TRANSACTIONAL',
             language: 'en_US',
             bodyText: '',
+            footerText: '',
         });
         await loadTemplates();
     } catch (error) {
         console.error('Failed to create template:', error);
-        toast.error(error.response?.data?.message || 'Failed to create template');
+        const d = error.response?.data;
+        let msg = d?.message || 'Failed to create template';
+        if (d?.meta_error?.message) {
+            msg += ` — ${d.meta_error.message}`;
+        }
+        if (d?.hint) {
+            msg += ` ${d.hint}`;
+        }
+        toast.error(msg);
+        await loadTemplates();
     } finally {
         creating.value = false;
     }
@@ -291,9 +426,60 @@ const resubmitTemplate = async (id) => {
     }
 };
 
+async function openViewModal(template) {
+    viewingTemplate.value = template;
+    previewParamsJson.value = '[]';
+    previewSampleTo.value = '';
+    previewResult.value = null;
+    previewError.value = null;
+    await runPreview();
+}
+
+function closeViewModal() {
+    viewingTemplate.value = null;
+    previewResult.value = null;
+    previewError.value = null;
+}
+
+async function runPreview() {
+    if (!viewingTemplate.value) {
+        return;
+    }
+    previewLoading.value = true;
+    previewError.value = null;
+    let params;
+    try {
+        params = JSON.parse(previewParamsJson.value || '[]');
+    } catch {
+        previewLoading.value = false;
+        previewError.value = 'Invalid JSON in template_params';
+        return;
+    }
+    if (params !== null && typeof params === 'object' && !Array.isArray(params)) {
+        params = { ...params };
+    } else if (!Array.isArray(params)) {
+        previewLoading.value = false;
+        previewError.value = 'template_params must be a JSON array or object';
+        return;
+    }
+    try {
+        const { data } = await axios.post('/api/whatsapp/templates/preview', {
+            template_name: viewingTemplate.value.name,
+            template_params: params,
+            language: viewingTemplate.value.language || undefined,
+            sample_to: previewSampleTo.value?.trim() || undefined,
+        });
+        previewResult.value = data;
+    } catch (err) {
+        previewResult.value = null;
+        previewError.value = err.response?.data?.message || err.message || 'Preview failed';
+    } finally {
+        previewLoading.value = false;
+    }
+}
+
 const viewTemplate = (template) => {
-    // You can implement a detailed view modal here
-    alert(`Template: ${template.name}\nStatus: ${template.status}\nCategory: ${template.category}`);
+    openViewModal(template);
 };
 
 watch([() => filters.status, () => filters.category], () => {

@@ -323,6 +323,139 @@ class WhatsAppServiceV2
     }
 
     /**
+     * Replace {{...}} placeholders in order using Cloud API parameter objects (text field).
+     *
+     * @param  array<int, array<string, mixed>>  $parameters
+     */
+    private function interpolateTemplateText(string $text, array $parameters): string
+    {
+        if ($text === '' || $parameters === []) {
+            return $text;
+        }
+
+        $i = 0;
+
+        return (string) preg_replace_callback('/\{\{[^}]+\}\}/', function () use (&$i, $parameters) {
+            $t = (string) ($parameters[$i]['text'] ?? '');
+            $i++;
+
+            return $t !== '' ? $t : '{{?}}';
+        }, $text);
+    }
+
+    /**
+     * Preview the exact JSON payload the CRM would send to Meta (no HTTP call).
+     * Use this to verify template name, language, components, and sample variable values.
+     *
+     * @param  array<int|string, mixed>  $templateParams
+     * @return array<string, mixed>
+     */
+    public function previewTemplatePayload(
+        string $templateName,
+        array $templateParams = [],
+        ?string $languageOverride = null,
+        ?string $sampleTo = null
+    ): array {
+        $templateModel = WhatsAppTemplate::where('name', $templateName)->firstOrFail();
+
+        $lang = $languageOverride ?: $templateModel->language ?: 'en_US';
+        $componentsJson = is_array($templateModel->components_json) ? $templateModel->components_json : [];
+        $parameterFormat = $templateModel->parameter_format;
+
+        $toE164 = $sampleTo
+            ? $this->windowService->formatToE164($sampleTo)
+            : '447000000000';
+
+        $queue = array_values($templateParams);
+        $byType = [];
+        foreach ($componentsJson as $c) {
+            $t = strtoupper((string) ($c['type'] ?? ''));
+            if ($t === 'HEADER' || $t === 'BODY') {
+                $byType[$t] = $c;
+            }
+        }
+
+        $headerPreview = null;
+        if (isset($byType['HEADER'])) {
+            $h = $byType['HEADER'];
+            $fmt = strtoupper((string) ($h['format'] ?? 'TEXT'));
+            if ($fmt !== 'TEXT') {
+                $headerPreview = '[' . $fmt . ' header — media is sent separately by Meta]';
+            } else {
+                $ht = (string) ($h['text'] ?? '');
+                $hp = $this->buildHeaderParametersForSend($h, $templateParams, $queue, $parameterFormat);
+                if ($hp !== null && $hp !== [] && $ht !== '') {
+                    $headerPreview = $this->interpolateTemplateText($ht, $hp);
+                } else {
+                    $headerPreview = $ht !== '' ? $ht : null;
+                }
+            }
+        }
+
+        $bodyPreview = null;
+        if (isset($byType['BODY'])) {
+            $b = $byType['BODY'];
+            $bt = (string) ($b['text'] ?? '');
+            $bp = $this->buildBodyParametersForSend($b, $templateParams, $queue, $parameterFormat);
+            if ($bp !== null && $bp !== [] && $bt !== '') {
+                $bodyPreview = $this->interpolateTemplateText($bt, $bp);
+            } else {
+                $bodyPreview = $bt !== '' ? $bt : null;
+            }
+        }
+
+        $components = $this->buildTemplateComponentsForSend($componentsJson, $templateParams, $parameterFormat);
+
+        $templateBlock = [
+            'name' => $templateName,
+            'language' => ['code' => $lang],
+        ];
+        if ($components !== null) {
+            $templateBlock['components'] = $components;
+        }
+
+        $graphPayload = [
+            'messaging_product' => 'whatsapp',
+            'to' => $toE164,
+            'type' => 'template',
+            'template' => $templateBlock,
+        ];
+
+        $urlButtonVars = false;
+        foreach ($componentsJson as $c) {
+            if (strtoupper((string) ($c['type'] ?? '')) !== 'BUTTONS') {
+                continue;
+            }
+            foreach ($c['buttons'] ?? [] as $btn) {
+                if (!is_array($btn)) {
+                    continue;
+                }
+                $url = (string) ($btn['url'] ?? '');
+                if ($url !== '' && preg_match('/\{\{[^}]+\}\}/', $url)) {
+                    $urlButtonVars = true;
+                    break 2;
+                }
+            }
+        }
+
+        return [
+            'template_name' => $templateName,
+            'language' => $lang,
+            'parameter_format' => $parameterFormat,
+            'sample_to_e164' => $toE164,
+            'sample_to_note' => $sampleTo
+                ? 'Uses your sample number for preview only; real sends use the customer WhatsApp number.'
+                : 'Placeholder number — pass sample_to (e.g. customer number) to match a real send.',
+            'header_preview' => $headerPreview,
+            'body_preview' => $bodyPreview,
+            'graph_payload' => $graphPayload,
+            'url_button_dynamic_note' => $urlButtonVars
+                ? 'This template has URL buttons with {{variables}}. Remaining template_params values are consumed in button order after body/header — include them in template_params in the same order the CRM send uses.'
+                : null,
+        ];
+    }
+
+    /**
      * Send template message (can be sent outside window)
      */
     public function sendTemplateMessage(
