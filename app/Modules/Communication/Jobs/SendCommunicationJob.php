@@ -2,6 +2,7 @@
 
 namespace App\Modules\Communication\Jobs;
 
+use App\Modules\Communication\Exceptions\WhatsAppGraphApiException;
 use App\Modules\Communication\Models\Communication;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -49,6 +50,9 @@ class SendCommunicationJob implements ShouldQueue
             ]);
             $payload = is_array($communication->provider_payload) ? $communication->provider_payload : [];
             $payload['send_error'] = $e->getMessage();
+            if ($e instanceof WhatsAppGraphApiException) {
+                $payload['meta_error'] = $e->toMetaErrorArray();
+            }
             if ($communication->channel === 'whatsapp') {
                 $payload['send_error_friendly'] = self::whatsappMetaUserHint($e->getMessage());
             }

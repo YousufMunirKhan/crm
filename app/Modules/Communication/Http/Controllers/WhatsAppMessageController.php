@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Modules\Communication\Models\WhatsAppConversation;
 use App\Modules\Communication\Models\WhatsAppMessage;
 use App\Modules\Communication\Models\WhatsAppTemplate;
+use App\Modules\Communication\Exceptions\WhatsAppGraphApiException;
+use App\Modules\Communication\Support\WhatsAppApiErrorResponse;
 use App\Modules\Communication\Services\ConversationWindowService;
 use App\Modules\Communication\Services\WhatsAppServiceV2;
 use App\Modules\CRM\Models\Customer;
@@ -72,9 +74,10 @@ class WhatsAppMessageController extends Controller
                 ], 422);
             }
 
-            return response()->json([
-                'message' => 'Failed to send message: ' . $e->getMessage(),
-            ], 500);
+            $body = WhatsAppApiErrorResponse::fromThrowable($e, 'Failed to send message');
+            $status = $e instanceof WhatsAppGraphApiException ? 422 : 500;
+
+            return response()->json($body, $status);
         }
     }
 
@@ -116,9 +119,10 @@ class WhatsAppMessageController extends Controller
                 'whatsapp_message' => $message,
             ], 201);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to send template message: ' . $e->getMessage(),
-            ], 500);
+            $body = WhatsAppApiErrorResponse::fromThrowable($e, 'Failed to send template message');
+            $status = $e instanceof WhatsAppGraphApiException ? 422 : 500;
+
+            return response()->json($body, $status);
         }
     }
 

@@ -493,13 +493,17 @@ class CustomerController extends Controller
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($c) {
+                $payload = is_array($c->provider_payload) ? $c->provider_payload : [];
+
                 return [
                     'id' => 'comm-' . $c->id,
                     'channel' => $c->channel,
-                    'subject' => $c->provider_payload['subject'] ?? null,
+                    'subject' => $payload['subject'] ?? null,
                     'message' => $c->message,
                     'status' => $c->status,
-                    'failure_hint' => $c->provider_payload['send_error_friendly'] ?? null,
+                    'failure_hint' => $payload['send_error_friendly'] ?? null,
+                    'send_error' => $c->status === 'failed' ? ($payload['send_error'] ?? null) : null,
+                    'meta_error' => $c->status === 'failed' ? ($payload['meta_error'] ?? null) : null,
                     'created_at' => $c->created_at->toIso8601String(),
                 ];
             });

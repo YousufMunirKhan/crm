@@ -4,8 +4,9 @@ namespace App\Modules\Communication\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Communication\Models\Communication;
-use App\Modules\Communication\Jobs\SendCommunicationJob;
 use App\Modules\Communication\Services\CommunicationService;
+use App\Modules\Communication\Exceptions\WhatsAppGraphApiException;
+use App\Modules\Communication\Support\WhatsAppApiErrorResponse;
 use App\Modules\Communication\Services\ConversationWindowService;
 use App\Modules\Communication\Services\WhatsAppServiceV2;
 use App\Modules\CRM\Models\Customer;
@@ -113,10 +114,10 @@ class CommunicationController extends Controller
 
                 return response()->json($communication->load(['customer', 'lead']), 201);
             } catch (\Exception $e) {
-                return response()->json([
-                    'message' => 'Failed to send WhatsApp message: ' . $e->getMessage(),
-                    'hint' => SendCommunicationJob::whatsappMetaUserHint($e->getMessage()),
-                ], 500);
+                $body = WhatsAppApiErrorResponse::fromThrowable($e);
+                $status = $e instanceof WhatsAppGraphApiException ? 422 : 500;
+
+                return response()->json($body, $status);
             }
         }
 

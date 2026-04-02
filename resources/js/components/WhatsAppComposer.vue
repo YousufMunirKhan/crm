@@ -57,6 +57,18 @@
         <div v-if="error" class="mb-3 text-sm text-red-600 bg-red-50 p-2 rounded">
             {{ error }}
         </div>
+        <div
+            v-if="metaError && (metaError.code != null || metaError.message || metaError.fbtrace_id)"
+            class="mb-3 text-xs text-red-900 bg-red-50 border border-red-100 rounded p-2 font-mono space-y-1"
+        >
+            <div class="font-sans font-semibold text-red-800">Meta API error</div>
+            <div v-if="metaError.http_status != null">HTTP {{ metaError.http_status }}</div>
+            <div v-if="metaError.code != null">code: {{ metaError.code }}</div>
+            <div v-if="metaError.error_subcode != null">error_subcode: {{ metaError.error_subcode }}</div>
+            <div v-if="metaError.type">type: {{ metaError.type }}</div>
+            <div v-if="metaError.message" class="whitespace-pre-wrap break-words">{{ metaError.message }}</div>
+            <div v-if="metaError.fbtrace_id" class="text-slate-600">fbtrace_id: {{ metaError.fbtrace_id }}</div>
+        </div>
 
         <!-- WhatsApp log -->
         <div v-if="logs && logs.length > 0" class="mt-4 pt-4 border-t border-slate-200">
@@ -71,6 +83,19 @@
                     <div class="text-xs text-slate-500 mt-0.5">{{ formatLogDate(log.created_at) }} · {{ log.status }}</div>
                     <p v-if="log.status === 'failed' && log.failure_hint" class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-2">
                         {{ log.failure_hint }}
+                    </p>
+                    <div
+                        v-if="log.status === 'failed' && log.meta_error && (log.meta_error.code != null || log.meta_error.message || log.meta_error.fbtrace_id || log.meta_error.http_status != null)"
+                        class="text-xs text-red-900 bg-red-50 border border-red-100 rounded px-2 py-1.5 mt-2 font-mono space-y-0.5"
+                    >
+                        <div v-if="log.meta_error.http_status != null">HTTP {{ log.meta_error.http_status }}</div>
+                        <div v-if="log.meta_error.code != null">code {{ log.meta_error.code }}</div>
+                        <div v-if="log.meta_error.error_subcode != null">subcode {{ log.meta_error.error_subcode }}</div>
+                        <div v-if="log.meta_error.message" class="whitespace-pre-wrap break-words">{{ log.meta_error.message }}</div>
+                        <div v-if="log.meta_error.fbtrace_id" class="text-slate-600">fbtrace {{ log.meta_error.fbtrace_id }}</div>
+                    </div>
+                    <p v-else-if="log.status === 'failed' && log.send_error" class="text-xs text-red-800 font-mono mt-2 whitespace-pre-wrap break-words">
+                        {{ log.send_error }}
                     </p>
                 </li>
             </ul>
@@ -97,6 +122,7 @@ const selectedTemplateId = ref('');
 const sending = ref(false);
 const savingNumber = ref(false);
 const error = ref(null);
+const metaError = ref(null);
 const messageTemplates = ref([]);
 const withinWindow = ref(true);
 const windowStatusMessage = ref('Checking WhatsApp window...');
@@ -179,6 +205,7 @@ async function sendMessage() {
     }
     sending.value = true;
     error.value = null;
+    metaError.value = null;
     try {
         const selectedTemplate = messageTemplates.value.find((x) => x.id == selectedTemplateId.value);
         await axios.post('/api/communications', {
@@ -198,6 +225,7 @@ async function sendMessage() {
         const d = err.response?.data;
         const hint = d?.hint ? ` ${d.hint}` : '';
         error.value = (d?.message || 'Failed to send WhatsApp message') + hint;
+        metaError.value = d?.meta_error && typeof d.meta_error === 'object' ? d.meta_error : null;
     } finally {
         sending.value = false;
     }

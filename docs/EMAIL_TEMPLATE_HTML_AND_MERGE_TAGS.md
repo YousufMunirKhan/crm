@@ -159,6 +159,7 @@ Implementation lives mainly in:
 2. Put merge tags **verbatim** in attributes: `src="{{header_logo_url}}"`, `href="{{company_website}}"`.
 3. **Scripts** are stripped on import (`<script>` removed).
 4. Prefer **Extract `<body>` only** for full pages; otherwise you may nest invalid HTML inside the CRM wrapper.
+5. **Preview vs real inboxes:** The template builder preview uses a normal browser (Chrome), so **flexbox**, **gap** / **row-gap** / **column-gap**, and very new properties (e.g. `white-space-collapse`, `text-wrap-mode`) can look perfect there but **break in Outlook** and some webmail. For multi-column rows (cards, offer + CTA, footer logo | URL | icons), use nested **`<table role="presentation">`** layouts with **`<tr><td>`**, not `display:flex`. See `resources/email-templates/welcome-grapes-outlook-safe.html` for a table-based version of a typical welcome layout.
 
 ---
 
