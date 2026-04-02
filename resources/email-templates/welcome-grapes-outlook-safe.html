@@ -1,0 +1,170 @@
+<!--
+  Table-based welcome email — same look as Grapes “div + flex” exports, but works in
+  Outlook and most webmail. Copy into raw HTML / Import HTML (body fragment).
+
+  Why the preview looked fine but the inbox broke:
+  - In-app preview = full Chrome engine (flexbox, gap, modern shorthand).
+  - Outlook (Word engine) and many clients ignore flex, gap, row-gap/column-gap,
+    white-space-collapse, text-wrap-mode, etc.
+
+  Rule of thumb: major rows = <table role="presentation">, not display:flex.
+-->
+<table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="margin:0;padding:0;background-color:#ffffff;">
+  <tr>
+    <td align="center" style="padding:0;">
+      <table width="600" cellpadding="0" cellspacing="0" border="0" role="presentation" style="max-width:600px;width:100%;background-color:#ffffff;">
+
+        <tr>
+          <td style="height:10px;line-height:10px;font-size:0;background-color:#004aad;">&nbsp;</td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:15px 10px;background-color:#ffffff;">
+            <img src="{{header_logo_url}}" alt="Switch &amp; Save" width="300" style="display:block;max-width:300px;width:100%;height:auto;margin:0 auto;">
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:28px 20px;background-color:#0078ba;color:#ffffff;font-family:Arial,Helvetica,sans-serif;">
+            <p style="margin:0;font-size:22px;font-weight:bold;line-height:1.3;">Welcome to SWITCH&amp;SAVE, {{first_name}}</p>
+            <p style="margin:12px 0 20px;font-size:15px;line-height:1.4;">Smart Solutions to grow your business - all in one place</p>
+            <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="margin:0 auto;">
+              <tr>
+                <td align="center" style="background-color:#3db271;border-radius:12px;">
+                  <a href="{{company_website}}" style="display:inline-block;padding:14px 36px;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;font-family:Arial,Helvetica,sans-serif;">Book Your Free Demo</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="height:8px;line-height:8px;font-size:0;background-color:#004aad;">&nbsp;</td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:15px;background-color:#ffffff;font-family:Arial,Helvetica,sans-serif;">
+            <p style="margin:0 0 10px;font-size:18px;font-weight:bold;color:#222222;">Trusted by leading partners</p>
+            <img src="https://switchandsavecrm.sspos.co.uk/storage/email-templates/BHt8gja1pxN2MbymY17gH35dEPF3qPC0RfA21eMQ.png" alt="Partners" width="500" style="display:block;max-width:500px;width:100%;height:auto;margin:0 auto;">
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:10px;background-color:#ffffff;">
+            <table class="cols-3" width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
+              <tr>
+                <td width="33%" valign="top" style="padding:5px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="background-color:#0078ba;border-radius:16px;">
+                    <tr>
+                      <td align="center" style="padding:14px 10px;min-height:130px;font-family:Arial,Helvetica,sans-serif;">
+                        <img src="https://cdn-icons-png.flaticon.com/512/1048/1048945.png" alt="EPOS" width="30" height="30" style="display:block;margin:0 auto 6px;">
+                        <p style="margin:0 0 6px;font-size:13px;font-weight:bold;line-height:1.3;color:#ffffff;">EPOS &amp; PAYMENT<br>SOLUTIONS</p>
+                        <p style="margin:0;font-size:11px;line-height:1.4;color:#ffffff;">Smart payment solutions for your business</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+                <td width="33%" valign="top" style="padding:5px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="background-color:#3db271;border-radius:16px;">
+                    <tr>
+                      <td align="center" style="padding:14px 10px;min-height:130px;font-family:Arial,Helvetica,sans-serif;">
+                        <img src="https://cdn-icons-png.flaticon.com/512/2331/2331941.png" alt="Funding" width="30" height="30" style="display:block;margin:0 auto 6px;">
+                        <p style="margin:0 0 6px;font-size:13px;font-weight:bold;line-height:1.3;color:#ffffff;">Business Funding</p>
+                        <p style="margin:0;font-size:11px;line-height:1.4;color:#ffffff;">Fast access to working capital</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+                <td width="33%" valign="top" style="padding:5px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="background-color:#0078ba;border-radius:16px;">
+                    <tr>
+                      <td align="center" style="padding:14px 10px;min-height:130px;font-family:Arial,Helvetica,sans-serif;">
+                        <img src="https://cdn-icons-png.flaticon.com/512/1055/1055687.png" alt="Website" width="30" height="30" style="display:block;margin:0 auto 6px;">
+                        <p style="margin:0 0 6px;font-size:13px;font-weight:bold;line-height:1.3;color:#ffffff;">Website &amp; App<br>Development</p>
+                        <p style="margin:0;font-size:11px;line-height:1.4;color:#ffffff;">Grow your digital presence</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:15px;background-color:#ffffff;">
+            <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="margin:0 auto;background-color:#004aad;border-radius:25px;">
+              <tr>
+                <td style="padding:10px 20px;font-family:Arial,Helvetica,sans-serif;">
+                  <a href="tel:{{company_phone}}" style="color:#ffffff;text-decoration:none;font-size:13px;">📞 Call: {{company_phone}}</a>
+                  <span class="contact-divider" style="color:#ffffff;margin:0 8px;font-size:13px;">|</span>
+                  <a href="https://wa.me/{{company_phone}}" style="color:#ffffff;text-decoration:none;font-size:13px;">WhatsApp</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:20px;background-color:#0078ba;color:#ffffff;font-family:Arial,Helvetica,sans-serif;">
+            <table class="offer-row" width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
+              <tr>
+                <td valign="middle" style="padding:0 12px 0 0;">
+                  <p style="margin:0;font-size:16px;font-weight:bold;line-height:1.4;">🎉 WELCOME OFFER 🎉<br>Get 20% off your EPOS Setup</p>
+                  <p style="margin:10px 0 0;font-size:13px;line-height:1.4;">Complete EPOS packages with everything you need to get started</p>
+                </td>
+                <td valign="middle" align="right" class="offer-btn-cell" style="white-space:nowrap;">
+                  <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="margin:0 0 0 auto;">
+                    <tr>
+                      <td align="center" style="background-color:#3db271;border-radius:10px;">
+                        <a href="{{company_website}}" style="display:inline-block;padding:12px 18px;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;font-family:Arial,Helvetica,sans-serif;">Book Your Free Demo</a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:10px;background-color:#004aad;">
+            <table class="footer-row" width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
+              <tr>
+                <td valign="middle" style="padding:0 8px 0 0;">
+                  <img src="{{logo_src}}" alt="Switch &amp; Save" width="110" style="display:block;width:110px;max-width:110px;height:auto;border:0;outline:none;">
+                </td>
+                <td valign="middle" align="center" style="padding:0 8px;">
+                  <a href="{{company_website}}" style="font-size:13px;font-weight:bold;color:#ffffff;text-decoration:none;font-family:Arial,Helvetica,sans-serif;">www.switch-and-save.uk</a>
+                </td>
+                <td valign="middle" align="right" style="padding:0;">
+                  <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="margin-left:auto;">
+                    <tr>
+                      <td style="padding:0 3px;"><a href="{{social_facebook_url}}"><img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" alt="Facebook" width="22" height="22" style="display:block;border:0;"></a></td>
+                      <td style="padding:0 3px;"><a href="{{social_linkedin_url}}"><img src="https://cdn-icons-png.flaticon.com/512/733/733561.png" alt="LinkedIn" width="22" height="22" style="display:block;border:0;"></a></td>
+                      <td style="padding:0 3px;"><a href="{{social_tiktok_url}}"><img src="https://cdn-icons-png.flaticon.com/512/3046/3046121.png" alt="TikTok" width="22" height="22" style="display:block;border:0;"></a></td>
+                      <td style="padding:0 3px;"><a href="{{social_instagram_url}}"><img src="https://cdn-icons-png.flaticon.com/512/733/733558.png" alt="Instagram" width="22" height="22" style="display:block;border:0;"></a></td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+
+<style type="text/css">
+@media only screen and (max-width: 480px) {
+  .cols-3 td { display: block !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; }
+  .offer-row td { display: block !important; width: 100% !important; text-align: center !important; padding-right: 0 !important; }
+  .offer-btn-cell { text-align: center !important; padding-top: 12px !important; white-space: normal !important; }
+  .offer-btn-cell table { margin-left: auto !important; margin-right: auto !important; }
+  .footer-row td { display: block !important; width: 100% !important; text-align: center !important; padding: 6px 0 !important; }
+  .footer-row td table { margin-left: auto !important; margin-right: auto !important; }
+  .contact-divider { display: none !important; }
+}
+</style>
