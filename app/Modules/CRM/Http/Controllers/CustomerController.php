@@ -498,6 +498,7 @@ class CustomerController extends Controller
                 return [
                     'id' => 'comm-' . $c->id,
                     'channel' => $c->channel,
+                    'direction' => $c->direction,
                     'subject' => $payload['subject'] ?? null,
                     'message' => $c->message,
                     'status' => $c->status,

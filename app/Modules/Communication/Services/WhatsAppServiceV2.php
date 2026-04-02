@@ -2,6 +2,8 @@
 
 namespace App\Modules\Communication\Services;
 
+use App\Events\NewMessageReceived;
+use App\Modules\Communication\Models\Communication;
 use App\Modules\Communication\Models\WhatsAppConversation;
 use App\Modules\Communication\Models\WhatsAppMessage;
 use App\Modules\Communication\Models\WhatsAppSetting;
@@ -598,6 +600,75 @@ class WhatsAppServiceV2
     }
 
     /**
+     * Match Meta sender id (digits, no +) to a customer even if CRM stores +44, spaces, or leading 0.
+     */
+    private function findCustomerForWhatsAppFrom(string $from): ?Customer
+    {
+        foreach (array_unique(array_filter([$from, ltrim($from, '+')])) as $variant) {
+            $c = Customer::where('whatsapp_number', $variant)
+                ->orWhere('phone', $variant)
+                ->first();
+            if ($c) {
+                return $c;
+            }
+        }
+
+        try {
+            $target = $this->windowService->formatToE164($from);
+        } catch (\Throwable) {
+            $target = preg_replace('/\D/', '', $from);
+        }
+
+        foreach (
+            Customer::query()
+                ->select(['id', 'name', 'phone', 'whatsapp_number'])
+                ->where(function ($q) {
+                    $q->whereNotNull('whatsapp_number')->orWhereNotNull('phone');
+                })
+                ->cursor() as $c
+        ) {
+            foreach (array_filter([$c->whatsapp_number, $c->phone]) as $num) {
+                if ($num === '' || $num === null) {
+                    continue;
+                }
+                try {
+                    if ($this->windowService->formatToE164((string) $num) === $target) {
+                        return $c;
+                    }
+                } catch (\Throwable) {
+                    continue;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $message
+     */
+    private function inboundMessageBodySummary(string $type, array $message): string
+    {
+        return match ($type) {
+            'text' => (string) ($message['text']['body'] ?? ''),
+            'image' => trim((string) ($message['image']['caption'] ?? '')) !== ''
+                ? (string) $message['image']['caption']
+                : '[Image]',
+            'video' => trim((string) ($message['video']['caption'] ?? '')) !== ''
+                ? (string) $message['video']['caption']
+                : '[Video]',
+            'audio' => '[Audio]',
+            'document' => (string) ($message['document']['filename'] ?? '[Document]'),
+            'sticker' => '[Sticker]',
+            'location' => '[Location]',
+            'contacts' => '[Contact card]',
+            'interactive' => '[Interactive]',
+            'button' => (string) ($message['button']['text'] ?? '[Button reply]'),
+            default => '[' . $type . ']',
+        };
+    }
+
+    /**
      * Handle inbound message from webhook
      */
     public function handleInboundMessage(array $webhookData): ?WhatsAppMessage
@@ -624,17 +695,23 @@ class WhatsAppServiceV2
             $from = $message['from'] ?? null;
             $wamid = $message['id'] ?? null;
             $type = $message['type'] ?? 'text';
-            $text = $message['text']['body'] ?? '';
-            $timestamp = $message['timestamp'] ?? null;
+            $bodySummary = $this->inboundMessageBodySummary($type, $message);
 
             if (!$from || !$wamid) {
                 return null;
             }
 
-            // Find or create customer
-            $customer = Customer::where('whatsapp_number', $from)
-                ->orWhere('phone', $from)
-                ->first();
+            $customer = $this->findCustomerForWhatsAppFrom($from);
+            if (!$customer) {
+                $profileName = is_array($contacts) ? ($contacts['profile']['name'] ?? null) : null;
+                $customer = Customer::firstOrCreate(
+                    ['whatsapp_number' => $from],
+                    [
+                        'name' => $profileName ?: $from,
+                        'phone' => $from,
+                    ]
+                );
+            }
 
             // Get or create conversation
             $conversation = $this->windowService->updateWindowAfterInbound($from, $customer);
@@ -652,11 +729,29 @@ class WhatsAppServiceV2
                 'from_e164' => $from,
                 'to_e164' => $value['metadata']['phone_number_id'] ?? null,
                 'type' => $type,
-                'body_text' => $text,
+                'body_text' => $bodySummary,
                 'meta_wamid' => $wamid,
                 'status' => 'delivered',
                 'meta_payload_json' => $message,
             ]);
+
+            // Surface in customer timeline + Send Messages log (communications list)
+            $comm = Communication::create([
+                'customer_id' => $customer->id,
+                'lead_id' => null,
+                'channel' => 'whatsapp',
+                'direction' => 'inbound',
+                'message' => $bodySummary !== '' ? $bodySummary : ('[' . $type . ']'),
+                'status' => 'delivered',
+                'provider_payload' => [
+                    'source' => 'whatsapp_cloud_webhook',
+                    'meta_wamid' => $wamid,
+                    'whatsapp_message_id' => $whatsappMessage->id,
+                    'type' => $type,
+                ],
+            ]);
+
+            event(new NewMessageReceived($comm));
 
             return $whatsappMessage;
         } catch (\Exception $e) {

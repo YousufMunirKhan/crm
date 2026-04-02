@@ -2,7 +2,9 @@
     <div class="bg-slate-50/80 rounded-xl border border-slate-200 p-4 sm:p-5">
         <h3 class="text-base font-semibold text-slate-800 mb-2">WhatsApp</h3>
         <p class="text-xs text-slate-500 mb-3 leading-relaxed">
-            You are messaging the customer directly from your connected business WhatsApp number. There is no extra “permission” step in the CRM—if Meta blocks a send, it is their platform rule (see the log hint on failed rows).
+            Outbound sends use your connected business number. <strong>Replies</strong> from the customer appear in the log below once Meta delivers webhooks to
+            <code class="text-[11px] bg-slate-100 px-1 rounded">/api/whatsapp/webhook</code>
+            (HTTPS, verify token in Settings → WhatsApp).
         </p>
 
         <div class="mb-3">
@@ -91,16 +93,25 @@
             <div v-if="metaError.fbtrace_id" class="text-slate-600">fbtrace_id: {{ metaError.fbtrace_id }}</div>
         </div>
 
-        <!-- WhatsApp log -->
+        <!-- WhatsApp log (outbound + inbound from webhook) -->
         <div v-if="logs && logs.length > 0" class="mt-4 pt-4 border-t border-slate-200">
-            <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Sent WhatsApp</h4>
-            <ul class="space-y-2 max-h-48 overflow-y-auto">
+            <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">WhatsApp messages</h4>
+            <ul class="space-y-2 max-h-56 overflow-y-auto">
                 <li
                     v-for="log in logs"
                     :key="log.id"
-                    class="text-sm p-2 rounded bg-white border border-slate-100"
+                    class="text-sm p-2 rounded border"
+                    :class="log.direction === 'inbound' ? 'bg-sky-50 border-sky-100' : 'bg-white border-slate-100'"
                 >
-                    <div class="text-slate-800 line-clamp-2">{{ log.message || '(No message)' }}</div>
+                    <div class="flex items-center gap-2 mb-0.5">
+                        <span
+                            class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded"
+                            :class="log.direction === 'inbound' ? 'bg-sky-200 text-sky-900' : 'bg-slate-200 text-slate-700'"
+                        >
+                            {{ log.direction === 'inbound' ? 'Received' : 'Sent' }}
+                        </span>
+                    </div>
+                    <div class="text-slate-800 line-clamp-3 whitespace-pre-wrap">{{ log.message || '(No message)' }}</div>
                     <div class="text-xs text-slate-500 mt-0.5">{{ formatLogDate(log.created_at) }} · {{ log.status }}</div>
                     <p v-if="log.status === 'failed' && log.failure_hint" class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-2">
                         {{ log.failure_hint }}
@@ -121,7 +132,7 @@
                 </li>
             </ul>
         </div>
-        <p v-else class="text-xs text-slate-500 mt-4 pt-4 border-t border-slate-200">No WhatsApp messages sent yet.</p>
+        <p v-else class="text-xs text-slate-500 mt-4 pt-4 border-t border-slate-200">No WhatsApp messages logged yet (replies need the Meta webhook configured).</p>
     </div>
 </template>
 
