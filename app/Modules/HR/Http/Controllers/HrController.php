@@ -79,6 +79,97 @@ class HrController extends Controller
         return response()->json($attendance);
     }
 
+    /**
+     * Grouped bar chart data: work hours per day per user (only users with at least one check-in in range).
+     * Presets: 3d (last 3 calendar days), 7d, month (start of month through today).
+     */
+    public function attendanceChartSummary(Request $request)
+    {
+        $user = $request->user();
+        $isPrivileged = $user->isRole('Admin') || $user->isRole('Manager') || $user->isRole('System Admin');
+
+        $preset = $request->get('preset', '3d');
+        if (! in_array($preset, ['3d', '7d', 'month'], true)) {
+            $preset = '3d';
+        }
+
+        $end = Carbon::today();
+        if ($preset === '3d') {
+            $start = Carbon::today()->copy()->subDays(2);
+        } elseif ($preset === '7d') {
+            $start = Carbon::today()->copy()->subDays(6);
+        } else {
+            $start = Carbon::now()->copy()->startOfMonth();
+        }
+
+        $dateKeys = [];
+        for ($d = $start->copy(); $d->lte($end); $d->addDay()) {
+            $dateKeys[] = $d->toDateString();
+        }
+
+        $query = Attendance::query()
+            ->with(['user:id,name'])
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->whereNotNull('check_in_at');
+
+        if (! $isPrivileged) {
+            $query->where('user_id', $user->id);
+        }
+
+        $rows = $query->orderBy('date')->orderBy('user_id')->get();
+        $byUser = $rows->groupBy('user_id');
+
+        $usersOut = [];
+        foreach ($byUser as $userId => $list) {
+            $hours = array_fill_keys($dateKeys, null);
+            $details = array_fill_keys($dateKeys, null);
+            foreach ($list as $a) {
+                $dk = $a->date instanceof Carbon
+                    ? $a->date->format('Y-m-d')
+                    : Carbon::parse($a->date)->format('Y-m-d');
+                if (! array_key_exists($dk, $hours)) {
+                    continue;
+                }
+                $hours[$dk] = $a->check_out_at ? (float) $a->work_hours : null;
+                $details[$dk] = [
+                    'check_in' => $a->check_in_at?->format('H:i'),
+                    'check_out' => $a->check_out_at?->format('H:i'),
+                    'work_hours' => $a->check_out_at ? (float) $a->work_hours : null,
+                    'open_shift' => ! $a->check_out_at,
+                ];
+            }
+            $first = $list->first();
+            $hoursOrdered = [];
+            $detailsOrdered = [];
+            foreach ($dateKeys as $dk) {
+                $hoursOrdered[] = $hours[$dk];
+                $detailsOrdered[] = $details[$dk];
+            }
+            $usersOut[] = [
+                'id' => (int) $userId,
+                'name' => $first->user?->name ?? 'Unknown',
+                'hours' => $hoursOrdered,
+                'details' => $detailsOrdered,
+            ];
+        }
+
+        usort($usersOut, fn ($a, $b) => strcasecmp($a['name'], $b['name']));
+
+        $labelDisplay = array_map(
+            fn ($dk) => Carbon::parse($dk)->format('j M'),
+            $dateKeys
+        );
+
+        return response()->json([
+            'preset' => $preset,
+            'date_from' => $start->toDateString(),
+            'date_to' => $end->toDateString(),
+            'labels' => $dateKeys,
+            'label_display' => $labelDisplay,
+            'users' => $usersOut,
+        ]);
+    }
+
     public function todayStatus(Request $request)
     {
         $user = $request->user();

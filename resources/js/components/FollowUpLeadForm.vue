@@ -9,7 +9,7 @@
             <!-- Type Selection - Card style -->
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-3">Select Type</label>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-5">
                     <label
                         class="relative flex flex-col items-center p-4 rounded-xl border-2 cursor-pointer transition-all"
                         :class="form.type === 'follow_up' ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'"
@@ -200,7 +200,7 @@
                     >
                         <option value="">First call / no specific lead — create new follow-up</option>
                         <option v-for="lead in customerLeads" :key="lead.id" :value="lead.id">
-                            Lead #{{ lead.id }} — {{ lead.stage }} ({{ formatDate(lead.created_at) }})
+                            Lead #{{ lead.id }} — {{ formatLeadStage(lead.stage) }} ({{ formatDate(lead.created_at) }})
                         </option>
                     </select>
                     <p class="text-xs text-slate-500 mt-1">Leave as "First call" for a simple follow-up (e.g. first contact). Choose a lead to add this follow-up to that lead.</p>
@@ -393,6 +393,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import { formatLeadStage } from '@/utils/displayFormat';
 
 const props = defineProps({
     customerId: {

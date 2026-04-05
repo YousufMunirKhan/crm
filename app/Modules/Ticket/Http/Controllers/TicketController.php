@@ -8,6 +8,7 @@ use App\Modules\Ticket\Models\TicketAttachment;
 use App\Modules\Ticket\Models\TicketMessage;
 use App\Modules\Ticket\Services\TicketService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class TicketController extends Controller
 {
@@ -55,6 +56,13 @@ class TicketController extends Controller
 
         if ($request->has('customer_id')) {
             $query->where('customer_id', $request->customer_id);
+        }
+
+        if ($request->filled('from')) {
+            $query->where('created_at', '>=', Carbon::parse($request->from)->startOfDay());
+        }
+        if ($request->filled('to')) {
+            $query->where('created_at', '<=', Carbon::parse($request->to)->endOfDay());
         }
 
         $tickets = $query->orderBy('created_at', 'desc')

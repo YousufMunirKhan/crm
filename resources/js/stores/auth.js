@@ -35,11 +35,25 @@ export const useAuthStore = defineStore('auth', {
 
             const userP = state.user.nav_permissions;
             if (userP && typeof userP === 'object' && Object.keys(userP).length > 0) {
-                return !!userP[sectionKey];
+                if (userP[sectionKey]) return true;
+                if (
+                    (sectionKey === 'all_leads' || sectionKey === 'lead_pipeline') &&
+                    userP.leads_pipeline
+                ) {
+                    return true;
+                }
+                return false;
             }
             const roleP = state.user.role?.nav_permissions;
             if (roleP && typeof roleP === 'object' && Object.keys(roleP).length > 0) {
-                return !!roleP[sectionKey];
+                if (roleP[sectionKey]) return true;
+                if (
+                    (sectionKey === 'all_leads' || sectionKey === 'lead_pipeline') &&
+                    roleP.leads_pipeline
+                ) {
+                    return true;
+                }
+                return false;
             }
             return true;
         },

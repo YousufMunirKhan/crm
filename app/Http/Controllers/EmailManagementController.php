@@ -9,11 +9,93 @@ use App\Models\SentCommunication;
 use App\Modules\CRM\Models\Customer;
 use App\Modules\CRM\Models\Lead;
 use App\Modules\CRM\Models\LeadItem;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmailManagementController extends Controller
 {
+    /**
+     * @return int[]
+     */
+    private function normalizeExcludeCustomerIds(mixed $input): array
+    {
+        if (! is_array($input)) {
+            return [];
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $input))));
+
+        return array_values(array_filter($ids, fn (int $id) => $id > 0));
+    }
+
+    /**
+     * @param  Builder<\App\Modules\CRM\Models\Customer>  $query
+     */
+    private function applyEmailAudienceProductDateSearch(Request $request, Builder $query): void
+    {
+        $audience = $request->input('audience');
+        $productFilters = $request->input('product_filters', []);
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+        $search = $request->input('search');
+
+        if ($dateFrom) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        if ($audience === 'prospect') {
+            $query->where('type', Customer::TYPE_PROSPECT);
+        } elseif ($audience === 'customer') {
+            $query->where('type', Customer::TYPE_CUSTOMER);
+        }
+
+        if (is_string($search) && trim($search) !== '') {
+            $term = '%' . addcslashes(trim($search), '%_\\') . '%';
+            $query->where('name', 'like', $term);
+        }
+
+        foreach ($productFilters as $filter) {
+            if (($filter['rule'] ?? '') === 'all') {
+                continue;
+            }
+            $productId = (int) $filter['product_id'];
+            $rule = $filter['rule'];
+            if ($rule === 'has') {
+                $query->where(function ($q) use ($productId, $audience) {
+                    $this->applyHasProduct($q, $productId, $audience);
+                });
+            } elseif ($rule === 'does_not_have') {
+                $query->where(function ($q) use ($productId, $audience) {
+                    $this->applyDoesNotHaveProduct($q, $productId, $audience);
+                });
+            }
+        }
+    }
+
+    /**
+     * @return Builder<\App\Modules\CRM\Models\Customer>
+     */
+    private function buildEmailFilteredQuery(Request $request, bool $applyExclude): Builder
+    {
+        $query = Customer::query()
+            ->whereNotNull('email')
+            ->where('email', '!=', '');
+
+        $this->applyEmailAudienceProductDateSearch($request, $query);
+
+        if ($applyExclude) {
+            $exclude = $this->normalizeExcludeCustomerIds($request->input('exclude_customer_ids'));
+            if ($exclude !== []) {
+                $query->whereNotIn('id', $exclude);
+            }
+        }
+
+        return $query;
+    }
+
     /**
      * Check SMTP settings status (from Settings page).
      */
@@ -40,51 +122,14 @@ class EmailManagementController extends Controller
             'product_filters.*.rule' => 'required_with:product_filters|in:has,does_not_have,all',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
+            'search' => 'nullable|string|max:255',
             'page' => 'nullable|integer|min:1',
             'per_page' => 'nullable|integer|min:1|max:100',
         ]);
 
-        $audience = $request->input('audience');
-        $productFilters = $request->input('product_filters', []);
-        $dateFrom = $request->input('date_from');
-        $dateTo = $request->input('date_to');
         $perPage = min((int) $request->input('per_page', 50), 100);
 
-        $query = Customer::query()
-            ->whereNotNull('email')
-            ->where('email', '!=', '');
-
-        // Date filters: filter by customer created_at
-        if ($dateFrom) {
-            $query->whereDate('created_at', '>=', $dateFrom);
-        }
-        if ($dateTo) {
-            $query->whereDate('created_at', '<=', $dateTo);
-        }
-
-        // Audience: prospect, customer, or both
-        if ($audience === 'prospect') {
-            $query->where('type', Customer::TYPE_PROSPECT);
-        } elseif ($audience === 'customer') {
-            $query->where('type', Customer::TYPE_CUSTOMER);
-        }
-
-        foreach ($productFilters as $filter) {
-            if (($filter['rule'] ?? '') === 'all') {
-                continue;
-            }
-            $productId = (int) $filter['product_id'];
-            $rule = $filter['rule'];
-            if ($rule === 'has') {
-                $query->where(function ($q) use ($productId, $audience) {
-                    $this->applyHasProduct($q, $productId, $audience);
-                });
-            } elseif ($rule === 'does_not_have') {
-                $query->where(function ($q) use ($productId, $audience) {
-                    $this->applyDoesNotHaveProduct($q, $productId, $audience);
-                });
-            }
-        }
+        $query = $this->buildEmailFilteredQuery($request, false);
 
         $paginator = $query->orderBy('name')->paginate($perPage, ['id', 'name', 'email', 'business_name', 'type']);
 
@@ -115,48 +160,12 @@ class EmailManagementController extends Controller
             'product_filters.*.rule' => 'required_with:product_filters|in:has,does_not_have,all',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
+            'search' => 'nullable|string|max:255',
         ]);
 
-        $audience = $request->input('audience');
-        $productFilters = $request->input('product_filters', []);
-        $dateFrom = $request->input('date_from');
-        $dateTo = $request->input('date_to');
-
-        $query = Customer::query()
-            ->whereNotNull('email')
-            ->where('email', '!=', '');
-
-        if ($dateFrom) {
-            $query->whereDate('created_at', '>=', $dateFrom);
-        }
-        if ($dateTo) {
-            $query->whereDate('created_at', '<=', $dateTo);
-        }
-
-        if ($audience === 'prospect') {
-            $query->where('type', Customer::TYPE_PROSPECT);
-        } elseif ($audience === 'customer') {
-            $query->where('type', Customer::TYPE_CUSTOMER);
-        }
-
-        foreach ($productFilters as $filter) {
-            if (($filter['rule'] ?? '') === 'all') {
-                continue;
-            }
-            $productId = (int) $filter['product_id'];
-            $rule = $filter['rule'];
-            if ($rule === 'has') {
-                $query->where(function ($q) use ($productId, $audience) {
-                    $this->applyHasProduct($q, $productId, $audience);
-                });
-            } elseif ($rule === 'does_not_have') {
-                $query->where(function ($q) use ($productId, $audience) {
-                    $this->applyDoesNotHaveProduct($q, $productId, $audience);
-                });
-            }
-        }
-
-        $contacts = $query->orderBy('name')->get(['id', 'name', 'email', 'business_name', 'type']);
+        $contacts = $this->buildEmailFilteredQuery($request, false)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'business_name', 'type']);
 
         $filename = 'email-contacts-' . date('Y-m-d-His') . '.csv';
 
@@ -203,47 +212,14 @@ class EmailManagementController extends Controller
             'product_filters.*.rule' => 'required_with:product_filters|in:has,does_not_have,all',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
+            'search' => 'nullable|string|max:255',
+            'exclude_customer_ids' => 'nullable|array',
+            'exclude_customer_ids.*' => 'integer|exists:customers,id',
         ]);
 
         $template = EmailTemplate::findOrFail($request->template_id);
-        $audience = $request->input('audience');
-        $productFilters = $request->input('product_filters', []);
-        $dateFrom = $request->input('date_from');
-        $dateTo = $request->input('date_to');
 
-        $query = Customer::query()
-            ->whereNotNull('email')
-            ->where('email', '!=', '');
-
-        if ($dateFrom) {
-            $query->whereDate('created_at', '>=', $dateFrom);
-        }
-        if ($dateTo) {
-            $query->whereDate('created_at', '<=', $dateTo);
-        }
-
-        if ($audience === 'prospect') {
-            $query->where('type', Customer::TYPE_PROSPECT);
-        } elseif ($audience === 'customer') {
-            $query->where('type', Customer::TYPE_CUSTOMER);
-        }
-
-        foreach ($productFilters as $filter) {
-            if (($filter['rule'] ?? '') === 'all') {
-                continue;
-            }
-            $productId = (int) $filter['product_id'];
-            $rule = $filter['rule'];
-            if ($rule === 'has') {
-                $query->where(function ($q) use ($productId, $audience) {
-                    $this->applyHasProduct($q, $productId, $audience);
-                });
-            } elseif ($rule === 'does_not_have') {
-                $query->where(function ($q) use ($productId, $audience) {
-                    $this->applyDoesNotHaveProduct($q, $productId, $audience);
-                });
-            }
-        }
+        $query = $this->buildEmailFilteredQuery($request, true);
 
         \App\Services\MailConfigFromDatabase::apply();
 

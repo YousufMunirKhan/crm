@@ -43,6 +43,9 @@
             <circle cx="9" cy="12" r="2" />
             <path d="M15 10h3M15 14h3" />
         </template>
+        <template v-else-if="name === 'list'">
+            <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+        </template>
         <template v-else-if="name === 'funnel'">
             <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
         </template>

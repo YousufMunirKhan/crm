@@ -82,6 +82,25 @@ class WhatsAppMessageController extends Controller
         }
     }
 
+    /**
+     * Formatted number + Meta “add to allowed list” link (no public Meta API for allowlisting).
+     */
+    public function phoneNumberInfo(Request $request)
+    {
+        $request->validate([
+            'phone' => ['required', 'string'],
+        ]);
+
+        $phoneInfo = $this->whatsappService->getAddPhoneNumberInfo($request->phone);
+
+        return response()->json([
+            'formatted_number' => $phoneInfo['formatted_number'],
+            'add_url' => $phoneInfo['add_url'],
+            'instructions' => $phoneInfo['instructions'],
+            'note' => 'Meta does not provide an API to automatically add phone numbers. You must add them manually through the Meta Business Dashboard.',
+        ]);
+    }
+
     public function sendTemplate(Request $request)
     {
         $data = $request->validate([

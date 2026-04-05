@@ -74,6 +74,12 @@ const routes = [
         meta: { requiresAuth: true, title: 'Lead Pipeline' },
     },
     {
+        path: '/leads/:id',
+        name: 'lead-workspace',
+        component: CustomerLeadView,
+        meta: { requiresAuth: true, title: 'Lead', workspaceFromLead: true },
+    },
+    {
         path: '/leads',
         name: 'leads-list',
         component: () => import('@/views/LeadsListView.vue'),
@@ -287,9 +293,13 @@ const routes = [
     },
     {
         path: '/bulk-whatsapp',
-        name: 'bulk-whatsapp',
-        component: () => import('@/views/BulkWhatsAppView.vue'),
-        meta: { requiresAuth: true, title: 'Bulk WhatsApp Messaging' },
+        redirect: '/whatsapp-management',
+    },
+    {
+        path: '/whatsapp-management',
+        name: 'whatsapp-management',
+        component: () => import('@/views/WhatsAppManagementView.vue'),
+        meta: { requiresAuth: true, title: 'WhatsApp Management' },
     },
     {
         path: '/whatsapp-templates',
@@ -384,6 +394,20 @@ router.beforeEach(async (to, from, next) => {
     // Per-user sidebar permissions: POS Support (nav section pos_support)
     if (to.name === 'pos-support' && auth.isAuthenticated && auth.user) {
         if (!auth.navSectionAllowed('pos_support')) {
+            const r = auth.user.role?.name;
+            return next({ name: r === 'Sales' || r === 'CallAgent' ? 'sales-dashboard' : 'dashboard' });
+        }
+    }
+
+    // Per-user sidebar permissions: All Leads / Lead Pipeline
+    if (to.name === 'leads-list' && auth.isAuthenticated && auth.user) {
+        if (!auth.navSectionAllowed('all_leads')) {
+            const r = auth.user.role?.name;
+            return next({ name: r === 'Sales' || r === 'CallAgent' ? 'sales-dashboard' : 'dashboard' });
+        }
+    }
+    if (to.name === 'leads-pipeline' && auth.isAuthenticated && auth.user) {
+        if (!auth.navSectionAllowed('lead_pipeline')) {
             const r = auth.user.role?.name;
             return next({ name: r === 'Sales' || r === 'CallAgent' ? 'sales-dashboard' : 'dashboard' });
         }

@@ -8,6 +8,7 @@ use App\Modules\CRM\Models\Lead;
 use App\Modules\CRM\Models\LeadItem;
 use App\Modules\CRM\Models\Product;
 use App\Modules\CRM\Models\CustomerUserAssignment;
+use App\Modules\CRM\Services\CustomerTimelineService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,10 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class CustomerController extends Controller
 {
+    public function __construct(
+        protected CustomerTimelineService $timelineService
+    ) {}
+
     public function index(Request $request)
     {
         $user = auth()->user();
@@ -37,24 +42,9 @@ class CustomerController extends Controller
                     ->where('lead_items.status', LeadItem::STATUS_WON),
             ]);
 
-        // For sales agents: show only customers they created, assigned to them, assigned by them, or with their leads
+        // For sales agents: creator, assignee, person who assigned customer to someone, or lead assignee
         if ($isSalesAgent) {
-            $query->where(function ($q) use ($user) {
-                // Customers created by agent
-                $q->where('created_by', $user->id)
-                // OR customers directly assigned to agent
-                ->orWhereHas('assignedUsers', function ($subQuery) use ($user) {
-                    $subQuery->where('user_id', $user->id);
-                })
-                // OR customers this agent has assigned to someone (assignment log)
-                ->orWhereHas('assignments', function ($subQuery) use ($user) {
-                    $subQuery->where('assigned_by', $user->id);
-                })
-                // OR customers with leads assigned to agent
-                ->orWhereHas('leads', function ($subQuery) use ($user) {
-                    $subQuery->where('assigned_to', $user->id);
-                });
-            });
+            $query->forSalesAgent($user->id);
         }
 
         // General search (searches across name, business name, phone, email, location)
@@ -150,270 +140,18 @@ class CustomerController extends Controller
         $user = auth()->user();
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
         
-        if ($isSalesAgent) {
-            $hasAccess = $customer->created_by === $user->id ||
-                        $customer->isAssignedTo($user->id) || 
-                        $customer->assignments()->where('assigned_by', $user->id)->exists() ||
-                        $customer->leads()->where('assigned_to', $user->id)->exists();
-            
-            if (!$hasAccess) {
-                return response()->json(['message' => 'Unauthorized access to this customer'], 403);
-            }
+        if ($isSalesAgent && ! $customer->salesAgentHasAccess($user->id)) {
+            return response()->json(['message' => 'Unauthorized access to this customer'], 403);
         }
 
         $lead = $customer->leads()->latest()->first();
         $tickets = $customer->tickets()->latest()->get();
         $invoices = $customer->invoices()->latest()->get();
 
-        // Build unified timeline
-        $timeline = collect();
-
-        // Add communications
-        foreach ($customer->communications()->latest()->get() as $comm) {
-            $channelIcons = [
-                'whatsapp' => '💬 WhatsApp',
-                'email' => '📧 Email',
-                'sms' => '📱 SMS',
-                'phone' => '📞 Phone Call',
-            ];
-            $channelLabel = $channelIcons[$comm->channel] ?? ucfirst($comm->channel);
-            $directionLabel = $comm->direction === 'outbound' ? 'sent' : 'received';
-            
-            $timeline->push([
-                'id' => 'comm-' . $comm->id,
-                'type' => 'communication',
-                'title' => $channelLabel . ' ' . $directionLabel,
-                'body' => $comm->message,
-                'when' => $comm->created_at->diffForHumans(),
-                'created_at' => $comm->created_at->toIso8601String(),
-                'meta' => 'Status: ' . ucfirst($comm->status),
-            ]);
-        }
-
-        // Collect appointments from all leads (for "Appointments" section like follow-ups)
-        $appointments = collect();
         $leadsWithActivities = $customer->leads()->with(['items.product', 'assignee', 'activities.user', 'activities.assignee'])->get();
 
-        // Add lead events and activities from ALL leads (one entry per meaningful event)
-            foreach ($leadsWithActivities as $leadItem) {
-            $stageLabels = [
-                'follow_up' => 'Follow-up',
-                'lead' => 'Lead',
-                'hot_lead' => 'Hot Lead',
-                'quotation' => 'Quotation',
-                'won' => 'Won',
-                'lost' => 'Lost',
-            ];
-            $stageLabel = $stageLabels[$leadItem->stage] ?? ucfirst($leadItem->stage);
-            $products = $leadItem->items->pluck('product.name')->filter()->implode(', ') ?: 'No products';
-            $metaParts = [];
-            if ($leadItem->source) $metaParts[] = 'Source: ' . $leadItem->source;
-            if ($leadItem->assignee) $metaParts[] = 'Assigned: ' . $leadItem->assignee->name;
-            if ($leadItem->next_follow_up_at) {
-                $metaParts[] = 'Next: ' . \Carbon\Carbon::parse($leadItem->next_follow_up_at)->format('d M Y, H:i');
-            }
-
-            // Include latest follow-up note (reminder) in the "Lead created / Follow-up created" body if available
-            $latestReminderNote = null;
-            if ($leadItem->relationLoaded('activities')) {
-                $latestReminder = $leadItem->activities
-                    ->where('type', 'reminder')
-                    ->sortByDesc('created_at')
-                    ->first();
-            } else {
-                $latestReminder = $leadItem->activities()
-                    ->where('type', 'reminder')
-                    ->latest()
-                    ->first();
-            }
-            if ($latestReminder && $latestReminder->description) {
-                $latestReminderNote = $latestReminder->description;
-            }
-
-            $leadCreatedBody = $products;
-            if ($latestReminderNote) {
-                $leadCreatedBody .= "\n" . $latestReminderNote;
-            }
-
-            // Single "Lead Created" entry (includes next follow-up + latest follow-up note if set at creation)
-            $timeline->push([
-                'id' => 'lead-created-' . $leadItem->id,
-                'type' => 'lead_created',
-                'title' => $stageLabel . ' created',
-                'body' => $leadCreatedBody,
-                'when' => $leadItem->created_at->diffForHumans(),
-                'created_at' => $leadItem->created_at->toIso8601String(),
-                'meta' => implode(' · ', $metaParts),
-            ]);
-
-            // Add lead activities (skip redundant stage_change and reminder at creation)
-            $leadCreatedAt = \Carbon\Carbon::parse($leadItem->created_at);
-            foreach ($leadItem->activities()->with('user')->latest()->get() as $activity) {
-                // Skip legacy 'followup' type created at the same moment as the lead (already represented by lead_created)
-                if ($activity->type === 'followup') {
-                    $activityCreatedAt = \Carbon\Carbon::parse($activity->created_at);
-                    if ($activityCreatedAt->diffInMinutes($leadCreatedAt) <= 2) {
-                        continue;
-                    }
-                }
-
-                // Skip stage_change that happens at lead creation
-                if ($activity->type === 'stage_change') {
-                    $meta = is_array($activity->meta) ? $activity->meta : (json_decode($activity->meta, true) ?? []);
-                    // Only show stage changes that have both from_stage and to_stage (actual changes, not creation)
-                    if (!isset($meta['from_stage']) || !isset($meta['to_stage'])) {
-                        continue; // Skip lead creation stage entries
-                    }
-                    
-                    // Format stage change nicely
-                    $stageLabels = [
-                        'follow_up' => 'Follow-up',
-                        'lead' => 'Lead',
-                        'hot_lead' => 'Hot Lead',
-                        'quotation' => 'Quotation',
-                        'won' => 'Won',
-                        'lost' => 'Lost',
-                    ];
-                    $fromStage = $stageLabels[$meta['from_stage']] ?? ucfirst($meta['from_stage']);
-                    $toStage = $stageLabels[$meta['to_stage']] ?? ucfirst($meta['to_stage']);
-                    
-                    $timeline->push([
-                        'id' => 'activity-' . $activity->id,
-                        'type' => 'stage_change',
-                        'title' => '🔄 Stage Changed',
-                        'body' => 'Moved from ' . $fromStage . ' → ' . $toStage,
-                        'when' => $activity->created_at->diffForHumans(),
-                        'created_at' => $activity->created_at->toIso8601String(),
-                        'meta' => 'By: ' . ($activity->user->name ?? 'Unknown') . ' | Lead #' . $leadItem->id,
-                    ]);
-                    continue;
-                }
-                
-                $activityIcons = [
-                    'call' => '📞 Call',
-                    'meeting' => '🤝 Meeting',
-                    'appointment' => '📅 Appointment',
-                    'email' => '📧 Email',
-                    'visit' => '🏢 Site Visit',
-                    'whatsapp' => '💬 WhatsApp',
-                    'sms' => '📱 SMS',
-                    'quote_sent' => '📄 Quote Sent',
-                    'note' => '📝 Note',
-                    'reminder' => '⏰ Reminder',
-                    'followup' => '📅 Follow-up Scheduled',
-                    'other' => '📋 Activity',
-                ];
-                $activityLabel = $activityIcons[$activity->type] ?? ucfirst(str_replace('_', ' ', $activity->type));
-                
-                // Parse meta for outcome
-                $meta = is_array($activity->meta) ? $activity->meta : (json_decode($activity->meta, true) ?? []);
-                $outcome = $meta['outcome'] ?? null;
-                $outcomeLabels = [
-                    'positive' => '✅ Positive',
-                    'neutral' => '➖ Neutral',
-                    'negative' => '❌ Negative',
-                    'no_answer' => '📵 No Answer',
-                ];
-                $outcomeLabel = $outcome ? ($outcomeLabels[$outcome] ?? ucfirst($outcome)) : null;
-                
-                $metaText = 'By: ' . ($activity->user->name ?? 'Unknown');
-                if ($outcomeLabel) {
-                    $metaText .= ' | Outcome: ' . $outcomeLabel;
-                }
-                if (isset($meta['duration']) && $meta['duration']) {
-                    $metaText .= ' | Duration: ' . $meta['duration'] . ' min';
-                }
-                
-                // Determine timeline type based on activity type
-                $timelineType = 'activity';
-                if (in_array($activity->type, ['call', 'meeting', 'visit', 'appointment'])) {
-                    $timelineType = $activity->type;
-                } elseif ($activity->type === 'reminder' || $activity->type === 'followup') {
-                    $timelineType = 'reminder';
-                } elseif ($activity->type === 'note') {
-                    $timelineType = 'note';
-                }
-                
-                $timeline->push([
-                    'id' => 'activity-' . $activity->id,
-                    'type' => $timelineType,
-                    'title' => $activityLabel . ' (Lead #' . $leadItem->id . ')',
-                    'body' => $activity->description,
-                    'when' => $activity->created_at->diffForHumans(),
-                    'created_at' => $activity->created_at->toIso8601String(),
-                    'meta' => $metaText,
-                ]);
-
-                // Collect appointments for the Appointments section (like follow-ups)
-                if ($activity->type === 'appointment') {
-                    $actMeta = is_array($activity->meta) ? $activity->meta : (json_decode($activity->meta, true) ?? []);
-                    $appointments->push([
-                        'id' => $activity->id,
-                        'lead_id' => $leadItem->id,
-                        'description' => $activity->description ?: 'Appointment',
-                        'appointment_date' => $actMeta['appointment_date'] ?? null,
-                        'appointment_time' => $actMeta['appointment_time'] ?? '10:00',
-                        'appointment_status' => $activity->appointment_status ?? 'pending',
-                        'outcome_notes' => $activity->outcome_notes,
-                        'assignee' => $activity->assignee,
-                        'created_at' => $activity->created_at->toIso8601String(),
-                    ]);
-                }
-            }
-
-            // Add won/lost product events
-            foreach ($leadItem->items as $item) {
-                if ($item->status === 'won' && $item->closed_at) {
-                    $timeline->push([
-                        'id' => 'item-won-' . $item->id,
-                        'type' => 'won',
-                        'title' => '🎉 Product Won',
-                        'body' => $item->product->name . ' - Qty: ' . $item->quantity . ' × £' . number_format($item->unit_price, 2) . ' = £' . number_format($item->total_price, 2),
-                        'when' => \Carbon\Carbon::parse($item->closed_at)->diffForHumans(),
-                        'created_at' => $item->closed_at,
-                        'meta' => 'Lead #' . $leadItem->id,
-                    ]);
-                } elseif ($item->status === 'lost' && $item->closed_at) {
-                    $timeline->push([
-                        'id' => 'item-lost-' . $item->id,
-                        'type' => 'lost',
-                        'title' => '❌ Product Lost',
-                        'body' => $item->product->name,
-                        'when' => \Carbon\Carbon::parse($item->closed_at)->diffForHumans(),
-                        'created_at' => $item->closed_at,
-                        'meta' => 'Lead #' . $leadItem->id,
-                    ]);
-                }
-            }
-        }
-
-        // Add tickets
-        foreach ($tickets as $ticket) {
-            $timeline->push([
-                'id' => 'ticket-' . $ticket->id,
-                'type' => 'ticket',
-                'title' => '🎫 Ticket: ' . $ticket->subject,
-                'body' => $ticket->description,
-                'when' => $ticket->created_at->diffForHumans(),
-                'created_at' => $ticket->created_at->toIso8601String(),
-                'meta' => 'Priority: ' . ucfirst($ticket->priority) . ' | Status: ' . ucfirst(str_replace('_', ' ', $ticket->status)),
-            ]);
-        }
-
-        // Sort by created_at timestamp (newest first)
-        $timeline = $timeline->sortByDesc(function ($item) {
-            return $item['created_at'];
-        })->values();
-
-        // Sort appointments by date then time (upcoming first)
-        $appointments = $appointments->sort(function ($a, $b) {
-            $dateA = $a['appointment_date'] ?? '';
-            $dateB = $b['appointment_date'] ?? '';
-            if ($dateA !== $dateB) {
-                return strcmp($dateA, $dateB);
-            }
-            return strcmp($a['appointment_time'] ?? '00:00', $b['appointment_time'] ?? '00:00');
-        })->values();
+        $timeline = $this->timelineService->buildTimeline($customer, $leadsWithActivities, $tickets, null);
+        $appointments = $this->timelineService->collectAppointments($leadsWithActivities);
 
         // Get items customer has (only WON items from won leads — exclude lost items)
         $customerHasItems = $customer->leads->filter(fn($l) => $l->stage === 'won')
@@ -479,14 +217,8 @@ class CustomerController extends Controller
 
         $user = auth()->user();
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
-        if ($isSalesAgent) {
-            $hasAccess = $customer->created_by === $user->id
-                || $customer->isAssignedTo($user->id)
-                || $customer->assignments()->where('assigned_by', $user->id)->exists()
-                || $customer->leads()->where('assigned_to', $user->id)->exists();
-            if (!$hasAccess) {
-                return response()->json(['message' => 'Unauthorized'], 403);
-            }
+        if ($isSalesAgent && ! $customer->salesAgentHasAccess($user->id)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $comms = \App\Modules\Communication\Models\Communication::where('customer_id', $customer->id)
@@ -535,6 +267,73 @@ class CustomerController extends Controller
             'emails' => array_values($emails),
             'sms' => array_values($sms),
             'whatsapp' => array_values($whatsapp),
+        ]);
+    }
+
+    /**
+     * Merged timeline: communications, template sends, lead activities, tickets (optional lead scope).
+     */
+    public function unifiedTimeline(Request $request, $id)
+    {
+        $customer = Customer::findOrFail($id);
+
+        $user = auth()->user();
+        $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
+
+        if ($isSalesAgent && ! $customer->salesAgentHasAccess($user->id)) {
+            return response()->json(['message' => 'Unauthorized access to this customer'], 403);
+        }
+
+        $filterLeadId = $request->query('lead_id');
+        $filterLeadId = ($filterLeadId !== null && $filterLeadId !== '') ? (int) $filterLeadId : null;
+        if ($filterLeadId && ! $customer->leads()->whereKey($filterLeadId)->exists()) {
+            return response()->json(['message' => 'Lead not found for this customer'], 404);
+        }
+
+        $fromInclusive = null;
+        $toInclusive = null;
+        if ($request->filled('on')) {
+            $day = Carbon::parse($request->query('on'))->startOfDay();
+            $fromInclusive = $day->copy();
+            $toInclusive = $day->copy()->endOfDay();
+        } else {
+            if ($request->filled('from')) {
+                $fromInclusive = Carbon::parse($request->query('from'))->startOfDay();
+            }
+            if ($request->filled('to')) {
+                $toInclusive = Carbon::parse($request->query('to'))->endOfDay();
+            }
+        }
+
+        if ($fromInclusive && $toInclusive && $fromInclusive->gt($toInclusive)) {
+            return response()->json(['message' => 'Invalid date range: from is after to'], 422);
+        }
+
+        $actorUserId = null;
+        if ($request->filled('user_id')) {
+            $actorUserId = (int) $request->query('user_id');
+        }
+
+        $leadsWithActivities = $customer->leads()->with(['items.product', 'assignee', 'activities.user', 'activities.assignee'])->get();
+        $tickets = $customer->tickets()->latest()->get();
+        $timeline = $this->timelineService->buildTimeline($customer, $leadsWithActivities, $tickets, $filterLeadId);
+
+        $hasTimeOrUserFilter = $fromInclusive !== null || $toInclusive !== null || $actorUserId !== null;
+        if ($hasTimeOrUserFilter) {
+            $timeline = $this->timelineService->applyTimelineFilters($timeline, $fromInclusive, $toInclusive, $actorUserId);
+        }
+
+        $matchingLeadIds = $timeline
+            ->pluck('lead_id')
+            ->filter(fn ($id) => $id !== null && $id !== '')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        return response()->json([
+            'timeline' => $timeline,
+            'matching_lead_ids' => $matchingLeadIds,
         ]);
     }
 

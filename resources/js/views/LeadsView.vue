@@ -144,6 +144,7 @@ import LogActivityModal from '@/components/LogActivityModal.vue';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
+import { formatLeadStage } from '@/utils/displayFormat';
 import { useToastStore } from '@/stores/toast';
 
 const toast = useToastStore();
@@ -162,9 +163,7 @@ const leadsBadge = computed(() =>
     pagination.value?.total != null ? `${pagination.value.total} Total` : null,
 );
 
-const formatStage = (stage) => {
-    return stage?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || '';
-};
+const formatStage = (stage) => formatLeadStage(stage, '');
 
 const getStageClass = (stage) => {
     const classes = {

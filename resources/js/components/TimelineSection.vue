@@ -3,8 +3,8 @@
         <div class="px-4 sm:px-6 py-4 border-b border-slate-200 bg-slate-50">
             <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <div>
-                    <h3 class="text-lg font-semibold text-slate-900">Activity & Communication</h3>
-                    <p class="text-sm text-slate-500 mt-0.5">Record of where we are with this customer</p>
+                    <h3 class="text-lg font-semibold text-slate-900">History</h3>
+                    <p class="text-sm text-slate-500 mt-0.5">Messages, appointments, notes, and stage changes in one place</p>
                 </div>
                 <select
                     v-model="filterType"
@@ -12,7 +12,10 @@
                     class="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 bg-white"
                 >
                     <option value="all">All activity</option>
-                    <option value="communication">Messages</option>
+                    <option value="communication">All messages</option>
+                    <option value="email">Email</option>
+                    <option value="sms">SMS</option>
+                    <option value="whatsapp">WhatsApp</option>
                     <option value="lead_created">Leads</option>
                     <option value="call">Calls</option>
                     <option value="meeting">Meetings</option>
@@ -44,9 +47,9 @@
                         >
                             <div
                                 class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-                                :class="getTimelineIconClass(item.type)"
+                                :class="getTimelineIconClass(item)"
                             >
-                                <span class="text-base">{{ getTimelineIcon(item.type) }}</span>
+                                <span class="text-base">{{ getTimelineIcon(item) }}</span>
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div class="flex flex-wrap items-baseline gap-2">
@@ -80,7 +83,12 @@ const filteredTimeline = computed(() => {
     if (filterType.value === 'all') {
         return props.timeline;
     }
-    return props.timeline.filter(item => item.type === filterType.value);
+    if (['email', 'sms', 'whatsapp'].includes(filterType.value)) {
+        return props.timeline.filter(
+            (item) => item.type === 'communication' && item.channel === filterType.value
+        );
+    }
+    return props.timeline.filter((item) => item.type === filterType.value);
 });
 
 const groupedTimeline = computed(() => {
@@ -142,7 +150,12 @@ const groupedTimeline = computed(() => {
     return order.filter(key => groups[key]).map(key => groups[key]);
 });
 
-const getTimelineIcon = (type) => {
+const getTimelineIcon = (item) => {
+    const type = item.type;
+    if (type === 'communication' && item.channel) {
+        const ch = { email: '📧', sms: '📱', whatsapp: '💬' };
+        return ch[item.channel] || '💬';
+    }
     const icons = {
         communication: '💬',
         activity: '📝',
@@ -161,7 +174,17 @@ const getTimelineIcon = (type) => {
     return icons[type] || '•';
 };
 
-const getTimelineIconClass = (type) => {
+const getTimelineIconClass = (item) => {
+    const type = item.type;
+    if (type === 'communication' && item.channel === 'email') {
+        return 'bg-blue-500';
+    }
+    if (type === 'communication' && item.channel === 'sms') {
+        return 'bg-purple-500';
+    }
+    if (type === 'communication' && item.channel === 'whatsapp') {
+        return 'bg-emerald-500';
+    }
     const classes = {
         communication: 'bg-emerald-500',
         activity: 'bg-blue-500',

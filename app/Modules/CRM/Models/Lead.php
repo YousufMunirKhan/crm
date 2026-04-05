@@ -42,6 +42,20 @@ class Lead extends Model
         return $this->belongsTo(\App\Models\User::class, 'assigned_to');
     }
 
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'created_by');
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Lead $lead) {
+            if ($lead->created_by === null && auth()->check()) {
+                $lead->created_by = auth()->id();
+            }
+        });
+    }
+
     public function activities(): HasMany
     {
         return $this->hasMany(LeadActivity::class);

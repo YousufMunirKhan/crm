@@ -121,6 +121,7 @@
         </div>
 
         <!-- WhatsApp log (outbound + inbound from webhook) -->
+        <template v-if="showInlineLogs">
         <div v-if="logs && logs.length > 0" class="mt-4 pt-4 border-t border-slate-200">
             <div class="flex items-center justify-between gap-2 mb-2">
                 <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide">WhatsApp messages</h4>
@@ -148,7 +149,7 @@
                         </span>
                     </div>
                     <div class="text-slate-800 line-clamp-3 whitespace-pre-wrap">{{ log.message || '(No message)' }}</div>
-                    <div class="text-xs text-slate-500 mt-0.5">{{ formatLogDate(log.created_at) }} · {{ log.status }}</div>
+                    <div class="text-xs text-slate-500 mt-0.5">{{ formatLogDate(log.created_at) }} · {{ formatCommLogStatus(log.status) }}</div>
                     <p v-if="log.status === 'failed' && log.failure_hint" class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-2">
                         {{ log.failure_hint }}
                     </p>
@@ -178,17 +179,20 @@
                 Refresh
             </button>
         </div>
+        </template>
     </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
+import { formatCommLogStatus } from '@/utils/displayFormat';
 
 const props = defineProps({
     customer: { type: Object, required: true },
     leadId: { type: [Number, String], default: null },
     logs: { type: Array, default: () => [] },
+    showInlineLogs: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(['sent', 'saved', 'refreshLogs']);

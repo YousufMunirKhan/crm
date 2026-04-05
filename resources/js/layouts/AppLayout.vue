@@ -7,7 +7,7 @@
             @click="mobileMenuOpen = false"
         ></div>
 
-        <!-- Sidebar - Hidden for customer detail view -->
+        <!-- Sidebar: full CRM menu (including on customer / lead workspace) -->
         <aside
             v-if="showSidebar"
             :class="[
@@ -195,13 +195,13 @@ const navItems = computed(() => {
         { to: '/', label: 'Dashboard', section: 'dashboard', icon: 'dashboard' },
         ...(uid ? [{ to: `/employees/${uid}/edit`, label: 'Bank & documents', section: 'dashboard', icon: 'wallet' }] : []),
         { to: '/appointments', label: 'Appointments', section: 'appointments', icon: 'calendar' },
+        { to: '/customers?type=prospect', label: 'Prospect', section: 'prospects', icon: 'user-plus' },
         { to: '/followups', label: 'Follow-ups', section: 'followups', icon: 'followup' },
-        { to: '/customers?type=prospect', label: 'Prospects', section: 'prospects', icon: 'user-plus' },
+        { to: '/leads', label: 'All Leads', section: 'all_leads', icon: 'list' },
         { to: '/customers?type=customer', label: 'Customers', section: 'customers', icon: 'users' },
+        { to: '/leads/pipeline', label: 'Lead Pipeline', section: 'lead_pipeline', icon: 'funnel' },
     ];
-
     items.push(
-        { to: '/leads/pipeline', label: 'Lead Pipeline', section: 'leads_pipeline', icon: 'funnel' },
         { to: '/products', label: 'Products', section: 'products', icon: 'cube' },
         { to: '/tickets', label: 'Tickets', section: 'tickets', icon: 'ticket' },
         { to: '/pos-support', label: 'POS Support', section: 'pos_support', icon: 'device' },
@@ -233,7 +233,7 @@ const navItems = computed(() => {
             children: [
                 { to: '/email-management', label: 'Email Management', section: 'marketing', icon: 'mail' },
                 { to: '/sms-management', label: 'SMS Management', section: 'marketing', icon: 'sms' },
-                { to: '/bulk-whatsapp', label: 'Bulk Whatsapp', section: 'marketing', icon: 'message' },
+                { to: '/whatsapp-management', label: 'WhatsApp Management', section: 'marketing', icon: 'message' },
                 { to: '/templates', label: 'Templates', section: 'marketing', icon: 'template' },
                 { to: '/whatsapp-templates', label: 'WhatsApp Templates', section: 'marketing', icon: 'message' },
             ],
@@ -301,6 +301,9 @@ function isGroupActive(item) {
 }
 
 function isChildActive(child) {
+    if (child.to === '/leads') {
+        return route.path === '/leads';
+    }
     return route.path === child.to || (child.to !== '/' && route.path.startsWith(child.to));
 }
 
@@ -323,13 +326,20 @@ const user = computed(() => auth.user);
 const pageTitle = computed(() => route.meta.title || 'Dashboard');
 
 function isNavItemActive(item) {
+    if (item.to === '/leads/pipeline') {
+        return route.path.startsWith('/leads/pipeline');
+    }
+    if (item.to === '/leads') {
+        return route.path === '/leads';
+    }
     if (item.to.startsWith('/customers') && item.to.includes('type=')) {
         const type = item.to.includes('type=prospect') ? 'prospect' : 'customer';
         return route.path === '/customers' && (route.query.type || 'prospect') === type;
     }
     return route.path === item.to || (item.to !== '/' && route.path.startsWith(item.to));
 }
-const showSidebar = computed(() => route.name !== 'customer-lead'); // Hide sidebar for customer detail view
+// Keep CRM navigation visible on customer / lead workspace so Leads and other sections stay reachable
+const showSidebar = computed(() => true);
 
 const logout = () => auth.logout();
 </script>

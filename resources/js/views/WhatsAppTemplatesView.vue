@@ -83,7 +83,7 @@
                                     'bg-red-100 text-red-800': template.status === 'REJECTED',
                                 }"
                             >
-                                {{ template.status }}
+                                {{ formatApiEnumLabel(template.status) }}
                             </span>
                             <div v-if="template.rejection_reason" class="text-xs text-red-600 mt-1">
                                 {{ template.rejection_reason }}
@@ -201,7 +201,7 @@
                     <div>
                         <h2 class="text-xl font-bold text-slate-900">{{ viewingTemplate.name }}</h2>
                         <p class="text-sm text-slate-500 mt-1">
-                            {{ viewingTemplate.status }} · {{ viewingTemplate.language }} · {{ viewingTemplate.category }}
+                            {{ formatApiEnumLabel(viewingTemplate.status) }} · {{ viewingTemplate.language }} · {{ formatApiEnumLabel(viewingTemplate.category) }}
                         </p>
                     </div>
                     <button type="button" class="text-slate-500 hover:text-slate-800 text-2xl leading-none" @click="closeViewModal" aria-label="Close">×</button>
@@ -282,6 +282,7 @@
 import { ref, reactive, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
+import { formatApiEnumLabel } from '@/utils/displayFormat';
 
 const toast = useToastStore();
 

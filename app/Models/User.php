@@ -68,16 +68,31 @@ class User extends Authenticatable
 
         $userP = $this->nav_permissions;
         if (is_array($userP) && $userP !== []) {
-            return ! empty($userP[$key]);
+            return $this->navWhitelistAllows($userP, $key);
         }
 
         $this->loadMissing('role');
         $roleP = $this->role?->nav_permissions;
         if (is_array($roleP) && $roleP !== []) {
-            return ! empty($roleP[$key]);
+            return $this->navWhitelistAllows($roleP, $key);
         }
 
         return true;
+    }
+
+    /**
+     * Whitelist entry is allowed if the key is true, or legacy leads_pipeline covers All Leads / Pipeline.
+     */
+    private function navWhitelistAllows(array $permissions, string $key): bool
+    {
+        if (! empty($permissions[$key])) {
+            return true;
+        }
+        if (($key === 'all_leads' || $key === 'lead_pipeline') && ! empty($permissions['leads_pipeline'])) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

@@ -233,7 +233,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
 
@@ -244,6 +244,10 @@ const props = defineProps({
     lead: {
         type: Object,
         required: true,
+    },
+    initialActivityType: {
+        type: String,
+        default: 'call',
     },
 });
 
@@ -293,6 +297,16 @@ onMounted(async () => {
         console.error('Failed to load users for appointment assignee', e);
     }
 });
+
+watch(
+    () => [props.lead?.id, props.initialActivityType],
+    () => {
+        const allowed = activityTypes.map((t) => t.value);
+        const next = allowed.includes(props.initialActivityType) ? props.initialActivityType : 'call';
+        form.value.activity_type = next;
+    },
+    { immediate: true }
+);
 
 const setQuickFollowUp = (days) => {
     const date = new Date();

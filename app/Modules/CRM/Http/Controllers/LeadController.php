@@ -3,56 +3,296 @@
 namespace App\Modules\CRM\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Modules\CRM\Models\Lead;
 use App\Modules\CRM\Models\LeadActivity;
 use App\Modules\CRM\Models\LeadAssignmentLog;
 use App\Modules\CRM\Models\LeadItem;
 use App\Modules\CRM\Models\Product;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
 class LeadController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * Base query for lead list, stats, and export (same visibility rules as index).
+     */
+    protected function leadsIndexBaseQuery(Request $request): Builder
     {
         $user = auth()->user();
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
 
-        $query = Lead::with(['customer', 'assignee', 'activities', 'convertedFromActivity', 'product', 'items.product']);
+        $query = Lead::query();
 
-        // "Leads I assigned" filter: leads that current user assigned to someone else
         if ($request->boolean('assigned_by_me')) {
             $query->whereHas('assignmentLogs', fn ($q) => $q->where('assigned_by', $user->id));
         } elseif ($isSalesAgent) {
             $query->where(function ($q) use ($user) {
                 $q->where('assigned_to', $user->id)
-                    ->orWhereHas('customer.assignedUsers', function ($subQuery) use ($user) {
-                        $subQuery->where('user_id', $user->id);
+                    ->orWhereHas('customer', function ($cq) use ($user) {
+                        $cq->forSalesAgent($user->id);
                     });
             });
-        } elseif ($request->has('assigned_to')) {
-            $query->where('assigned_to', $request->assigned_to);
+        } elseif ($request->filled('assigned_to')) {
+            if ($request->assigned_to === 'unassigned') {
+                $query->whereNull('assigned_to');
+            } else {
+                $query->where('assigned_to', $request->assigned_to);
+            }
         }
 
-        if ($request->has('stage')) {
+        if ($request->filled('stage')) {
             $query->where('stage', $request->stage);
         }
 
-        if ($request->has('source')) {
+        if ($request->filled('source')) {
             $query->where('source', $request->source);
         }
 
-        // Optional date filters (created_at)
-        if ($request->has('from')) {
+        if ($request->filled('from')) {
             $query->whereDate('created_at', '>=', $request->from);
         }
-        if ($request->has('to')) {
+        if ($request->filled('to')) {
             $query->whereDate('created_at', '<=', $request->to);
         }
 
-        $leads = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
+        return $query;
+    }
+
+    protected function assertNavSectionAllows(Request $request, string $sectionKey): void
+    {
+        $user = $request->user();
+        if ($user && ! $user->allowsNavSection($sectionKey)) {
+            abort(403, 'You do not have access to this area.');
+        }
+    }
+
+    /**
+     * Sales/Call agent may view or edit this lead: lead assignee, customer access (owner / customer assignee / customer assigner / any lead on customer), or lead assigner.
+     */
+    protected function salesUserCanAccessLead(Lead $lead): bool
+    {
+        $user = auth()->user();
+
+        return $lead->assigned_to === $user->id
+            || $lead->customer->salesAgentHasAccess($user->id)
+            || $lead->assignmentLogs()->where('assigned_by', $user->id)->exists();
+    }
+
+    protected function assertSalesAgentLeadAccess(Lead $lead): void
+    {
+        $user = auth()->user();
+        if (! $user->isRole('Sales') && ! $user->isRole('CallAgent')) {
+            return;
+        }
+        if (! $this->salesUserCanAccessLead($lead)) {
+            abort(403, 'Unauthorized access to this lead');
+        }
+    }
+
+    public function index(Request $request)
+    {
+        $this->assertNavSectionAllows($request, 'all_leads');
+
+        $query = $this->leadsIndexBaseQuery($request)->with([
+            'customer',
+            'assignee',
+            'creator',
+            'convertedFromActivity',
+            'product',
+            'items.product',
+            'activities' => function ($q) {
+                $q->where('type', 'appointment')
+                    ->where(function ($q2) {
+                        $q2->whereNull('appointment_status')
+                            ->orWhereIn('appointment_status', [
+                                LeadActivity::APPOINTMENT_STATUS_PENDING,
+                                LeadActivity::APPOINTMENT_STATUS_RESCHEDULED,
+                            ]);
+                    })
+                    ->orderBy('appointment_date')
+                    ->orderBy('appointment_time')
+                    ->limit(5);
+            },
+        ]);
+
+        $leads = $query->orderBy('created_at', 'desc')->paginate($request->integer('per_page', 25));
+
+        $leads->getCollection()->transform(function (Lead $lead) {
+            $lead->setAttribute('next_activity_summary', $this->buildNextActivitySummaryForLeadList($lead));
+
+            return $lead;
+        });
 
         return response()->json($leads);
+    }
+
+    /**
+     * Aggregates for the leads hub (same filters as index).
+     */
+    public function stats(Request $request)
+    {
+        $this->assertNavSectionAllows($request, 'all_leads');
+
+        $base = $this->leadsIndexBaseQuery($request);
+
+        $total = (clone $base)->count();
+
+        $stageKeys = ['follow_up', 'lead', 'hot_lead', 'quotation', 'won', 'lost'];
+        $stageCounts = (clone $base)->selectRaw('stage, count(*) as c')->groupBy('stage')->pluck('c', 'stage');
+        $byStage = collect($stageKeys)->mapWithKeys(fn ($s) => [$s => (int) ($stageCounts[$s] ?? 0)])->all();
+
+        $openPipelineSum = (float) (clone $base)->whereIn('stage', ['follow_up', 'lead', 'hot_lead', 'quotation'])->sum('pipeline_value');
+        $wonPipelineValueSum = (float) (clone $base)->where('stage', 'won')->sum('pipeline_value');
+
+        $wonLeadIdsSubquery = (clone $base)->where('stage', 'won')->select('leads.id');
+        $wonRevenueFromItems = (float) LeadItem::query()
+            ->where('status', LeadItem::STATUS_WON)
+            ->whereIn('lead_id', $wonLeadIdsSubquery)
+            ->sum('total_price');
+        $wonProductUnits = (int) LeadItem::query()
+            ->where('status', LeadItem::STATUS_WON)
+            ->whereIn('lead_id', $wonLeadIdsSubquery)
+            ->sum('quantity');
+        $wonProductLines = (int) LeadItem::query()
+            ->where('status', LeadItem::STATUS_WON)
+            ->whereIn('lead_id', $wonLeadIdsSubquery)
+            ->count();
+
+        $wonValueDisplay = $wonRevenueFromItems > 0 ? $wonRevenueFromItems : $wonPipelineValueSum;
+
+        $assigneeRows = (clone $base)->whereNotNull('assigned_to')
+            ->selectRaw('assigned_to, count(*) as c')
+            ->groupBy('assigned_to')
+            ->orderByDesc('c')
+            ->limit(30)
+            ->get();
+
+        $ids = $assigneeRows->pluck('assigned_to')->unique()->filter()->values();
+        $names = $ids->isEmpty()
+            ? collect()
+            : User::whereIn('id', $ids)->pluck('name', 'id');
+
+        $byAssignee = $assigneeRows->map(fn ($r) => [
+            'id' => (int) $r->assigned_to,
+            'name' => $names[$r->assigned_to] ?? '—',
+            'count' => (int) $r->c,
+        ])->values()->all();
+
+        $unassignedCount = (clone $base)->whereNull('assigned_to')->count();
+
+        return response()->json([
+            'total' => $total,
+            'by_stage' => $byStage,
+            'by_assignee' => $byAssignee,
+            'unassigned_count' => $unassignedCount,
+            'open_pipeline_value' => round($openPipelineSum, 2),
+            'won_pipeline_value' => round($wonPipelineValueSum, 2),
+            'won_revenue_from_items' => round($wonRevenueFromItems, 2),
+            'won_value' => round($wonValueDisplay, 2),
+            'won_product_units' => $wonProductUnits,
+            'won_product_lines' => $wonProductLines,
+        ]);
+    }
+
+    /**
+     * CSV export for all rows matching current filters (chunked).
+     */
+    public function exportCsv(Request $request)
+    {
+        $this->assertNavSectionAllows($request, 'all_leads');
+
+        $query = $this->leadsIndexBaseQuery($request)->with([
+            'customer',
+            'assignee',
+            'creator',
+            'product',
+            'items.product',
+            'activities' => function ($q) {
+                $q->where('type', 'appointment')
+                    ->where(function ($q2) {
+                        $q2->whereNull('appointment_status')
+                            ->orWhereIn('appointment_status', [
+                                LeadActivity::APPOINTMENT_STATUS_PENDING,
+                                LeadActivity::APPOINTMENT_STATUS_RESCHEDULED,
+                            ]);
+                    })
+                    ->orderBy('appointment_date')
+                    ->orderBy('appointment_time')
+                    ->limit(5);
+            },
+        ])->orderBy('created_at', 'desc');
+
+        $filename = 'leads_export_'.now()->format('Y-m-d_His').'.csv';
+
+        return response()->streamDownload(function () use ($query) {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
+            fputcsv($out, [
+                'Lead ID',
+                'Created at',
+                'Created by',
+                'Customer',
+                'Customer email',
+                'Stage',
+                'Assignee',
+                'Source',
+                'Products',
+                'Pipeline value',
+                'Next follow-up',
+                'Next activity summary',
+            ]);
+
+            $query->chunk(400, function ($leads) use ($out) {
+                foreach ($leads as $lead) {
+                    $products = $lead->items->isNotEmpty()
+                        ? $lead->items->pluck('product.name')->filter()->implode(', ')
+                        : ($lead->product?->name ?? '');
+                    $summary = $this->buildNextActivitySummaryForLeadList($lead);
+                    fputcsv($out, [
+                        $lead->id,
+                        $lead->created_at?->toDateTimeString(),
+                        $lead->creator?->name ?? '',
+                        $lead->customer?->name ?? '',
+                        $lead->customer?->email ?? '',
+                        $lead->stage,
+                        $lead->assignee?->name ?? '',
+                        $lead->source ?? '',
+                        $products,
+                        $lead->pipeline_value,
+                        $lead->next_follow_up_at?->toDateTimeString() ?? '',
+                        $summary,
+                    ]);
+                }
+            });
+
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
+     * Short label for leads table (follow-up date or next pending appointment).
+     */
+    protected function buildNextActivitySummaryForLeadList(Lead $lead): string
+    {
+        if ($lead->next_follow_up_at) {
+            return 'Follow-up · '.$lead->next_follow_up_at->format('d M Y, H:i');
+        }
+
+        foreach ($lead->activities as $activity) {
+            $date = $activity->appointment_date?->format('Y-m-d') ?? data_get($activity->meta, 'appointment_date');
+            if (! $date) {
+                continue;
+            }
+            $time = $activity->appointment_time ?? data_get($activity->meta, 'appointment_time', '10:00');
+
+            return 'Appointment · '.$date.' '.$time;
+        }
+
+        return '';
     }
 
     public function show($id)
@@ -60,18 +300,12 @@ class LeadController extends Controller
         $user = auth()->user();
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
 
-        $lead = Lead::with(['customer', 'assignee', 'activities.user', 'communications', 'convertedFromActivity', 'product', 'items.product', 'assignmentLogs.assignedByUser', 'assignmentLogs.newAssignee'])
+        $lead = Lead::with(['customer', 'assignee', 'creator', 'activities.user', 'communications', 'convertedFromActivity', 'product', 'items.product', 'assignmentLogs.assignedByUser', 'assignmentLogs.newAssignee'])
             ->findOrFail($id);
 
         // Check access for sales agents: current assignee, customer assigned to them, or they assigned this lead to someone (so they can see logs/actions)
-        if ($isSalesAgent) {
-            $hasAccess = $lead->assigned_to === $user->id
-                || $lead->customer->isAssignedTo($user->id)
-                || $lead->assignmentLogs()->where('assigned_by', $user->id)->exists();
-
-            if (!$hasAccess) {
-                return response()->json(['message' => 'Unauthorized access to this lead'], 403);
-            }
+        if ($isSalesAgent && ! $this->salesUserCanAccessLead($lead)) {
+            return response()->json(['message' => 'Unauthorized access to this lead'], 403);
         }
 
         return response()->json($lead);
@@ -112,11 +346,7 @@ class LeadController extends Controller
         
         if ($isSalesAgent) {
             $customer = \App\Modules\CRM\Models\Customer::findOrFail($data['customer_id']);
-            $hasAccess = $customer->created_by === $user->id || 
-                        $customer->isAssignedTo($user->id) ||
-                        $customer->leads()->where('assigned_to', $user->id)->exists();
-            
-            if (!$hasAccess) {
+            if (! $customer->salesAgentHasAccess($user->id)) {
                 return response()->json([
                     'message' => 'You do not have access to create leads for this customer. Please request assignment first.',
                 ], 403);
@@ -171,6 +401,7 @@ class LeadController extends Controller
     public function update(Request $request, $id)
     {
         $lead = Lead::findOrFail($id);
+        $this->assertSalesAgentLeadAccess($lead);
         $oldStage = $lead->stage;
 
         $data = $request->validate([
@@ -244,6 +475,7 @@ class LeadController extends Controller
     public function addActivity(Request $request, $id)
     {
         $lead = Lead::findOrFail($id);
+        $this->assertSalesAgentLeadAccess($lead);
 
         $data = $request->validate([
             'type' => ['required', 'string', 'in:note,call,meeting,email,visit,whatsapp,sms,quote_sent,stage_change,appointment,other'],
@@ -269,6 +501,10 @@ class LeadController extends Controller
         ];
         if ($data['type'] === 'appointment' && !empty($data['assigned_user_id'])) {
             $activityData['assigned_user_id'] = $data['assigned_user_id'];
+        }
+        if ($data['type'] === 'appointment' && ! empty($data['meta']['appointment_date'] ?? null)) {
+            $activityData['appointment_date'] = $data['meta']['appointment_date'];
+            $activityData['appointment_time'] = $data['meta']['appointment_time'] ?? '10:00';
         }
         $activity = LeadActivity::create($activityData);
 
@@ -338,6 +574,7 @@ class LeadController extends Controller
     public function setFollowUp(Request $request, $id)
     {
         $lead = Lead::findOrFail($id);
+        $this->assertSalesAgentLeadAccess($lead);
 
         $data = $request->validate([
             'next_follow_up_at' => ['required', 'date'],
@@ -397,6 +634,12 @@ class LeadController extends Controller
 
         $customer = \App\Modules\CRM\Models\Customer::findOrFail($data['customer_id']);
 
+        $user = auth()->user();
+        $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
+        if ($isSalesAgent && ! $customer->salesAgentHasAccess($user->id)) {
+            return response()->json(['message' => 'You do not have access to this customer.'], 403);
+        }
+
         if ($data['type'] === 'follow_up') {
             // Determine which lead to add follow-up to
             $targetLead = null;
@@ -406,6 +649,12 @@ class LeadController extends Controller
                 $targetLead = $customer->leads()->find($data['lead_id']);
                 if (!$targetLead) {
                     return response()->json(['message' => 'Selected lead does not belong to this customer.'], 422);
+                }
+                if ($isSalesAgent) {
+                    $targetLead->loadMissing('customer');
+                    if (! $this->salesUserCanAccessLead($targetLead)) {
+                        return response()->json(['message' => 'Unauthorized access to this lead'], 403);
+                    }
                 }
             } else {
                 // No lead selected = first call / simple follow-up — create a new lead
@@ -562,6 +811,7 @@ class LeadController extends Controller
     public function destroy($id)
     {
         $lead = Lead::findOrFail($id);
+        $this->assertSalesAgentLeadAccess($lead);
         $lead->delete();
 
         return response()->noContent();
@@ -569,6 +819,8 @@ class LeadController extends Controller
 
     public function pipeline(Request $request)
     {
+        $this->assertNavSectionAllows($request, 'lead_pipeline');
+
         $user = auth()->user();
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
         
@@ -600,15 +852,13 @@ class LeadController extends Controller
                 $q->where('assigned_by', $user->id);
             });
         }
-        // For sales agents: filter leads where assigned_to OR customer is assigned to agent
+        // For sales agents: own leads, or any lead on a customer they can access (assignee, assigner, creator, lead owner)
         elseif ($isSalesAgent) {
             $query->where(function ($q) use ($user) {
-                // Leads directly assigned to agent
                 $q->where('assigned_to', $user->id)
-                // OR leads for customers assigned to agent
-                ->orWhereHas('customer.assignedUsers', function ($subQuery) use ($user) {
-                    $subQuery->where('user_id', $user->id);
-                });
+                    ->orWhereHas('customer', function ($cq) use ($user) {
+                        $cq->forSalesAgent($user->id);
+                    });
             });
         } elseif ($request->has('assigned_to')) {
             // For admin/manager: filter by assigned_to if provided
@@ -616,7 +866,7 @@ class LeadController extends Controller
         }
 
         $allLeads = (clone $query)
-            ->orderBy('created_at', 'desc')
+            ->orderBy('updated_at', 'desc')
             ->get();
 
         // One card per customer: show won/lost in Won/Lost only; hide parallel open leads for same contact.
@@ -632,6 +882,7 @@ class LeadController extends Controller
             $pipeline[$stage] = $allLeads
                 ->where('stage', $stage)
                 ->filter(fn ($lead) => isset($visibleIds[$lead->id]))
+                ->sortByDesc('updated_at')
                 ->values();
         }
 
@@ -687,28 +938,14 @@ class LeadController extends Controller
         $customer = \App\Modules\CRM\Models\Customer::findOrFail($customerId);
         
         // Check access for sales agents
-        if ($isSalesAgent) {
-            $hasAccess = $customer->isAssignedTo($user->id) || 
-                        $customer->leads()->where('assigned_to', $user->id)->exists();
-            
-            if (!$hasAccess) {
-                return response()->json(['message' => 'Unauthorized access to this customer'], 403);
-            }
+        if ($isSalesAgent && ! $customer->salesAgentHasAccess($user->id)) {
+            return response()->json(['message' => 'Unauthorized access to this customer'], 403);
         }
-        
+
         $query = $customer->leads()
-            ->with(['assignee', 'product', 'items.product']);
-        
-        // For sales agents, only show their leads
-        if ($isSalesAgent) {
-            $query->where(function ($q) use ($user) {
-                $q->where('assigned_to', $user->id)
-                  ->orWhereHas('customer.assignedUsers', function ($subQuery) use ($user) {
-                      $subQuery->where('user_id', $user->id);
-                  });
-            });
-        }
-        
+            ->with(['assignee', 'creator', 'product', 'items.product']);
+
+        // Sales agents with customer access see every lead on that customer (assignee + assigner + creator).
         $leads = $query->orderBy('created_at', 'desc')->get();
 
         return response()->json($leads);
@@ -725,28 +962,13 @@ class LeadController extends Controller
         $customer = \App\Modules\CRM\Models\Customer::findOrFail($customerId);
         
         // Check access for sales agents
-        if ($isSalesAgent) {
-            $hasAccess = $customer->isAssignedTo($user->id) || 
-                        $customer->leads()->where('assigned_to', $user->id)->exists();
-            
-            if (!$hasAccess) {
-                return response()->json(['message' => 'Unauthorized access to this customer'], 403);
-            }
+        if ($isSalesAgent && ! $customer->salesAgentHasAccess($user->id)) {
+            return response()->json(['message' => 'Unauthorized access to this customer'], 403);
         }
-        
+
         // Get all follow-up activities (type='reminder') that haven't been converted yet
-        $query = LeadActivity::whereHas('lead', function ($q) use ($customerId, $user, $isSalesAgent) {
+        $query = LeadActivity::whereHas('lead', function ($q) use ($customerId) {
                 $q->where('customer_id', $customerId);
-                
-                // For sales agents, filter by their leads only
-                if ($isSalesAgent) {
-                    $q->where(function ($subQ) use ($user) {
-                        $subQ->where('assigned_to', $user->id)
-                            ->orWhereHas('customer.assignedUsers', function ($subSubQ) use ($user) {
-                                $subSubQ->where('user_id', $user->id);
-                            });
-                    });
-                }
             })
             ->where('type', 'reminder')
             ->whereNull('converted_to_lead_id')
@@ -764,6 +986,7 @@ class LeadController extends Controller
     public function addItems(Request $request, $id)
     {
         $lead = Lead::findOrFail($id);
+        $this->assertSalesAgentLeadAccess($lead);
 
         $data = $request->validate([
             'items' => ['required', 'array', 'min:1'],
@@ -800,6 +1023,7 @@ class LeadController extends Controller
     public function closeItem(Request $request, $leadId, $itemId)
     {
         $lead = Lead::findOrFail($leadId);
+        $this->assertSalesAgentLeadAccess($lead);
         $item = $lead->items()->findOrFail($itemId);
 
         $data = $request->validate([
@@ -861,6 +1085,7 @@ class LeadController extends Controller
     public function updateItem(Request $request, $leadId, $itemId)
     {
         $lead = Lead::findOrFail($leadId);
+        $this->assertSalesAgentLeadAccess($lead);
         $item = $lead->items()->findOrFail($itemId);
 
         $data = $request->validate([
@@ -885,13 +1110,8 @@ class LeadController extends Controller
         $lead = Lead::findOrFail($id);
         
         // Check access for sales agents
-        if ($isSalesAgent) {
-            $hasAccess = $lead->assigned_to === $user->id || 
-                        $lead->customer->isAssignedTo($user->id);
-            
-            if (!$hasAccess) {
-                return response()->json(['message' => 'Unauthorized access to this lead'], 403);
-            }
+        if ($isSalesAgent && ! $this->salesUserCanAccessLead($lead)) {
+            return response()->json(['message' => 'Unauthorized access to this lead'], 403);
         }
 
         $data = $request->validate([

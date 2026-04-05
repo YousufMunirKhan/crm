@@ -347,6 +347,7 @@ import { useRoute } from 'vue-router';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
+import { formatTicketStatus } from '@/utils/displayFormat';
 
 const route = useRoute();
 const toast = useToastStore();
@@ -417,14 +418,7 @@ const commentRecipientRows = computed(() => {
 });
 
 function getStatusLabel(status) {
-    const labels = {
-        open: 'Open',
-        in_progress: 'Working',
-        on_hold: 'On Hold',
-        resolved: 'Resolved',
-        closed: 'Closed',
-    };
-    return labels[status] || status || 'Open';
+    return formatTicketStatus(status, 'Open');
 }
 
 function formatDuration(start, end) {

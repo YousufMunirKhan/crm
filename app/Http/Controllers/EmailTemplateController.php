@@ -38,9 +38,15 @@ class EmailTemplateController extends Controller
     {
         $data = $request->validate([
             'template_id' => ['required', 'exists:email_templates,id'],
+            'lead_id' => ['nullable', 'integer', 'exists:leads,id'],
         ]);
         $customer = \App\Modules\CRM\Models\Customer::findOrFail($id);
-        return $this->sendTemplateEmail($data['template_id'], $customer);
+        $leadId = isset($data['lead_id']) ? (int) $data['lead_id'] : null;
+        if ($leadId && (int) \App\Modules\CRM\Models\Lead::whereKey($leadId)->value('customer_id') !== (int) $customer->id) {
+            return response()->json(['message' => 'Lead does not belong to this customer.'], 422);
+        }
+
+        return $this->sendTemplateEmail($data['template_id'], $customer, $leadId);
     }
 
     public function index(Request $request)
@@ -69,7 +75,7 @@ class EmailTemplateController extends Controller
             'customer_id' => ['required', 'exists:customers,id'],
         ]);
         $customer = \App\Modules\CRM\Models\Customer::findOrFail($data['customer_id']);
-        return $this->sendTemplateEmail($data['template_id'], $customer);
+        return $this->sendTemplateEmail($data['template_id'], $customer, null);
     }
 
     /**
@@ -285,7 +291,7 @@ class EmailTemplateController extends Controller
         ]);
     }
 
-    private function sendTemplateEmail(int $templateId, \App\Modules\CRM\Models\Customer $customer)
+    private function sendTemplateEmail(int $templateId, \App\Modules\CRM\Models\Customer $customer, ?int $leadId = null)
     {
         $template = EmailTemplate::findOrFail($templateId);
 
@@ -314,6 +320,7 @@ class EmailTemplateController extends Controller
                 'template_type' => 'email_template',
                 'template_id' => $template->id,
                 'customer_id' => $customer->id,
+                'lead_id' => $leadId,
                 'recipient_email' => $customer->email,
                 'subject' => $subject,
                 'content' => $content,
@@ -329,6 +336,7 @@ class EmailTemplateController extends Controller
                 'template_type' => 'email_template',
                 'template_id' => $template->id,
                 'customer_id' => $customer->id,
+                'lead_id' => $leadId,
                 'recipient_email' => $customer->email,
                 'subject' => $subject,
                 'content' => $content,

@@ -5,6 +5,7 @@ namespace App\Modules\CRM\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Traits\HasAuditLog;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -116,6 +117,41 @@ class Customer extends Model
     public function isAssignedTo(int $userId): bool
     {
         return $this->assignedUsers()->where('user_id', $userId)->exists();
+    }
+
+    /**
+     * Sales/Call agents: can open this customer (and related leads, comms, timeline) if they created them,
+     * are assigned as owner, assigned the customer to someone else, or own a lead on this customer.
+     */
+    public function salesAgentHasAccess(int $userId): bool
+    {
+        if ((int) $this->created_by === $userId) {
+            return true;
+        }
+        if ($this->isAssignedTo($userId)) {
+            return true;
+        }
+        if ($this->assignments()->where('assigned_by', $userId)->exists()) {
+            return true;
+        }
+        if ($this->leads()->where('assigned_to', $userId)->exists()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Limit a customers query to rows visible to a Sales/Call agent (same rules as {@see salesAgentHasAccess()}).
+     */
+    public function scopeForSalesAgent(Builder $query, int $userId): void
+    {
+        $query->where(function (Builder $q) use ($userId) {
+            $q->where('customers.created_by', $userId)
+                ->orWhereHas('assignedUsers', fn (Builder $s) => $s->where('user_id', $userId))
+                ->orWhereHas('assignments', fn (Builder $s) => $s->where('assigned_by', $userId))
+                ->orWhereHas('leads', fn (Builder $l) => $l->where('assigned_to', $userId));
+        });
     }
 
     public function assignTo(array $userIds, int $assignedBy, ?string $notes = null): void

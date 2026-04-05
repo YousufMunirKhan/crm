@@ -229,6 +229,7 @@ import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
+import { formatInvoiceStatus } from '@/utils/displayFormat';
 
 const toast = useToastStore();
 const auth = useAuthStore();
@@ -278,16 +279,7 @@ const formatDate = (date) => {
     });
 };
 
-const formatStatus = (status) => {
-    const statusMap = {
-        draft: 'Draft',
-        sent: 'Sent',
-        partially_paid: 'Partially Paid',
-        paid: 'Paid',
-        overdue: 'Overdue',
-    };
-    return statusMap[status] || status;
-};
+const formatStatus = formatInvoiceStatus;
 
 const getStatusClass = (status) => {
     const classes = {

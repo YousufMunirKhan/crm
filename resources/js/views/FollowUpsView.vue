@@ -182,6 +182,7 @@
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
+import { formatLeadStage } from '@/utils/displayFormat';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 
 const loading = ref(true);
@@ -220,11 +221,7 @@ function formatDate(ymd) {
     return `${d}/${m}/${y}`;
 }
 
-function formatStage(stage) {
-    if (!stage) return '—';
-    if (stage === 'follow_up') return 'Follow-up';
-    return stage.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-}
+const formatStage = formatLeadStage;
 
 function stageClass(stage) {
     const map = {

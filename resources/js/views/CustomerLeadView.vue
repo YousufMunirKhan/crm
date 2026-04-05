@@ -1,7 +1,7 @@
 <template>
-    <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 w-full min-w-0 overflow-x-hidden">
+    <div class="min-h-screen bg-slate-100 w-full min-w-0 overflow-x-hidden">
         <!-- Top Navigation Bar -->
-        <header class="bg-gradient-to-r from-emerald-50/90 via-white to-teal-50/75 border-b border-slate-200/70 sticky top-0 z-20 backdrop-blur-sm">
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-20">
             <div class="px-4 sm:px-6 py-3 sm:py-4">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 min-w-0">
@@ -15,8 +15,16 @@
                         <nav class="text-base sm:text-sm font-semibold sm:font-normal text-slate-600 flex items-center gap-1 flex-wrap">
                             <router-link to="/" class="text-teal-600 hover:text-teal-700 font-medium">Dashboard</router-link>
                             <span class="text-slate-300">/</span>
-                            <router-link :to="customersListRoute" class="hover:text-slate-900">{{ customerTypeLabel === 'Customer' ? 'Customers' : 'Prospects' }}</router-link>
-                            <span class="text-slate-300">/</span>
+                            <template v-if="isLeadWorkspace">
+                                <router-link to="/leads/pipeline" class="hover:text-slate-900">Leads</router-link>
+                                <span class="text-slate-300">/</span>
+                                <span class="text-slate-700">#{{ route.params.id }}</span>
+                                <span class="text-slate-300">/</span>
+                            </template>
+                            <template v-else>
+                                <router-link :to="customersListRoute" class="hover:text-slate-900">{{ customerTypeLabel === 'Customer' ? 'Customers' : 'Prospects' }}</router-link>
+                                <span class="text-slate-300">/</span>
+                            </template>
                             <span class="text-slate-900 font-semibold sm:font-medium truncate">{{ customer?.name || 'Loading...' }}</span>
                         </nav>
                     </div>
@@ -39,75 +47,176 @@
         </header>
 
         <!-- Main Content -->
-        <div class="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 w-full min-w-0">
-            <!-- Customer Header (compact) -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 sm:p-5 mb-4 sm:mb-6">
-                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-                    <div class="min-w-0">
-                        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 break-words">{{ customer?.name }}</h1>
-                        <p class="text-sm text-slate-500 mt-0.5">{{ customer?.business_name || '—' }}</p>
-                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-slate-600">
-                            <span v-if="customer?.email">{{ customer.email }}</span>
-                            <span v-if="customer?.phone">{{ customer.phone }}</span>
-                            <span v-if="customer?.city">{{ customer.city }}</span>
+        <div class="max-w-[1600px] mx-auto px-3 sm:px-5 py-4 sm:py-5 w-full min-w-0">
+            <!-- Deal header (pipeline-style) -->
+            <div v-if="customer" class="bg-white rounded-lg border border-slate-200 shadow-sm mb-4 p-4 sm:p-5">
+                <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                    <div class="min-w-0 flex-1">
+                        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight break-words">{{ customer.name }}</h1>
+                        <p v-if="customer.business_name" class="text-sm text-slate-500 mt-0.5">{{ customer.business_name }}</p>
+                        <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm">
+                            <a v-if="customer.phone" :href="'tel:' + customer.phone" class="text-sky-700 hover:underline font-medium">{{ customer.phone }}</a>
+                            <a v-if="customer.email" :href="'mailto:' + customer.email" class="text-sky-700 hover:underline font-medium truncate max-w-full">{{ customer.email }}</a>
+                            <span v-if="customer.city" class="text-slate-600">{{ customer.city }}</span>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2 flex-shrink-0">
-                        <span
-                            v-if="lead"
-                            class="px-3 py-1 rounded-full text-xs font-medium"
-                            :class="getStageClass(lead.stage)"
+                    <div v-if="activeLead" class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 shrink-0">
+                        <label class="sr-only" for="active-lead-select">Active lead</label>
+                        <select
+                            id="active-lead-select"
+                            v-model.number="selectedLeadId"
+                            class="px-3 py-2 text-sm border border-slate-300 rounded-md bg-white min-w-[11rem] focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                            @change="onActiveLeadSelectChange"
                         >
-                            {{ formatStage(lead.stage) }}
-                        </span>
-                        <span v-else class="px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                            No Lead
-                        </span>
+                            <option v-for="l in allLeads" :key="l.id" :value="l.id">Lead #{{ l.id }} · {{ formatStage(l.stage) }}</option>
+                        </select>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" class="px-4 py-2 text-sm font-semibold rounded-md bg-[#22a06b] text-white hover:bg-[#1c8a5a] disabled:opacity-50 touch-manipulation" :disabled="stageUpdating || activeLead.stage === 'won'" @click="submitMarkLeadWon">Won</button>
+                            <button type="button" class="px-4 py-2 text-sm font-semibold rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 touch-manipulation" :disabled="stageUpdating || activeLead.stage === 'lost'" @click="showLostLeadModal = true; lostReasonInput = ''">Lost</button>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" class="px-3 py-2 text-sm font-medium rounded-md border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 touch-manipulation" @click="openScheduleModal(activeLead)">Schedule</button>
+                            <button type="button" class="px-3 py-2 text-sm font-medium rounded-md border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 touch-manipulation" @click="openActivityModal(activeLead)">Log activity</button>
+                        </div>
+                    </div>
+                    <p v-else class="text-sm text-slate-500 shrink-0">No lead yet — use <strong>Focus</strong> below to add products.</p>
+                </div>
+                <div v-if="activeLead" class="mt-4 flex rounded-md overflow-hidden border border-slate-200">
+                    <div
+                        v-for="st in pipelineStageOrder"
+                        :key="st"
+                        class="flex-1 min-w-0 text-center py-2.5 px-0.5 sm:px-2 text-[10px] sm:text-xs font-bold uppercase tracking-tight border-r border-white/25 last:border-r-0"
+                        :class="pipelineStageVisualClass(activeLead.stage, st)"
+                    >
+                        {{ formatStagePipe(st) }}
                     </div>
                 </div>
+                <p v-if="activeLead?.assignee" class="text-xs text-slate-500 mt-3">Owner: <span class="font-medium text-slate-800">{{ activeLead.assignee.name }}</span></p>
             </div>
 
-            <!-- Full Customer / Prospect Details (all fields) -->
-            <div v-if="customer" class="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 sm:p-6 mb-4 sm:mb-6">
+            <!-- Full-width on desktop: avoids 3-column grid inside a narrow sidebar -->
+            <div v-if="customer" class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 sm:p-5 mb-4 lg:mb-5 w-full min-w-0">
                 <h2 class="text-base font-semibold text-slate-800 mb-4 pb-2 border-b border-slate-200">
                     {{ customerTypeLabel }} details
                 </h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Name</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.name || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Business name</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.business_name || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Owner name</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.owner_name || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Phone number 1</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.phone || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Contact Person 2 Name</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.contact_person_2_name || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Contact Person 2 Phone</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.contact_person_2_phone || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Email</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.email || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Secondary email</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.email_secondary || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">WhatsApp number</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.whatsapp_number || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">SMS number</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.sms_number || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Address</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.address || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Postcode</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.postcode || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">City</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.city || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">VAT number</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.vat_number || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Source</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.source || lead?.source || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">AnyDesk / RustDesk</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.anydesk_rustdesk || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">EPOS type</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.epos_type || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Licence days</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.lic_days ?? '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Birthday</span><div class="font-medium text-slate-900 mt-0.5">{{ formatDate(customer.birthday) || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Category</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.category || '—' }}</div></div>
-                    <div><span class="text-xs text-slate-500 uppercase tracking-wide">Created on</span><div class="font-medium text-slate-900 mt-0.5">{{ formatDate(customer.created_at) || '—' }}</div></div>
-                    <div class="sm:col-span-2 lg:col-span-1"><span class="text-xs text-slate-500 uppercase tracking-wide">Assigned employees</span><div class="font-medium text-slate-900 mt-0.5 flex flex-wrap gap-1"><template v-if="customer.assigned_users?.length"><span v-for="u in customer.assigned_users" :key="u.id" class="inline-flex px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-sm">{{ u.name }}</span></template><span v-else>—</span></div></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-5 [word-break:break-word]">
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.name || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Business name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.business_name || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Owner name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.owner_name || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Phone number 1</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.phone || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Contact Person 2 Name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.contact_person_2_name || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Contact Person 2 Phone</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.contact_person_2_phone || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Email</span><div class="font-medium text-slate-900 mt-0.5 break-all">{{ customer.email || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Secondary email</span><div class="font-medium text-slate-900 mt-0.5 break-all">{{ customer.email_secondary || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">WhatsApp number</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.whatsapp_number || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">SMS number</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.sms_number || '—' }}</div></div>
+                    <div class="min-w-0 sm:col-span-2 lg:col-span-2 xl:col-span-2"><span class="text-xs text-slate-500 uppercase tracking-wide block">Address</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.address || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Postcode</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.postcode || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">City</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.city || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">VAT number</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.vat_number || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Source</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.source || lead?.source || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">AnyDesk / RustDesk</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.anydesk_rustdesk || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">EPOS type</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.epos_type || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Licence days</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.lic_days ?? '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Birthday</span><div class="font-medium text-slate-900 mt-0.5">{{ formatDate(customer.birthday) || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Category</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.category || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Created on</span><div class="font-medium text-slate-900 mt-0.5">{{ formatDate(customer.created_at) || '—' }}</div></div>
+                    <div class="min-w-0 sm:col-span-2 lg:col-span-3 xl:col-span-4"><span class="text-xs text-slate-500 uppercase tracking-wide block">Assigned employees</span><div class="font-medium text-slate-900 mt-0.5 flex flex-wrap gap-1"><template v-if="customer.assigned_users?.length"><span v-for="u in customer.assigned_users" :key="u.id" class="inline-flex px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-sm">{{ u.name }}</span></template><span v-else>—</span></div></div>
                 </div>
                 <div v-if="customer.notes" class="mt-4 pt-4 border-t border-slate-200">
-                    <span class="text-xs text-slate-500 uppercase tracking-wide">Notes</span>
-                    <div class="font-medium text-slate-900 mt-0.5 whitespace-pre-wrap">{{ customer.notes }}</div>
+                    <span class="text-xs text-slate-500 uppercase tracking-wide block">Notes</span>
+                    <div class="font-medium text-slate-900 mt-0.5 whitespace-pre-wrap break-words">{{ customer.notes }}</div>
                 </div>
-                <div v-if="lead?.expected_closing_date" class="mt-4 pt-4 border-t border-slate-200">
-                    <span class="text-xs text-slate-500 uppercase tracking-wide">Expected closing date</span>
-                    <div class="font-medium text-slate-900 mt-0.5">{{ formatDate(lead.expected_closing_date) }}</div>
+                <div v-if="activeLead?.expected_closing_date" class="mt-4 pt-4 border-t border-slate-200">
+                    <span class="text-xs text-slate-500 uppercase tracking-wide block">Expected closing date</span>
+                    <div class="font-medium text-slate-900 mt-0.5">{{ formatDate(activeLead.expected_closing_date) }}</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start">
+                <aside class="lg:col-span-4 xl:col-span-3 space-y-4 order-2 lg:order-1 min-w-0">
+            <!-- Leads + activity filters → History for selected lead -->
+            <div v-if="customer" class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                <button
+                    type="button"
+                    class="w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 text-left hover:bg-slate-50/80 transition-colors touch-manipulation"
+                    :aria-expanded="showLeadsPanel"
+                    @click="showLeadsPanel = !showLeadsPanel"
+                >
+                    <div class="min-w-0">
+                        <span class="text-base font-semibold text-slate-900">Leads &amp; activity</span>
+                        <p class="text-xs text-slate-500 mt-0.5 truncate">Filter by time or person — click a lead for its timeline</p>
+                    </div>
+                    <svg class="w-5 h-5 text-slate-400 shrink-0 transition-transform" :class="showLeadsPanel ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+                <div v-show="showLeadsPanel" class="px-4 sm:px-5 pb-4 border-t border-slate-100 space-y-3">
+                    <div class="flex flex-wrap gap-1.5 pt-3">
+                        <button type="button" class="px-2.5 py-1 text-xs font-semibold rounded-md border transition-colors touch-manipulation" :class="leadActivityPreset === 'all' ? 'border-sky-600 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'" @click="setActivityPreset('all')">All</button>
+                        <button type="button" class="px-2.5 py-1 text-xs font-semibold rounded-md border transition-colors touch-manipulation" :class="leadActivityPreset === 'today' ? 'border-sky-600 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'" @click="setActivityPreset('today')">Today</button>
+                        <button type="button" class="px-2.5 py-1 text-xs font-semibold rounded-md border transition-colors touch-manipulation" :class="leadActivityPreset === 'week' ? 'border-sky-600 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'" @click="setActivityPreset('week')">Week</button>
+                        <button type="button" class="px-2.5 py-1 text-xs font-semibold rounded-md border transition-colors touch-manipulation" :class="leadActivityPreset === 'month' ? 'border-sky-600 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'" @click="setActivityPreset('month')">Month</button>
+                    </div>
+                    <div class="grid grid-cols-1 gap-2">
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">One day</label>
+                            <input v-model="leadFilterSingleDate" type="date" class="mt-0.5 w-full text-sm border border-slate-300 rounded-md px-2 py-1.5" @change="onSingleDayPicked" />
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">From</label>
+                                <input v-model="leadFilterFrom" type="date" class="mt-0.5 w-full text-sm border border-slate-300 rounded-md px-2 py-1.5" @change="onRangeChanged" />
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">To</label>
+                                <input v-model="leadFilterTo" type="date" class="mt-0.5 w-full text-sm border border-slate-300 rounded-md px-2 py-1.5" @change="onRangeChanged" />
+                            </div>
+                        </div>
+                        <div v-if="isAdminForFilter">
+                            <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Activity by</label>
+                            <select v-model="leadFilterUserId" class="mt-0.5 w-full text-sm border border-slate-300 rounded-md px-2 py-1.5 bg-white">
+                                <option value="">Anyone</option>
+                                <option v-for="emp in filterEmployees" :key="emp.id" :value="String(emp.id)">{{ emp.name }}</option>
+                            </select>
+                        </div>
+                        <p v-else class="text-[11px] text-slate-500">Managers and admins can filter by the person who logged an activity.</p>
+                        <button type="button" class="text-xs text-sky-700 hover:text-sky-900 font-medium text-left" @click="clearActivityFilters">Clear filters</button>
+                    </div>
+                    <p v-if="allLeads.length === 0" class="text-sm text-slate-500 py-2">No leads yet for this {{ customerTypeLabel.toLowerCase() }}.</p>
+                    <template v-else>
+                        <p class="text-xs text-slate-500">
+                            Showing <span class="font-semibold text-slate-700">{{ sidebarLeadsFiltered.length }}</span> of {{ allLeads.length }} leads
+                            <span v-if="activityFilterActive">(with activity in the current filter)</span>
+                        </p>
+                        <div v-if="sidebarLeadsFiltered.length === 0" class="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
+                            No leads match this filter. Try <strong>All</strong> or widen the date range.
+                        </div>
+                        <nav aria-label="Leads for this customer" class="space-y-1 max-h-[min(420px,50vh)] overflow-y-auto -mx-1 px-1">
+                            <button
+                                v-for="l in sidebarLeadsFiltered"
+                                :key="l.id"
+                                type="button"
+                                class="w-full text-left rounded-lg border px-3 py-2.5 transition-colors touch-manipulation"
+                                :class="Number(selectedLeadId) === Number(l.id) ? 'border-sky-400 bg-sky-50/90 ring-1 ring-sky-200' : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/80'"
+                                @click="openLeadHistoryFromSidebar(l)"
+                            >
+                                <div class="font-medium text-slate-900 text-sm leading-snug pr-1">{{ leadSidebarTitle(l) }}</div>
+                                <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                    <span class="font-mono text-xs text-sky-700">#{{ l.id }}</span>
+                                    <span class="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium" :class="getStageClass(l.stage)">{{ formatStage(l.stage) }}</span>
+                                </div>
+                                <div class="text-[11px] text-slate-500 mt-1">Created {{ formatDate(l.created_at) || '—' }}<template v-if="l.creator?.name"> · {{ l.creator.name }}</template></div>
+                                <div v-if="l.assignee?.name" class="text-[11px] text-slate-600">Owner: {{ l.assignee.name }}</div>
+                            </button>
+                        </nav>
+                        <p class="text-[11px] text-slate-500">Click a lead for <strong>History</strong>: appointments, follow-ups, messages, notes.</p>
+                    </template>
                 </div>
             </div>
 
             <!-- Prospect for / Purchased (categorization) -->
-            <div v-if="customer && (prospectProductNames.length > 0 || purchasedProductNames.length > 0)" class="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 sm:p-6 mb-4 sm:mb-6">
+            <div v-if="customer && (prospectProductNames.length > 0 || purchasedProductNames.length > 0)" class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 sm:p-5">
                 <h2 class="text-base font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">Products</h2>
                 <div v-if="prospectProductNames.length > 0" class="mb-3">
                     <span class="text-xs text-slate-500 uppercase tracking-wide">Prospect for</span>
@@ -124,7 +233,7 @@
             </div>
 
             <!-- Assignment log (customer) -->
-            <div v-if="customer?.assignments?.length" class="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 sm:p-6 mb-4 sm:mb-6">
+            <div v-if="customer?.assignments?.length" class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 sm:p-5">
                 <h2 class="text-base font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">Assignment log</h2>
                 <ul class="space-y-2">
                     <li v-for="a in customer.assignments" :key="a.id" class="text-sm text-slate-700">
@@ -135,9 +244,9 @@
             </div>
 
             <!-- What Customer / Prospect Has Section -->
-            <div v-if="customerHasItems.length > 0" class="bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
+            <div v-if="customerHasItems.length > 0" class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 sm:p-5">
                 <h3 class="text-lg font-semibold text-slate-900 mb-4">What {{ customerTypeLabel }} Has</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 gap-3">
                     <div
                         v-for="item in customerHasItems"
                         :key="item.id"
@@ -156,9 +265,9 @@
             </div>
 
             <!-- What to Sell Next Section -->
-            <div v-if="nextProducts.length > 0" class="bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
+            <div v-if="nextProducts.length > 0" class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 sm:p-5">
                 <h3 class="text-lg font-semibold text-slate-900 mb-4">What to Sell Next</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 gap-3">
                     <div
                         v-for="suggestion in nextProducts"
                         :key="suggestion.product.id"
@@ -172,16 +281,48 @@
                 </div>
             </div>
 
-            <!-- Appointment timeline -->
-            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
-                <h3 class="text-lg font-semibold text-slate-900 mb-1">📅 View appointment timeline</h3>
-                <p class="text-sm text-slate-500 mb-4">Appointments for this customer with status. You can complete or update an appointment from the Appointments page.</p>
-                <div v-if="appointments.length === 0" class="text-center py-6 text-slate-400 text-sm">
-                    No appointments yet. Use the form below to add one (Log Activity → Appointment).
+            <!-- Sidebar: tickets & invoices -->
+            <div v-if="tickets.length > 0 || invoices.length > 0" class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 sm:p-5 space-y-4">
+                <div v-if="tickets.length > 0">
+                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Tickets</h3>
+                    <ul class="space-y-2">
+                        <li v-for="t in tickets" :key="t.id" class="text-sm border border-slate-100 rounded-md p-2">
+                            <div class="font-medium text-slate-900">{{ t.ticket_number }}</div>
+                            <div class="text-slate-600 truncate">{{ t.subject }}</div>
+                        </li>
+                    </ul>
+                </div>
+                <div v-if="invoices.length > 0">
+                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Invoices</h3>
+                    <ul class="space-y-2">
+                        <li v-for="inv in invoices" :key="inv.id" class="text-sm border border-slate-100 rounded-md p-2 flex justify-between gap-2">
+                            <span class="font-medium text-slate-900">{{ inv.invoice_number }}</span>
+                            <span class="text-slate-700">£{{ formatNumber(inv.total) }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+                </aside>
+
+                <main class="lg:col-span-8 xl:col-span-9 space-y-4 order-1 lg:order-2 min-w-0">
+                    <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <nav class="flex border-b border-slate-200 text-sm font-semibold bg-slate-50/90" aria-label="Workspace">
+                            <button type="button" class="flex-1 sm:flex-none px-4 py-3 border-b-2 transition-colors touch-manipulation min-h-[44px]" :class="workspaceMainTab === 'focus' ? 'border-sky-600 text-sky-900 bg-white' : 'border-transparent text-slate-600 hover:text-slate-900'" @click="workspaceMainTab = 'focus'">Focus</button>
+                            <button type="button" class="flex-1 sm:flex-none px-4 py-3 border-b-2 transition-colors touch-manipulation min-h-[44px]" :class="workspaceMainTab === 'messages' ? 'border-sky-600 text-sky-900 bg-white' : 'border-transparent text-slate-600 hover:text-slate-900'" @click="workspaceMainTab = 'messages'">Messages</button>
+                            <button type="button" class="flex-1 sm:flex-none px-4 py-3 border-b-2 transition-colors touch-manipulation min-h-[44px]" :class="workspaceMainTab === 'history' ? 'border-sky-600 text-sky-900 bg-white' : 'border-transparent text-slate-600 hover:text-slate-900'" @click="workspaceMainTab = 'history'">History</button>
+                        </nav>
+                        <div class="p-4 sm:p-5">
+                            <div v-show="workspaceMainTab === 'focus'" class="space-y-5">
+            <!-- Appointment timeline (active lead) -->
+            <div>
+                <h3 class="text-base font-semibold text-slate-900 mb-1">Appointments</h3>
+                <p class="text-sm text-slate-500 mb-3">Scheduled visits for the selected lead. Use <strong>Schedule</strong> above or Log activity → Appointment.</p>
+                <div v-if="appointmentsForActiveLead.length === 0" class="rounded-lg border border-dashed border-slate-200 bg-slate-50/80 py-6 sm:py-8 px-4 text-center text-sm text-slate-500">
+                    No appointment scheduled. Click <strong>Schedule</strong> in the header to book one.
                 </div>
                 <div v-else class="space-y-3">
                     <div
-                        v-for="apt in appointments"
+                        v-for="apt in appointmentsForActiveLead"
                         :key="apt.id"
                         class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 p-4 rounded-lg border"
                         :class="apt.appointment_status === 'completed' ? 'bg-green-50 border-green-100' : apt.appointment_status === 'cancelled' || apt.appointment_status === 'no_show' ? 'bg-slate-50 border-slate-200' : 'bg-amber-50 border-amber-100'"
@@ -219,51 +360,47 @@
                 </div>
             </div>
 
-            <!-- Active Follow-ups Section -->
-            <div v-if="activeLeads.length > 0" class="bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
-                <h3 class="text-lg font-semibold text-slate-900 mb-4">Active Leads & Products</h3>
+            <!-- Active leads & line items (all open leads) -->
+            <div v-if="activeLeads.length > 0" class="rounded-lg border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+                <h3 class="text-base font-semibold text-slate-900 mb-3">Leads &amp; products</h3>
                 <div class="space-y-4">
                     <div
-                        v-for="activeLead in activeLeads"
-                        :key="activeLead.id"
-                        class="border border-slate-200 rounded-lg p-4"
+                        v-for="leadRow in activeLeads"
+                        :key="leadRow.id"
+                        class="border border-slate-200 rounded-lg p-4 bg-white"
                     >
                         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
                             <div>
                                 <div class="font-medium text-slate-900">
-                                    Lead #{{ activeLead.id }}
+                                    Lead #{{ leadRow.id }}
                                 </div>
                                 <div class="text-sm text-slate-600 mt-1">
-                                    Stage: <span :class="getStageClass(activeLead.stage)" class="px-2 py-1 rounded text-xs">
-                                        {{ formatStage(activeLead.stage) }}
+                                    Stage: <span :class="getStageClass(leadRow.stage)" class="px-2 py-1 rounded text-xs">
+                                        {{ formatStage(leadRow.stage) }}
                                     </span>
                                 </div>
-                                <div v-if="activeLead.next_follow_up_at" class="text-sm text-amber-600 mt-1 font-medium">
-                                    📅 Next Follow-up: {{ formatDate(activeLead.next_follow_up_at) }}
+                                <div v-if="leadRow.next_follow_up_at" class="text-sm text-amber-700 mt-1 font-medium">
+                                    Next follow-up: {{ formatDate(leadRow.next_follow_up_at) }}
                                 </div>
-                                <div v-if="(activeLead.assignment_logs || activeLead.assignmentLogs)?.length" class="text-xs text-slate-500 mt-2">
-                                    Assignment: <span v-for="(log, i) in (activeLead.assignment_logs || activeLead.assignmentLogs)" :key="log.id">
+                                <div v-if="(leadRow.assignment_logs || leadRow.assignmentLogs)?.length" class="text-xs text-slate-500 mt-2">
+                                    Assignment: <span v-for="(log, i) in (leadRow.assignment_logs || leadRow.assignmentLogs)" :key="log.id">
                                         {{ i ? '; ' : '' }}to {{ (log.new_assignee || log.newAssignee)?.name || '—' }} by {{ (log.assigned_by_user || log.assignedByUser)?.name || '—' }} on {{ formatDate(log.assigned_at) }}
                                     </span>
                                 </div>
                             </div>
                             <button
-                                @click="openActivityModal(activeLead)"
-                                class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 w-full sm:w-auto"
+                                type="button"
+                                @click="openActivityModal(leadRow)"
+                                class="px-4 py-2 bg-sky-600 text-white text-sm rounded-md hover:bg-sky-700 flex items-center justify-center gap-2 w-full sm:w-auto"
                             >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                </svg>
-                                Log Activity
+                                Log activity
                             </button>
                         </div>
-                        
-                        <!-- Products on this lead -->
-                        <div v-if="activeLead.items && activeLead.items.length > 0" class="mt-3 pt-3 border-t border-slate-100">
-                            <div class="text-sm font-medium text-slate-700 mb-2">Products:</div>
+                        <div v-if="leadRow.items && leadRow.items.length > 0" class="mt-3 pt-3 border-t border-slate-100">
+                            <div class="text-sm font-medium text-slate-700 mb-2">Products</div>
                             <div class="space-y-2">
                                 <div
-                                    v-for="item in activeLead.items"
+                                    v-for="item in leadRow.items"
                                     :key="item.id"
                                     class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg min-w-0"
                                     :class="getItemStatusClass(item.status)"
@@ -281,20 +418,22 @@
                                     </div>
                                     <div v-if="item.status === 'pending'" class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
                                         <button
-                                            @click="openCloseItemModal(activeLead, item, 'won')"
-                                            class="px-3 py-1 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 touch-manipulation"
+                                            type="button"
+                                            @click="openCloseItemModal(leadRow, item, 'won')"
+                                            class="px-3 py-1 text-xs bg-green-600 text-white rounded-md hover:bg-green-700 touch-manipulation"
                                         >
                                             Won
                                         </button>
                                         <button
-                                            @click="openCloseItemModal(activeLead, item, 'lost')"
-                                            class="px-3 py-1 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 touch-manipulation"
+                                            type="button"
+                                            @click="openCloseItemModal(leadRow, item, 'lost')"
+                                            class="px-3 py-1 text-xs bg-red-600 text-white rounded-md hover:bg-red-700 touch-manipulation"
                                         >
                                             Lost
                                         </button>
                                     </div>
                                     <span v-else class="text-xs px-2 py-1 rounded shrink-0" :class="item.status === 'won' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
-                                        {{ item.status.toUpperCase() }}
+                                        {{ formatLineItemStatus(item.status) }}
                                     </span>
                                 </div>
                             </div>
@@ -303,173 +442,139 @@
                 </div>
             </div>
 
-            <!-- Close Item Modal -->
-            <div v-if="showCloseItemModal" class="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
-                <div class="bg-white rounded-xl shadow-xl p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-                    <h3 class="text-lg font-semibold text-slate-900 mb-4">
-                        Close Product: {{ closeItemData.item?.product?.name }}
-                    </h3>
-                    
-                    <div v-if="closeItemData.status === 'won'" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Quantity *</label>
-                            <input
-                                v-model.number="closeItemData.quantity"
-                                type="number"
-                                min="1"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                            />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Unit Price (£) *</label>
-                            <input
-                                v-model.number="closeItemData.unit_price"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                            />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-                            <textarea
-                                v-model="closeItemData.notes"
-                                rows="2"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                                placeholder="Optional notes..."
-                            />
-                        </div>
-                    </div>
-                    
-                    <div v-else class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Lost Reason *</label>
-                            <textarea
-                                v-model="closeItemData.lost_reason"
-                                rows="3"
-                                required
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                                placeholder="Why was this product lost?"
-                            />
-                        </div>
-                    </div>
-
-                    <div v-if="closeItemError" class="mt-4 text-sm text-red-600 bg-red-50 p-3 rounded">
-                        {{ closeItemError }}
-                    </div>
-
-                    <div class="flex justify-end gap-3 mt-6">
-                        <button
-                            @click="showCloseItemModal = false"
-                            class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            @click="confirmCloseItem"
-                            :disabled="closeItemLoading"
-                            class="px-4 py-2 text-sm text-white rounded-lg"
-                            :class="closeItemData.status === 'won' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'"
-                        >
-                            {{ closeItemLoading ? 'Saving...' : (closeItemData.status === 'won' ? 'Mark as Won' : 'Mark as Lost') }}
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Follow-up/Lead Form -->
             <FollowUpLeadForm
                 v-if="customer"
                 :customer-id="customer.id"
-                :existing-lead="lead"
+                :existing-lead="activeLead"
                 @saved="handleFormSaved"
                 @cancel="showForm = false"
             />
 
-            <!-- Timeline Section -->
-            <TimelineSection
-                :timeline="timeline"
-                class="mb-6"
-            />
-
-            <!-- Tickets & Invoices -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
-                <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
-                    <h3 class="text-lg font-semibold text-slate-700 mb-4">Tickets</h3>
-                    <div v-if="tickets.length === 0" class="text-center py-8 text-slate-400 text-sm">
-                        No tickets yet
-                    </div>
-                    <ul v-else class="space-y-3">
-                        <li
-                            v-for="t in tickets"
-                            :key="t.id"
-                            class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between p-3 bg-slate-50 rounded-lg min-w-0"
-                        >
-                            <div class="min-w-0 flex-1">
-                                <div class="font-medium text-slate-900">{{ t.ticket_number }}</div>
-                                <div class="text-sm text-slate-600 mt-1 break-words">{{ t.subject }}</div>
                             </div>
-                            <span class="text-xs px-2 py-1 rounded shrink-0 self-start" :class="getStatusClass(t.status)">
-                                {{ t.status }}
-                            </span>
-                        </li>
-                    </ul>
-                </div>
 
-                <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
-                    <h3 class="text-lg font-semibold text-slate-700 mb-4">Invoices</h3>
-                    <div v-if="invoices.length === 0" class="text-center py-8 text-slate-400 text-sm">
-                        No invoices yet
-                    </div>
-                    <ul v-else class="space-y-3">
-                        <li
-                            v-for="inv in invoices"
-                            :key="inv.id"
-                            class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between p-3 bg-slate-50 rounded-lg min-w-0"
-                        >
-                            <div class="min-w-0 flex-1">
-                                <div class="font-medium text-slate-900">{{ inv.invoice_number }}</div>
-                                <div class="text-sm text-slate-600 mt-1">{{ formatDate(inv.invoice_date) }}</div>
-                            </div>
-                            <div class="text-left sm:text-right shrink-0">
-                                <div class="font-medium text-slate-900">£{{ formatNumber(inv.total) }}</div>
-                                <div class="text-xs text-slate-500 mt-1">{{ inv.status }}</div>
-                            </div>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Send Messages: Email, SMS, WhatsApp (template + send + log) -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 sm:p-6 mb-4 sm:mb-6">
-                <h2 class="text-base font-semibold text-slate-800 mb-4 pb-2 border-b border-slate-200">Send messages</h2>
-                <p class="text-sm text-slate-500 mb-4">Send from the CRM like a normal business message; everything is logged below. WhatsApp uses Meta’s rules in the background (failed sends show a short explanation in the log).</p>
+                            <div v-show="workspaceMainTab === 'messages'" class="space-y-4">
+            <div>
+                <h2 class="text-base font-semibold text-slate-900 mb-1">Send messages</h2>
+                <p class="text-sm text-slate-500 mb-4">Email, SMS, and WhatsApp are logged in <strong>History</strong>. WhatsApp follows Meta’s delivery rules.</p>
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <EmailComposer
                         v-if="customer"
                         :customer="customer"
-                        :lead-id="lead?.id"
+                        :lead-id="activeLead?.id"
                         :logs="communicationLogs.emails"
+                        :show-inline-logs="false"
                         @sent="handleMessageSent"
                         @saved="handleContactSaved"
                     />
                     <SMSComposer
                         v-if="customer"
                         :customer="customer"
-                        :lead-id="lead?.id"
+                        :lead-id="activeLead?.id"
                         :logs="communicationLogs.sms"
+                        :show-inline-logs="false"
                         @sent="handleMessageSent"
                         @saved="handleContactSaved"
                     />
                     <WhatsAppComposer
                         v-if="customer"
                         :customer="customer"
-                        :lead-id="lead?.id"
+                        :lead-id="activeLead?.id"
                         :logs="communicationLogs.whatsapp"
+                        :show-inline-logs="false"
                         @sent="handleMessageSent"
                         @saved="handleContactSaved"
                         @refresh-logs="loadCommunicationLogsOnly"
                     />
+                </div>
+            </div>
+                            </div>
+
+                            <div v-show="workspaceMainTab === 'history'">
+                                <p v-if="historyTimelineLoading" class="text-sm text-slate-500 mb-2">Updating history…</p>
+            <TimelineSection
+                :timeline="displayHistoryTimeline"
+                class="border-0 shadow-none"
+            />
+                            </div>
+
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <!-- Close line item (Won / Lost) -->
+        <div v-if="showCloseItemModal" class="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-xl shadow-xl p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <h3 class="text-lg font-semibold text-slate-900 mb-4">
+                    Close Product: {{ closeItemData.item?.product?.name }}
+                </h3>
+
+                <div v-if="closeItemData.status === 'won'" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Quantity *</label>
+                        <input
+                            v-model.number="closeItemData.quantity"
+                            type="number"
+                            min="1"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Unit Price (£) *</label>
+                        <input
+                            v-model.number="closeItemData.unit_price"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+                        <textarea
+                            v-model="closeItemData.notes"
+                            rows="2"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                            placeholder="Optional notes..."
+                        />
+                    </div>
+                </div>
+
+                <div v-else class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Lost Reason *</label>
+                        <textarea
+                            v-model="closeItemData.lost_reason"
+                            rows="3"
+                            required
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                            placeholder="Why was this product lost?"
+                        />
+                    </div>
+                </div>
+
+                <div v-if="closeItemError" class="mt-4 text-sm text-red-600 bg-red-50 p-3 rounded">
+                    {{ closeItemError }}
+                </div>
+
+                <div class="flex justify-end gap-3 mt-6">
+                    <button
+                        type="button"
+                        @click="showCloseItemModal = false"
+                        class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        @click="confirmCloseItem"
+                        :disabled="closeItemLoading"
+                        class="px-4 py-2 text-sm text-white rounded-lg"
+                        :class="closeItemData.status === 'won' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'"
+                    >
+                        {{ closeItemLoading ? 'Saving...' : (closeItemData.status === 'won' ? 'Mark as Won' : 'Mark as Lost') }}
+                    </button>
                 </div>
             </div>
         </div>
@@ -486,9 +591,34 @@
         <LogActivityModal
             v-if="showActivityModal && activityLead"
             :lead="activityLead"
+            :initial-activity-type="activityModalInitialType"
             @close="closeActivityModal"
             @saved="handleActivitySaved"
         />
+
+        <div v-if="showLostLeadModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+                <h3 class="text-lg font-semibold text-slate-900 mb-2">Mark lead as Lost</h3>
+                <p class="text-sm text-slate-600 mb-4">Please provide a reason. This is required for reporting.</p>
+                <textarea
+                    v-model="lostReasonInput"
+                    rows="3"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500"
+                    placeholder="Lost reason..."
+                />
+                <div class="flex justify-end gap-2 mt-4">
+                    <button type="button" class="px-4 py-2 text-sm border border-slate-300 rounded-lg" @click="showLostLeadModal = false">Cancel</button>
+                    <button
+                        type="button"
+                        class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg disabled:opacity-50"
+                        :disabled="stageUpdating"
+                        @click="submitMarkLeadLost"
+                    >
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- Complete Follow-up / Appointment Modal -->
         <div v-if="showCompleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -555,15 +685,117 @@ import WhatsAppComposer from '@/components/WhatsAppComposer.vue';
 import EmailComposer from '@/components/EmailComposer.vue';
 import SMSComposer from '@/components/SMSComposer.vue';
 import CustomerAssignmentModal from '@/components/CustomerAssignmentModal.vue';
+import { formatLeadStage, formatLineItemStatus } from '@/utils/displayFormat';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const toast = useToastStore();
 
+const isLeadWorkspace = computed(() => route.meta.workspaceFromLead === true);
+const resolvedCustomerId = ref(null);
+const workspaceLeadId = ref(null);
+const selectedLeadId = ref(null);
+const activityModalInitialType = ref('call');
+const showLostLeadModal = ref(false);
+const lostReasonInput = ref('');
+const stageUpdating = ref(false);
+
+const effectiveCustomerId = computed(() => {
+    if (isLeadWorkspace.value && resolvedCustomerId.value) {
+        return String(resolvedCustomerId.value);
+    }
+    return route.params.id ? String(route.params.id) : '';
+});
+
+function pickRepresentativeLeadId(leads) {
+    const list = (leads || []).filter(Boolean);
+    if (!list.length) {
+        return null;
+    }
+    const byUpdated = (a, b) => new Date(b.updated_at) - new Date(a.updated_at);
+    const won = [...list].filter((l) => l.stage === 'won').sort(byUpdated)[0];
+    if (won) {
+        return won.id;
+    }
+    const lost = [...list].filter((l) => l.stage === 'lost').sort(byUpdated)[0];
+    if (lost) {
+        return lost.id;
+    }
+    const rank = { follow_up: 1, lead: 2, hot_lead: 3, quotation: 4 };
+    return [...list].sort((a, b) => {
+        const ra = rank[a.stage] ?? 0;
+        const rb = rank[b.stage] ?? 0;
+        if (ra !== rb) {
+            return rb - ra;
+        }
+        return byUpdated(a, b);
+    })[0]?.id ?? null;
+}
+
 const customer = ref(null);
 const lead = ref(null);
 const allLeads = ref([]);
+
+const activeLead = computed(() => {
+    const id = selectedLeadId.value;
+    if (id && allLeads.value?.length) {
+        const found = allLeads.value.find((l) => l.id === id);
+        if (found) {
+            return found;
+        }
+    }
+    return lead.value;
+});
+
+const pipelineStageOrder = ['follow_up', 'lead', 'hot_lead', 'quotation', 'won', 'lost'];
+
+function formatStagePipe(stage) {
+    const map = {
+        follow_up: 'Follow-up',
+        lead: 'Lead',
+        hot_lead: 'Hot',
+        quotation: 'Quote',
+        won: 'Won',
+        lost: 'Lost',
+    };
+    return map[stage] || formatLeadStage(stage, '-');
+}
+
+function pipelineStageVisualClass(currentStage, segmentStage) {
+    const order = pipelineStageOrder;
+    const ci = order.indexOf(currentStage);
+    const si = order.indexOf(segmentStage);
+    if (ci < 0 || si < 0) {
+        return 'bg-slate-100 text-slate-500';
+    }
+    if (si < ci) {
+        return 'bg-emerald-500 text-white';
+    }
+    if (si === ci) {
+        return 'bg-sky-600 text-white';
+    }
+    return 'bg-slate-200 text-slate-600';
+}
+
+/** History scoped to active lead (hide customer-level comms without lead_id when a lead is selected). */
+const timelineForActiveLead = computed(() => {
+    const items = timeline.value || [];
+    const lid = activeLead.value?.id;
+    if (!lid) {
+        return items;
+    }
+    return items.filter((item) => {
+        if (item.type === 'ticket') {
+            return true;
+        }
+        if (item.lead_id === null || item.lead_id === undefined) {
+            return false;
+        }
+        return Number(item.lead_id) === Number(lid);
+    });
+});
+
 const tickets = ref([]);
 const invoices = ref([]);
 const timeline = ref([]);
@@ -571,6 +803,248 @@ const customerHasItems = ref([]);
 const nextProducts = ref([]);
 const activeLeads = ref([]);
 const appointments = ref([]);
+const workspaceMainTab = ref('focus');
+const showLeadsPanel = ref(true);
+
+const leadActivityPreset = ref('all');
+const leadFilterSingleDate = ref('');
+const leadFilterFrom = ref('');
+const leadFilterTo = ref('');
+const leadFilterUserId = ref('');
+const filterEmployees = ref([]);
+const historyTimelineApi = ref(null);
+const historyTimelineLoading = ref(false);
+const matchingActivityLeadIds = ref(null);
+
+const isAdminForFilter = computed(() => {
+    const role = auth.user?.role?.name;
+    return role === 'Admin' || role === 'Manager' || role === 'System Admin';
+});
+
+function formatLocalYmd(d) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function setActivityPreset(p) {
+    leadActivityPreset.value = p;
+    if (p !== 'single') {
+        leadFilterSingleDate.value = '';
+    }
+    if (p !== 'range' && p !== 'single') {
+        leadFilterFrom.value = '';
+        leadFilterTo.value = '';
+    }
+}
+
+function onSingleDayPicked() {
+    if (leadFilterSingleDate.value) {
+        leadActivityPreset.value = 'single';
+        leadFilterFrom.value = '';
+        leadFilterTo.value = '';
+    }
+}
+
+function onRangeChanged() {
+    if (leadFilterFrom.value || leadFilterTo.value) {
+        leadActivityPreset.value = 'range';
+        leadFilterSingleDate.value = '';
+    }
+}
+
+function clearActivityFilters() {
+    setActivityPreset('all');
+    leadFilterUserId.value = '';
+}
+
+function getTimelineDateQuery() {
+    const now = new Date();
+    const p = leadActivityPreset.value;
+    if (p === 'today') {
+        return { on: formatLocalYmd(now) };
+    }
+    if (p === 'week') {
+        const day = now.getDay();
+        const diff = day === 0 ? -6 : 1 - day;
+        const start = new Date(now);
+        start.setDate(now.getDate() + diff);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        return { from: formatLocalYmd(start), to: formatLocalYmd(end) };
+    }
+    if (p === 'month') {
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        return { from: formatLocalYmd(start), to: formatLocalYmd(end) };
+    }
+    if (p === 'single' && leadFilterSingleDate.value) {
+        return { on: leadFilterSingleDate.value };
+    }
+    if (p === 'range') {
+        const q = {};
+        if (leadFilterFrom.value) {
+            q.from = leadFilterFrom.value;
+        }
+        if (leadFilterTo.value) {
+            q.to = leadFilterTo.value;
+        }
+        return q;
+    }
+    return {};
+}
+
+const activityFilterActive = computed(() => {
+    if (leadFilterUserId.value !== '' && leadFilterUserId.value != null) {
+        return true;
+    }
+    const p = leadActivityPreset.value;
+    if (p === 'all') {
+        return false;
+    }
+    if (p === 'single') {
+        return !!leadFilterSingleDate.value;
+    }
+    if (p === 'range') {
+        return !!(leadFilterFrom.value || leadFilterTo.value);
+    }
+    return true;
+});
+
+function buildUnifiedTimelineParams(leadScoped) {
+    const params = { ...getTimelineDateQuery() };
+    if (leadFilterUserId.value !== '' && leadFilterUserId.value != null) {
+        params.user_id = leadFilterUserId.value;
+    }
+    if (leadScoped && selectedLeadId.value) {
+        params.lead_id = selectedLeadId.value;
+    }
+    return params;
+}
+
+async function fetchMatchingLeadIds() {
+    const cid = effectiveCustomerId.value;
+    if (!cid || !activityFilterActive.value) {
+        matchingActivityLeadIds.value = null;
+        return;
+    }
+    try {
+        const { data } = await axios.get(`/api/customers/${cid}/unified-timeline`, {
+            params: buildUnifiedTimelineParams(false),
+        });
+        matchingActivityLeadIds.value = data.matching_lead_ids || [];
+    } catch {
+        matchingActivityLeadIds.value = [];
+    }
+}
+
+async function fetchHistoryTimeline() {
+    const cid = effectiveCustomerId.value;
+    if (!cid || workspaceMainTab.value !== 'history') {
+        return;
+    }
+    historyTimelineLoading.value = true;
+    try {
+        const { data } = await axios.get(`/api/customers/${cid}/unified-timeline`, {
+            params: buildUnifiedTimelineParams(true),
+        });
+        historyTimelineApi.value = Array.isArray(data.timeline) ? data.timeline : [];
+    } catch (e) {
+        toast.error(e?.response?.data?.message || 'Could not load history');
+        historyTimelineApi.value = null;
+    } finally {
+        historyTimelineLoading.value = false;
+    }
+}
+
+const sidebarLeadsFiltered = computed(() => {
+    const list = allLeads.value || [];
+    const ids = matchingActivityLeadIds.value;
+    if (!activityFilterActive.value || ids === null) {
+        return list;
+    }
+    const set = new Set(ids);
+    return list.filter((l) => set.has(l.id));
+});
+
+const displayHistoryTimeline = computed(() => {
+    if (historyTimelineApi.value !== null) {
+        return historyTimelineApi.value;
+    }
+    return timelineForActiveLead.value;
+});
+
+async function loadFilterEmployees() {
+    if (!isAdminForFilter.value) {
+        return;
+    }
+    try {
+        const res = await axios.get('/api/users');
+        filterEmployees.value = Array.isArray(res.data) ? res.data : res.data?.data || [];
+    } catch {
+        filterEmployees.value = [];
+    }
+}
+
+/** Readable lead line for sidebar menu (products / deal). */
+function leadSidebarTitle(lead) {
+    if (!lead) {
+        return 'Lead';
+    }
+    const items = lead.items || [];
+    const names = items.map((i) => i.product?.name).filter(Boolean);
+    const fromItems = names.length ? names.slice(0, 2).join(', ') : '';
+    const primary = fromItems || lead.product?.name || '';
+    if (primary) {
+        return names.length > 2 ? `${primary} (+${names.length - 2} more)` : primary;
+    }
+    return `Deal #${lead.id}`;
+}
+
+function openLeadHistoryFromSidebar(l) {
+    selectedLeadId.value = l.id;
+    if (!isLeadWorkspace.value) {
+        router.replace({ path: route.path, query: { ...route.query, lead: String(l.id) } });
+    }
+    workspaceMainTab.value = 'history';
+    historyTimelineApi.value = null;
+    fetchHistoryTimeline();
+}
+
+let historyRefreshTimer = null;
+function scheduleHistoryRefresh() {
+    clearTimeout(historyRefreshTimer);
+    historyRefreshTimer = setTimeout(() => {
+        fetchMatchingLeadIds();
+        if (workspaceMainTab.value === 'history') {
+            fetchHistoryTimeline();
+        }
+    }, 280);
+}
+
+watch(
+    () => [
+        effectiveCustomerId.value,
+        workspaceMainTab.value,
+        selectedLeadId.value,
+        leadActivityPreset.value,
+        leadFilterSingleDate.value,
+        leadFilterFrom.value,
+        leadFilterTo.value,
+        leadFilterUserId.value,
+    ],
+    () => {
+        scheduleHistoryRefresh();
+    },
+);
+
+const appointmentsForActiveLead = computed(() => {
+    const lid = activeLead.value?.id;
+    if (!lid) {
+        return [];
+    }
+    return (appointments.value || []).filter((a) => Number(a.lead_id) === Number(lid));
+});
+
 const showForm = ref(true);
 const showCompleteModal = ref(false);
 const completingFollowUp = ref(false);
@@ -586,11 +1060,12 @@ const communicationLogs = ref({ emails: [], sms: [], whatsapp: [] });
 
 /** Refetch only message logs (lightweight) — used for WhatsApp replies without full page reload */
 const loadCommunicationLogsOnly = async () => {
-    if (!route.params.id) {
+    const cid = effectiveCustomerId.value;
+    if (!cid) {
         return;
     }
     try {
-        const logsRes = await axios.get(`/api/customers/${route.params.id}/communication-logs`);
+        const logsRes = await axios.get(`/api/customers/${cid}/communication-logs`);
         communicationLogs.value = logsRes.data || { emails: [], sms: [], whatsapp: [] };
     } catch {
         communicationLogs.value = { emails: [], sms: [], whatsapp: [] };
@@ -604,14 +1079,14 @@ function scheduleCommunicationLogsPolling() {
         clearInterval(communicationLogsPollTimer);
     }
     communicationLogsPollTimer = setInterval(() => {
-        if (document.visibilityState === 'visible' && route.params.id) {
+        if (document.visibilityState === 'visible' && effectiveCustomerId.value) {
             loadCommunicationLogsOnly();
         }
     }, 20000);
 }
 
 function onVisibilityRefreshLogs() {
-    if (document.visibilityState === 'visible' && route.params.id) {
+    if (document.visibilityState === 'visible' && effectiveCustomerId.value) {
         loadCommunicationLogsOnly();
     }
 }
@@ -635,7 +1110,14 @@ const showActivityModal = ref(false);
 const activityLead = ref(null);
 
 const openActivityModal = (leadObj) => {
+    activityModalInitialType.value = 'call';
     activityLead.value = leadObj;
+    showActivityModal.value = true;
+};
+
+const openScheduleModal = (leadObj) => {
+    activityModalInitialType.value = 'appointment';
+    activityLead.value = leadObj || activeLead.value;
     showActivityModal.value = true;
 };
 
@@ -647,6 +1129,46 @@ const closeActivityModal = () => {
 const handleActivitySaved = () => {
     loadData();
     closeActivityModal();
+};
+
+const submitMarkLeadWon = async () => {
+    const l = activeLead.value;
+    if (!l || stageUpdating.value) {
+        return;
+    }
+    stageUpdating.value = true;
+    try {
+        await axios.put(`/api/leads/${l.id}`, { stage: 'won' });
+        toast.success('Lead marked as Won. Customer type updated if applicable.');
+        await loadData();
+    } catch (e) {
+        toast.error(e?.response?.data?.message || 'Could not mark as Won. Add products to the lead first if required.');
+    } finally {
+        stageUpdating.value = false;
+    }
+};
+
+const submitMarkLeadLost = async () => {
+    const l = activeLead.value;
+    if (!l || stageUpdating.value) {
+        return;
+    }
+    if (!lostReasonInput.value.trim()) {
+        toast.error('Please enter a lost reason.');
+        return;
+    }
+    stageUpdating.value = true;
+    try {
+        await axios.put(`/api/leads/${l.id}`, { stage: 'lost', lost_reason: lostReasonInput.value.trim() });
+        toast.success('Lead marked as Lost.');
+        showLostLeadModal.value = false;
+        lostReasonInput.value = '';
+        await loadData();
+    } catch (e) {
+        toast.error(e?.response?.data?.message || 'Failed to update lead.');
+    } finally {
+        stageUpdating.value = false;
+    }
 };
 
 const formatAppointmentDate = (dateStr) => {
@@ -739,10 +1261,7 @@ const formatDate = (dateString) => {
     });
 };
 
-const formatStage = (stage) => {
-    if (!stage) return '-';
-    return stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-};
+const formatStage = (stage) => formatLeadStage(stage, '-');
 
 const getStageClass = (stage) => {
     const classes = {
@@ -823,7 +1342,7 @@ const confirmCloseItem = async () => {
 
         await axios.post(`/api/leads/${closeItemData.value.lead.id}/items/${closeItemData.value.item.id}/close`, payload);
         
-        toast.success(`Product marked as ${closeItemData.value.status}!`);
+        toast.success(`Product marked as ${formatLineItemStatus(closeItemData.value.status)}!`);
         showCloseItemModal.value = false;
         await loadData();
     } catch (err) {
@@ -834,9 +1353,30 @@ const confirmCloseItem = async () => {
     }
 };
 
+async function resolveLeadWorkspace() {
+    if (!isLeadWorkspace.value) {
+        resolvedCustomerId.value = null;
+        workspaceLeadId.value = null;
+        return;
+    }
+    try {
+        const { data } = await axios.get(`/api/leads/${route.params.id}`);
+        resolvedCustomerId.value = data.customer_id;
+        workspaceLeadId.value = data.id;
+        selectedLeadId.value = data.id;
+    } catch (e) {
+        toast.error(e?.response?.data?.message || 'Lead not found.');
+        router.push('/leads/pipeline');
+    }
+}
+
 const loadData = async () => {
+        const cid = effectiveCustomerId.value;
+        if (!cid) {
+            return;
+        }
         try {
-            const { data } = await axios.get(`/api/customers/${route.params.id}`);
+            const { data } = await axios.get(`/api/customers/${cid}`);
             customer.value = data.customer;
             lead.value = data.lead;
             tickets.value = data.tickets || [];
@@ -855,8 +1395,18 @@ const loadData = async () => {
 
         // Load all leads for this customer
         try {
-            const leadsResponse = await axios.get(`/api/customers/${route.params.id}/leads`);
+            const leadsResponse = await axios.get(`/api/customers/${cid}/leads`);
             allLeads.value = leadsResponse.data || [];
+
+            const qLead = route.query.lead ? parseInt(String(route.query.lead), 10) : NaN;
+            if (!Number.isNaN(qLead) && allLeads.value.some((l) => l.id === qLead)) {
+                selectedLeadId.value = qLead;
+            } else if (isLeadWorkspace.value && workspaceLeadId.value) {
+                selectedLeadId.value = workspaceLeadId.value;
+            } else {
+                const pick = pickRepresentativeLeadId(allLeads.value);
+                selectedLeadId.value = pick;
+            }
 
             // Get items from won leads — only WON items (exclude lost items)
             if (!data.customer_has_items || data.customer_has_items.length === 0) {
@@ -883,18 +1433,27 @@ const loadData = async () => {
         // Load next products to sell (if not already set from response)
         if (!data.next_products || data.next_products.length === 0) {
             try {
-                const nextProductsResponse = await axios.get(`/api/customers/${route.params.id}/next-products`);
+                const nextProductsResponse = await axios.get(`/api/customers/${cid}/next-products`);
                 nextProducts.value = nextProductsResponse.data?.suggested_products || [];
             } catch (err) {
                 console.error('Error loading next products:', err);
                 nextProducts.value = [];
             }
         }
+
+            historyTimelineApi.value = null;
+            await fetchMatchingLeadIds();
+            if (workspaceMainTab.value === 'history') {
+                await fetchHistoryTimeline();
+            }
     } catch (error) {
         console.error('Failed to load customer data:', error);
         if (error.response?.status === 404) {
             toast.error('Customer not found.');
             router.push({ path: '/customers', query: { type: 'prospect' } });
+        } else if (error.response?.status === 403) {
+            toast.error('You do not have access to this record.');
+            router.push(isLeadWorkspace.value ? '/leads/pipeline' : { path: '/customers', query: { type: 'prospect' } });
         } else {
             console.error('Error details:', error.response?.data || error.message);
         }
@@ -926,19 +1485,41 @@ const logout = () => {
     auth.logout();
 };
 
+function onActiveLeadSelectChange() {
+    const id = selectedLeadId.value;
+    if (!id || isLeadWorkspace.value) {
+        return;
+    }
+    router.replace({ path: route.path, query: { ...route.query, lead: String(id) } });
+}
+
 onMounted(async () => {
+    if (isLeadWorkspace.value) {
+        await resolveLeadWorkspace();
+    }
+    await loadFilterEmployees();
     await loadData();
     document.addEventListener('visibilitychange', onVisibilityRefreshLogs);
     scheduleCommunicationLogsPolling();
 });
 
+let skipInitialRouteWatch = true;
 watch(
     () => route.params.id,
-    (newId, oldId) => {
-        if (newId && newId !== oldId) {
-            loadCommunicationLogsOnly();
-            scheduleCommunicationLogsPolling();
+    async (newId, oldId) => {
+        if (skipInitialRouteWatch) {
+            skipInitialRouteWatch = false;
+            return;
         }
+        if (!newId || newId === oldId) {
+            return;
+        }
+        if (isLeadWorkspace.value) {
+            await resolveLeadWorkspace();
+        }
+        await loadData();
+        loadCommunicationLogsOnly();
+        scheduleCommunicationLogsPolling();
     }
 );
 

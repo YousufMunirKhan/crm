@@ -27,11 +27,14 @@ class LeadActivity extends Model
         'remind_at',
         'appointment_status',
         'outcome_notes',
+        'appointment_date',
+        'appointment_time',
     ];
 
     protected $casts = [
         'meta' => 'array',
         'remind_at' => 'datetime',
+        'appointment_date' => 'date',
     ];
 
     public function lead(): BelongsTo

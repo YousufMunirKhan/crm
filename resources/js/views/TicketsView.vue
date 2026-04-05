@@ -24,6 +24,14 @@
                         <option value="closed">Closed</option>
                     </select>
                 </div>
+                <div class="w-full sm:w-44">
+                    <label class="listing-label">From</label>
+                    <input v-model="dateFrom" type="date" class="listing-input" />
+                </div>
+                <div class="w-full sm:w-44">
+                    <label class="listing-label">To</label>
+                    <input v-model="dateTo" type="date" class="listing-input" />
+                </div>
                 <button type="button" class="listing-btn-primary" @click="loadTickets">
                     Filter
                 </button>
@@ -137,15 +145,18 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import axios from 'axios';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
+import { formatTicketStatus } from '@/utils/displayFormat';
 
 const toast = useToastStore();
 const auth = useAuthStore();
+const route = useRoute();
 
 const isStaffAdmin = computed(() => {
     const n = auth.user?.role?.name;
@@ -165,6 +176,10 @@ function formatDateTime(value) {
 }
 const tickets = ref([]);
 const statusFilter = ref('');
+const dateFrom = ref('');
+const dateTo = ref('');
+/** Set from dashboard deep link (`assigned_to`); only sent when present. */
+const assignedToFilter = ref('');
 const pagination = ref({
     current_page: 1,
     last_page: 1,
@@ -180,6 +195,22 @@ const onStatusFilterChange = () => {
     pagination.value.current_page = 1;
     loadTickets();
 };
+
+const TICKET_STATUS_QUERY = ['open', 'in_progress', 'on_hold', 'resolved', 'closed'];
+
+function syncFiltersFromRoute() {
+    const q = route.query;
+    const st = q.status;
+    if (st != null && String(st) !== '') {
+        const s = String(st);
+        statusFilter.value = TICKET_STATUS_QUERY.includes(s) ? s : '';
+    } else {
+        statusFilter.value = '';
+    }
+    dateFrom.value = q.from != null && q.from !== '' ? String(q.from) : '';
+    dateTo.value = q.to != null && q.to !== '' ? String(q.to) : '';
+    assignedToFilter.value = q.assigned_to != null && q.assigned_to !== '' ? String(q.assigned_to) : '';
+}
 
 const getPriorityClass = (priority) => {
     const classes = {
@@ -210,16 +241,7 @@ const formatAssignees = (ticket) => {
     return ticket.assignee?.name || '—';
 };
 
-const getStatusLabel = (status) => {
-    const labels = {
-        open: 'Open',
-        in_progress: 'Working',
-        on_hold: 'On Hold',
-        resolved: 'Resolved',
-        closed: 'Closed',
-    };
-    return labels[status] || status || '—';
-};
+const getStatusLabel = (status) => formatTicketStatus(status);
 
 const loadTickets = async () => {
     try {
@@ -230,6 +252,9 @@ const loadTickets = async () => {
         if (statusFilter.value) {
             params.status = statusFilter.value;
         }
+        if (dateFrom.value) params.from = dateFrom.value;
+        if (dateTo.value) params.to = dateTo.value;
+        if (assignedToFilter.value) params.assigned_to = assignedToFilter.value;
 
         const { data } = await axios.get('/api/tickets', { params });
         tickets.value = data.data || data;
@@ -251,8 +276,19 @@ const goToPage = (page) => {
     loadTickets();
 };
 
+watch(
+    () => route.query,
+    () => {
+        syncFiltersFromRoute();
+        pagination.value.current_page = 1;
+        loadTickets();
+    },
+    { deep: true },
+);
+
 onMounted(async () => {
     if (!auth.initialized) await auth.bootstrap();
+    syncFiltersFromRoute();
     loadTickets();
 });
 </script>

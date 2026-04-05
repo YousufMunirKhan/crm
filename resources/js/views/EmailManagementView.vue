@@ -139,10 +139,20 @@
                         + Add product rule
                     </button>
                 </div>
-                <div class="mt-4">
+                <div class="mt-4 flex flex-wrap gap-3 items-end">
+                    <div class="min-w-[200px] flex-1 max-w-md">
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Search by customer name (optional)</label>
+                        <input
+                            v-model="searchQuery"
+                            type="search"
+                            placeholder="e.g. Smith"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            @keydown.enter.prevent="applyFilters"
+                        />
+                    </div>
                     <button
                         type="button"
-                        @click="applyFilters()"
+                        @click="applyFilters"
                         :disabled="loadingContacts"
                         class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium"
                     >
@@ -162,9 +172,17 @@
                 </div>
                 <div v-else>
                     <p class="text-sm text-slate-700 mb-3">
-                        <strong>{{ totalContacts }}</strong> recipient(s) will receive the email.
+                        <strong>{{ totalContacts }}</strong> match filters;
+                        <strong class="text-blue-700">{{ sendableTotal }}</strong> selected to receive (uncheck rows to exclude).
                         <span v-if="totalContacts > contacts.length" class="text-slate-500">(showing page {{ contactsPage }} of {{ contactsLastPage }})</span>
                     </p>
+                    <div class="flex flex-wrap gap-2 mb-3 text-sm">
+                        <button type="button" class="text-blue-600 hover:text-blue-800" @click="selectAllRecipientsOnPage">Select all on this page</button>
+                        <span class="text-slate-300">|</span>
+                        <button type="button" class="text-blue-600 hover:text-blue-800" @click="deselectAllRecipientsOnPage">Uncheck all on this page</button>
+                        <span class="text-slate-300">|</span>
+                        <button type="button" class="text-slate-600 hover:text-slate-900" @click="clearRecipientExclusions">Include everyone again</button>
+                    </div>
                     <div class="flex flex-wrap gap-3 mb-4 items-center">
                         <button
                             type="button"
@@ -198,6 +216,7 @@
                         <table class="w-full text-sm min-w-[320px]">
                             <thead class="bg-slate-50 sticky top-0">
                                 <tr>
+                                    <th class="w-10 px-2 py-2 font-medium text-slate-700 text-center" title="Include in send">✓</th>
                                     <th class="text-left px-3 sm:px-4 py-2 font-medium text-slate-700">Name</th>
                                     <th class="text-left px-3 sm:px-4 py-2 font-medium text-slate-700">Email</th>
                                     <th class="text-left px-3 sm:px-4 py-2 font-medium text-slate-700">Type</th>
@@ -205,6 +224,14 @@
                             </thead>
                             <tbody>
                                 <tr v-for="c in contacts" :key="c.id" class="border-t border-slate-100 hover:bg-slate-50">
+                                    <td class="px-2 py-2 text-center">
+                                        <input
+                                            type="checkbox"
+                                            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                            :checked="recipientIncluded(c.id)"
+                                            @change="toggleRecipient(c.id, $event.target.checked)"
+                                        />
+                                    </td>
                                     <td class="px-3 sm:px-4 py-2">{{ c.name }}</td>
                                     <td class="px-3 sm:px-4 py-2">{{ c.email }}</td>
                                     <td class="px-3 sm:px-4 py-2 capitalize">{{ c.type }}</td>
@@ -231,7 +258,7 @@
                         </select>
                     </div>
                     <div v-if="totalContacts > 0" class="text-sm text-slate-600">
-                        This email will go to <strong>{{ totalContacts }}</strong> recipient(s).
+                        This email will go to <strong>{{ sendableTotal }}</strong> recipient(s) ({{ totalContacts }} match filters<span v-if="excludedRecipientIds.length">; {{ excludedRecipientIds.length }} excluded</span>).
                     </div>
                     <div v-if="preview.subject || preview.content" class="border border-slate-200 rounded-lg overflow-hidden">
                         <div class="px-4 py-2 bg-slate-50 border-b border-slate-200 text-sm font-medium text-slate-700">
@@ -264,10 +291,10 @@
                 <button
                     type="button"
                     @click="sendBulk"
-                    :disabled="sending || totalContacts === 0 || !selectedTemplateId"
+                    :disabled="sending || sendableTotal === 0 || !selectedTemplateId"
                     class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
                 >
-                    {{ sending ? 'Sending...' : `Send email to ${totalContacts} recipient(s)` }}
+                    {{ sending ? 'Sending...' : `Send email to ${sendableTotal} recipient(s)` }}
                 </button>
                 <p v-if="sendResult" class="mt-3 text-sm" :class="sendResult.failed ? 'text-amber-600' : 'text-green-600'">
                     {{ sendResult.message }}
@@ -280,7 +307,7 @@
             <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200 space-y-6">
                 <h2 class="text-lg font-semibold text-slate-900">Send by Date</h2>
                 <p class="text-sm text-slate-600">Filter customers and prospects by creation date, choose a template, and send email.</p>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">From date</label>
                         <input v-model="dateFilterFrom" type="date" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -296,6 +323,16 @@
                             <option value="customer">Customers only</option>
                             <option value="both">Both</option>
                         </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Search name (optional)</label>
+                        <input
+                            v-model="dateSearchQuery"
+                            type="search"
+                            placeholder="e.g. Smith"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            @keydown.enter.prevent="applyDateFilter"
+                        />
                     </div>
                     <div class="flex items-end">
                         <button
@@ -313,7 +350,8 @@
                 <div v-if="hasDateApplied" class="space-y-4">
                     <div class="flex flex-wrap items-center gap-4">
                         <p class="text-sm text-slate-700">
-                            <strong>{{ dateTotalContacts }}</strong> recipient(s) will receive the email.
+                            <strong>{{ dateTotalContacts }}</strong> match;
+                            <strong class="text-blue-700">{{ dateSendableTotal }}</strong> selected to send.
                         </p>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Choose template</label>
@@ -329,11 +367,18 @@
                         <button
                             type="button"
                             @click="sendByDate"
-                            :disabled="sendingByDate || dateTotalContacts === 0 || !dateSelectedTemplateId"
+                            :disabled="sendingByDate || dateSendableTotal === 0 || !dateSelectedTemplateId"
                             class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
                         >
-                            {{ sendingByDate ? 'Sending...' : `Send to ${dateTotalContacts} recipient(s)` }}
+                            {{ sendingByDate ? 'Sending...' : `Send to ${dateSendableTotal} recipient(s)` }}
                         </button>
+                    </div>
+                    <div class="flex flex-wrap gap-2 text-sm">
+                        <button type="button" class="text-blue-600 hover:text-blue-800" @click="selectAllDateRecipientsOnPage">Select all on this page</button>
+                        <span class="text-slate-300">|</span>
+                        <button type="button" class="text-blue-600 hover:text-blue-800" @click="deselectAllDateRecipientsOnPage">Uncheck all on this page</button>
+                        <span class="text-slate-300">|</span>
+                        <button type="button" class="text-slate-600 hover:text-slate-900" @click="clearDateRecipientExclusions">Include everyone again</button>
                     </div>
 
                     <div v-if="datePreview.subject || datePreview.content" class="border border-slate-200 rounded-lg overflow-hidden">
@@ -356,6 +401,7 @@
                         <table class="w-full text-sm min-w-[320px]">
                             <thead class="bg-slate-50 sticky top-0">
                                 <tr>
+                                    <th class="w-10 px-2 py-2 font-medium text-slate-700 text-center">✓</th>
                                     <th class="text-left px-3 py-2 font-medium text-slate-700">Name</th>
                                     <th class="text-left px-3 py-2 font-medium text-slate-700">Email</th>
                                     <th class="text-left px-3 py-2 font-medium text-slate-700">Type</th>
@@ -364,6 +410,14 @@
                             </thead>
                             <tbody>
                                 <tr v-for="c in dateContacts" :key="c.id" class="border-t border-slate-100">
+                                    <td class="px-2 py-2 text-center">
+                                        <input
+                                            type="checkbox"
+                                            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                            :checked="dateRecipientIncluded(c.id)"
+                                            @change="toggleDateRecipient(c.id, $event.target.checked)"
+                                        />
+                                    </td>
                                     <td class="px-3 py-2">{{ c.name }}</td>
                                     <td class="px-3 py-2">{{ c.email }}</td>
                                     <td class="px-3 py-2 capitalize">{{ c.type }}</td>
@@ -441,7 +495,7 @@
                                     <td class="px-4 py-2">{{ row.recipient_email }}</td>
                                     <td class="px-4 py-2">{{ row.template_name }}</td>
                                     <td class="px-4 py-2">
-                                        <span :class="row.status === 'sent' ? 'text-green-600' : 'text-red-600'">{{ row.status }}</span>
+                                        <span :class="row.status === 'sent' ? 'text-green-600' : 'text-red-600'">{{ formatCommLogStatus(row.status) }}</span>
                                         <span v-if="row.error_message" class="block text-xs text-slate-500 truncate max-w-[200px]" :title="row.error_message">{{ row.error_message }}</span>
                                     </td>
                                     <td class="px-4 py-2 text-slate-600">{{ formatDate(row.sent_at) }}</td>
@@ -577,7 +631,7 @@
                                     <tr v-for="r in listRecipients" :key="r.id" class="border-t border-slate-100">
                                         <td class="px-2 py-1">{{ r.email }}</td>
                                         <td class="px-2 py-1">{{ r.name || '—' }}</td>
-                                        <td class="px-2 py-1"><span :class="r.status === 'sent' ? 'text-green-600' : r.status === 'failed' ? 'text-red-600' : 'text-slate-500'">{{ r.status }}</span></td>
+                                        <td class="px-2 py-1"><span :class="r.status === 'sent' ? 'text-green-600' : r.status === 'failed' ? 'text-red-600' : 'text-slate-500'">{{ formatCommLogStatus(r.status) }}</span></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -625,9 +679,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
+import { formatCommLogStatus } from '@/utils/displayFormat';
 
 const activeTab = ref('send');
 const audience = ref('both');
+const searchQuery = ref('');
+const excludedRecipientIds = ref([]);
 const productFilters = ref([{ product_id: null, rule: 'all' }]);
 const smtpStatus = ref(null);
 const products = ref([]);
@@ -677,6 +734,8 @@ const sendToListResult = ref(null);
 const dateFilterFrom = ref('');
 const dateFilterTo = ref('');
 const dateFilterAudience = ref('both');
+const dateSearchQuery = ref('');
+const dateExcludedRecipientIds = ref([]);
 const dateContacts = ref([]);
 const dateTotalContacts = ref(0);
 const hasDateApplied = ref(false);
@@ -685,6 +744,68 @@ const dateSelectedTemplateId = ref(null);
 const datePreview = ref({ subject: '', content: '', template_name: '' });
 const sendingByDate = ref(false);
 const dateSendResult = ref(null);
+
+const sendableTotal = computed(() =>
+    Math.max(0, totalContacts.value - new Set(excludedRecipientIds.value).size)
+);
+
+const dateSendableTotal = computed(() =>
+    Math.max(0, dateTotalContacts.value - new Set(dateExcludedRecipientIds.value).size)
+);
+
+function recipientIncluded(id) {
+    return !excludedRecipientIds.value.includes(id);
+}
+
+function toggleRecipient(id, checked) {
+    const s = new Set(excludedRecipientIds.value);
+    if (checked) s.delete(id);
+    else s.add(id);
+    excludedRecipientIds.value = [...s];
+}
+
+function selectAllRecipientsOnPage() {
+    const s = new Set(excludedRecipientIds.value);
+    contacts.value.forEach((c) => s.delete(c.id));
+    excludedRecipientIds.value = [...s];
+}
+
+function deselectAllRecipientsOnPage() {
+    const s = new Set(excludedRecipientIds.value);
+    contacts.value.forEach((c) => s.add(c.id));
+    excludedRecipientIds.value = [...s];
+}
+
+function clearRecipientExclusions() {
+    excludedRecipientIds.value = [];
+}
+
+function dateRecipientIncluded(id) {
+    return !dateExcludedRecipientIds.value.includes(id);
+}
+
+function toggleDateRecipient(id, checked) {
+    const s = new Set(dateExcludedRecipientIds.value);
+    if (checked) s.delete(id);
+    else s.add(id);
+    dateExcludedRecipientIds.value = [...s];
+}
+
+function selectAllDateRecipientsOnPage() {
+    const s = new Set(dateExcludedRecipientIds.value);
+    dateContacts.value.forEach((c) => s.delete(c.id));
+    dateExcludedRecipientIds.value = [...s];
+}
+
+function deselectAllDateRecipientsOnPage() {
+    const s = new Set(dateExcludedRecipientIds.value);
+    dateContacts.value.forEach((c) => s.add(c.id));
+    dateExcludedRecipientIds.value = [...s];
+}
+
+function clearDateRecipientExclusions() {
+    dateExcludedRecipientIds.value = [];
+}
 
 function addFilter() {
     productFilters.value.push({ product_id: null, rule: 'all' });
@@ -698,13 +819,23 @@ function buildPayload() {
     const product_filters = productFilters.value
         .filter(f => f.product_id != null && f.rule !== 'all')
         .map(f => ({ product_id: Number(f.product_id), rule: f.rule }));
-    return { audience: audience.value, product_filters };
+    const payload = { audience: audience.value, product_filters };
+    const s = (searchQuery.value || '').trim();
+    if (s) payload.search = s;
+    return payload;
 }
 
-async function applyFilters(page = 1) {
+function buildSendPayload() {
+    const ex = [...new Set(excludedRecipientIds.value)];
+    return {
+        ...buildPayload(),
+        ...(ex.length ? { exclude_customer_ids: ex } : {}),
+    };
+}
+
+async function loadContactsPage(page = 1) {
     const pageNum = typeof page === 'number' && Number.isInteger(page) ? page : 1;
     loadingContacts.value = true;
-    sendResult.value = null;
     contactsPage.value = pageNum;
     try {
         const payload = { ...buildPayload(), page: pageNum, per_page: contactsPerPage.value };
@@ -725,9 +856,15 @@ async function applyFilters(page = 1) {
     }
 }
 
+async function applyFilters() {
+    sendResult.value = null;
+    excludedRecipientIds.value = [];
+    await loadContactsPage(1);
+}
+
 function goToContactsPage(page) {
     if (page < 1 || page > contactsLastPage.value) return;
-    applyFilters(page);
+    loadContactsPage(page);
 }
 
 async function exportCsv() {
@@ -769,14 +906,15 @@ async function loadPreview() {
 }
 
 async function sendBulk() {
-    if (totalContacts.value === 0 || !selectedTemplateId.value) return;
+    if (sendableTotal.value === 0 || !selectedTemplateId.value) return;
     sending.value = true;
     sendResult.value = null;
     try {
-        const payload = { template_id: selectedTemplateId.value, ...buildPayload() };
+        const payload = { template_id: selectedTemplateId.value, ...buildSendPayload() };
         const { data } = await axios.post('/api/email-management/send', payload);
         sendResult.value = { message: data.message, failed: (data.failed || 0) > 0 };
-        applyFilters(contactsPage.value);
+        excludedRecipientIds.value = [];
+        loadContactsPage(contactsPage.value);
         if (activeTab.value === 'report') loadReport();
     } catch (e) {
         sendResult.value = { message: e.response?.data?.message || e.message || 'Send failed', failed: true };
@@ -899,6 +1037,7 @@ const dateSelectedTemplateName = computed(() => {
 async function applyDateFilter() {
     loadingDateContacts.value = true;
     dateSendResult.value = null;
+    dateExcludedRecipientIds.value = [];
     try {
         const payload = {
             audience: dateFilterAudience.value,
@@ -906,6 +1045,8 @@ async function applyDateFilter() {
         };
         if (dateFilterFrom.value) payload.date_from = dateFilterFrom.value;
         if (dateFilterTo.value) payload.date_to = dateFilterTo.value;
+        const ds = (dateSearchQuery.value || '').trim();
+        if (ds) payload.search = ds;
         const { data } = await axios.post('/api/email-management/filtered-contacts', { ...payload, page: 1, per_page: 1000 });
         dateContacts.value = data.contacts || [];
         dateTotalContacts.value = data.total ?? 0;
@@ -932,7 +1073,7 @@ async function loadDatePreview() {
 }
 
 async function sendByDate() {
-    if (dateTotalContacts.value === 0 || !dateSelectedTemplateId.value) return;
+    if (dateSendableTotal.value === 0 || !dateSelectedTemplateId.value) return;
     sendingByDate.value = true;
     dateSendResult.value = null;
     try {
@@ -943,6 +1084,10 @@ async function sendByDate() {
         };
         if (dateFilterFrom.value) payload.date_from = dateFilterFrom.value;
         if (dateFilterTo.value) payload.date_to = dateFilterTo.value;
+        const ds = (dateSearchQuery.value || '').trim();
+        if (ds) payload.search = ds;
+        const dex = [...new Set(dateExcludedRecipientIds.value)];
+        if (dex.length) payload.exclude_customer_ids = dex;
         const { data } = await axios.post('/api/email-management/send', payload);
         dateSendResult.value = {
             message: data.message,

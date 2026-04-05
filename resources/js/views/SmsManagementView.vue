@@ -107,10 +107,20 @@
                         + Add product rule
                     </button>
                 </div>
-                <div class="mt-4">
+                <div class="mt-4 flex flex-wrap gap-3 items-end">
+                    <div class="min-w-[200px] flex-1 max-w-md">
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Search by customer name (optional)</label>
+                        <input
+                            v-model="searchQuery"
+                            type="search"
+                            placeholder="e.g. Smith"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                            @keydown.enter.prevent="applyFilters"
+                        />
+                    </div>
                     <button
                         type="button"
-                        @click="applyFilters()"
+                        @click="applyFilters"
                         :disabled="loadingContacts"
                         class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium"
                     >
@@ -130,12 +140,27 @@
                 </div>
                 <div v-else>
                     <p class="text-sm text-slate-700 mb-3">
-                        <strong>{{ totalContacts }}</strong> recipient(s) will receive the SMS.
+                        <strong>{{ totalContacts }}</strong> match filters;
+                        <strong class="text-green-700">{{ sendableTotal }}</strong> selected to receive.
+                        <span v-if="totalContacts > contacts.length" class="text-slate-500">(page {{ contactsPage }} of {{ contactsLastPage }})</span>
                     </p>
+                    <div class="flex flex-wrap gap-2 mb-3 text-sm">
+                        <button type="button" class="text-green-700 hover:text-green-900" @click="selectAllRecipientsOnPage">Select all on this page</button>
+                        <span class="text-slate-300">|</span>
+                        <button type="button" class="text-green-700 hover:text-green-900" @click="deselectAllRecipientsOnPage">Uncheck all on this page</button>
+                        <span class="text-slate-300">|</span>
+                        <button type="button" class="text-slate-600 hover:text-slate-900" @click="clearRecipientExclusions">Include everyone again</button>
+                    </div>
+                    <div v-if="contactsLastPage > 1" class="flex items-center gap-2 mb-3 text-sm">
+                        <button type="button" class="px-2 py-1 border border-slate-300 rounded disabled:opacity-50" :disabled="contactsPage <= 1" @click="goToContactsPage(contactsPage - 1)">Previous</button>
+                        <span class="text-slate-600">Page {{ contactsPage }} of {{ contactsLastPage }}</span>
+                        <button type="button" class="px-2 py-1 border border-slate-300 rounded disabled:opacity-50" :disabled="contactsPage >= contactsLastPage" @click="goToContactsPage(contactsPage + 1)">Next</button>
+                    </div>
                     <div class="border border-slate-200 rounded-lg overflow-hidden max-h-64 overflow-y-auto overflow-x-auto">
                         <table class="w-full text-sm min-w-[320px]">
                             <thead class="bg-slate-50 sticky top-0">
                                 <tr>
+                                    <th class="w-10 px-2 py-2 font-medium text-slate-700 text-center">✓</th>
                                     <th class="text-left px-3 sm:px-4 py-2 font-medium text-slate-700">Name</th>
                                     <th class="text-left px-3 sm:px-4 py-2 font-medium text-slate-700">Phone</th>
                                     <th class="text-left px-3 sm:px-4 py-2 font-medium text-slate-700">Type</th>
@@ -143,6 +168,14 @@
                             </thead>
                             <tbody>
                                 <tr v-for="c in contacts" :key="c.id" class="border-t border-slate-100 hover:bg-slate-50">
+                                    <td class="px-2 py-2 text-center">
+                                        <input
+                                            type="checkbox"
+                                            class="rounded border-slate-300 text-green-600 focus:ring-green-500"
+                                            :checked="recipientIncluded(c.id)"
+                                            @change="toggleRecipient(c.id, $event.target.checked)"
+                                        />
+                                    </td>
                                     <td class="px-3 sm:px-4 py-2">{{ c.name }}</td>
                                     <td class="px-3 sm:px-4 py-2">{{ c.phone }}</td>
                                     <td class="px-3 sm:px-4 py-2 capitalize">{{ c.type }}</td>
@@ -182,6 +215,9 @@
                     <div v-if="preview" class="border border-slate-200 rounded-lg p-4 bg-slate-50 text-sm">
                         <strong>Preview:</strong> {{ preview }}
                     </div>
+                    <p v-if="totalContacts > 0" class="text-sm text-slate-600">
+                        SMS will go to <strong>{{ sendableTotal }}</strong> recipient(s) ({{ totalContacts }} match<span v-if="excludedRecipientIds.length">; {{ excludedRecipientIds.length }} excluded</span>).
+                    </p>
                 </div>
             </div>
 
@@ -191,10 +227,10 @@
                 <button
                     type="button"
                     @click="sendBulk"
-                    :disabled="sending || totalContacts === 0 || !canSend"
+                    :disabled="sending || sendableTotal === 0 || !canSend"
                     class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
                 >
-                    {{ sending ? 'Sending...' : `Send SMS to ${totalContacts} recipient(s)` }}
+                    {{ sending ? 'Sending...' : `Send SMS to ${sendableTotal} recipient(s)` }}
                 </button>
                 <p v-if="sendResult" class="mt-3 text-sm" :class="sendResult.failed ? 'text-amber-600' : 'text-green-600'">
                     {{ sendResult.message }}
@@ -256,7 +292,7 @@
                                     <td class="px-4 py-2">{{ row.recipient_phone }}</td>
                                     <td class="px-4 py-2">{{ row.template_name }}</td>
                                     <td class="px-4 py-2">
-                                        <span :class="row.status === 'sent' ? 'text-green-600' : 'text-red-600'">{{ row.status }}</span>
+                                        <span :class="row.status === 'sent' ? 'text-green-600' : 'text-red-600'">{{ formatCommLogStatus(row.status) }}</span>
                                         <span v-if="row.error_message" class="block text-xs text-slate-500 truncate max-w-[200px]" :title="row.error_message">{{ row.error_message }}</span>
                                     </td>
                                     <td class="px-4 py-2 text-slate-600">{{ formatDate(row.sent_at) }}</td>
@@ -279,15 +315,21 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
+import { formatCommLogStatus } from '@/utils/displayFormat';
 
 const activeTab = ref('send');
 const audience = ref('both');
+const searchQuery = ref('');
+const excludedRecipientIds = ref([]);
 const productFilters = ref([{ product_id: null, rule: 'all' }]);
 const smsStatus = ref(null);
 const products = ref([]);
 const messageTemplates = ref([]);
 const contacts = ref([]);
 const totalContacts = ref(0);
+const contactsPage = ref(1);
+const contactsLastPage = ref(1);
+const contactsPerPage = ref(50);
 const hasApplied = ref(false);
 const loadingContacts = ref(false);
 const selectedTemplateId = ref(null);
@@ -306,6 +348,37 @@ const loadingReport = ref(false);
 
 const canSend = computed(() => selectedTemplateId.value || (customMessage.value && customMessage.value.trim().length > 0));
 
+const sendableTotal = computed(() =>
+    Math.max(0, totalContacts.value - new Set(excludedRecipientIds.value).size)
+);
+
+function recipientIncluded(id) {
+    return !excludedRecipientIds.value.includes(id);
+}
+
+function toggleRecipient(id, checked) {
+    const s = new Set(excludedRecipientIds.value);
+    if (checked) s.delete(id);
+    else s.add(id);
+    excludedRecipientIds.value = [...s];
+}
+
+function selectAllRecipientsOnPage() {
+    const s = new Set(excludedRecipientIds.value);
+    contacts.value.forEach((c) => s.delete(c.id));
+    excludedRecipientIds.value = [...s];
+}
+
+function deselectAllRecipientsOnPage() {
+    const s = new Set(excludedRecipientIds.value);
+    contacts.value.forEach((c) => s.add(c.id));
+    excludedRecipientIds.value = [...s];
+}
+
+function clearRecipientExclusions() {
+    excludedRecipientIds.value = [];
+}
+
 function addFilter() {
     productFilters.value.push({ product_id: null, rule: 'all' });
 }
@@ -318,27 +391,52 @@ function buildPayload() {
     const product_filters = productFilters.value
         .filter(f => f.product_id != null && f.rule !== 'all')
         .map(f => ({ product_id: Number(f.product_id), rule: f.rule }));
-    return { audience: audience.value, product_filters };
+    const payload = { audience: audience.value, product_filters };
+    const s = (searchQuery.value || '').trim();
+    if (s) payload.search = s;
+    return payload;
 }
 
-async function applyFilters() {
+function buildSendPayload() {
+    const ex = [...new Set(excludedRecipientIds.value)];
+    return {
+        ...buildPayload(),
+        ...(ex.length ? { exclude_customer_ids: ex } : {}),
+    };
+}
+
+async function loadContactsPage(page = 1) {
+    const pageNum = typeof page === 'number' && Number.isInteger(page) ? page : 1;
     loadingContacts.value = true;
-    sendResult.value = null;
+    contactsPage.value = pageNum;
     try {
-        const payload = { ...buildPayload(), page: 1, per_page: 50 };
+        const payload = { ...buildPayload(), page: pageNum, per_page: contactsPerPage.value };
         const { data } = await axios.post('/api/sms-management/filtered-contacts', payload);
         contacts.value = data.contacts || [];
         totalContacts.value = data.total ?? 0;
+        contactsLastPage.value = data.last_page ?? 1;
         hasApplied.value = true;
         if (selectedTemplateId.value) loadPreview();
     } catch (e) {
         console.error(e);
         contacts.value = [];
         totalContacts.value = 0;
+        contactsLastPage.value = 1;
         hasApplied.value = true;
     } finally {
         loadingContacts.value = false;
     }
+}
+
+async function applyFilters() {
+    sendResult.value = null;
+    excludedRecipientIds.value = [];
+    await loadContactsPage(1);
+}
+
+function goToContactsPage(page) {
+    if (page < 1 || page > contactsLastPage.value) return;
+    loadContactsPage(page);
 }
 
 async function loadPreview() {
@@ -355,16 +453,17 @@ async function loadPreview() {
 }
 
 async function sendBulk() {
-    if (totalContacts.value === 0 || !canSend.value) return;
+    if (sendableTotal.value === 0 || !canSend.value) return;
     sending.value = true;
     sendResult.value = null;
     try {
-        const payload = { ...buildPayload() };
+        const payload = { ...buildSendPayload() };
         if (selectedTemplateId.value) payload.template_id = selectedTemplateId.value;
         if (customMessage.value?.trim()) payload.message = customMessage.value.trim();
         const { data } = await axios.post('/api/sms-management/send', payload);
         sendResult.value = { message: data.message, failed: (data.failed || 0) > 0 };
-        applyFilters();
+        excludedRecipientIds.value = [];
+        loadContactsPage(contactsPage.value);
     } catch (e) {
         sendResult.value = { message: e.response?.data?.message || e.message || 'Send failed', failed: true };
     } finally {

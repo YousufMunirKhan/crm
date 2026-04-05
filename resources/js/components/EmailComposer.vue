@@ -76,7 +76,7 @@
         </div>
 
         <!-- Email log -->
-        <div v-if="logs && logs.length > 0" class="mt-4 pt-4 border-t border-slate-200">
+        <div v-if="showInlineLogs && logs && logs.length > 0" class="mt-4 pt-4 border-t border-slate-200">
             <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Sent emails</h4>
             <ul class="space-y-2 max-h-48 overflow-y-auto">
                 <li
@@ -85,23 +85,25 @@
                     class="text-sm p-2 rounded bg-white border border-slate-100"
                 >
                     <div class="font-medium text-slate-800 truncate">{{ log.subject || '(No subject)' }}</div>
-                    <div class="text-xs text-slate-500 mt-0.5">{{ formatLogDate(log.created_at) }} · {{ log.status }}</div>
+                    <div class="text-xs text-slate-500 mt-0.5">{{ formatLogDate(log.created_at) }} · {{ formatCommLogStatus(log.status) }}</div>
                     <p v-if="log.message" class="text-xs text-slate-600 mt-1 line-clamp-2">{{ stripHtml(log.message) }}</p>
                 </li>
             </ul>
         </div>
-        <p v-else class="text-xs text-slate-500 mt-4 pt-4 border-t border-slate-200">No emails sent yet.</p>
+        <p v-else-if="showInlineLogs" class="text-xs text-slate-500 mt-4 pt-4 border-t border-slate-200">No emails sent yet.</p>
     </div>
 </template>
 
 <script setup>
 import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
+import { formatCommLogStatus } from '@/utils/displayFormat';
 
 const props = defineProps({
     customer: { type: Object, required: true },
     leadId: { type: [Number, String], default: null },
     logs: { type: Array, default: () => [] },
+    showInlineLogs: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(['sent', 'saved']);
@@ -172,6 +174,7 @@ async function sendWithTemplate() {
     try {
         await axios.post(`/api/customers/${props.customer.id}/send-template-email`, {
             template_id: selectedTemplateId.value,
+            lead_id: props.leadId || undefined,
         });
         emit('sent');
         selectedTemplateId.value = '';

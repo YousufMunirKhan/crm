@@ -2,36 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\MessageTemplate;
 use App\Models\SentCommunication;
+use App\Modules\Communication\Models\WhatsAppSetting;
+use App\Modules\Communication\Models\WhatsAppTemplate;
+use App\Modules\Communication\Services\WhatsAppServiceV2;
 use App\Modules\CRM\Models\Customer;
 use App\Modules\CRM\Models\LeadItem;
-use App\Services\SmsService;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
-class SmsManagementController extends Controller
+class WhatsAppManagementController extends Controller
 {
     public function __construct(
-        private SmsService $smsService
+        private WhatsAppServiceV2 $whatsappService
     ) {}
 
-    /**
-     * Check SMS settings status (from Settings page).
-     */
-    public function smsStatus()
-    {
-        $apiKey = \App\Modules\Settings\Models\Setting::where('key', 'sms_api_key')->first()?->value;
-        $secretKey = \App\Modules\Settings\Models\Setting::where('key', 'sms_secret_key')->first()?->value;
-        $configured = !empty(trim($apiKey ?? '')) && !empty(trim($secretKey ?? ''));
-        return response()->json([
-            'configured' => $configured,
-            'message' => $configured ? 'SMS settings are configured from Settings → SMS.' : 'Please configure SMS (VoodooSMS API Key & Secret) in Settings → SMS before sending messages.',
-        ]);
-    }
-
-    /**
-     * Build the same base query as EmailManagementController but for contacts with phone.
-     */
     /**
      * @return int[]
      */
@@ -45,7 +30,33 @@ class SmsManagementController extends Controller
         return array_values(array_filter($ids, fn (int $id) => $id > 0));
     }
 
-    private function buildFilteredQuery(Request $request, bool $applyExclude = false)
+    public function whatsappStatus()
+    {
+        $row = WhatsAppSetting::query()->orderByDesc('id')->first();
+        $token = $row?->access_token;
+        $configured = $row && $row->is_enabled && $token && trim($token) !== '';
+
+        return response()->json([
+            'configured' => $configured,
+            'message' => $configured
+                ? 'WhatsApp Cloud API is enabled. Templates must be approved in Meta.'
+                : 'Enable WhatsApp and add your access token under Settings (or WhatsApp settings).',
+        ]);
+    }
+
+    /**
+     * Approved templates for bulk UI dropdown.
+     */
+    public function approvedTemplates()
+    {
+        $items = WhatsAppTemplate::approved()
+            ->orderBy('name')
+            ->get(['id', 'name', 'language', 'category']);
+
+        return response()->json(['data' => $items]);
+    }
+
+    private function buildFilteredQuery(Request $request)
     {
         $audience = $request->input('audience');
         $productFilters = $request->input('product_filters', []);
@@ -54,8 +65,13 @@ class SmsManagementController extends Controller
         $search = $request->input('search');
 
         $query = Customer::query()
-            ->whereNotNull('phone')
-            ->where('phone', '!=', '');
+            ->where(function ($q) {
+                $q->where(function ($q2) {
+                    $q2->whereNotNull('whatsapp_number')->where('whatsapp_number', '!=', '');
+                })->orWhere(function ($q2) {
+                    $q2->whereNotNull('phone')->where('phone', '!=', '');
+                });
+            });
 
         if ($dateFrom) {
             $query->whereDate('created_at', '>=', $dateFrom);
@@ -92,19 +108,9 @@ class SmsManagementController extends Controller
             }
         }
 
-        if ($applyExclude) {
-            $exclude = $this->normalizeExcludeCustomerIds($request->input('exclude_customer_ids'));
-            if ($exclude !== []) {
-                $query->whereNotIn('id', $exclude);
-            }
-        }
-
         return $query;
     }
 
-    /**
-     * Get contacts matching the same filters as email, but with phone numbers.
-     */
     public function getFilteredContacts(Request $request)
     {
         $request->validate([
@@ -120,14 +126,16 @@ class SmsManagementController extends Controller
         ]);
 
         $perPage = min((int) $request->input('per_page', 50), 100);
-        $query = $this->buildFilteredQuery($request, false);
-        $paginator = $query->orderBy('name')->paginate($perPage, ['id', 'name', 'phone', 'business_name', 'type']);
+        $query = $this->buildFilteredQuery($request);
+        $paginator = $query->orderBy('name')->paginate($perPage, ['id', 'name', 'phone', 'whatsapp_number', 'business_name', 'type']);
 
         return response()->json([
             'contacts' => collect($paginator->items())->map(fn ($c) => [
                 'id' => $c->id,
                 'name' => $c->name,
                 'phone' => $c->phone,
+                'whatsapp_number' => $c->whatsapp_number,
+                'display_phone' => $c->whatsapp_number ?: $c->phone,
                 'business_name' => $c->business_name,
                 'type' => $c->type,
             ])->values()->all(),
@@ -138,29 +146,77 @@ class SmsManagementController extends Controller
         ]);
     }
 
-    /**
-     * Preview a message template with sample customer data.
-     */
-    public function previewTemplate(int $templateId)
+    public function exportFilteredContacts(Request $request): StreamedResponse
     {
-        $template = MessageTemplate::where('is_active', true)->findOrFail($templateId);
-        $sample = $this->getSampleCustomerForPreview();
-        $message = $this->replaceVariables($template->message, $sample);
+        $request->validate([
+            'audience' => 'required|in:prospect,customer,both',
+            'product_filters' => 'nullable|array',
+            'product_filters.*.product_id' => 'required_with:product_filters|integer|exists:products,id',
+            'product_filters.*.rule' => 'required_with:product_filters|in:has,does_not_have,all',
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+            'search' => 'nullable|string|max:255',
+        ]);
 
-        return response()->json([
-            'message' => $message,
-            'template_name' => $template->name,
+        $contacts = $this->buildFilteredQuery($request)
+            ->orderBy('name')
+            ->get(['id', 'name', 'phone', 'whatsapp_number', 'business_name', 'type']);
+
+        $filename = 'whatsapp-contacts-' . date('Y-m-d-His') . '.csv';
+
+        return response()->streamDownload(function () use ($contacts) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['ID', 'Name', 'WhatsApp number', 'Phone', 'Business Name', 'Type']);
+            foreach ($contacts as $c) {
+                fputcsv($out, [
+                    $c->id,
+                    $c->name,
+                    $c->whatsapp_number ?? '',
+                    $c->phone ?? '',
+                    $c->business_name ?? '',
+                    $c->type,
+                ]);
+            }
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
     }
 
-    /**
-     * Send bulk SMS to filtered contacts using the given template or custom message.
-     */
+    public function previewTemplate(int $templateId)
+    {
+        $template = WhatsAppTemplate::approved()->findOrFail($templateId);
+        $sample = Customer::query()
+            ->where(function ($q) {
+                $q->where(function ($q2) {
+                    $q2->whereNotNull('whatsapp_number')->where('whatsapp_number', '!=', '');
+                })->orWhere(function ($q2) {
+                    $q2->whereNotNull('phone')->where('phone', '!=', '');
+                });
+            })
+            ->orderBy('id')
+            ->first();
+
+        $preview = $this->whatsappService->previewTemplatePayload(
+            $template->name,
+            [],
+            $template->language,
+            null,
+            $sample,
+            null
+        );
+
+        return response()->json(array_merge($preview, [
+            'template_name' => $template->name,
+            'template_id' => $template->id,
+        ]));
+    }
+
     public function sendBulk(Request $request)
     {
         $request->validate([
-            'template_id' => 'nullable|exists:message_templates,id',
-            'message' => 'nullable|string|max:1600',
+            'whatsapp_template_id' => 'required|integer|exists:whatsapp_templates,id',
             'audience' => 'required|in:prospect,customer,both',
             'product_filters' => 'nullable|array',
             'product_filters.*.product_id' => 'required_with:product_filters|integer|exists:products,id',
@@ -172,60 +228,103 @@ class SmsManagementController extends Controller
             'exclude_customer_ids.*' => 'integer|exists:customers,id',
         ]);
 
-        $templateId = $request->input('template_id');
-        $customMessage = $request->input('message');
+        $template = WhatsAppTemplate::where('id', $request->integer('whatsapp_template_id'))
+            ->where('status', 'APPROVED')
+            ->firstOrFail();
 
-        if (!$templateId && empty(trim($customMessage ?? ''))) {
-            return response()->json(['message' => 'Either template_id or message is required'], 422);
+        $query = $this->buildFilteredQuery($request);
+        $exclude = $this->normalizeExcludeCustomerIds($request->input('exclude_customer_ids'));
+        if ($exclude !== []) {
+            $query->whereNotIn('id', $exclude);
         }
-
-        $template = $templateId ? MessageTemplate::find($templateId) : null;
-        $query = $this->buildFilteredQuery($request, true);
 
         $sent = 0;
         $failed = 0;
         $failedList = [];
+        $n = 0;
 
-        $query->orderBy('id')->chunk(50, function ($contacts) use ($template, $customMessage, &$sent, &$failed, &$failedList) {
+        $query->orderBy('id')->chunk(50, function ($contacts) use ($template, &$sent, &$failed, &$failedList, &$n) {
             foreach ($contacts as $customer) {
-                $rawMessage = $template ? $template->message : trim($customMessage);
-                $message = $this->replaceVariables($rawMessage, $customer);
+                if ($n > 0 && $n % 10 === 0) {
+                    usleep(200000);
+                }
+                $n++;
 
-                if (empty(trim($message))) {
+                $phone = $customer->whatsapp_number ?? $customer->phone;
+                if (!$phone || trim((string) $phone) === '') {
                     $failed++;
-                    $failedList[] = ['phone' => $customer->phone, 'name' => $customer->name, 'error' => 'Empty message after variable replacement'];
-                    $this->logSmsSent($template, $customer, $message, 'failed', 'Empty message');
+                    $failedList[] = ['name' => $customer->name, 'phone' => '—', 'error' => 'No WhatsApp or phone number'];
+                    SentCommunication::create([
+                        'type' => 'whatsapp',
+                        'template_type' => 'whatsapp_template',
+                        'template_id' => $template->id,
+                        'customer_id' => $customer->id,
+                        'recipient_phone' => null,
+                        'subject' => $template->name,
+                        'content' => '',
+                        'status' => 'failed',
+                        'error_message' => 'No WhatsApp or phone number',
+                        'sent_by' => auth()->id(),
+                    ]);
+
                     continue;
                 }
 
-                $result = $this->smsService->send($customer->phone, $message);
-
-                if ($result['success']) {
+                try {
+                    $this->whatsappService->sendTemplateMessage(
+                        $customer,
+                        $template->name,
+                        [],
+                        $template->language ?: 'en_US',
+                        null
+                    );
+                    SentCommunication::create([
+                        'type' => 'whatsapp',
+                        'template_type' => 'whatsapp_template',
+                        'template_id' => $template->id,
+                        'customer_id' => $customer->id,
+                        'recipient_phone' => $phone,
+                        'subject' => $template->name,
+                        'content' => 'WhatsApp template message',
+                        'status' => 'sent',
+                        'sent_at' => now(),
+                        'sent_by' => auth()->id(),
+                    ]);
                     $sent++;
-                    $this->logSmsSent($template, $customer, $message, 'sent');
-                } else {
+                } catch (\Throwable $e) {
                     $failed++;
-                    $errMsg = strlen($result['message'] ?? '') > 200 ? substr($result['message'], 0, 200) . '...' : ($result['message'] ?? 'Unknown error');
-                    $failedList[] = ['phone' => $customer->phone, 'name' => $customer->name, 'error' => $errMsg];
-                    $this->logSmsSent($template, $customer, $message, 'failed', $result['message'] ?? '');
+                    $err = $e->getMessage();
+                    if (strlen($err) > 500) {
+                        $err = substr($err, 0, 500) . '…';
+                    }
+                    $failedList[] = ['name' => $customer->name, 'phone' => $phone, 'error' => $err];
+                    SentCommunication::create([
+                        'type' => 'whatsapp',
+                        'template_type' => 'whatsapp_template',
+                        'template_id' => $template->id,
+                        'customer_id' => $customer->id,
+                        'recipient_phone' => $phone,
+                        'subject' => $template->name,
+                        'content' => '',
+                        'status' => 'failed',
+                        'error_message' => $e->getMessage(),
+                        'sent_by' => auth()->id(),
+                    ]);
                 }
             }
         });
 
         $total = $sent + $failed;
-        $msg = "Sent: {$sent}, Failed: {$failed}";
+
         return response()->json([
-            'message' => $msg,
+            'message' => "Sent: {$sent}, Failed: {$failed}",
             'sent' => $sent,
             'failed' => $failed,
             'total' => $total,
-            'failed_list' => $failedList,
+            'failed_list' => array_slice($failedList, 0, 150),
         ]);
     }
 
-    /**
-     * Report: paginated list of sent SMS.
-     */
     public function getSentReport(Request $request)
     {
         $request->validate([
@@ -237,9 +336,10 @@ class SmsManagementController extends Controller
 
         $perPage = min((int) $request->input('per_page', 20), 100);
         $query = SentCommunication::query()
-            ->where('type', 'sms')
-            ->with(['customer:id,name,phone,type', 'sender:id,name'])
-            ->orderByDesc('sent_at');
+            ->where('type', 'whatsapp')
+            ->with(['customer:id,name,phone,whatsapp_number,type', 'sender:id,name'])
+            ->orderByDesc('sent_at')
+            ->orderByDesc('created_at');
 
         if ($request->filled('date_from')) {
             $query->whereDate('sent_at', '>=', $request->date_from);
@@ -250,7 +350,7 @@ class SmsManagementController extends Controller
 
         $paginator = $query->paginate($perPage);
 
-        $summaryQuery = SentCommunication::query()->where('type', 'sms');
+        $summaryQuery = SentCommunication::query()->where('type', 'whatsapp');
         if ($request->filled('date_from')) {
             $summaryQuery->whereDate('sent_at', '>=', $request->date_from);
         }
@@ -261,15 +361,16 @@ class SmsManagementController extends Controller
         $totalFailed = (clone $summaryQuery)->where('status', 'failed')->count();
 
         $templateIds = collect($paginator->items())->pluck('template_id')->filter()->unique()->values()->all();
-        $templates = $templateIds ? MessageTemplate::whereIn('id', $templateIds)->pluck('name', 'id') : collect();
+        $templates = $templateIds
+            ? WhatsAppTemplate::whereIn('id', $templateIds)->pluck('name', 'id')
+            : collect();
 
         $items = collect($paginator->items())->map(function ($row) use ($templates) {
             return [
                 'id' => $row->id,
                 'recipient_name' => $row->customer?->name ?? '—',
-                'recipient_phone' => $row->recipient_phone ?? $row->customer?->phone ?? '—',
-                'template_name' => $templates[$row->template_id] ?? ($row->template_id ? 'Template #' . $row->template_id : 'Custom'),
-                'content' => \Illuminate\Support\Str::limit($row->content ?? '', 80),
+                'recipient_phone' => $row->recipient_phone ?? $row->customer?->whatsapp_number ?? $row->customer?->phone ?? '—',
+                'template_name' => $templates[$row->template_id] ?? ($row->template_id ? 'Template #' . $row->template_id : '—'),
                 'status' => $row->status,
                 'error_message' => $row->error_message,
                 'sent_at' => $row->sent_at?->format('c'),
@@ -288,71 +389,6 @@ class SmsManagementController extends Controller
                 'total_failed' => $totalFailed,
             ],
         ]);
-    }
-
-    private function logSmsSent(?MessageTemplate $template, Customer $customer, string $message, string $status, ?string $errorMessage = null): void
-    {
-        SentCommunication::create([
-            'type' => 'sms',
-            'template_type' => 'message_template',
-            'template_id' => $template?->id,
-            'customer_id' => $customer->id,
-            'recipient_phone' => $customer->phone,
-            'subject' => $template?->name ?? 'SMS',
-            'content' => $message,
-            'status' => $status,
-            'error_message' => $errorMessage,
-            'sent_at' => $status === 'sent' ? now() : null,
-            'sent_by' => auth()->id(),
-        ]);
-    }
-
-    private function replaceVariables(string $text, Customer $customer): string
-    {
-        $settings = \App\Modules\Settings\Models\Setting::whereIn('key', [
-            'company_name', 'company_phone', 'company_address',
-        ])->pluck('value', 'key');
-
-        $firstName = trim(explode(' ', $customer->name ?? '')[0] ?? '');
-
-        return str_replace(
-            [
-                '{{customer_name}}',
-                '{{first_name}}',
-                '{{customer_phone}}',
-                '{{customer_email}}',
-                '{{company_name}}',
-                '{{company_phone}}',
-                '{{company_address}}',
-            ],
-            [
-                $customer->name ?? '',
-                $firstName,
-                $customer->phone ?? '',
-                $customer->email ?? '',
-                $settings['company_name'] ?? '',
-                $settings['company_phone'] ?? '',
-                $settings['company_address'] ?? '',
-            ],
-            $text
-        );
-    }
-
-    private function getSampleCustomerForPreview(): Customer
-    {
-        $customer = Customer::whereNotNull('phone')->where('phone', '!=', '')->first();
-        if ($customer) {
-            return $customer;
-        }
-        $sample = new Customer([
-            'name' => 'John Smith',
-            'phone' => '07700900123',
-            'email' => 'john@example.com',
-            'business_name' => 'Sample Business',
-            'type' => 'customer',
-        ]);
-        $sample->id = 0;
-        return $sample;
     }
 
     private function applyHasProduct($query, int $productId, string $audience): void

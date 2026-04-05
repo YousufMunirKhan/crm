@@ -344,7 +344,7 @@
                             <div v-else class="font-medium text-slate-900">
                                 {{ lead.customer?.name || 'Customer' }}
                             </div>
-                            <div class="text-xs text-slate-500">{{ lead.stage }} • {{ lead.items?.length ? lead.items.map(i => i.product?.name).filter(Boolean).join(', ') : '-' }}</div>
+                            <div class="text-xs text-slate-500">{{ formatLeadStage(lead.stage) }} • {{ lead.items?.length ? lead.items.map(i => i.product?.name).filter(Boolean).join(', ') : '-' }}</div>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 sm:justify-end">
                             <div class="text-sm font-medium text-slate-700 tabular-nums">£{{ formatNumber(getLeadValue(lead)) }}</div>
@@ -495,6 +495,7 @@ import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
 import AttendanceClock from '@/components/AttendanceClock.vue';
 import LogActivityModal from '@/components/LogActivityModal.vue';
+import { formatLeadStage } from '@/utils/displayFormat';
 
 const toast = useToastStore();
 const auth = useAuthStore();

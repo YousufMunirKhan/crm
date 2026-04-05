@@ -99,6 +99,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/customers/{id}/assign', [CustomerController::class, 'assign']);
     Route::delete('/customers/{id}/assign/{userId}', [CustomerController::class, 'unassign']);
     Route::get('/customers/{id}/communication-logs', [CustomerController::class, 'communicationLogs']);
+    Route::get('/customers/{id}/unified-timeline', [CustomerController::class, 'unifiedTimeline']);
+    Route::get('/leads/stats', [LeadController::class, 'stats']);
+    Route::get('/leads/export', [LeadController::class, 'exportCsv']);
     Route::apiResource('leads', LeadController::class);
     Route::apiResource('products', ProductController::class);
     Route::get('/products/{id}/suggested', [ProductController::class, 'getSuggestedProducts']);
@@ -122,17 +125,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Communications
     Route::apiResource('communications', CommunicationController::class);
     
-    // Bulk WhatsApp Messaging
-    Route::prefix('bulk-whatsapp')->group(function () {
-        Route::get('/customers', [\App\Modules\Communication\Http\Controllers\BulkWhatsAppController::class, 'getCustomersWithLastMessage']);
-        Route::post('/send-single', [\App\Modules\Communication\Http\Controllers\BulkWhatsAppController::class, 'sendSingleMessage']);
-        Route::post('/campaigns', [\App\Modules\Communication\Http\Controllers\BulkWhatsAppController::class, 'createCampaign']);
-        Route::get('/campaigns', [\App\Modules\Communication\Http\Controllers\BulkWhatsAppController::class, 'getCampaigns']);
-        Route::get('/campaigns/{id}', [\App\Modules\Communication\Http\Controllers\BulkWhatsAppController::class, 'getCampaign']);
-        Route::delete('/campaigns/{id}', [\App\Modules\Communication\Http\Controllers\BulkWhatsAppController::class, 'deleteCampaign']);
-        Route::get('/phone-info', [\App\Modules\Communication\Http\Controllers\BulkWhatsAppController::class, 'getPhoneNumberInfo']);
-    });
-
     // WhatsApp Cloud API (New Integration)
     Route::prefix('whatsapp')->group(function () {
         // Settings
@@ -152,6 +144,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Messages
         Route::post('/messages/send-text', [\App\Modules\Communication\Http\Controllers\WhatsAppMessageController::class, 'sendText']);
         Route::post('/messages/send-template', [\App\Modules\Communication\Http\Controllers\WhatsAppMessageController::class, 'sendTemplate']);
+        Route::get('/phone-info', [\App\Modules\Communication\Http\Controllers\WhatsAppMessageController::class, 'phoneNumberInfo']);
         Route::get('/customers/{customerId}/window-status', [\App\Modules\Communication\Http\Controllers\WhatsAppMessageController::class, 'windowStatus']);
         Route::get('/conversations', [\App\Modules\Communication\Http\Controllers\WhatsAppMessageController::class, 'conversations']);
         Route::get('/conversations/{id}/messages', [\App\Modules\Communication\Http\Controllers\WhatsAppMessageController::class, 'conversationMessages']);
@@ -176,6 +169,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/hr/attendance/today', [HrController::class, 'todayStatus']);
     Route::post('/hr/attendance/check-in', [HrController::class, 'checkIn']);
     Route::post('/hr/attendance/check-out', [HrController::class, 'checkOut']);
+    Route::get('/hr/attendance/chart-summary', [HrController::class, 'attendanceChartSummary']);
     Route::get('/hr/attendance', [HrController::class, 'attendance']);
     Route::delete('/hr/attendance/{id}', [HrController::class, 'deleteAttendance']);
     Route::get('/hr/salaries', [HrController::class, 'salaries']);
@@ -265,6 +259,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/lists/{id}', [\App\Http\Controllers\EmailManagementController::class, 'getList']);
         Route::get('/lists/{id}/recipients', [\App\Http\Controllers\EmailManagementController::class, 'getListRecipients']);
         Route::post('/send-to-list', [\App\Http\Controllers\EmailManagementController::class, 'sendToList']);
+    });
+
+    // WhatsApp Management (Meta template bulk sends — same audience/product filters as email)
+    Route::prefix('whatsapp-management')->group(function () {
+        Route::get('/whatsapp-status', [\App\Http\Controllers\WhatsAppManagementController::class, 'whatsappStatus']);
+        Route::get('/approved-templates', [\App\Http\Controllers\WhatsAppManagementController::class, 'approvedTemplates']);
+        Route::post('/filtered-contacts', [\App\Http\Controllers\WhatsAppManagementController::class, 'getFilteredContacts']);
+        Route::post('/export', [\App\Http\Controllers\WhatsAppManagementController::class, 'exportFilteredContacts']);
+        Route::get('/preview-template/{templateId}', [\App\Http\Controllers\WhatsAppManagementController::class, 'previewTemplate']);
+        Route::post('/send', [\App\Http\Controllers\WhatsAppManagementController::class, 'sendBulk']);
+        Route::get('/sent-report', [\App\Http\Controllers\WhatsAppManagementController::class, 'getSentReport']);
     });
 
     // SMS Management (same filters as email, settings from Settings → SMS)

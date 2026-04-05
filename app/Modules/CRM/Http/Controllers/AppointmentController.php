@@ -20,7 +20,11 @@ class AppointmentController extends Controller
         $query = LeadActivity::where('type', 'appointment')
             ->where(function ($q) use ($user) {
                 $q->where('assigned_user_id', $user->id)
-                    ->orWhere('user_id', $user->id);
+                    ->orWhere('user_id', $user->id)
+                    ->orWhereHas('lead', function ($lq) use ($user) {
+                        $lq->where('assigned_to', $user->id)
+                            ->orWhereHas('customer', fn ($cq) => $cq->forSalesAgent($user->id));
+                    });
             })
             ->with(['lead.customer', 'lead.assignee', 'user', 'assignee']);
 
@@ -29,25 +33,22 @@ class AppointmentController extends Controller
         $date = $request->get('date');
         if ($date) {
             $activities = $activities->filter(function ($a) use ($date) {
-                $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
-                return ($meta['appointment_date'] ?? null) === $date;
+                return $this->appointmentDateFrom($a) === $date;
             })->values();
         }
 
         $activities = $activities->sortBy(function ($a) {
-            $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
-            return ($meta['appointment_date'] ?? '') . ' ' . ($meta['appointment_time'] ?? '00:00');
+            return ($this->appointmentDateFrom($a) ?? '') . ' ' . ($this->appointmentTimeFrom($a) ?? '00:00');
         })->values();
 
         $list = $activities->map(function ($a) {
-            $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
             return [
                 'id' => $a->id,
                 'lead_id' => $a->lead_id,
                 'customer' => $a->lead?->customer,
                 'description' => $a->description,
-                'appointment_date' => $meta['appointment_date'] ?? null,
-                'appointment_time' => $meta['appointment_time'] ?? '10:00',
+                'appointment_date' => $this->appointmentDateFrom($a),
+                'appointment_time' => $this->appointmentTimeFrom($a),
                 'appointment_status' => $a->appointment_status ?? 'pending',
                 'outcome_notes' => $a->outcome_notes,
                 'user' => $a->user,
@@ -68,13 +69,16 @@ class AppointmentController extends Controller
         $todayStr = now()->toDateString();
         $activities = LeadActivity::where('type', 'appointment')
             ->where(function ($q) use ($user) {
-                $q->where('assigned_user_id', $user->id)->orWhere('user_id', $user->id);
+                $q->where('assigned_user_id', $user->id)
+                    ->orWhere('user_id', $user->id)
+                    ->orWhereHas('lead', function ($lq) use ($user) {
+                        $lq->where('assigned_to', $user->id)
+                            ->orWhereHas('customer', fn ($cq) => $cq->forSalesAgent($user->id));
+                    });
             })
             ->get();
         $count = $activities->filter(function ($a) use ($todayStr) {
-            $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
-            $appDate = $meta['appointment_date'] ?? null;
-            return $appDate === $todayStr;
+            return $this->appointmentDateFrom($a) === $todayStr;
         })->count();
         return response()->json(['count' => $count]);
     }
@@ -92,21 +96,21 @@ class AppointmentController extends Controller
         $hasAccess = $activity->assigned_user_id === $user->id
             || $activity->user_id === $user->id
             || $activity->lead->assigned_to === $user->id
-            || $activity->lead->customer->isAssignedTo($user->id);
+            || $activity->lead->customer->salesAgentHasAccess($user->id)
+            || $activity->lead->assignmentLogs()->where('assigned_by', $user->id)->exists();
 
-        if (!$hasAccess) {
+        if (! $hasAccess) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $meta = is_array($activity->meta) ? $activity->meta : (json_decode($activity->meta, true) ?? []);
         return response()->json([
             'id' => $activity->id,
             'lead_id' => $activity->lead_id,
             'lead' => $activity->lead,
             'customer' => $activity->lead->customer,
             'description' => $activity->description,
-            'appointment_date' => $meta['appointment_date'] ?? null,
-            'appointment_time' => $meta['appointment_time'] ?? '10:00',
+            'appointment_date' => $this->appointmentDateFrom($activity),
+            'appointment_time' => $this->appointmentTimeFrom($activity),
             'appointment_status' => $activity->appointment_status ?? 'pending',
             'outcome_notes' => $activity->outcome_notes,
             'user' => $activity->user,
@@ -126,9 +130,10 @@ class AppointmentController extends Controller
         $hasAccess = $activity->assigned_user_id === $user->id
             || $activity->user_id === $user->id
             || $activity->lead->assigned_to === $user->id
-            || $activity->lead->customer->isAssignedTo($user->id);
+            || $activity->lead->customer->salesAgentHasAccess($user->id)
+            || $activity->lead->assignmentLogs()->where('assigned_by', $user->id)->exists();
 
-        if (!$hasAccess) {
+        if (! $hasAccess) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -159,6 +164,12 @@ class AppointmentController extends Controller
         }
         if (array_key_exists('outcome_notes', $data)) {
             $activity->outcome_notes = $data['outcome_notes'];
+        }
+        if (isset($data['appointment_date'])) {
+            $activity->appointment_date = $data['appointment_date'];
+        }
+        if (isset($data['appointment_time'])) {
+            $activity->appointment_time = $data['appointment_time'];
         }
         $activity->save();
 
@@ -206,5 +217,25 @@ class AppointmentController extends Controller
         }
 
         return response()->json($activity->fresh(['lead.customer', 'lead.items.product', 'user', 'assignee']));
+    }
+
+    private function appointmentDateFrom(LeadActivity $a): ?string
+    {
+        if ($a->appointment_date) {
+            return $a->appointment_date->format('Y-m-d');
+        }
+        $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
+
+        return $meta['appointment_date'] ?? null;
+    }
+
+    private function appointmentTimeFrom(LeadActivity $a): string
+    {
+        if ($a->appointment_time) {
+            return (string) $a->appointment_time;
+        }
+        $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
+
+        return $meta['appointment_time'] ?? '10:00';
     }
 }

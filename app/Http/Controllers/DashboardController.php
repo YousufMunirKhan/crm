@@ -76,6 +76,7 @@ class DashboardController extends Controller
             ->where('created_at', '<=', $toDate)
             ->count();
         $filteredRevenue = $this->calculateRevenueForPeriod($fromDate, $toDate, $agentId);
+        $filteredWonProducts = $this->getWonProductAggregatesForPeriod($fromDate, $toDate, $agentId);
 
         // Daily stats (today only) - leads = active opportunities, exclude lost/won
         $dailyLeadsQuery = (clone $leadQuery)->whereDate('created_at', $today)->whereNotIn('stage', ['won', 'lost']);
@@ -84,6 +85,7 @@ class DashboardController extends Controller
         // Total opportunities today (all stages)
         $dailyTotalOpportunities = (clone $leadQuery)->whereDate('created_at', $today)->count();
         $dailyRevenue = $this->calculateRevenueForPeriod($today, $today->copy()->endOfDay(), $agentId);
+        $dailyWonProducts = $this->getWonProductAggregatesForPeriod($today, $today->copy()->endOfDay(), $agentId);
 
         // Monthly stats - leads = active opportunities, exclude lost/won
         $monthlyLeadsQuery = (clone $leadQuery)->where('created_at', '>=', $thisMonth)->whereNotIn('stage', ['won', 'lost']);
@@ -92,6 +94,7 @@ class DashboardController extends Controller
         // Total opportunities this month (all stages)
         $monthlyTotalOpportunities = (clone $leadQuery)->where('created_at', '>=', $thisMonth)->count();
         $monthlyRevenue = $this->calculateRevenueForPeriod($thisMonth, now(), $agentId);
+        $monthlyWonProducts = $this->getWonProductAggregatesForPeriod($thisMonth, now(), $agentId);
 
         // Yearly stats - leads = active opportunities, exclude lost/won
         $yearlyLeadsQuery = (clone $leadQuery)->where('created_at', '>=', $thisYear)->whereNotIn('stage', ['won', 'lost']);
@@ -100,6 +103,7 @@ class DashboardController extends Controller
         // Total opportunities this year (all stages)
         $yearlyTotalOpportunities = (clone $leadQuery)->where('created_at', '>=', $thisYear)->count();
         $yearlyRevenue = $this->calculateRevenueForPeriod($thisYear, now(), $agentId);
+        $yearlyWonProducts = $this->getWonProductAggregatesForPeriod($thisYear, now(), $agentId);
 
         // Product stats (using filter dates)
         $productStats = $this->getProductStatsForPeriod($fromDate, $toDate, $agentId);
@@ -238,18 +242,6 @@ class DashboardController extends Controller
             $totalInvoices = Invoice::count();
         }
 
-        $leadsByMonth = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $mStart = now()->copy()->subMonths($i)->startOfMonth();
-            $mEnd = now()->copy()->subMonths($i)->endOfMonth();
-            $leadsByMonth[] = [
-                'label' => $mStart->format('M'),
-                'key' => $mStart->format('Y-m'),
-                'total' => (clone $leadQuery)->whereBetween('created_at', [$mStart, $mEnd])->count(),
-                'won' => (clone $leadQuery)->whereBetween('created_at', [$mStart, $mEnd])->where('stage', 'won')->count(),
-            ];
-        }
-
         return response()->json([
             'meta' => [
                 'viewer_scope' => $canViewAll ? 'organization' : 'self',
@@ -262,24 +254,32 @@ class DashboardController extends Controller
                     'won' => $filteredWon,
                     'revenue' => $filteredRevenue,
                     'total_opportunities' => $filteredTotalOpportunities,
+                    'won_product_units' => $filteredWonProducts['won_product_units'],
+                    'won_product_lines' => $filteredWonProducts['won_product_lines'],
                 ],
                 'daily' => [
                     'leads' => $dailyLeads,
                     'won' => $dailyWon,
                     'revenue' => $dailyRevenue,
                     'total_opportunities' => $dailyTotalOpportunities,
+                    'won_product_units' => $dailyWonProducts['won_product_units'],
+                    'won_product_lines' => $dailyWonProducts['won_product_lines'],
                 ],
                 'monthly' => [
                     'leads' => $monthlyLeads,
                     'won' => $monthlyWon,
                     'revenue' => $monthlyRevenue,
                     'total_opportunities' => $monthlyTotalOpportunities,
+                    'won_product_units' => $monthlyWonProducts['won_product_units'],
+                    'won_product_lines' => $monthlyWonProducts['won_product_lines'],
                 ],
                 'yearly' => [
                     'leads' => $yearlyLeads,
                     'won' => $yearlyWon,
                     'revenue' => $yearlyRevenue,
                     'total_opportunities' => $yearlyTotalOpportunities,
+                    'won_product_units' => $yearlyWonProducts['won_product_units'],
+                    'won_product_lines' => $yearlyWonProducts['won_product_lines'],
                 ],
             ],
             'products' => $productStats,
@@ -290,9 +290,6 @@ class DashboardController extends Controller
             'total_invoices' => $totalInvoices,
             'lead_sources' => $leadSources,
             'pipeline' => $pipeline,
-            'charts' => [
-                'leads_by_month' => $leadsByMonth,
-            ],
             'filters' => [
                 'from' => $fromDate->toDateString(),
                 'to' => $toDate->toDateString(),
@@ -711,6 +708,40 @@ class DashboardController extends Controller
             'won' => (clone $query)->where('status', LeadItem::STATUS_WON)->count(),
             'lost' => (clone $query)->where('status', LeadItem::STATUS_LOST)->count(),
             'pending' => (clone $query)->where('status', LeadItem::STATUS_PENDING)->count(),
+        ];
+    }
+
+    /**
+     * Sum of quantities on won line items for leads created in the period (and optional agent scope).
+     * Matches leads hub "won product units" semantics for the same date window.
+     */
+    private function getWonProductAggregatesForPeriod($fromDate, $toDate, $agentId = null): array
+    {
+        $leadQuery = Lead::query()
+            ->where('created_at', '>=', $fromDate)
+            ->where('created_at', '<=', $toDate);
+
+        if ($agentId) {
+            $leadQuery->where(function ($q) use ($agentId) {
+                $q->where('assigned_to', $agentId)
+                    ->orWhereHas('customer.assignedUsers', function ($subQuery) use ($agentId) {
+                        $subQuery->where('user_id', $agentId);
+                    });
+            });
+        }
+
+        $wonLeadIds = (clone $leadQuery)->where('stage', 'won')->pluck('id');
+        if ($wonLeadIds->isEmpty()) {
+            return ['won_product_units' => 0, 'won_product_lines' => 0];
+        }
+
+        $itemBase = LeadItem::query()
+            ->where('status', LeadItem::STATUS_WON)
+            ->whereIn('lead_id', $wonLeadIds);
+
+        return [
+            'won_product_units' => (int) (clone $itemBase)->sum('quantity'),
+            'won_product_lines' => (int) (clone $itemBase)->count(),
         ];
     }
 }
