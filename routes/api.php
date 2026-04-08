@@ -79,12 +79,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/daily-activities/{id}', [\App\Http\Controllers\DailyActivityController::class, 'update']);
     Route::delete('/daily-activities/{id}', [\App\Http\Controllers\DailyActivityController::class, 'destroy']);
     Route::get('/daily-activities/todays-report', [\App\Http\Controllers\DailyActivityController::class, 'todaysReport']);
+    Route::get('/daily-activities/todays-report/export', [\App\Http\Controllers\DailyActivityController::class, 'todaysReportExport']);
     Route::post('/daily-activities/generate-report', [\App\Http\Controllers\DailyActivityController::class, 'generateReportWithGpt']);
 
     // Users
     Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
 
-    // Users Management
+    // Users Management (specific routes before {user} binding)
+    Route::post('/users/reset-all-passwords', [UserController::class, 'resetAllPasswords']);
     Route::apiResource('users', UserController::class);
     Route::get('/roles', [RoleController::class, 'index']);
     Route::patch('/roles/{role}', [RoleController::class, 'update']);
@@ -103,6 +105,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/leads/stats', [LeadController::class, 'stats']);
     Route::get('/leads/export', [LeadController::class, 'exportCsv']);
     Route::apiResource('leads', LeadController::class);
+    Route::get('/products/categories', [ProductController::class, 'categories']);
     Route::apiResource('products', ProductController::class);
     Route::get('/products/{id}/suggested', [ProductController::class, 'getSuggestedProducts']);
     Route::get('/leads/pipeline/board', [LeadController::class, 'pipeline']);
@@ -213,6 +216,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reporting/revenue-by-employee', [ReportingController::class, 'revenueByEmployee']);
     Route::get('/reporting/team-location-status', [ReportingController::class, 'teamLocationStatus']);
     Route::get('/reporting/products-sold-by-employee', [ReportingController::class, 'productsSoldByEmployee']);
+    Route::get('/reporting/employee-performance-overview', [ReportingController::class, 'employeePerformanceOverview']);
     Route::get('/reporting/target-vs-achievement', [ReportingController::class, 'targetVsAchievement']);
     Route::get('/reporting/employee-self-report', [ReportingController::class, 'employeeSelfReport']);
 

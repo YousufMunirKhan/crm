@@ -878,20 +878,28 @@ const loadDashboard = async () => {
         const targetsByUser = {};
 
         for (const t of targetsRaw) {
+            const lines = t.lines || [];
+            const tsFromLines = lines.length
+                ? lines.reduce((s, l) => s + num(l.target_quantity), 0)
+                : 0;
             const tp = num(t.target_appointments);
-            const ts = num(t.target_sales);
+            const ts = lines.length ? tsFromLines : num(t.target_sales);
             const tr = num(t.target_revenue);
             if (tp === 0 && ts === 0 && tr === 0) {
                 continue;
             }
+            const achievedFromLines = lines.length
+                ? lines.reduce((s, l) => s + num(l.achieved_quantity), 0)
+                : 0;
             targetsByUser[t.user_id] = {
                 user_id: t.user_id,
                 user: t.user,
+                lines,
                 target_appointments: tp,
                 target_sales: ts,
                 target_revenue: tr,
                 achieved_appointments: 0,
-                achieved_sales: 0,
+                achieved_sales: achievedFromLines,
                 achieved_revenue: 0,
             };
         }
@@ -913,6 +921,7 @@ const loadDashboard = async () => {
                 existing || {
                     user_id: id,
                     user: { id: ag.id, name: ag.name },
+                    lines: [],
                     target_appointments: 0,
                     target_sales: 0,
                     target_revenue: 0,
@@ -921,7 +930,11 @@ const loadDashboard = async () => {
                     achieved_revenue: 0,
                 };
             row.achieved_appointments = num(ag.appointments_count);
-            row.achieved_sales = num(ag.won_products) || num(ag.won_count);
+            if (row.lines?.length) {
+                row.achieved_sales = row.lines.reduce((s, l) => s + num(l.achieved_quantity), 0);
+            } else {
+                row.achieved_sales = num(ag.won_products) || num(ag.won_count);
+            }
             row.achieved_revenue = num(ag.revenue);
             targetsByUser[id] = row;
         }

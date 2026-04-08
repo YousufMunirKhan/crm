@@ -4,6 +4,7 @@ namespace App\Modules\Reporting\Services;
 
 use App\Modules\CRM\Models\Lead;
 use App\Modules\CRM\Models\LeadItem;
+use App\Modules\CRM\Models\Product;
 use App\Modules\CRM\Models\Customer;
 use App\Modules\CRM\Models\LeadActivity;
 use App\Modules\Invoice\Models\Invoice;
@@ -11,10 +12,52 @@ use App\Modules\Ticket\Models\Ticket;
 use App\Modules\Communication\Models\Communication;
 use App\Models\User;
 use App\Modules\HR\Models\EmployeeTarget;
+use App\Modules\HR\Models\EmployeeTargetLine;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class ReportingService
 {
+    /**
+     * Won line items credited to an agent (lead assignee OR customer-assigned rep).
+     * Period: closed_at in range, or (legacy) closed_at null and lead created in range.
+     */
+    private function baseWonLeadItemsForAgentInPeriod(int $agentId, Carbon $from, Carbon $to): Builder
+    {
+        return LeadItem::query()
+            ->where('status', LeadItem::STATUS_WON)
+            ->where(function ($w) use ($from, $to) {
+                $w->whereBetween('closed_at', [$from, $to])
+                    ->orWhere(function ($o) use ($from, $to) {
+                        $o->whereNull('closed_at')
+                            ->whereHas('lead', fn ($l) => $l->whereBetween('created_at', [$from, $to]));
+                    });
+            })
+            ->whereHas('lead', function ($q) use ($agentId) {
+                $q->where(function ($subQ) use ($agentId) {
+                    $subQ->where('assigned_to', $agentId)
+                        ->orWhereHas('customer.assignedUsers', function ($userQ) use ($agentId) {
+                            $userQ->where('user_id', $agentId);
+                        });
+                });
+            });
+    }
+
+    /**
+     * Won line items for an agent on one calendar day (daily activity / export).
+     */
+    public function wonLeadItemsForAgentOnDate(int $agentId, Carbon $date): Collection
+    {
+        $from = $date->copy()->startOfDay();
+        $to = $date->copy()->endOfDay();
+
+        return $this->baseWonLeadItemsForAgentInPeriod($agentId, $from, $to)
+            ->with(['product:id,name', 'lead:id,customer_id', 'lead.customer:id,name'])
+            ->orderByRaw('COALESCE(closed_at, lead_items.created_at) ASC')
+            ->get();
+    }
+
     public function getExecutiveDashboard(array $filters = []): array
     {
         $from = isset($filters['from']) ? Carbon::parse($filters['from'])->startOfDay() : now()->startOfMonth();
@@ -236,22 +279,16 @@ class ReportingService
         $agents = $agentsQuery->get()->map(function ($agent) use ($from, $to) {
             $leads = $agent->leads()->whereBetween('created_at', [$from, $to])->with('items')->get();
 
-            // Count won products (primary sales metric)
-            $wonProducts = LeadItem::whereHas('lead', function($q) use ($agent, $from, $to) {
-                $q->where('assigned_to', $agent->id)
-                  ->whereBetween('created_at', [$from, $to]);
-            })->where('status', LeadItem::STATUS_WON)->count();
+            // Won lines: same rules as monthly targets (assignee OR customer rep; month by closed_at)
+            $wonProducts = (int) $this->baseWonLeadItemsForAgentInPeriod((int) $agent->id, $from, $to)->count();
 
             // Count leads that have at least one won product (won deals)
             $wonLeads = $leads->filter(function($lead) {
                 return $lead->items->where('status', LeadItem::STATUS_WON)->count() > 0;
             })->count();
 
-            // Revenue from won items
-            $leadRevenue = LeadItem::whereHas('lead', function($q) use ($agent, $from, $to) {
-                $q->where('assigned_to', $agent->id)
-                  ->whereBetween('created_at', [$from, $to]);
-            })->where('status', LeadItem::STATUS_WON)->sum('total_price');
+            // Revenue from won items (same scope as wonProducts)
+            $leadRevenue = (float) $this->baseWonLeadItemsForAgentInPeriod((int) $agent->id, $from, $to)->sum('total_price');
             
             // Invoice revenue
             $invoiceRevenue = Invoice::whereHas('customer', function ($q) use ($agent) {
@@ -317,15 +354,8 @@ class ReportingService
                 ->with('items')
                 ->get();
 
-            // Product-level stats
-            $wonProducts = LeadItem::whereHas('lead', function($q) use ($agent, $from, $to) {
-                $q->where(function($subQ) use ($agent) {
-                    $subQ->where('assigned_to', $agent->id)
-                         ->orWhereHas('customer.assignedUsers', function ($userQ) use ($agent) {
-                             $userQ->where('user_id', $agent->id);
-                         });
-                })->whereBetween('created_at', [$from, $to]);
-            })->where('status', LeadItem::STATUS_WON)->count();
+            // Product-level stats (won lines in period by closed_at / legacy)
+            $wonProducts = (int) $this->baseWonLeadItemsForAgentInPeriod((int) $agent->id, $from, $to)->count();
             
             $lostProducts = LeadItem::whereHas('lead', function($q) use ($agent, $from, $to) {
                 $q->where(function($subQ) use ($agent) {
@@ -345,14 +375,7 @@ class ReportingService
                 })->whereBetween('created_at', [$from, $to]);
             })->where('status', LeadItem::STATUS_PENDING)->count();
             
-            $wonRevenue = LeadItem::whereHas('lead', function($q) use ($agent, $from, $to) {
-                $q->where(function($subQ) use ($agent) {
-                    $subQ->where('assigned_to', $agent->id)
-                         ->orWhereHas('customer.assignedUsers', function ($userQ) use ($agent) {
-                             $userQ->where('user_id', $agent->id);
-                         });
-                })->whereBetween('created_at', [$from, $to]);
-            })->where('status', LeadItem::STATUS_WON)->sum('total_price');
+            $wonRevenue = (float) $this->baseWonLeadItemsForAgentInPeriod((int) $agent->id, $from, $to)->sum('total_price');
 
             $pipeline[] = [
                 'employee_id' => $agent->id,
@@ -488,25 +511,9 @@ class ReportingService
 
         $revenue = [];
         foreach ($agents as $agent) {
-            // Revenue from WON items (status = 'won')
-            $leadRevenue = LeadItem::whereHas('lead', function($q) use ($agent, $from, $to) {
-                $q->where(function($subQ) use ($agent) {
-                    $subQ->where('assigned_to', $agent->id)
-                         ->orWhereHas('customer.assignedUsers', function ($userQ) use ($agent) {
-                             $userQ->where('user_id', $agent->id);
-                         });
-                })->whereBetween('created_at', [$from, $to]);
-            })->where('status', LeadItem::STATUS_WON)->sum('total_price');
-            
-            // Product stats
-            $wonProducts = LeadItem::whereHas('lead', function($q) use ($agent, $from, $to) {
-                $q->where(function($subQ) use ($agent) {
-                    $subQ->where('assigned_to', $agent->id)
-                         ->orWhereHas('customer.assignedUsers', function ($userQ) use ($agent) {
-                             $userQ->where('user_id', $agent->id);
-                         });
-                })->whereBetween('created_at', [$from, $to]);
-            })->where('status', LeadItem::STATUS_WON)->count();
+            $aid = (int) $agent->id;
+            $leadRevenue = (float) $this->baseWonLeadItemsForAgentInPeriod($aid, $from, $to)->sum('total_price');
+            $wonProducts = (int) $this->baseWonLeadItemsForAgentInPeriod($aid, $from, $to)->count();
             
             $lostProducts = LeadItem::whereHas('lead', function($q) use ($agent, $from, $to) {
                 $q->where(function($subQ) use ($agent) {
@@ -581,6 +588,62 @@ class ReportingService
     }
 
     /**
+     * One place for managers: previous calendar week (Mon–Sun) sales, selected month sales detail,
+     * and monthly target vs achievement for the same month.
+     *
+     * @return array{
+     *   month: string,
+     *   last_week: array{period: array{from: string, to: string}, won_line_items: int, total_revenue: float, products: list<array>},
+     *   selected_month: array{period: array{from: string, to: string}, won_line_items: int, total_revenue: float, products: list<array>},
+     *   targets: array{self: ?array, total_employees_with_targets: int}
+     * }
+     */
+    public function getEmployeePerformanceOverview(int $agentId, ?string $month = null): array
+    {
+        $month = $month ?? now()->format('Y-m');
+        $monthStart = Carbon::parse($month . '-01')->startOfMonth();
+        $monthEnd = $monthStart->copy()->endOfMonth();
+
+        $lastWeekStart = Carbon::now()->startOfWeek()->subWeek();
+        $lastWeekEnd = $lastWeekStart->copy()->endOfWeek();
+
+        $lastWeek = $this->getProductsSoldByEmployee([
+            'agent_id' => $agentId,
+            'from' => $lastWeekStart->toDateString(),
+            'to' => $lastWeekEnd->toDateString(),
+        ]);
+
+        $selectedMonth = $this->getProductsSoldByEmployee([
+            'agent_id' => $agentId,
+            'from' => $monthStart->toDateString(),
+            'to' => $monthEnd->toDateString(),
+        ]);
+
+        $targets = $this->getEmployeeSelfReport($agentId, ['month' => $month]);
+
+        return [
+            'month' => $month,
+            'last_week' => [
+                'period' => $lastWeek['period'],
+                'label' => $lastWeekStart->format('j M') . ' – ' . $lastWeekEnd->format('j M Y'),
+                'won_line_items' => count($lastWeek['products'] ?? []),
+                'total_revenue' => (float) ($lastWeek['total_revenue'] ?? 0),
+                'products' => $lastWeek['products'] ?? [],
+            ],
+            'selected_month' => [
+                'period' => $selectedMonth['period'],
+                'won_line_items' => count($selectedMonth['products'] ?? []),
+                'total_revenue' => (float) ($selectedMonth['total_revenue'] ?? 0),
+                'products' => $selectedMonth['products'] ?? [],
+            ],
+            'targets' => [
+                'self' => $targets['self'] ?? null,
+                'total_employees_with_targets' => (int) ($targets['total_employees_with_targets'] ?? 0),
+            ],
+        ];
+    }
+
+    /**
      * Products sold by a specific employee in a given period (product-level detail).
      * Admin only - used for "Products by Employee" report.
      */
@@ -599,17 +662,9 @@ class ReportingService
             ];
         }
 
-        $items = LeadItem::where('status', LeadItem::STATUS_WON)
-            ->whereHas('lead', function ($q) use ($agentId, $from, $to) {
-                $q->where(function ($subQ) use ($agentId) {
-                    $subQ->where('assigned_to', $agentId)
-                        ->orWhereHas('customer.assignedUsers', function ($userQ) use ($agentId) {
-                            $userQ->where('user_id', $agentId);
-                        });
-                })->whereBetween('created_at', [$from, $to]);
-            })
+        $items = $this->baseWonLeadItemsForAgentInPeriod((int) $agentId, $from, $to)
             ->with(['product', 'lead.customer'])
-            ->orderBy('closed_at', 'desc')
+            ->orderByDesc('closed_at')
             ->get();
 
         $agent = User::find($agentId);
@@ -634,6 +689,145 @@ class ReportingService
     }
 
     /**
+     * Won lead line items for an employee (assignee or customer rep), optional product or category filter.
+     * Product filter: exact product_id.
+     * Category filter: counts every won line item whose product is in that category — one category can include
+     * many products; each qualifying won row counts toward the category target (name match is case-insensitive, trimmed).
+     */
+    public function countWonLeadItemsForAgent(int $agentId, Carbon $from, Carbon $to, ?int $productId = null, ?string $categoryName = null): int
+    {
+        $q = $this->baseWonLeadItemsForAgentInPeriod($agentId, $from, $to);
+
+        if ($productId !== null) {
+            $q->where('product_id', $productId);
+        } elseif ($categoryName !== null && trim($categoryName) !== '') {
+            $catNorm = mb_strtolower(trim($categoryName), 'UTF-8');
+            $productIdsInCategory = Product::query()
+                ->whereNotNull('category')
+                ->whereRaw('LOWER(TRIM(COALESCE(category, \'\'))) = ?', [$catNorm])
+                ->select('id');
+            // Must have a product on the line item so it can belong to the category set
+            $q->whereNotNull('product_id')->whereIn('product_id', $productIdsInCategory);
+        }
+
+        return (int) $q->count();
+    }
+
+    /**
+     * When target lines exist, sales target is the sum of line targets and achieved is summed per line
+     * (overlapping product + category lines can double-count the same sale across lines).
+     * When no lines, uses legacy target_sales and total won items for the employee.
+     *
+     * @return array{target_sales: int, achieved_sales: int}
+     */
+    public function resolveSalesTargetAndAchieved(?EmployeeTarget $target, int $agentId, Carbon $from, Carbon $to): array
+    {
+        $target?->loadMissing('lines');
+        $lines = $target?->lines ?? new Collection;
+        if ($lines->isEmpty()) {
+            return [
+                'target_sales' => (int) ($target?->target_sales ?? 0),
+                'achieved_sales' => $this->countWonLeadItemsForAgent($agentId, $from, $to),
+            ];
+        }
+
+        $targetSum = 0;
+        $achievedSum = 0;
+        foreach ($lines as $line) {
+            $targetSum += max(0, (int) $line->target_quantity);
+            if ($line->line_type === EmployeeTargetLine::TYPE_CATEGORY) {
+                $achievedSum += $this->countWonLeadItemsForAgent($agentId, $from, $to, null, (string) ($line->category_name ?? ''));
+            } else {
+                $achievedSum += $this->countWonLeadItemsForAgent($agentId, $from, $to, $line->product_id);
+            }
+        }
+
+        return [
+            'target_sales' => $targetSum,
+            'achieved_sales' => $achievedSum,
+        ];
+    }
+
+    /**
+     * Appointments, all won line items count, and revenue (won items + invoices) for an employee.
+     *
+     * @return array{appointments: int, sales: int, revenue: float}
+     */
+    public function getEmployeeAchievementTotals(int $userId, Carbon $from, Carbon $to): array
+    {
+        $appointmentsCount = LeadActivity::where('type', 'appointment')
+            ->whereBetween('created_at', [$from, $to])
+            ->where(function ($q) use ($userId) {
+                $q->where('assigned_user_id', $userId)->orWhere('user_id', $userId);
+            })
+            ->count();
+
+        $sales = $this->countWonLeadItemsForAgent($userId, $from, $to);
+
+        $wonRevenue = (float) $this->baseWonLeadItemsForAgentInPeriod($userId, $from, $to)->sum('total_price');
+
+        $invoiceRevenue = Invoice::whereHas('customer', function ($q) use ($userId) {
+            $q->whereHas('assignedUsers', function ($sub) use ($userId) {
+                $sub->where('user_id', $userId);
+            })->orWhereHas('leads', function ($sub) use ($userId) {
+                $sub->where('assigned_to', $userId);
+            });
+        })->whereBetween('invoice_date', [$from, $to])->sum('total');
+
+        $totalRevenue = (float) $wonRevenue + (float) $invoiceRevenue;
+
+        return [
+            'appointments' => $appointmentsCount,
+            'sales' => $sales,
+            'revenue' => $totalRevenue,
+        ];
+    }
+
+    /**
+     * @return list<array{line_type: string, label: string, target_quantity: int, achieved_quantity: int}>
+     */
+    public function getSalesTargetLinesBreakdown(?EmployeeTarget $target, int $userId, Carbon $from, Carbon $to): array
+    {
+        if (!$target) {
+            return [];
+        }
+        $target->loadMissing('lines.product');
+        $out = [];
+        $categoryProductCounts = [];
+        foreach ($target->lines as $line) {
+            if ($line->line_type === EmployeeTargetLine::TYPE_CATEGORY) {
+                $achieved = $this->countWonLeadItemsForAgent($userId, $from, $to, null, (string) ($line->category_name ?? ''));
+                $rawCat = (string) ($line->category_name ?? '');
+                $norm = mb_strtolower(trim($rawCat), 'UTF-8');
+                if ($norm !== '') {
+                    if (! array_key_exists($norm, $categoryProductCounts)) {
+                        $categoryProductCounts[$norm] = (int) Product::query()
+                            ->whereNotNull('category')
+                            ->whereRaw('LOWER(TRIM(COALESCE(category, \'\'))) = ?', [$norm])
+                            ->count();
+                    }
+                    $n = $categoryProductCounts[$norm];
+                    $suffix = $n > 0 ? " — {$n} products in this group" : ' — no products use this category yet';
+                    $label = 'Category: ' . $rawCat . $suffix;
+                } else {
+                    $label = 'Category: (not set)';
+                }
+            } else {
+                $achieved = $this->countWonLeadItemsForAgent($userId, $from, $to, $line->product_id);
+                $label = $line->product?->name ?? ('Product #' . (string) $line->product_id);
+            }
+            $out[] = [
+                'line_type' => $line->line_type,
+                'label' => $label,
+                'target_quantity' => max(0, (int) $line->target_quantity),
+                'achieved_quantity' => $achieved,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Target vs Achievement summary for all employees (admin).
      * Includes ranking by achievement percentage.
      */
@@ -648,13 +842,12 @@ class ReportingService
                 $q->whereIn('name', ['Sales', 'CallAgent']);
             })->get();
 
-        $targetsByUser = EmployeeTarget::where('month', $month)->get()->keyBy('user_id');
+        $targetsByUser = EmployeeTarget::where('month', $month)->with('lines')->get()->keyBy('user_id');
 
         $rows = [];
         foreach ($agents as $agent) {
             $target = $targetsByUser->get($agent->id);
             $targetAppts = $target?->target_appointments ?? 0;
-            $targetSales = $target?->target_sales ?? 0;
             $targetRevenue = (float) ($target?->target_revenue ?? 0);
 
             $appointmentsCount = LeadActivity::where('type', 'appointment')
@@ -664,23 +857,11 @@ class ReportingService
                 })
                 ->count();
 
-            $wonProducts = LeadItem::whereHas('lead', function ($q) use ($agent, $from, $to) {
-                $q->where(function ($subQ) use ($agent) {
-                    $subQ->where('assigned_to', $agent->id)
-                        ->orWhereHas('customer.assignedUsers', function ($userQ) use ($agent) {
-                            $userQ->where('user_id', $agent->id);
-                        });
-                })->whereBetween('created_at', [$from, $to]);
-            })->where('status', LeadItem::STATUS_WON)->count();
+            $salesResolved = $this->resolveSalesTargetAndAchieved($target, $agent->id, $from, $to);
+            $targetSales = $salesResolved['target_sales'];
+            $wonProducts = $salesResolved['achieved_sales'];
 
-            $wonRevenue = LeadItem::whereHas('lead', function ($q) use ($agent, $from, $to) {
-                $q->where(function ($subQ) use ($agent) {
-                    $subQ->where('assigned_to', $agent->id)
-                        ->orWhereHas('customer.assignedUsers', function ($userQ) use ($agent) {
-                            $userQ->where('user_id', $agent->id);
-                        });
-                })->whereBetween('created_at', [$from, $to]);
-            })->where('status', LeadItem::STATUS_WON)->sum('total_price');
+            $wonRevenue = (float) $this->baseWonLeadItemsForAgentInPeriod((int) $agent->id, $from, $to)->sum('total_price');
 
             $invoiceRevenue = Invoice::whereHas('customer', function ($q) use ($agent) {
                 $q->whereHas('assignedUsers', function ($sub) use ($agent) {
@@ -690,7 +871,7 @@ class ReportingService
                 });
             })->whereBetween('invoice_date', [$from, $to])->sum('total');
 
-            $totalRevenue = (float) $wonRevenue + (float) $invoiceRevenue;
+            $totalRevenue = $wonRevenue + (float) $invoiceRevenue;
 
             $apptPct = $targetAppts > 0 ? round($appointmentsCount / $targetAppts * 100, 1) : ($appointmentsCount > 0 ? 100 : 0);
             $salesPct = $targetSales > 0 ? round($wonProducts / $targetSales * 100, 1) : ($wonProducts > 0 ? 100 : 0);
@@ -755,41 +936,49 @@ class ReportingService
             $agents = User::where('is_active', true)
                 ->whereHas('role', fn ($q) => $q->whereIn('name', ['Sales', 'CallAgent']))->get();
             $agent = $agents->firstWhere('id', $userId);
-            $target = EmployeeTarget::where('user_id', $userId)->where('month', $month)->first();
+            $target = EmployeeTarget::where('user_id', $userId)->where('month', $month)->with('lines')->first();
             $from = Carbon::parse($month . '-01')->startOfMonth();
             $to = $from->copy()->endOfMonth();
 
-            $appointmentsCount = LeadActivity::where('type', 'appointment')
-                ->whereBetween('created_at', [$from, $to])
-                ->where(fn ($q) => $q->where('assigned_user_id', $userId)->orWhere('user_id', $userId))
-                ->count();
-            $wonProducts = LeadItem::whereHas('lead', fn ($q) => $q->where('assigned_to', $userId)->whereBetween('created_at', [$from, $to]))
-                ->where('status', LeadItem::STATUS_WON)->count();
-            $wonRevenue = LeadItem::whereHas('lead', fn ($q) => $q->where('assigned_to', $userId)->whereBetween('created_at', [$from, $to]))
-                ->where('status', LeadItem::STATUS_WON)->sum('total_price');
-            $invoiceRevenue = Invoice::whereHas('customer', fn ($q) => $q->whereHas('assignedUsers', fn ($s) => $s->where('user_id', $userId)))
-                ->whereBetween('invoice_date', [$from, $to])->sum('total');
-            $totalRevenue = (float) $wonRevenue + (float) $invoiceRevenue;
+            $totals = $this->getEmployeeAchievementTotals($userId, $from, $to);
+            $salesResolved = $this->resolveSalesTargetAndAchieved($target, $userId, $from, $to);
 
             $targetAppts = $target?->target_appointments ?? 0;
-            $targetSales = $target?->target_sales ?? 0;
+            $targetSales = $salesResolved['target_sales'];
+            $wonProducts = $salesResolved['achieved_sales'];
             $targetRevenue = (float) ($target?->target_revenue ?? 0);
+            $totalRevenue = $totals['revenue'];
             $myRow = [
                 'employee_id' => $userId,
                 'employee_name' => $agent?->name ?? 'Unknown',
                 'target_appointments' => $targetAppts,
-                'achieved_appointments' => $appointmentsCount,
-                'appointment_progress' => $targetAppts > 0 ? round($appointmentsCount / $targetAppts * 100, 1) : 0,
+                'achieved_appointments' => $totals['appointments'],
+                'appointment_progress' => $targetAppts > 0 ? round($totals['appointments'] / $targetAppts * 100, 1) : 0,
                 'target_sales' => $targetSales,
                 'achieved_sales' => $wonProducts,
-                'sales_progress' => $targetSales > 0 ? round($wonProducts / $targetSales * 100, 1) : 0,
+                'sales_progress' => $targetSales > 0 ? round($wonProducts / $targetSales * 100, 1) : ($wonProducts > 0 ? 100 : 0),
                 'target_revenue' => $targetRevenue,
                 'achieved_revenue' => $totalRevenue,
-                'revenue_progress' => $targetRevenue > 0 ? round($totalRevenue / $targetRevenue * 100, 1) : 0,
+                'revenue_progress' => $targetRevenue > 0 ? round($totalRevenue / $targetRevenue * 100, 1) : ($totalRevenue > 0 ? 100 : 0),
                 'overall_progress' => 0,
                 'rank' => null,
             ];
+            $ap = $myRow['appointment_progress'];
+            $sp = $myRow['sales_progress'];
+            $rp = $myRow['revenue_progress'];
+            $denom = (int) ($targetAppts > 0) + (int) ($targetSales > 0) + (int) ($targetRevenue > 0);
+            $myRow['overall_progress'] = $denom > 0
+                ? round(
+                    (($targetAppts > 0 ? $ap : 0) + ($targetSales > 0 ? $sp : 0) + ($targetRevenue > 0 ? $rp : 0)) / $denom,
+                    1
+                )
+                : 0;
         }
+
+        $from = Carbon::parse($month . '-01')->startOfMonth();
+        $to = $from->copy()->endOfMonth();
+        $selfTarget = EmployeeTarget::where('user_id', $userId)->where('month', $month)->with(['lines.product'])->first();
+        $myRow['sales_target_lines'] = $this->getSalesTargetLinesBreakdown($selfTarget, $userId, $from, $to);
 
         $totalWithTargets = collect($rows)->filter(fn ($r) => ($r['target_appointments'] ?? 0) > 0 || ($r['target_sales'] ?? 0) > 0 || ($r['target_revenue'] ?? 0) > 0)->count();
 

@@ -182,33 +182,39 @@ class AppointmentController extends Controller
             $lead->update($update);
             $lead->customer?->syncTypeFromLeads();
 
-            // When marking as Won, close selected products as won so they appear in "What Customer Has"
-            if ($data['lead_stage'] === 'won' && !empty($data['won_items'])) {
-                $validItemIds = $lead->items()->where('status', LeadItem::STATUS_PENDING)->pluck('id')->toArray();
-                foreach ($data['won_items'] as $wi) {
-                    $itemId = (int) ($wi['lead_item_id'] ?? 0);
-                    if ($itemId && in_array($itemId, $validItemIds, true)) {
-                        $item = LeadItem::find($itemId);
-                        if ($item && $item->lead_id === $lead->id && $item->status === LeadItem::STATUS_PENDING) {
-                            $qty = max(1, (int) ($wi['quantity'] ?? 1));
-                            $price = max(0, (float) ($wi['unit_price'] ?? 0));
-                            $item->status = LeadItem::STATUS_WON;
-                            $item->quantity = $qty;
-                            $item->unit_price = $price;
-                            $item->closed_at = now();
-                            $item->save();
+            // When marking as Won, align line items for reporting / "What Customer Has"
+            if ($data['lead_stage'] === 'won') {
+                if (! empty($data['won_items'])) {
+                    $validItemIds = $lead->items()->where('status', LeadItem::STATUS_PENDING)->pluck('id')->toArray();
+                    foreach ($data['won_items'] as $wi) {
+                        $itemId = (int) ($wi['lead_item_id'] ?? 0);
+                        if ($itemId && in_array($itemId, $validItemIds, true)) {
+                            $item = LeadItem::find($itemId);
+                            if ($item && $item->lead_id === $lead->id && $item->status === LeadItem::STATUS_PENDING) {
+                                $qty = max(1, (int) ($wi['quantity'] ?? 1));
+                                $price = max(0, (float) ($wi['unit_price'] ?? 0));
+                                $item->status = LeadItem::STATUS_WON;
+                                $item->quantity = $qty;
+                                $item->unit_price = $price;
+                                $item->closed_at = now();
+                                $item->save();
 
-                            $productName = $item->product->name ?? 'Unknown';
-                            LeadActivity::create([
-                                'lead_id' => $lead->id,
-                                'user_id' => auth()->id(),
-                                'type' => 'item_closed',
-                                'description' => "Product '{$productName}' closed as WON - Qty: {$qty}, Price: £" . number_format($price, 2),
-                                'meta' => ['item_id' => $item->id, 'product_id' => $item->product_id, 'status' => 'won'],
-                            ]);
+                                $productName = $item->product->name ?? 'Unknown';
+                                LeadActivity::create([
+                                    'lead_id' => $lead->id,
+                                    'user_id' => auth()->id(),
+                                    'type' => 'item_closed',
+                                    'description' => "Product '{$productName}' closed as WON - Qty: {$qty}, Price: £" . number_format($price, 2),
+                                    'meta' => ['item_id' => $item->id, 'product_id' => $item->product_id, 'status' => 'won'],
+                                ]);
+                            }
                         }
                     }
+                } else {
+                    // No explicit selection: win all pending (or create from primary product), same as other "mark won" flows
+                    $lead->materializeWonLineItemsForReporting(false);
                 }
+                $lead->refresh();
                 $lead->updateStageFromItems();
                 $lead->customer?->syncTypeFromLeads();
                 $totalValue = $lead->wonItems()->sum('total_price');

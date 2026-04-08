@@ -72,7 +72,7 @@
 
         <div v-else-if="data.length === 0" class="px-5 py-12 text-center text-slate-500 text-sm">
             No employees with targets for this month. Set targets in
-            <router-link to="/employees/goals" class="text-blue-600 hover:underline">Employee goals</router-link>.
+            <router-link to="/employees/goals" class="text-blue-600 hover:underline">Set targets</router-link>.
         </div>
 
         <div v-else class="space-y-6 px-3 pb-4 sm:px-5">

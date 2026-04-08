@@ -152,6 +152,12 @@ const routes = [
         meta: { requiresAuth: true, title: 'Products Sold by Employee', roles: ['Admin', 'Manager', 'System Admin'] },
     },
     {
+        path: '/report/employee-performance',
+        name: 'report-employee-performance',
+        component: () => import('@/views/report/ReportEmployeePerformanceView.vue'),
+        meta: { requiresAuth: true, title: 'Employee Performance', roles: ['Admin', 'Manager', 'System Admin'] },
+    },
+    {
         path: '/reports',
         name: 'reports',
         component: ReportsView,
@@ -247,7 +253,7 @@ const routes = [
         path: '/employees/goals',
         name: 'employee-goals',
         component: () => import('@/views/EmployeeGoalsView.vue'),
-        meta: { requiresAuth: true, title: 'Employee Goals', roles: ['Admin', 'Manager', 'System Admin'] },
+        meta: { requiresAuth: true, title: 'Set targets', roles: ['Admin', 'Manager', 'System Admin'] },
     },
     {
         path: '/templates/email/new',
@@ -284,6 +290,12 @@ const routes = [
         name: 'today-activity',
         component: () => import('@/views/TodaysActivityView.vue'),
         meta: { requiresAuth: true, title: "Today's Activity" },
+    },
+    {
+        path: '/change-password',
+        name: 'change-password',
+        component: () => import('@/views/ChangePasswordView.vue'),
+        meta: { requiresAuth: true, title: 'Change password' },
     },
     {
         path: '/todays-report',

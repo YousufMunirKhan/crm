@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Modules\HR\Models\Attendance;
 use App\Modules\HR\Models\Salary;
 use App\Modules\HR\Models\EmployeeTarget;
+use App\Modules\HR\Models\EmployeeTargetLine;
 use App\Modules\HR\Models\EmployeeDocument;
 use App\Modules\HR\Services\HrService;
+use App\Modules\Reporting\Services\ReportingService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
@@ -16,7 +19,8 @@ use Carbon\Carbon;
 class HrController extends Controller
 {
     public function __construct(
-        private HrService $hrService
+        private HrService $hrService,
+        private ReportingService $reportingService
     ) {}
 
     public function checkIn(Request $request)
@@ -265,11 +269,59 @@ class HrController extends Controller
             $query->where('user_id', $user->id);
         }
 
-        $targets = $query->get();
+        $targets = $query->with(['lines.product', 'user.role'])->get();
+
+        $from = Carbon::parse($month . '-01')->startOfMonth();
+        $to = $from->copy()->endOfMonth();
+
+        $data = $targets->map(function (EmployeeTarget $t) use ($from, $to) {
+            $sales = $this->reportingService->resolveSalesTargetAndAchieved($t, (int) $t->user_id, $from, $to);
+            $totals = $this->reportingService->getEmployeeAchievementTotals((int) $t->user_id, $from, $to);
+
+            $linesOut = [];
+            foreach ($t->lines as $line) {
+                if ($line->line_type === EmployeeTargetLine::TYPE_CATEGORY) {
+                    $ach = $this->reportingService->countWonLeadItemsForAgent(
+                        (int) $t->user_id,
+                        $from,
+                        $to,
+                        null,
+                        (string) ($line->category_name ?? '')
+                    );
+                } else {
+                    $ach = $this->reportingService->countWonLeadItemsForAgent(
+                        (int) $t->user_id,
+                        $from,
+                        $to,
+                        $line->product_id
+                    );
+                }
+                $linesOut[] = [
+                    'id' => $line->id,
+                    'line_type' => $line->line_type,
+                    'product_id' => $line->product_id,
+                    'product' => $line->product,
+                    'category_name' => $line->category_name,
+                    'target_quantity' => (int) $line->target_quantity,
+                    'achieved_quantity' => $ach,
+                ];
+            }
+
+            $base = $t->toArray();
+            $base['lines'] = $linesOut;
+            $base['effective_target_sales'] = $sales['target_sales'];
+            $base['achievement'] = [
+                'appointments' => $totals['appointments'],
+                'sales_total_won_items' => $totals['sales'],
+                'revenue' => $totals['revenue'],
+            ];
+
+            return $base;
+        });
 
         return response()->json([
             'month' => $month,
-            'data' => $targets,
+            'data' => $data,
         ]);
     }
 
@@ -283,17 +335,71 @@ class HrController extends Controller
             'meta' => ['nullable', 'array'],
         ]);
 
-        $target = EmployeeTarget::updateOrCreate(
-            ['user_id' => $userId, 'month' => $data['month']],
-            [
-                'target_appointments' => $data['target_appointments'] ?? 0,
-                'target_sales' => $data['target_sales'] ?? 0,
-                'target_revenue' => $data['target_revenue'] ?? 0,
-                'meta' => $data['meta'] ?? null,
-            ]
-        );
+        $linesPayload = null;
+        if ($request->exists('lines')) {
+            $linesPayload = $request->validate([
+                'lines' => ['present', 'array'],
+                'lines.*.line_type' => ['required', 'in:product,category'],
+                'lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+                'lines.*.category_name' => ['nullable', 'string', 'max:255'],
+                'lines.*.target_quantity' => ['nullable', 'integer', 'min:0'],
+            ])['lines'];
+        }
 
-        return response()->json($target->load('user.role'));
+        if (is_array($linesPayload)) {
+            foreach ($linesPayload as $i => $line) {
+                if (($line['line_type'] ?? '') === EmployeeTargetLine::TYPE_PRODUCT && empty($line['product_id'])) {
+                    return response()->json([
+                        'message' => "Product targets must include product_id (row " . ($i + 1) . ').',
+                    ], 422);
+                }
+                if (($line['line_type'] ?? '') === EmployeeTargetLine::TYPE_CATEGORY && trim((string) ($line['category_name'] ?? '')) === '') {
+                    return response()->json([
+                        'message' => "Category targets must include category_name (row " . ($i + 1) . ').',
+                    ], 422);
+                }
+            }
+        }
+
+        $target = DB::transaction(function () use ($userId, $data, $linesPayload) {
+            $target = EmployeeTarget::firstOrNew([
+                'user_id' => $userId,
+                'month' => $data['month'],
+            ]);
+
+            $target->target_appointments = $data['target_appointments'] ?? 0;
+            $target->target_revenue = $data['target_revenue'] ?? 0;
+            $target->meta = $data['meta'] ?? null;
+
+            if (is_array($linesPayload)) {
+                $sumLineTargets = 0;
+                foreach ($linesPayload as $line) {
+                    $sumLineTargets += max(0, (int) ($line['target_quantity'] ?? 0));
+                }
+                $target->target_sales = count($linesPayload) > 0 ? $sumLineTargets : (int) ($data['target_sales'] ?? 0);
+                $target->save();
+
+                $target->lines()->delete();
+                foreach ($linesPayload as $line) {
+                    EmployeeTargetLine::create([
+                        'employee_target_id' => $target->id,
+                        'line_type' => $line['line_type'],
+                        'product_id' => $line['line_type'] === EmployeeTargetLine::TYPE_PRODUCT ? $line['product_id'] : null,
+                        'category_name' => $line['line_type'] === EmployeeTargetLine::TYPE_CATEGORY ? trim((string) $line['category_name']) : null,
+                        'target_quantity' => max(0, (int) ($line['target_quantity'] ?? 0)),
+                    ]);
+                }
+            } else {
+                $target->target_sales = (int) ($data['target_sales'] ?? 0);
+                $target->save();
+            }
+
+            return $target;
+        });
+
+        return response()->json(
+            $target->load(['user.role', 'lines.product'])
+        );
     }
 
     public function employeeAttendanceStats($userId)

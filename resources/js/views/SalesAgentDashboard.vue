@@ -55,14 +55,18 @@
             <div class="space-y-2">
                 <div class="flex justify-between items-center text-xs text-slate-500">
                     <span>Overall progress</span>
-                    <span class="font-medium text-slate-700">{{ myTarget.appointment_progress }}%</span>
+                    <span class="font-medium text-slate-700">{{ myTarget.overall_progress }}%</span>
                 </div>
                 <div class="w-full bg-slate-200/80 rounded-full h-2.5 overflow-hidden">
                     <div
-                        class="h-2.5 rounded-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-600 transition-all duration-500"
-                        :style="{ width: `${myTarget.appointment_progress}%` }"
+                        class="h-2.5 rounded-full bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-500 transition-all duration-500"
+                        :style="{ width: `${Math.min(100, myTarget.overall_progress || 0)}%` }"
                     ></div>
                 </div>
+                <p v-if="myTarget.target_revenue > 0" class="text-[11px] text-slate-500">
+                    Revenue: {{ formatNumber(myTarget.achieved_revenue) }} / {{ formatNumber(myTarget.target_revenue) }}
+                    ({{ myTarget.revenue_progress }}%)
+                </p>
             </div>
         </div>
 
@@ -639,14 +643,22 @@ const loadDashboard = async (dateParam = null) => {
         monthlyTopPerformer.value = performanceCandidates[0] || null;
 
         for (const t of targetsRaw) {
+            const lines = t.lines || [];
+            const achievedFromLines = lines.length
+                ? lines.reduce((s, l) => s + Number(l.achieved_quantity || 0), 0)
+                : 0;
+            const targetSales = lines.length
+                ? lines.reduce((s, l) => s + Number(l.target_quantity || 0), 0)
+                : t.target_sales || 0;
             byUser[t.user_id] = {
                 user_id: t.user_id,
                 user: t.user,
+                lines,
                 target_appointments: t.target_appointments || 0,
-                target_sales: t.target_sales || 0,
+                target_sales: targetSales,
                 target_revenue: t.target_revenue || 0,
                 achieved_appointments: 0,
-                achieved_sales: 0,
+                achieved_sales: achievedFromLines,
                 achieved_revenue: 0,
             };
         }
@@ -657,6 +669,7 @@ const loadDashboard = async (dateParam = null) => {
                 {
                     user_id: ag.id,
                     user: { id: ag.id, name: ag.name },
+                    lines: [],
                     target_appointments: 0,
                     target_sales: 0,
                     target_revenue: 0,
@@ -665,17 +678,57 @@ const loadDashboard = async (dateParam = null) => {
                     achieved_revenue: 0,
                 };
             existing.achieved_appointments = ag.appointments_count || 0;
-            // Sales = individual products marked WON
-            existing.achieved_sales = ag.won_products || ag.won_count || 0;
+            if (existing.lines?.length) {
+                existing.achieved_sales = existing.lines.reduce(
+                    (s, l) => s + Number(l.achieved_quantity || 0),
+                    0
+                );
+            } else {
+                existing.achieved_sales = ag.won_products || ag.won_count || 0;
+            }
             existing.achieved_revenue = ag.revenue || 0;
             byUser[ag.id] = existing;
         }
 
         employeeTargets.value = Object.values(byUser).map((t) => {
-            const denom = t.target_appointments || 0;
-            const progress =
-                denom > 0 ? Math.min(100, Math.round((t.achieved_appointments / denom) * 100)) : 0;
-            return { ...t, appointment_progress: progress };
+            const apptDenom = num(t.target_appointments);
+            const apptAch = num(t.achieved_appointments);
+            const appointment_progress =
+                apptDenom > 0
+                    ? Math.min(100, Math.round((apptAch / apptDenom) * 100))
+                    : apptAch > 0
+                      ? 100
+                      : 0;
+            const salesDenom = num(t.target_sales);
+            const salesAch = num(t.achieved_sales);
+            const sales_progress =
+                salesDenom > 0
+                    ? Math.min(100, Math.round((salesAch / salesDenom) * 100))
+                    : salesAch > 0
+                      ? 100
+                      : 0;
+            const revDenom = num(t.target_revenue);
+            const revAch = num(t.achieved_revenue);
+            const revenue_progress =
+                revDenom > 0
+                    ? Math.min(100, Math.round((revAch / revDenom) * 100))
+                    : revAch > 0
+                      ? 100
+                      : 0;
+            const parts = [];
+            if (apptDenom > 0) parts.push(appointment_progress);
+            if (salesDenom > 0) parts.push(sales_progress);
+            if (revDenom > 0) parts.push(revenue_progress);
+            const overall_progress = parts.length
+                ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length)
+                : 0;
+            return {
+                ...t,
+                appointment_progress,
+                sales_progress,
+                revenue_progress,
+                overall_progress,
+            };
         });
     } catch (error) {
         console.error('Failed to load dashboard:', error);

@@ -9,7 +9,9 @@ use App\Modules\HR\Services\ContractService;
 use App\Modules\Reporting\Services\ReportingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class UserController extends Controller
 {
@@ -242,6 +244,62 @@ class UserController extends Controller
         $sanitized = NavSections::sanitize($raw);
 
         return $sanitized === [] ? null : $sanitized;
+    }
+
+    /**
+     * Set the same new password for every user except the caller (so you stay logged in).
+     * Admin / System Admin only. Revokes Sanctum API tokens for affected users.
+     */
+    public function resetAllPasswords(Request $request)
+    {
+        $viewer = $request->user();
+        if (! $viewer->isRole('Admin') && ! $viewer->isRole('System Admin')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $data = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'confirm_phrase' => ['required', 'string', 'in:RESET ALL'],
+            'skip_protected_accounts' => ['nullable', 'boolean'],
+        ]);
+
+        $hash = Hash::make($data['password']);
+        $skipProtected = $request->boolean('skip_protected_accounts', true);
+
+        $query = User::query()->where('id', '!=', $viewer->id);
+        if ($skipProtected) {
+            $query->where('email', '!=', 'admin@switchsave.com');
+        }
+
+        $ids = $query->pluck('id')->all();
+        if ($ids === []) {
+            return response()->json([
+                'message' => 'No accounts matched. Your own user is never changed.',
+                'affected' => 0,
+            ]);
+        }
+
+        User::whereIn('id', $ids)->update(['password' => $hash]);
+
+        PersonalAccessToken::query()
+            ->where('tokenable_type', User::class)
+            ->whereIn('tokenable_id', $ids)
+            ->delete();
+
+        Log::warning('Bulk password reset executed', [
+            'by_user_id' => $viewer->id,
+            'by_email' => $viewer->email,
+            'affected_count' => count($ids),
+            'skip_protected_accounts' => $skipProtected,
+            'ip' => $request->ip(),
+        ]);
+
+        $n = count($ids);
+
+        return response()->json([
+            'message' => "Passwords updated for {$n} user(s). They must sign in again on other devices.",
+            'affected' => $n,
+        ]);
     }
 
     public function destroy($id)

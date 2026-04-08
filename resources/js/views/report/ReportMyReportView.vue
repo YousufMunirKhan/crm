@@ -93,11 +93,43 @@
                 </div>
             </div>
 
+            <div
+                v-if="self.sales_target_lines?.length"
+                class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+            >
+                <div class="px-5 py-3 border-b border-slate-100">
+                    <h2 class="text-sm font-semibold text-slate-900">Sales targets by product & category</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Won line items in the month — category rows include every product in that category.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 text-left text-xs font-medium text-slate-600">
+                            <tr>
+                                <th class="px-4 py-2">Target</th>
+                                <th class="px-4 py-2">Achieved</th>
+                                <th class="px-4 py-2">Target qty</th>
+                                <th class="px-4 py-2">Progress</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="(ln, idx) in self.sales_target_lines" :key="idx">
+                                <td class="px-4 py-2 text-slate-900">{{ ln.label }}</td>
+                                <td class="px-4 py-2 font-medium">{{ ln.achieved_quantity }}</td>
+                                <td class="px-4 py-2 text-slate-600">{{ ln.target_quantity }}</td>
+                                <td class="px-4 py-2">
+                                    <span class="text-slate-600">{{ lineProgress(ln) }}%</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <div v-if="!self.rank && (self.target_appointments || self.target_sales || self.target_revenue)" class="text-sm text-slate-500">
                 No ranking yet — you may not be in the Sales/CallAgent role or targets were set recently.
             </div>
             <div v-if="!self.target_appointments && !self.target_sales && !self.target_revenue" class="text-sm text-slate-500 bg-slate-50 rounded-lg p-4">
-                No targets set for this month. Ask your admin to set targets in Employee Goals.
+                No targets set for this month. Ask your admin to use Set targets (Employees).
             </div>
         </div>
 
@@ -135,6 +167,13 @@ const monthOptions = (() => {
 })();
 
 const formatNumber = (n) => new Intl.NumberFormat('en-GB').format(n);
+
+const lineProgress = (ln) => {
+    const t = Number(ln.target_quantity || 0);
+    const a = Number(ln.achieved_quantity || 0);
+    if (t <= 0) return a > 0 ? 100 : 0;
+    return Math.min(100, Math.round((a / t) * 100));
+};
 
 const loadReport = async () => {
     loading.value = true;

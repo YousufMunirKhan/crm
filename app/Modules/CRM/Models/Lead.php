@@ -177,6 +177,79 @@ class Lead extends Model
             $this->save();
         }
     }
+
+    /**
+     * When a deal is marked won, align lead_items with reporting (targets, dashboards, "what customer has"):
+     * - Every pending line item becomes won with closed_at set.
+     * - If there are no line items but lead.product_id is set (legacy / edge case), create one won line item.
+     * - Refreshes pipeline_value from the sum of won line totals.
+     *
+     * @param  bool  $logActivities  When true, writes item_closed activities (e.g. follow-up completion).
+     */
+    public function materializeWonLineItemsForReporting(bool $logActivities = false): void
+    {
+        $pending = $this->items()->where('status', LeadItem::STATUS_PENDING)->get();
+        foreach ($pending as $item) {
+            $item->status = LeadItem::STATUS_WON;
+            $item->closed_at = now();
+            if (! $item->quantity || (int) $item->quantity < 1) {
+                $item->quantity = 1;
+            }
+            if ($item->unit_price === null) {
+                $item->unit_price = 0;
+            }
+            $item->save();
+
+            if ($logActivities && auth()->check()) {
+                $productName = $item->product->name ?? 'Unknown';
+                LeadActivity::create([
+                    'lead_id' => $this->id,
+                    'user_id' => auth()->id(),
+                    'type' => 'item_closed',
+                    'description' => "Product '{$productName}' auto-marked as WON when deal was marked won.",
+                    'meta' => [
+                        'item_id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'status' => LeadItem::STATUS_WON,
+                        'auto_closed' => true,
+                    ],
+                ]);
+            }
+        }
+
+        $this->load('items');
+        if ($this->items->count() === 0 && $this->product_id) {
+            $item = LeadItem::create([
+                'lead_id' => $this->id,
+                'product_id' => $this->product_id,
+                'quantity' => 1,
+                'unit_price' => (float) ($this->pipeline_value ?: 0),
+                'status' => LeadItem::STATUS_WON,
+                'closed_at' => now(),
+            ]);
+
+            if ($logActivities && auth()->check()) {
+                $productName = $item->product->name ?? 'Unknown';
+                LeadActivity::create([
+                    'lead_id' => $this->id,
+                    'user_id' => auth()->id(),
+                    'type' => 'item_closed',
+                    'description' => "Product '{$productName}' recorded as WON from primary product when deal was marked won.",
+                    'meta' => [
+                        'item_id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'status' => LeadItem::STATUS_WON,
+                        'auto_closed' => true,
+                        'from_primary_product' => true,
+                    ],
+                ]);
+            }
+        }
+
+        $wonSum = (float) $this->wonItems()->sum('total_price');
+        static::query()->whereKey($this->id)->update(['pipeline_value' => $wonSum]);
+        $this->refresh();
+    }
 }
 
 

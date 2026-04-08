@@ -217,6 +217,30 @@ class ReportingController extends Controller
 
         return response()->json($data);
     }
+
+    /**
+     * Last week + month sales detail + monthly targets for one employee (managers).
+     */
+    public function employeePerformanceOverview(Request $request)
+    {
+        $user = auth()->user();
+        $isAdmin = $user->isRole('Admin') || $user->isRole('Manager') || $user->isRole('System Admin');
+        if (! $isAdmin) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $request->validate([
+            'agent_id' => ['required', 'integer', 'exists:users,id'],
+            'month' => ['nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
+        ]);
+
+        $agentId = (int) $request->input('agent_id');
+        $month = $request->input('month');
+
+        $data = $this->reportingService->getEmployeePerformanceOverview($agentId, $month);
+
+        return response()->json($data);
+    }
 }
 
 

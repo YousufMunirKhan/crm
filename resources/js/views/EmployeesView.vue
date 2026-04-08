@@ -14,7 +14,15 @@
                 + Add employee
             </button>
             <button type="button" @click="goToGoals" class="listing-btn-outline w-full sm:w-auto touch-manipulation">
-                View Goals
+                Set targets
+            </button>
+            <button
+                v-if="canBulkResetPasswords"
+                type="button"
+                class="listing-btn-outline w-full sm:w-auto touch-manipulation border-amber-300 text-amber-900 hover:bg-amber-50"
+                @click="openResetAllModal"
+            >
+                Reset all passwords
             </button>
         </template>
 
@@ -110,6 +118,12 @@
                                 <router-link :to="`/hr/employees/${employee.id}`" class="listing-link-edit">
                                     View
                                 </router-link>
+                                <router-link
+                                    :to="{ name: 'report-employee-performance', query: { employee_id: employee.id } }"
+                                    class="listing-link-edit"
+                                >
+                                    Performance
+                                </router-link>
                                 <button type="button" class="listing-link-edit" @click="openEditForm(employee)">
                                     Edit
                                 </button>
@@ -161,6 +175,12 @@
                 <div class="text-sm text-slate-600">Phone: {{ employee.phone || '—' }}</div>
                 <div class="flex flex-wrap items-center gap-3 pt-1">
                     <router-link :to="`/hr/employees/${employee.id}`" class="listing-link-edit">View</router-link>
+                    <router-link
+                        :to="{ name: 'report-employee-performance', query: { employee_id: employee.id } }"
+                        class="listing-link-edit"
+                    >
+                        Performance
+                    </router-link>
                     <button type="button" class="listing-link-edit" @click="openEditForm(employee)">Edit</button>
                 </div>
             </div>
@@ -184,6 +204,52 @@
         @close="closeForm"
         @saved="handleSaved"
     />
+
+    <div
+        v-if="showResetAllModal"
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reset-all-passwords-title"
+        @click.self="closeResetAllModal"
+    >
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 sm:p-6 space-y-4 border border-slate-200">
+            <h2 id="reset-all-passwords-title" class="text-lg font-semibold text-slate-900">Reset password for all users</h2>
+            <p class="text-sm text-slate-600">
+                Sets the <strong>same new password</strong> for every account except yours (you stay signed in). Optional: keep the protected admin login unchanged.
+                All affected users are signed out on other devices and must log in again.
+            </p>
+            <div class="space-y-3">
+                <div>
+                    <label class="listing-label">New password (min 8 characters)</label>
+                    <input v-model="resetAllForm.password" type="password" autocomplete="new-password" class="listing-input w-full" />
+                </div>
+                <div>
+                    <label class="listing-label">Confirm password</label>
+                    <input v-model="resetAllForm.password_confirmation" type="password" autocomplete="new-password" class="listing-input w-full" />
+                </div>
+                <div>
+                    <label class="listing-label">Type <code class="text-xs bg-slate-100 px-1 rounded">RESET ALL</code> to confirm</label>
+                    <input v-model="resetAllForm.confirm_phrase" type="text" class="listing-input w-full" placeholder="RESET ALL" autocomplete="off" />
+                </div>
+                <label class="flex items-start gap-2 text-sm text-slate-700 cursor-pointer">
+                    <input v-model="resetAllForm.skip_protected_accounts" type="checkbox" class="mt-1 rounded border-slate-300" />
+                    <span>Do not change <code class="text-xs bg-slate-100 px-1 rounded">admin@switchsave.com</code></span>
+                </label>
+            </div>
+            <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+                <button type="button" class="listing-btn-outline w-full sm:w-auto" :disabled="resetAllSubmitting" @click="closeResetAllModal">Cancel</button>
+                <button
+                    type="button"
+                    class="w-full sm:w-auto px-4 py-2.5 rounded-lg text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                    :disabled="resetAllSubmitting"
+                    @click="submitResetAllPasswords"
+                >
+                    {{ resetAllSubmitting ? 'Working…' : 'Apply to all users' }}
+                </button>
+            </div>
+        </div>
+    </div>
 </template>
 
 <script setup>
@@ -216,6 +282,21 @@ const selectedEmployee = ref(null);
 const canAddEmployee = computed(() => {
     const userRole = auth.user?.role?.name;
     return userRole === 'Admin' || userRole === 'Manager';
+});
+
+/** Bulk reset is limited to full admins (high impact). */
+const canBulkResetPasswords = computed(() => {
+    const userRole = auth.user?.role?.name;
+    return userRole === 'Admin' || userRole === 'System Admin';
+});
+
+const showResetAllModal = ref(false);
+const resetAllSubmitting = ref(false);
+const resetAllForm = ref({
+    password: '',
+    password_confirmation: '',
+    confirm_phrase: '',
+    skip_protected_accounts: true,
 });
 
 const employeesBadge = computed(() =>
@@ -355,6 +436,55 @@ const downloadContract = (employee) => {
 
 const goToGoals = () => {
     router.push({ name: 'employee-goals' });
+};
+
+const openResetAllModal = () => {
+    resetAllForm.value = {
+        password: '',
+        password_confirmation: '',
+        confirm_phrase: '',
+        skip_protected_accounts: true,
+    };
+    showResetAllModal.value = true;
+};
+
+const closeResetAllModal = () => {
+    if (resetAllSubmitting.value) return;
+    showResetAllModal.value = false;
+};
+
+const submitResetAllPasswords = async () => {
+    if (resetAllForm.value.confirm_phrase !== 'RESET ALL') {
+        toast.error('Type RESET ALL exactly to confirm.');
+        return;
+    }
+    if (resetAllForm.value.password.length < 8) {
+        toast.error('Password must be at least 8 characters.');
+        return;
+    }
+    if (resetAllForm.value.password !== resetAllForm.value.password_confirmation) {
+        toast.error('Passwords do not match.');
+        return;
+    }
+    resetAllSubmitting.value = true;
+    try {
+        const { data } = await axios.post('/api/users/reset-all-passwords', {
+            password: resetAllForm.value.password,
+            password_confirmation: resetAllForm.value.password_confirmation,
+            confirm_phrase: resetAllForm.value.confirm_phrase,
+            skip_protected_accounts: resetAllForm.value.skip_protected_accounts,
+        });
+        toast.success(data?.message || 'Passwords updated.');
+        showResetAllModal.value = false;
+    } catch (error) {
+        const msg =
+            error.response?.data?.message ||
+            (error.response?.data?.errors && Object.values(error.response.data.errors).flat().join(' ')) ||
+            'Request failed.';
+        toast.error(msg);
+    } finally {
+        resetAllSubmitting.value = false;
+    }
 };
 
 onMounted(async () => {

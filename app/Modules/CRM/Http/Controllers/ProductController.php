@@ -98,5 +98,23 @@ class ProductController extends Controller
         $suggested = $product->getSuggestedProducts();
         return response()->json($suggested);
     }
+
+    /**
+     * Distinct product categories for target pickers (active products only).
+     */
+    public function categories()
+    {
+        $cats = Product::query()
+            ->where('is_active', true)
+            ->whereNotNull('category')
+            ->where('category', '!=', '')
+            ->orderBy('category')
+            ->pluck('category')
+            ->map(fn ($c) => trim((string) $c))
+            ->unique()
+            ->values();
+
+        return response()->json(['data' => $cats]);
+    }
 }
 

@@ -109,9 +109,18 @@
                     </router-link>
                 </template>
             </nav>
-            <div class="p-4 border-t border-white/15 bg-[#0D9488]/90 backdrop-blur-sm">
-                <div class="text-xs text-white mb-2 font-medium">{{ user?.name }}</div>
-                <div class="text-xs text-white/85">{{ user?.role?.name }}</div>
+            <div class="p-3 sm:p-4 border-t border-white/15 bg-[#0D9488]/90 backdrop-blur-sm space-y-2 min-w-0">
+                <div class="min-w-0">
+                    <div class="text-xs sm:text-sm text-white font-semibold truncate">{{ user?.name }}</div>
+                    <div class="text-[11px] sm:text-xs text-white/85 truncate">{{ user?.role?.name }}</div>
+                </div>
+                <router-link
+                    to="/change-password"
+                    class="flex w-full items-center justify-center gap-2 rounded-lg border border-white/25 bg-white/10 px-3 py-2.5 text-center text-xs sm:text-sm font-medium text-white hover:bg-white/20 active:bg-white/25 transition touch-manipulation min-h-[44px]"
+                    @click="mobileMenuOpen = false"
+                >
+                    Change password
+                </router-link>
             </div>
         </aside>
 
@@ -135,22 +144,33 @@
                         {{ pageTitle }}
                     </h1>
                 </div>
-                <div class="flex items-center gap-2 sm:gap-4 flex-shrink-0 min-w-0">
+                <div class="flex flex-wrap items-center justify-end gap-2 sm:gap-3 flex-shrink-0 min-w-0 w-full sm:w-auto">
                     <router-link
                         v-if="todayAppointmentCount > 0"
                         to="/appointments"
-                        class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-100/80 hover:bg-emerald-100/90 text-sm font-medium shrink-0"
+                        class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-100/80 hover:bg-emerald-100/90 text-xs sm:text-sm font-medium shrink-0 order-first sm:order-none w-full sm:w-auto justify-center sm:justify-start"
                     >
                         <span>📅</span>
-                        <span>You have {{ todayAppointmentCount }} appointment{{ todayAppointmentCount !== 1 ? 's' : '' }} — Check details</span>
+                        <span class="truncate">{{ todayAppointmentCount }} appt{{ todayAppointmentCount !== 1 ? 's' : '' }} — View</span>
                     </router-link>
-                    <p class="text-slate-600 text-xs sm:text-sm text-right truncate max-w-[100px] sm:max-w-none" :title="`${user?.name || ''} (${user?.role?.name || ''})`">
-                        <span class="hidden sm:inline">Welcome back, </span>
-                        <span class="font-medium text-slate-800 truncate">{{ user?.name }}</span>
-                        <span v-if="user?.role?.name" class="hidden sm:inline text-slate-500"> ({{ user.role.name }})</span>
+                    <p
+                        class="text-slate-600 text-xs sm:text-sm text-right truncate min-w-0 max-w-[9rem] sm:max-w-none order-2 sm:order-none"
+                        :title="`${user?.name || ''} (${user?.role?.name || ''})`"
+                    >
+                        <span class="hidden sm:inline">Welcome, </span>
+                        <span class="font-medium text-slate-800">{{ user?.name }}</span>
+                        <span v-if="user?.role?.name" class="hidden md:inline text-slate-500"> ({{ user.role.name }})</span>
                     </p>
+                    <router-link
+                        to="/change-password"
+                        class="order-3 sm:order-none px-3 py-2 min-h-[44px] sm:min-h-0 inline-flex items-center justify-center text-xs sm:text-sm rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm shrink-0 touch-manipulation font-medium"
+                    >
+                        <span class="sm:hidden">Password</span>
+                        <span class="hidden sm:inline">Change password</span>
+                    </router-link>
                     <button
-                        class="px-3 py-2 sm:py-2.5 lg:px-4 text-sm rounded-lg bg-[#7C3AED] text-white hover:bg-[#6d28d9] shadow-sm shadow-violet-600/25 transition shrink-0 touch-manipulation font-medium"
+                        type="button"
+                        class="order-4 sm:order-none px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-2.5 lg:px-4 text-xs sm:text-sm rounded-lg bg-[#7C3AED] text-white hover:bg-[#6d28d9] shadow-sm shadow-violet-600/25 transition shrink-0 touch-manipulation font-medium"
                         @click="logout"
                     >
                         Logout
@@ -218,6 +238,7 @@ const navItems = computed(() => {
     if (isAdmin) {
         reportChildren.push({ to: '/report/target-achievement', label: 'Target vs Achievement', section: 'report', icon: 'target' });
         reportChildren.push({ to: '/report/products-by-employee', label: 'Products by Employee', section: 'report', icon: 'shopping' });
+        reportChildren.push({ to: '/report/employee-performance', label: 'Employee performance', section: 'report', icon: 'document' });
         reportChildren.push({ to: '/reports', label: 'Reports & Analytics', section: 'report', icon: 'chart-pie' });
     }
     items.push({

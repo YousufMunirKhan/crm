@@ -415,19 +415,15 @@ class LeadController extends Controller
             'expected_closing_date' => ['nullable', 'date'],
         ]);
 
-        // If changing to "won", require items and update pipeline_value
+        // If changing to "won", require line items OR a primary product we can materialize into a won line
         if (isset($data['stage']) && $data['stage'] === 'won' && $oldStage !== 'won') {
             $itemsCount = $lead->items()->count();
-            if ($itemsCount === 0) {
+            if ($itemsCount === 0 && ! $lead->product_id) {
                 return response()->json([
-                    'message' => 'Cannot close deal without items. Please add items first.',
-                    'errors' => ['items' => ['At least one item is required when closing a deal.']]
+                    'message' => 'Cannot close deal without products. Add line items or set a primary product on the lead.',
+                    'errors' => ['items' => ['At least one product is required when closing a deal.']],
                 ], 422);
             }
-            
-            // Calculate pipeline_value from items total
-            $totalValue = $lead->items()->sum('total_price');
-            $data['pipeline_value'] = $totalValue;
         }
 
         // If changing to "lost", require lost_reason
@@ -440,6 +436,11 @@ class LeadController extends Controller
 
         $previousAssignedTo = $lead->assigned_to;
         $lead->update($data);
+
+        // Won deals must have won lead_items for targets, revenue, and customer product history
+        if (isset($data['stage']) && $data['stage'] === 'won' && $oldStage !== 'won') {
+            $lead->materializeWonLineItemsForReporting(false);
+        }
 
         // Keep customer type in sync (prospect ↔ customer) when lead stage changes to/from won
         if (isset($data['stage'])) {
@@ -1136,35 +1137,8 @@ class LeadController extends Controller
             // If lead is now WON, auto-mark any pending items as WON so that
             // sales/revenue and "What customer has" stay in sync even when closing directly here.
             if ($data['new_stage'] === 'won') {
-                $pendingItems = $lead->items()->where('status', \App\Modules\CRM\Models\LeadItem::STATUS_PENDING)->get();
-                foreach ($pendingItems as $item) {
-                    $item->status = \App\Modules\CRM\Models\LeadItem::STATUS_WON;
-                    $item->closed_at = now();
-                    // Keep existing quantity/unit_price if already set; otherwise default to 1 / 0
-                    $item->quantity = $item->quantity ?: 1;
-                    $item->unit_price = $item->unit_price ?: 0;
-                    $item->save();
-
-                    // Log auto-closure of item
-                    $productName = $item->product->name ?? 'Unknown';
-                    LeadActivity::create([
-                        'lead_id' => $lead->id,
-                        'user_id' => auth()->id(),
-                        'type' => 'item_closed',
-                        'description' => "Product '{$productName}' auto-marked as WON when completing follow-up.",
-                        'meta' => [
-                            'item_id' => $item->id,
-                            'product_id' => $item->product_id,
-                            'status' => $item->status,
-                            'auto_closed' => true,
-                        ],
-                    ]);
-                }
-
-                // Ensure lead stage and pipeline value reflect won items
+                $lead->materializeWonLineItemsForReporting(true);
                 $lead->updateStageFromItems();
-                $totalValue = $lead->wonItems()->sum('total_price');
-                $lead->update(['pipeline_value' => $totalValue]);
             }
         }
 

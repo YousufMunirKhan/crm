@@ -5,6 +5,7 @@ namespace App\Modules\HR\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Traits\HasAuditLog;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EmployeeTarget extends Model
 {
@@ -26,6 +27,11 @@ class EmployeeTarget extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class);
+    }
+
+    public function lines(): HasMany
+    {
+        return $this->hasMany(EmployeeTargetLine::class, 'employee_target_id')->orderBy('id');
     }
 }
 
