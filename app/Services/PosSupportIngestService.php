@@ -19,9 +19,17 @@ class PosSupportIngestService
         $out = [];
 
         foreach ($items as $row) {
-            $externalId = (string) ($row['id'] ?? '');
-            if ($externalId === '') {
+            $posRowId = trim((string) ($row['id'] ?? ''));
+            if ($posRowId === '') {
                 $out[] = ['id' => null, 'error' => 'missing id'];
+                continue;
+            }
+
+            // Desktop POS often sends the same `id` for every message (e.g. shop or machine id).
+            // Without a per-message key, every sync updates one row. Composite id = POS id + payload fingerprint.
+            $externalId = $this->resolvePosExternalId($row, $posRowId);
+            if ($externalId === '') {
+                $out[] = ['id' => null, 'error' => 'invalid external id'];
                 continue;
             }
 
@@ -94,7 +102,7 @@ class PosSupportIngestService
             }
 
             $out[] = [
-                'id' => (int) $row['id'],
+                'id' => is_numeric($row['id']) ? (int) $row['id'] : $row['id'],
                 'crm_ticket_id' => $ticket->id,
                 'ticket_number' => $ticket->ticket_number,
             ];
@@ -118,17 +126,10 @@ class PosSupportIngestService
             return [];
         }
 
-        $tickets = Ticket::query()
-            ->where('source', 'pos_support')
-            ->whereIn('pos_external_id', $ids)
-            ->get(['id', 'pos_external_id', 'pos_support_status', 'pos_resolution_notes', 'updated_at']);
-
-        $byExternal = $tickets->keyBy(fn (Ticket $t) => (string) $t->pos_external_id);
-
         $result = [];
         foreach ($ids as $id) {
-            $t = $byExternal->get($id);
-            if (!$t) {
+            $t = $this->latestTicketForPosRootId((string) $id);
+            if (! $t) {
                 $result[] = ['id' => is_numeric($id) ? (int) $id : $id, 'status' => null, 'found' => false];
                 continue;
             }
@@ -141,6 +142,50 @@ class PosSupportIngestService
         }
 
         return $result;
+    }
+
+    /**
+     * Stable CRM key for one POS payload. Must stay within tickets.pos_external_id (64).
+     * Pairs with {@see latestTicketForPosRootId()} so POS can still poll status using its `id`.
+     */
+    private function resolvePosExternalId(array $row, string $posRowId): string
+    {
+        $posRowId = trim($posRowId);
+        if ($posRowId === '') {
+            return '';
+        }
+
+        $idHead = Str::limit($posRowId, 48, '');
+        $msg = (string) ($row['message'] ?? '');
+        $created = (string) ($row['createdAt'] ?? '');
+        $sent = (string) ($row['sentAt'] ?? '');
+        $computer = (string) ($row['computerName'] ?? '');
+
+        $fingerprint = substr(hash('sha256', $posRowId . "\0" . $msg . "\0" . $created . "\0" . $sent . "\0" . $computer), 0, 12);
+
+        return Str::limit($idHead . '-' . $fingerprint, 64, '');
+    }
+
+    /**
+     * Latest ticket for a POS root id: legacy bare `5` or composite `5-abc…`.
+     */
+    private function latestTicketForPosRootId(string $rootId): ?Ticket
+    {
+        $rootId = trim($rootId);
+        if ($rootId === '') {
+            return null;
+        }
+
+        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $rootId);
+
+        return Ticket::query()
+            ->where('source', 'pos_support')
+            ->where(function ($q) use ($rootId, $escaped) {
+                $q->where('pos_external_id', $rootId)
+                    ->orWhere('pos_external_id', 'like', $escaped . '-%');
+            })
+            ->orderByDesc('updated_at')
+            ->first(['id', 'pos_external_id', 'pos_support_status', 'pos_resolution_notes', 'updated_at']);
     }
 
     private function buildDescription(array $row): string

@@ -39,10 +39,12 @@
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
                     <textarea
+                        ref="descriptionTextareaRef"
                         v-model="form.description"
-                        rows="4"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                        rows="8"
+                        class="w-full min-h-[13rem] max-h-[min(70vh,36rem)] px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 resize-y overflow-x-hidden"
                     />
+                    <p class="text-xs text-slate-500 mt-1">Drag the corner to resize. Expands as you type or paste.</p>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -115,6 +117,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
+import { useAutosizeTextarea } from '@/composables/useAutosizeTextarea';
 import axios from 'axios';
 
 const props = defineProps({
@@ -139,6 +142,8 @@ const customers = ref([]);
 const users = ref([]);
 const loading = ref(false);
 const error = ref(null);
+
+const { textareaRef: descriptionTextareaRef } = useAutosizeTextarea(() => form.description);
 
 onMounted(async () => {
     await Promise.all([loadCustomers(), loadUsers()]);

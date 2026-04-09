@@ -44,10 +44,12 @@
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
                     <textarea
+                        ref="descriptionTextareaRef"
                         v-model="form.description"
-                        rows="4"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                        rows="8"
+                        class="w-full min-h-[13rem] max-h-[min(70vh,36rem)] px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 resize-y overflow-x-hidden"
                     />
+                    <p class="text-xs text-slate-500 mt-1">Drag the corner to resize. Expands as you type or paste.</p>
                 </div>
 
                 <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
@@ -176,9 +178,10 @@
                     <p v-else class="text-xs text-slate-500">No comments yet.</p>
                     <div class="space-y-2">
                         <textarea
+                            ref="commentTextareaRef"
                             v-model="newComment"
-                            rows="3"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            rows="4"
+                            class="w-full min-h-[7.5rem] max-h-[min(50vh,24rem)] px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 resize-y overflow-x-hidden"
                             placeholder="Add a comment about this ticket..."
                         />
                         <div class="flex justify-end">
@@ -221,7 +224,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
+import { useAutosizeTextarea } from '@/composables/useAutosizeTextarea';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
 
@@ -255,6 +259,13 @@ const error = ref(null);
 const pendingAttachmentFiles = ref([]);
 const attachmentInputRef = ref(null);
 const ticketAttachments = ref([]);
+
+const { textareaRef: descriptionTextareaRef } = useAutosizeTextarea(() => form.value.description, {
+    minHeightPx: 208,
+});
+const { textareaRef: commentTextareaRef, syncHeight: syncCommentHeight } = useAutosizeTextarea(() => newComment.value, {
+    minHeightPx: 120,
+});
 
 const comments = ref([]);
 const newComment = ref('');
@@ -408,6 +419,7 @@ const addComment = async () => {
         });
         comments.value.unshift(data);
         newComment.value = '';
+        nextTick(syncCommentHeight);
     } catch (err) {
         commentError.value = err.response?.data?.message || 'Failed to add comment';
     } finally {

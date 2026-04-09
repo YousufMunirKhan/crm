@@ -308,11 +308,13 @@
                             </div>
 
                             <textarea
+                                ref="commentTextareaRef"
                                 v-model="newComment"
-                                rows="4"
-                                class="w-full min-h-[7.5rem] px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 resize-y"
+                                rows="6"
+                                class="w-full min-h-[10rem] max-h-[min(70vh,36rem)] px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 resize-y overflow-x-hidden"
                                 placeholder="Write your comment..."
                             />
+                            <p class="text-xs text-slate-500 mt-1">Drag the corner to resize; grows with longer notes.</p>
                             <label v-if="isStaffAdmin" class="mt-3 flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                                 <input v-model="newCommentInternal" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
                                 Internal note (no email)
@@ -342,7 +344,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { useAutosizeTextarea } from '@/composables/useAutosizeTextarea';
 import { useRoute } from 'vue-router';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
@@ -358,6 +361,9 @@ const loading = ref(true);
 const error = ref(null);
 const users = ref([]);
 const newComment = ref('');
+const { textareaRef: commentTextareaRef, syncHeight: syncCommentHeight } = useAutosizeTextarea(() => newComment.value, {
+    minHeightPx: 160,
+});
 const commentSending = ref(false);
 const commentError = ref(null);
 const editStatus = ref('open');
@@ -603,6 +609,8 @@ async function addComment() {
         ticket.value.messages.push(data);
         newComment.value = '';
         newCommentInternal.value = false;
+        await nextTick();
+        syncCommentHeight();
         toast.success('Comment added');
     } catch (err) {
         commentError.value = err.response?.data?.message || 'Failed to add comment';

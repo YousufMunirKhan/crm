@@ -228,7 +228,8 @@ const navItems = computed(() => {
         { to: '/invoices', label: 'Invoices', section: 'invoices', icon: 'invoice' },
     );
 
-    if (!isAdmin) {
+    // Personal daily log: show for field roles and for Manager (Manager is isAdmin for reports/HR but still needs to log their own day).
+    if (!isAdmin || userRole === 'Manager') {
         items.push({ to: '/today-activity', label: "Today's Activity", section: 'today_activity', icon: 'activity' });
     }
 

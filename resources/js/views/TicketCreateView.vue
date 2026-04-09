@@ -45,7 +45,13 @@
 
                     <div>
                         <label class="form-label">Description</label>
-                        <textarea v-model="form.description" rows="4" class="form-input resize-none" />
+                        <textarea
+                            ref="descriptionTextareaRef"
+                            v-model="form.description"
+                            rows="8"
+                            class="form-textarea-ticket-description"
+                        />
+                        <p class="text-xs text-slate-500 mt-1">Drag the corner to resize. The field expands as you type or paste.</p>
                     </div>
 
                     <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
@@ -155,6 +161,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useAutosizeTextarea } from '@/composables/useAutosizeTextarea';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
@@ -181,6 +188,10 @@ const form = ref({
     estimated_resolve_hours: null,
     assigned_user_ids: [],
 });
+
+const { textareaRef: descriptionTextareaRef, syncHeight: syncDescriptionHeight } = useAutosizeTextarea(
+    () => form.value.description,
+);
 
 const createCommentRecipientRows = computed(() => {
     const seen = new Set();
