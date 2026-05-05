@@ -261,6 +261,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/preview-template/{templateId}', [\App\Http\Controllers\EmailManagementController::class, 'previewTemplate']);
         Route::post('/send', [\App\Http\Controllers\EmailManagementController::class, 'sendBulk']);
         Route::get('/sent-report', [\App\Http\Controllers\EmailManagementController::class, 'getSentReport']);
+        Route::get('/sent-report/export', [\App\Http\Controllers\EmailManagementController::class, 'exportSentReport']);
         Route::post('/sent/{id}/resend', [\App\Http\Controllers\EmailManagementController::class, 'resendSentEmail']);
         Route::post('/retry-queue', [\App\Http\Controllers\EmailManagementController::class, 'queueRetryAll']);
         Route::post('/lists/upload', [\App\Http\Controllers\EmailManagementController::class, 'uploadList']);

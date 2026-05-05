@@ -481,6 +481,21 @@
                     >
                         {{ loadingReport ? 'Loading...' : 'Apply' }}
                     </button>
+                    <button
+                        v-if="reportScope === 'opened'"
+                        type="button"
+                        @click="exportOpenedEmailsCsv"
+                        :disabled="exportingOpenedReport || (reportSummary && (reportSummary.total_opened ?? 0) === 0)"
+                        class="px-4 py-2 border border-teal-600 text-teal-800 rounded-lg hover:bg-teal-50 text-sm font-medium disabled:opacity-50"
+                    >
+                        {{ exportingOpenedReport ? 'Exporting…' : 'Export CSV' }}
+                    </button>
+                </div>
+                <div
+                    v-if="reportScope === 'opened'"
+                    class="mb-4 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-xs text-teal-900"
+                >
+                    Lists delivered emails where the tracking pixel loaded at least once (same date filter as above). Export downloads every matching row, not only this page.
                 </div>
                 <div
                     v-if="reportSummary && reportScope === 'retry_queue' && (reportSummary.total_failed_retryable ?? 0) > 0"
@@ -538,7 +553,7 @@
                                     <th class="text-left px-4 py-2 font-medium text-slate-700">Email</th>
                                     <th class="text-left px-4 py-2 font-medium text-slate-700">Template</th>
                                     <th class="text-left px-4 py-2 font-medium text-slate-700">Status</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Opened</th>
+                                    <th class="text-left px-4 py-2 font-medium text-slate-700">{{ reportScope === 'opened' ? 'First opened' : 'Opened' }}</th>
                                     <th class="text-left px-4 py-2 font-medium text-slate-700">Sent at</th>
                                     <th class="text-left px-4 py-2 font-medium text-slate-700">Sent by</th>
                                     <th class="text-left px-4 py-2 font-medium text-slate-700 w-28">Actions</th>
@@ -564,7 +579,9 @@
                                     </td>
                                     <td class="px-4 py-2">
                                         <template v-if="row.status === 'sent'">
-                                            <span v-if="row.seen" class="text-teal-700 font-medium" :title="row.opened_at ? 'First opened: ' + formatDate(row.opened_at) : ''">Opened</span>
+                                            <span v-if="row.seen" class="text-teal-700 font-medium" :title="row.opened_at ? 'First opened: ' + formatDate(row.opened_at) : ''">
+                                                {{ reportScope === 'opened' && row.opened_at ? formatDate(row.opened_at) : 'Opened' }}
+                                            </span>
                                             <span v-else class="text-slate-400">Not opened</span>
                                             <span v-if="row.open_count > 1" class="block text-xs text-slate-500">({{ row.open_count }} loads)</span>
                                         </template>
@@ -802,10 +819,12 @@ const reportScope = ref('all');
 const resendingId = ref(null);
 const queueingRetryAll = ref(false);
 const reportRetryChunkSize = ref(5);
+const exportingOpenedReport = ref(false);
 
 const reportScopeOptions = [
     { value: 'all', label: 'All activity' },
     { value: 'sent', label: 'Delivered only' },
+    { value: 'opened', label: 'Opened' },
     { value: 'retry_queue', label: 'Retry queue' },
     { value: 'bounces', label: 'Bounces' },
 ];
@@ -814,6 +833,7 @@ const reportEmptyMessage = computed(() => {
     if (reportScope.value === 'bounces') return 'No bounces in this period.';
     if (reportScope.value === 'retry_queue') return 'Nothing in the retry queue for this period.';
     if (reportScope.value === 'sent') return 'No delivered emails in this period.';
+    if (reportScope.value === 'opened') return 'No opened emails in this period (tracking pixel may be blocked by the inbox).';
     return 'No email activity in this period.';
 });
 
@@ -1078,6 +1098,31 @@ async function resendSentEmail(row) {
         toast.error(msg);
     } finally {
         resendingId.value = null;
+    }
+}
+
+async function exportOpenedEmailsCsv() {
+    if ((reportSummary.value?.total_opened ?? 0) < 1) {
+        toast.warning('No opened emails to export for this filter.');
+        return;
+    }
+    exportingOpenedReport.value = true;
+    try {
+        const params = { scope: 'opened' };
+        if (reportDateFrom.value) params.date_from = reportDateFrom.value;
+        if (reportDateTo.value) params.date_to = reportDateTo.value;
+        const res = await axios.get('/api/email-management/sent-report/export', { params, responseType: 'blob' });
+        const url = URL.createObjectURL(res.data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `email-opened-report-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('Export downloaded.');
+    } catch (e) {
+        toast.error(e.response?.data?.message || e.message || 'Export failed');
+    } finally {
+        exportingOpenedReport.value = false;
     }
 }
 

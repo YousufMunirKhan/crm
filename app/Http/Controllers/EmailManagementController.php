@@ -331,7 +331,7 @@ class EmailManagementController extends Controller
     /**
      * Report: paginated list of sent emails (who received, when, template, status, opens).
      *
-     * @queryParam scope string Optional: all|bounces|retry_queue|sent
+     * @queryParam scope string Optional: all|bounces|retry_queue|sent|opened
      */
     public function getSentReport(Request $request)
     {
@@ -340,7 +340,7 @@ class EmailManagementController extends Controller
             'per_page' => 'nullable|integer|min:1|max:100',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
-            'scope' => 'nullable|in:all,bounces,retry_queue,sent',
+            'scope' => 'nullable|in:all,bounces,retry_queue,sent,opened',
         ]);
 
         $perPage = min((int) $request->input('per_page', 20), 100);
@@ -348,8 +348,7 @@ class EmailManagementController extends Controller
 
         $query = SentCommunication::query()
             ->where('type', 'email')
-            ->with(['customer:id,name,email,type', 'sender:id,name'])
-            ->orderByDesc(DB::raw('COALESCE(sent_at, created_at)'));
+            ->with(['customer:id,name,email,type', 'sender:id,name']);
 
         $this->applySentReportDateFilter($query, $request);
 
@@ -368,6 +367,14 @@ class EmailManagementController extends Controller
                 });
         } elseif ($scope === 'sent') {
             $query->where('status', 'sent');
+        } elseif ($scope === 'opened') {
+            $query->where('status', 'sent')->whereNotNull('opened_at');
+        }
+
+        if ($scope === 'opened') {
+            $query->orderByDesc('opened_at')->orderByDesc(DB::raw('COALESCE(sent_at, created_at)'));
+        } else {
+            $query->orderByDesc(DB::raw('COALESCE(sent_at, created_at)'));
         }
 
         $paginator = $query->paginate($perPage);
@@ -430,6 +437,69 @@ class EmailManagementController extends Controller
                 'total_bounced' => $totalBounced,
                 'total_opened' => $totalOpened,
             ],
+        ]);
+    }
+
+    /**
+     * CSV export for opened emails (same date filter as the report; scope must be opened).
+     */
+    public function exportSentReport(Request $request): StreamedResponse
+    {
+        $request->validate([
+            'scope' => 'required|in:opened',
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+        ]);
+
+        $base = SentCommunication::query()
+            ->where('type', 'email')
+            ->where('status', 'sent')
+            ->whereNotNull('opened_at');
+
+        $this->applySentReportDateFilter($base, $request);
+
+        $templateIds = (clone $base)->whereNotNull('template_id')->distinct()->pluck('template_id');
+        $templates = $templateIds->isNotEmpty()
+            ? EmailTemplate::whereIn('id', $templateIds->all())->pluck('name', 'id')
+            : collect();
+
+        $filename = 'email-opened-report-' . date('Y-m-d-His') . '.csv';
+
+        return response()->streamDownload(function () use ($base, $templates) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, [
+                'Recipient name',
+                'Recipient email',
+                'Template',
+                'Subject',
+                'Sent at',
+                'First opened at',
+                'Open count',
+                'Sent by',
+            ]);
+
+            $cursorQuery = clone $base;
+            $cursorQuery->with(['customer:id,name', 'sender:id,name'])
+                ->orderByDesc('opened_at')
+                ->orderByDesc('id');
+
+            foreach ($cursorQuery->cursor() as $row) {
+                fputcsv($handle, [
+                    $row->customer?->name ?? '',
+                    $row->recipient_email ?? '',
+                    $row->template_id ? ($templates[$row->template_id] ?? 'Template #'.$row->template_id) : '',
+                    $row->subject ?? '',
+                    $row->sent_at?->format('Y-m-d H:i:s') ?? '',
+                    $row->opened_at?->format('Y-m-d H:i:s') ?? '',
+                    (string) (int) ($row->open_count ?? 0),
+                    $row->sender?->name ?? '',
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
