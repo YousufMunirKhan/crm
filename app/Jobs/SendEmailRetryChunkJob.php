@@ -39,6 +39,10 @@ class SendEmailRetryChunkJob implements ShouldQueue
                     'message' => $result['message'] ?? null,
                 ]);
             }
+            $ms = (int) config('email_send.between_message_delay_ms', 1200);
+            if ($ms > 0) {
+                usleep($ms * 1000);
+            }
         }
     }
 }

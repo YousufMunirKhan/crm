@@ -294,17 +294,21 @@ class EmailManagementController extends Controller
                     $sentList[] = ['email' => $customer->email, 'name' => $customer->name];
                 } catch (\Exception $e) {
                     $failed++;
-                    $errMsg = strlen($e->getMessage()) > 200 ? substr($e->getMessage(), 0, 200) . '...' : $e->getMessage();
-                    $failedList[] = ['email' => $customer->email, 'name' => $customer->name, 'error' => $errMsg];
                     $category = EmailFailureClassifier::classify($e->getMessage());
+                    $failedList[] = [
+                        'email' => $customer->email,
+                        'name' => $customer->name,
+                        'error' => EmailFailureClassifier::failedListSummary($e->getMessage()),
+                    ];
                     $status = $category === 'bounce' ? 'bounced' : 'failed';
                     $pending->update([
                         'status' => $status,
                         'failure_category' => $category,
-                        'error_message' => $e->getMessage(),
+                        'error_message' => EmailFailureClassifier::friendlyWithTechnical($e->getMessage()),
                         'content' => '',
                     ]);
                 }
+                $this->pauseBetweenBulkMarketingEmails();
             }
         });
 
@@ -593,17 +597,28 @@ class EmailManagementController extends Controller
             $pending->update([
                 'status' => $status,
                 'failure_category' => $category,
-                'error_message' => $e->getMessage(),
+                'error_message' => EmailFailureClassifier::friendlyWithTechnical($e->getMessage()),
                 'content' => '',
             ]);
 
             return [
                 'ok' => false,
-                'message' => 'Resend failed: '.$e->getMessage(),
+                'message' => 'Resend failed: '.EmailFailureClassifier::failedListSummary($e->getMessage()),
                 'new_id' => $pending->id,
                 'status' => $status,
                 'http_status' => 422,
             ];
+        }
+    }
+
+    /**
+     * Space out SMTP sends to reduce 450 “too much mail” from the relay/hosting IP.
+     */
+    private function pauseBetweenBulkMarketingEmails(): void
+    {
+        $ms = (int) config('email_send.between_message_delay_ms', 1200);
+        if ($ms > 0) {
+            usleep($ms * 1000);
         }
     }
 
@@ -879,16 +894,17 @@ class EmailManagementController extends Controller
                 $status = $category === 'bounce' ? 'bounced' : 'failed';
                 $recipient->update([
                     'status' => EmailListRecipient::STATUS_FAILED,
-                    'error_message' => $e->getMessage(),
+                    'error_message' => EmailFailureClassifier::friendlyWithTechnical($e->getMessage()),
                 ]);
                 $pending->update([
                     'status' => $status,
                     'failure_category' => $category,
-                    'error_message' => $e->getMessage(),
+                    'error_message' => EmailFailureClassifier::friendlyWithTechnical($e->getMessage()),
                     'content' => '',
                 ]);
                 $failed++;
             }
+            $this->pauseBetweenBulkMarketingEmails();
         }
 
         $msg = "Sent: {$sent}, Failed: {$failed}";

@@ -45,6 +45,7 @@ export function formatLineItemStatus(status, whenEmpty = 'Pending') {
 const COMM_LOG_LABELS = {
     sent: 'Sent',
     failed: 'Failed',
+    rate_limit: 'Rate limited',
     pending: 'Pending',
     delivered: 'Delivered',
     queued: 'Queued',

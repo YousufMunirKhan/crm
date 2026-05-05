@@ -347,11 +347,13 @@ class EmailTemplateController extends Controller
             $pending->update([
                 'status' => $status,
                 'failure_category' => $category,
-                'error_message' => $e->getMessage(),
+                'error_message' => EmailFailureClassifier::friendlyWithTechnical($e->getMessage()),
                 'content' => '',
             ]);
 
-            return response()->json(['message' => 'Failed to send email: ' . $e->getMessage()], 500);
+            return response()->json([
+                'message' => 'Failed to send email: '.EmailFailureClassifier::failedListSummary($e->getMessage()),
+            ], 500);
         }
     }
 
