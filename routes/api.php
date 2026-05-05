@@ -262,6 +262,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/send', [\App\Http\Controllers\EmailManagementController::class, 'sendBulk']);
         Route::get('/sent-report', [\App\Http\Controllers\EmailManagementController::class, 'getSentReport']);
         Route::post('/sent/{id}/resend', [\App\Http\Controllers\EmailManagementController::class, 'resendSentEmail']);
+        Route::post('/retry-queue', [\App\Http\Controllers\EmailManagementController::class, 'queueRetryAll']);
         Route::post('/lists/upload', [\App\Http\Controllers\EmailManagementController::class, 'uploadList']);
         Route::get('/lists', [\App\Http\Controllers\EmailManagementController::class, 'listLists']);
         Route::get('/lists/{id}', [\App\Http\Controllers\EmailManagementController::class, 'getList']);

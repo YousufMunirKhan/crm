@@ -7,6 +7,7 @@ use App\Models\EmailListRecipient;
 use App\Models\EmailTemplate;
 use App\Models\SentCommunication;
 use App\Modules\CRM\Models\Customer;
+use App\Jobs\SendEmailRetryChunkJob;
 use App\Services\EmailFailureClassifier;
 use App\Services\MarketingEmailOpenTracker;
 use App\Modules\CRM\Models\Lead;
@@ -415,6 +416,8 @@ class EmailManagementController extends Controller
             'current_page' => $paginator->currentPage(),
             'per_page' => $paginator->perPage(),
             'last_page' => $paginator->lastPage(),
+            'retry_chunk_size' => max(1, (int) config('email_retry.chunk_size', 5)),
+            'retry_chunk_delay_seconds' => max(0, (int) config('email_retry.chunk_delay_seconds', 15)),
             'summary' => [
                 'total_sent' => $totalSent,
                 'total_failed' => $totalFailedRetryable + $totalFailedValidation,
@@ -431,32 +434,110 @@ class EmailManagementController extends Controller
      */
     public function resendSentEmail(Request $request, int $id)
     {
-        $row = SentCommunication::query()
-            ->where('type', 'email')
-            ->findOrFail($id);
-
-        if (! $this->sentEmailCanResend($row)) {
+        $result = $this->retryFailedSend($id, auth()->id());
+        if ($result['ok'] ?? false) {
             return response()->json([
-                'message' => 'This message cannot be resent (bounce, validation skip, or not in a failed state).',
+                'message' => $result['message'] ?? 'Email sent successfully.',
+                'new_id' => $result['new_id'] ?? null,
+            ]);
+        }
+
+        return response()->json([
+            'message' => $result['message'] ?? 'Resend failed.',
+            'new_id' => $result['new_id'] ?? null,
+            'status' => $result['status'] ?? null,
+        ], $result['http_status'] ?? 422);
+    }
+
+    /**
+     * Queue background retries for every item in the retry queue (same rules as single resend),
+     * processing up to N emails per job with a delay between each batch.
+     */
+    public function queueRetryAll(Request $request)
+    {
+        $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+        ]);
+
+        $query = SentCommunication::query()
+            ->where('type', 'email')
+            ->where('status', 'failed')
+            ->where(function ($q) {
+                $q->whereNull('failure_category')
+                    ->orWhereNotIn('failure_category', ['validation', 'bounce']);
+            });
+
+        $this->applySentReportDateFilter($query, $request);
+
+        $ids = $query->orderBy('id')->pluck('id')->all();
+
+        if ($ids === []) {
+            return response()->json([
+                'message' => 'No items in the retry queue for this filter.',
+                'queued' => 0,
+                'batches' => 0,
             ], 422);
         }
 
+        $chunkSize = max(1, (int) config('email_retry.chunk_size', 5));
+        $delaySeconds = max(0, (int) config('email_retry.chunk_delay_seconds', 15));
+        $chunks = array_chunk($ids, $chunkSize);
+        $userId = auth()->id();
+
+        $batchDelay = 0;
+        foreach ($chunks as $chunk) {
+            SendEmailRetryChunkJob::dispatch($chunk, $userId)->delay(now()->addSeconds($batchDelay));
+            $batchDelay += $delaySeconds;
+        }
+
+        $queueDriver = config('queue.default');
+        $hint = $queueDriver === 'sync'
+            ? ' Queue driver is "sync": batches run immediately in this request (delays may be limited). Set QUEUE_CONNECTION=database and run php artisan queue:work for true background processing.'
+            : '';
+
+        return response()->json([
+            'message' => 'Queued '.count($ids).' resend(s) in '.count($chunks).' batch(es) of up to '.$chunkSize.'.'.$hint,
+            'queued' => count($ids),
+            'batches' => count($chunks),
+            'chunk_size' => $chunkSize,
+            'queue_connection' => $queueDriver,
+        ]);
+    }
+
+    /**
+     * @return array{ok: bool, message?: string, new_id?: int|null, http_status?: int, status?: string}
+     */
+    public function retryFailedSend(int $id, ?int $sentByUserId): array
+    {
+        $row = SentCommunication::query()
+            ->where('type', 'email')
+            ->find($id);
+
+        if (! $row) {
+            return ['ok' => false, 'message' => 'Record not found.', 'http_status' => 404];
+        }
+
+        if (! $this->sentEmailCanResend($row)) {
+            return ['ok' => false, 'message' => 'This message cannot be resent (bounce, validation skip, or not in a failed state).', 'http_status' => 422];
+        }
+
         if (! $row->template_id) {
-            return response()->json(['message' => 'Original send has no template on file.'], 422);
+            return ['ok' => false, 'message' => 'Original send has no template on file.', 'http_status' => 422];
         }
 
         $template = EmailTemplate::find($row->template_id);
         if (! $template) {
-            return response()->json(['message' => 'Email template no longer exists.'], 422);
+            return ['ok' => false, 'message' => 'Email template no longer exists.', 'http_status' => 422];
         }
 
         $email = $row->recipient_email;
         if (! $email || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return response()->json(['message' => 'Invalid recipient email on record.'], 422);
+            return ['ok' => false, 'message' => 'Invalid recipient email on record.', 'http_status' => 422];
         }
 
         if (\App\Models\EmailUnsubscribe::isUnsubscribed($email)) {
-            return response()->json(['message' => 'This address has unsubscribed from marketing emails.'], 422);
+            return ['ok' => false, 'message' => 'This address has unsubscribed from marketing emails.', 'http_status' => 422];
         }
 
         $customer = $row->customer_id
@@ -468,9 +549,11 @@ class EmailManagementController extends Controller
 
         [$valid, $missingVars] = $this->validateRecipientForTemplate($customer, $template);
         if (! $valid) {
-            return response()->json([
-                'message' => 'Cannot resend: missing data for variable(s): ' . implode(', ', $missingVars),
-            ], 422);
+            return [
+                'ok' => false,
+                'message' => 'Cannot resend: missing data for variable(s): '.implode(', ', $missingVars),
+                'http_status' => 422,
+            ];
         }
 
         \App\Services\MailConfigFromDatabase::apply();
@@ -486,7 +569,7 @@ class EmailManagementController extends Controller
             'subject' => $subject,
             'content' => '',
             'status' => 'pending',
-            'sent_by' => auth()->id(),
+            'sent_by' => $sentByUserId,
         ]);
 
         try {
@@ -503,7 +586,7 @@ class EmailManagementController extends Controller
                 'failure_category' => null,
             ]);
 
-            return response()->json(['message' => 'Email sent successfully.', 'new_id' => $pending->id]);
+            return ['ok' => true, 'message' => 'Email sent successfully.', 'new_id' => $pending->id];
         } catch (\Exception $e) {
             $category = EmailFailureClassifier::classify($e->getMessage());
             $status = $category === 'bounce' ? 'bounced' : 'failed';
@@ -514,11 +597,13 @@ class EmailManagementController extends Controller
                 'content' => '',
             ]);
 
-            return response()->json([
-                'message' => 'Resend failed: ' . $e->getMessage(),
+            return [
+                'ok' => false,
+                'message' => 'Resend failed: '.$e->getMessage(),
                 'new_id' => $pending->id,
                 'status' => $status,
-            ], 422);
+                'http_status' => 422,
+            ];
         }
     }
 

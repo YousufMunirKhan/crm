@@ -482,6 +482,25 @@
                         {{ loadingReport ? 'Loading...' : 'Apply' }}
                     </button>
                 </div>
+                <div
+                    v-if="reportSummary && reportScope === 'retry_queue' && (reportSummary.total_failed_retryable ?? 0) > 0"
+                    class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3"
+                >
+                    <button
+                        type="button"
+                        @click="queueAllRetries"
+                        :disabled="queueingRetryAll"
+                        class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium disabled:opacity-50"
+                    >
+                        {{ queueingRetryAll ? 'Queuing…' : `Queue all retries (${reportSummary.total_failed_retryable})` }}
+                    </button>
+                    <p class="text-xs text-amber-900 max-w-xl">
+                        Queues every failed send in this filter (not only this page), up to
+                        {{ reportRetryChunkSize }} per background job, staggered so SMTP is not hammered. Use
+                        <code class="rounded bg-amber-100 px-1">php artisan queue:work</code>
+                        when <code class="rounded bg-amber-100 px-1">QUEUE_CONNECTION</code> is not <code class="rounded bg-amber-100 px-1">sync</code>.
+                    </p>
+                </div>
                 <div v-if="reportSummary" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
                     <div class="bg-slate-50 rounded-lg p-4">
                         <div class="text-xs text-slate-500 uppercase">Delivered</div>
@@ -780,6 +799,8 @@ const reportDateTo = ref('');
 const loadingReport = ref(false);
 const reportScope = ref('all');
 const resendingId = ref(null);
+const queueingRetryAll = ref(false);
+const reportRetryChunkSize = ref(5);
 
 const reportScopeOptions = [
     { value: 'all', label: 'All activity' },
@@ -1030,6 +1051,7 @@ async function loadReport(page = 1) {
         if (reportDateFrom.value) params.date_from = reportDateFrom.value;
         if (reportDateTo.value) params.date_to = reportDateTo.value;
         const { data } = await axios.get('/api/email-management/sent-report', { params });
+        reportRetryChunkSize.value = data.retry_chunk_size ?? 5;
         reportData.value = data.data || [];
         reportSummary.value = data.summary || {
             total_sent: 0,
@@ -1061,6 +1083,24 @@ async function resendSentEmail(row) {
         toast.error(msg);
     } finally {
         resendingId.value = null;
+    }
+}
+
+async function queueAllRetries() {
+    if (!reportSummary.value || (reportSummary.value.total_failed_retryable ?? 0) < 1) return;
+    if (!window.confirm(`Queue ${reportSummary.value.total_failed_retryable} resend(s) in the background (batches of ${reportRetryChunkSize.value})?`)) return;
+    queueingRetryAll.value = true;
+    try {
+        const payload = {};
+        if (reportDateFrom.value) payload.date_from = reportDateFrom.value;
+        if (reportDateTo.value) payload.date_to = reportDateTo.value;
+        const { data } = await axios.post('/api/email-management/retry-queue', payload);
+        toast.success(data.message || 'Queued.');
+        await loadReport(reportPage.value);
+    } catch (e) {
+        toast.error(e.response?.data?.message || e.message || 'Could not queue retries');
+    } finally {
+        queueingRetryAll.value = false;
     }
 }
 
