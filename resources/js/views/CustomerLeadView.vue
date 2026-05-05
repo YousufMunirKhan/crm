@@ -73,6 +73,14 @@
                         <div class="flex flex-wrap gap-2">
                             <button type="button" class="px-4 py-2 text-sm font-semibold rounded-md bg-[#22a06b] text-white hover:bg-[#1c8a5a] disabled:opacity-50 touch-manipulation" :disabled="stageUpdating || activeLead.stage === 'won'" @click="submitMarkLeadWon">Won</button>
                             <button type="button" class="px-4 py-2 text-sm font-semibold rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 touch-manipulation" :disabled="stageUpdating || activeLead.stage === 'lost'" @click="showLostLeadModal = true; lostReasonInput = ''">Lost</button>
+                            <button
+                                v-if="isAdminRole && activeLead.stage === 'won'"
+                                type="button"
+                                class="px-4 py-2 text-sm font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700 touch-manipulation"
+                                @click="openChangeSaleCreditForLead(activeLead)"
+                            >
+                                Change Sale Owner
+                            </button>
                         </div>
                         <div class="flex flex-wrap gap-2">
                             <button type="button" class="px-3 py-2 text-sm font-medium rounded-md border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 touch-manipulation" @click="openScheduleModal(activeLead)">Schedule</button>
@@ -669,6 +677,26 @@
                 </form>
             </div>
         </div>
+
+        <div v-if="showSaleCreditModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+            <div class="bg-white rounded-xl shadow-xl max-w-md w-full">
+                <div class="p-6 border-b border-slate-200">
+                    <h3 class="text-lg font-semibold text-slate-900">Sale Credit</h3>
+                    <p class="text-sm text-slate-600 mt-1">{{ saleCreditContextText }}</p>
+                </div>
+                <div class="p-6 space-y-3">
+                    <label class="block text-sm font-medium text-slate-700">Select user for this sale</label>
+                    <select v-model="selectedSaleCreditUserId" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select user...</option>
+                        <option v-for="u in saleCreditUsers" :key="u.id" :value="String(u.id)">{{ u.name }} ({{ u.role?.name || '—' }})</option>
+                    </select>
+                </div>
+                <div class="px-6 pb-6 flex justify-end gap-3">
+                    <button type="button" class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50" @click="closeSaleCreditModal">Cancel</button>
+                    <button type="button" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50" :disabled="!selectedSaleCreditUserId" @click="confirmSaleCreditSelection">Confirm</button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -812,6 +840,11 @@ const leadFilterFrom = ref('');
 const leadFilterTo = ref('');
 const leadFilterUserId = ref('');
 const filterEmployees = ref([]);
+const saleCreditUsers = ref([]);
+const showSaleCreditModal = ref(false);
+const selectedSaleCreditUserId = ref('');
+const saleCreditContextText = ref('Select who should get this sale.');
+const saleCreditLeadId = ref(null);
 const historyTimelineApi = ref(null);
 const historyTimelineLoading = ref(false);
 const matchingActivityLeadIds = ref(null);
@@ -985,6 +1018,58 @@ async function loadFilterEmployees() {
     }
 }
 
+async function loadSaleCreditUsers() {
+    if (!isAdminRole.value) {
+        return;
+    }
+    try {
+        const res = await axios.get('/api/users');
+        saleCreditUsers.value = Array.isArray(res.data) ? res.data : res.data?.data || [];
+    } catch {
+        saleCreditUsers.value = [];
+    }
+}
+
+function openSaleCreditModal(contextText, leadId = null) {
+    if (!isAdminRole.value) return;
+    saleCreditContextText.value = contextText || 'Select who should get this sale.';
+    saleCreditLeadId.value = leadId;
+    selectedSaleCreditUserId.value = '';
+    if (!saleCreditUsers.value.length) {
+        loadSaleCreditUsers();
+    }
+    showSaleCreditModal.value = true;
+}
+
+function closeSaleCreditModal() {
+    showSaleCreditModal.value = false;
+    selectedSaleCreditUserId.value = '';
+    saleCreditLeadId.value = null;
+}
+
+function openChangeSaleCreditForLead(leadObj) {
+    if (!leadObj?.id || !isAdminRole.value) return;
+    openSaleCreditModal(`Reassign sale credit for Lead #${leadObj.id}.`, leadObj.id);
+}
+
+async function confirmSaleCreditSelection() {
+    const selected = saleCreditUsers.value.find((u) => String(u.id) === String(selectedSaleCreditUserId.value));
+    if (!selected || !saleCreditLeadId.value) return;
+    try {
+        await axios.put(`/api/leads/${saleCreditLeadId.value}`, { assigned_to: selected.id });
+        await axios.post(`/api/leads/${saleCreditLeadId.value}/activity`, {
+            type: 'note',
+            description: `Sale credited to ${selected.name} by ${auth.user?.name || 'Admin'}.`,
+        });
+        toast.success(`Sale will go on ${selected.name}.`);
+        await loadData();
+    } catch (e) {
+        toast.error(e?.response?.data?.message || 'Failed to save sale credit.');
+        return;
+    }
+    closeSaleCreditModal();
+}
+
 /** Readable lead line for sidebar menu (products / deal). */
 function leadSidebarTitle(lead) {
     if (!lead) {
@@ -1054,6 +1139,10 @@ const completeForm = ref({
     saleHappened: false,
     newStage: 'won',
     nextFollowUpAt: '',
+});
+const isAdminRole = computed(() => {
+    const r = auth.user?.role?.name;
+    return r === 'Admin' || r === 'System Admin' || r === 'Manager';
 });
 const showAssignmentModal = ref(false);
 const communicationLogs = ref({ emails: [], sms: [], whatsapp: [] });
@@ -1141,6 +1230,7 @@ const submitMarkLeadWon = async () => {
         await axios.put(`/api/leads/${l.id}`, { stage: 'won' });
         toast.success('Lead marked as Won. Customer type updated if applicable.');
         await loadData();
+        openSaleCreditModal('Lead marked as won.', l.id);
     } catch (e) {
         toast.error(e?.response?.data?.message || 'Could not mark as Won. Add products to the lead first if required.');
     } finally {
@@ -1201,6 +1291,7 @@ const completeFollowUp = async () => {
     if (!selectedFollowUp.value?.id || completingFollowUp.value) return;
     completingFollowUp.value = true;
     try {
+        const saleWon = completeForm.value.saleHappened && completeForm.value.newStage === 'won';
         const payload = {
             remarks: completeForm.value.remarks,
             sale_happened: completeForm.value.saleHappened,
@@ -1210,8 +1301,10 @@ const completeFollowUp = async () => {
         await axios.post(`/api/leads/${selectedFollowUp.value.id}/complete-followup`, payload);
         closeCompleteModal();
         await loadData();
-        const saleWon = completeForm.value.saleHappened && completeForm.value.newStage === 'won';
         toast.success(saleWon ? 'Appointment completed. Sale counted; prospect is now a customer.' : 'Completed.');
+        if (saleWon) {
+            openSaleCreditModal('Follow-up completed as won.', selectedFollowUp.value?.id || null);
+        }
     } catch (e) {
         toast.error(e?.response?.data?.message || 'Failed to complete');
     } finally {
@@ -1313,6 +1406,8 @@ const confirmCloseItem = async () => {
     closeItemError.value = null;
 
     try {
+        const wasWon = closeItemData.value.status === 'won';
+        const productLabel = closeItemData.value.item?.product?.name || 'Selected product';
         const payload = {
             status: closeItemData.value.status,
         };
@@ -1345,6 +1440,9 @@ const confirmCloseItem = async () => {
         toast.success(`Product marked as ${formatLineItemStatus(closeItemData.value.status)}!`);
         showCloseItemModal.value = false;
         await loadData();
+        if (wasWon) {
+            openSaleCreditModal(`Product won: ${productLabel}.`, closeItemData.value.lead?.id || null);
+        }
     } catch (err) {
         closeItemError.value = err.response?.data?.message || 'Failed to close item. Please try again.';
         console.error('Error closing item:', err);
@@ -1498,6 +1596,9 @@ onMounted(async () => {
         await resolveLeadWorkspace();
     }
     await loadFilterEmployees();
+    if (isAdminRole.value) {
+        await loadSaleCreditUsers();
+    }
     await loadData();
     document.addEventListener('visibilitychange', onVisibilityRefreshLogs);
     scheduleCommunicationLogsPolling();

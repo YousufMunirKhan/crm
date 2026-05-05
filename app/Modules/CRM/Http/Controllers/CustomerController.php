@@ -4,10 +4,11 @@ namespace App\Modules\CRM\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\CRM\Models\Customer;
+use App\Modules\CRM\Models\CustomerUserAssignment;
 use App\Modules\CRM\Models\Lead;
+use App\Modules\CRM\Models\LeadActivity;
 use App\Modules\CRM\Models\LeadItem;
 use App\Modules\CRM\Models\Product;
-use App\Modules\CRM\Models\CustomerUserAssignment;
 use App\Modules\CRM\Services\CustomerTimelineService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -52,11 +53,11 @@ class CustomerController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('business_name', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('postcode', 'like', "%{$search}%")
-                  ->orWhere('city', 'like', "%{$search}%");
+                    ->orWhere('business_name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('postcode', 'like', "%{$search}%")
+                    ->orWhere('city', 'like', "%{$search}%");
             });
         }
 
@@ -133,13 +134,13 @@ class CustomerController extends Controller
             'assignedUsers.role',
             'assignments.user',
             'assignments.assignedBy',
-            'creator'
+            'creator',
         ])->findOrFail($id);
 
         // Check access for sales agents
         $user = auth()->user();
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
-        
+
         if ($isSalesAgent && ! $customer->salesAgentHasAccess($user->id)) {
             return response()->json(['message' => 'Unauthorized access to this customer'], 403);
         }
@@ -154,27 +155,27 @@ class CustomerController extends Controller
         $appointments = $this->timelineService->collectAppointments($leadsWithActivities);
 
         // Get items customer has (only WON items from won leads — exclude lost items)
-        $customerHasItems = $customer->leads->filter(fn($l) => $l->stage === 'won')
-                                        ->flatMap(fn($l) => $l->items)
-                                        ->filter(fn($item) => $item->status === \App\Modules\CRM\Models\LeadItem::STATUS_WON)
-                                        ->unique('product_id')
-                                        ->values();
+        $customerHasItems = $customer->leads->filter(fn ($l) => $l->stage === 'won')
+            ->flatMap(fn ($l) => $l->items)
+            ->filter(fn ($item) => $item->status === \App\Modules\CRM\Models\LeadItem::STATUS_WON)
+            ->unique('product_id')
+            ->values();
 
         // Get next products to sell (suggestions) - inline implementation
         $suggestedProducts = collect();
         try {
-            $wonLeads = $customer->leads->filter(fn($l) => $l->stage === 'won');
-            $ownedProductIds = $wonLeads->flatMap(function($l) {
+            $wonLeads = $customer->leads->filter(fn ($l) => $l->stage === 'won');
+            $ownedProductIds = $wonLeads->flatMap(function ($l) {
                 return $l->items ?? collect();
             })->pluck('product_id')->filter()->unique();
-            
+
             foreach ($ownedProductIds as $productId) {
                 try {
                     $product = Product::find($productId);
                     if ($product) {
                         $suggestions = $product->getSuggestedProducts();
                         foreach ($suggestions as $suggestion) {
-                            if ($suggestion && !$ownedProductIds->contains($suggestion->id)) {
+                            if ($suggestion && ! $ownedProductIds->contains($suggestion->id)) {
                                 $suggestedProducts->push([
                                     'product' => $suggestion,
                                     'suggested_by' => $product->name,
@@ -188,7 +189,7 @@ class CustomerController extends Controller
                     continue;
                 }
             }
-            $suggestedProducts = $suggestedProducts->unique(function($item) {
+            $suggestedProducts = $suggestedProducts->unique(function ($item) {
                 return $item['product']->id ?? null;
             })->values();
         } catch (\Exception $e) {
@@ -228,7 +229,7 @@ class CustomerController extends Controller
                 $payload = is_array($c->provider_payload) ? $c->provider_payload : [];
 
                 return [
-                    'id' => 'comm-' . $c->id,
+                    'id' => 'comm-'.$c->id,
                     'channel' => $c->channel,
                     'direction' => $c->direction,
                     'subject' => $payload['subject'] ?? null,
@@ -246,7 +247,7 @@ class CustomerController extends Controller
             ->get()
             ->map(function ($s) {
                 return [
-                    'id' => 'sent-' . $s->id,
+                    'id' => 'sent-'.$s->id,
                     'channel' => $s->type,
                     'subject' => $s->subject ?? null,
                     'message' => $s->content,
@@ -360,6 +361,9 @@ class CustomerController extends Controller
             'remote_licenses.*.passwords' => ['nullable', 'string'],
             'remote_licenses.*.epos_type' => ['nullable', 'string'],
             'remote_licenses.*.lic_days' => ['nullable', 'string'],
+            'won_product_ids' => ['nullable', 'array'],
+            'won_product_ids.*' => ['exists:products,id'],
+            'sale_credit_user_id' => ['nullable', 'exists:users,id'],
             'birthday' => ['nullable', 'date'],
             'category' => ['nullable', 'string', 'max:100'],
             'latitude' => ['nullable', 'numeric'],
@@ -369,20 +373,75 @@ class CustomerController extends Controller
         $data['type'] = $data['type'] ?? Customer::TYPE_PROSPECT;
         $data['created_by'] = auth()->id();
         $remoteLicenses = $data['remote_licenses'] ?? [];
-        unset($data['remote_licenses']);
-        $customer = Customer::create($data);
-
-        foreach ($remoteLicenses as $i => $rl) {
-            if (!empty(array_filter($rl))) {
-                $customer->remoteLicenses()->create([
-                    'anydesk_rustdesk' => $rl['anydesk_rustdesk'] ?? null,
-                    'passwords' => $rl['passwords'] ?? null,
-                    'epos_type' => $rl['epos_type'] ?? null,
-                    'lic_days' => isset($rl['lic_days']) && $rl['lic_days'] !== '' ? (string) $rl['lic_days'] : null,
-                    'sort_order' => $i,
-                ]);
-            }
+        $wonProductIds = array_values(array_unique($data['won_product_ids'] ?? []));
+        $saleCreditUserId = isset($data['sale_credit_user_id']) ? (int) $data['sale_credit_user_id'] : null;
+        $actor = auth()->user();
+        $canChooseSaleCredit = $actor && ($actor->isRole('Admin') || $actor->isRole('Manager') || $actor->isRole('System Admin'));
+        if (! $canChooseSaleCredit) {
+            $saleCreditUserId = null;
         }
+        unset($data['remote_licenses']);
+        unset($data['won_product_ids']);
+        unset($data['sale_credit_user_id']);
+
+        $createdWonLeadId = null;
+        $customer = DB::transaction(function () use ($data, $remoteLicenses, $wonProductIds, $saleCreditUserId, &$createdWonLeadId) {
+            $customer = Customer::create($data);
+
+            foreach ($remoteLicenses as $i => $rl) {
+                if (! empty(array_filter($rl))) {
+                    $customer->remoteLicenses()->create([
+                        'anydesk_rustdesk' => $rl['anydesk_rustdesk'] ?? null,
+                        'passwords' => $rl['passwords'] ?? null,
+                        'epos_type' => $rl['epos_type'] ?? null,
+                        'lic_days' => isset($rl['lic_days']) && $rl['lic_days'] !== '' ? (string) $rl['lic_days'] : null,
+                        'sort_order' => $i,
+                    ]);
+                }
+            }
+
+            if (! empty($wonProductIds)) {
+                $creditedTo = $saleCreditUserId ?: auth()->id();
+                $lead = Lead::create([
+                    'customer_id' => $customer->id,
+                    'product_id' => $wonProductIds[0],
+                    'stage' => 'won',
+                    'source' => $customer->source ?: 'customer_create',
+                    'assigned_to' => $creditedTo,
+                    'pipeline_value' => 0,
+                ]);
+                $createdWonLeadId = $lead->id;
+
+                foreach ($wonProductIds as $productId) {
+                    LeadItem::create([
+                        'lead_id' => $lead->id,
+                        'product_id' => $productId,
+                        'quantity' => 1,
+                        'unit_price' => 0,
+                        'status' => LeadItem::STATUS_WON,
+                        'closed_at' => now(),
+                    ]);
+                }
+
+                $productNames = Product::whereIn('id', $wonProductIds)->pluck('name')->join(', ');
+                LeadActivity::create([
+                    'lead_id' => $lead->id,
+                    'user_id' => auth()->id(),
+                    'type' => 'stage_change',
+                    'description' => 'Lead created as won from customer creation with products: '.$productNames,
+                    'meta' => [
+                        'stage' => 'won',
+                        'product_ids' => $wonProductIds,
+                        'from_customer_create' => true,
+                        'sale_credit_user_id' => $creditedTo,
+                    ],
+                ]);
+
+                $customer->syncTypeFromLeads();
+            }
+
+            return $customer;
+        });
 
         // Log WhatsApp number info if phone/whatsapp_number exists
         if (($customer->whatsapp_number || $customer->phone) && config('services.whatsapp.access_token')) {
@@ -402,7 +461,11 @@ class CustomerController extends Controller
             }
         }
 
-        return response()->json($customer->load('creator'), 201);
+        return response()->json([
+            'id' => $customer->id,
+            'customer' => $customer->load('creator'),
+            'won_lead_id' => $createdWonLeadId,
+        ], 201);
     }
 
     public function update(Request $request, $id)
@@ -445,7 +508,7 @@ class CustomerController extends Controller
         if ($remoteLicenses !== null) {
             $customer->remoteLicenses()->delete();
             foreach ($remoteLicenses as $i => $rl) {
-                if (!empty(array_filter($rl))) {
+                if (! empty(array_filter($rl))) {
                     $customer->remoteLicenses()->create([
                         'anydesk_rustdesk' => $rl['anydesk_rustdesk'] ?? null,
                         'passwords' => $rl['passwords'] ?? null,
@@ -521,7 +584,7 @@ class CustomerController extends Controller
 
         $file = $request->file('file');
         $extension = $file->getClientOriginalExtension();
-        
+
         try {
             // Read file based on extension
             if ($extension === 'csv') {
@@ -578,7 +641,7 @@ class CustomerController extends Controller
                 }
             }
 
-            if (!isset($columnMap['name']) || !isset($columnMap['phone'])) {
+            if (! isset($columnMap['name']) || ! isset($columnMap['phone'])) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Required columns (Name and Phone) not found in file.',
@@ -624,14 +687,16 @@ class CustomerController extends Controller
 
                     if (empty($customerData['name']) || empty($customerData['phone'])) {
                         $errors++;
-                        $errorDetails[] = "Row " . ($rowIndex + 2) . ": Missing name or phone";
+                        $errorDetails[] = 'Row '.($rowIndex + 2).': Missing name or phone';
+
                         continue;
                     }
 
                     $existing = Customer::where('phone', $customerData['phone'])->first();
                     if ($existing) {
                         $errors++;
-                        $errorDetails[] = "Row " . ($rowIndex + 2) . ": Customer with phone {$customerData['phone']} already exists";
+                        $errorDetails[] = 'Row '.($rowIndex + 2).": Customer with phone {$customerData['phone']} already exists";
+
                         continue;
                     }
 
@@ -654,13 +719,13 @@ class CustomerController extends Controller
                     }
                     for ($n = 1; $n <= 10; $n++) {
                         $prefix = "remote_{$n}_";
-                        $aidx = array_search($prefix . 'anydesk_rustdesk', $headers);
+                        $aidx = array_search($prefix.'anydesk_rustdesk', $headers);
                         if ($aidx === false) {
-                            $aidx = array_search($prefix . 'anydesk', $headers);
+                            $aidx = array_search($prefix.'anydesk', $headers);
                         }
-                        $pidx = array_search($prefix . 'passwords', $headers);
-                        $eidx = array_search($prefix . 'epos_type', $headers);
-                        $lidx = array_search($prefix . 'lic_days', $headers);
+                        $pidx = array_search($prefix.'passwords', $headers);
+                        $eidx = array_search($prefix.'epos_type', $headers);
+                        $lidx = array_search($prefix.'lic_days', $headers);
                         if ($aidx === false && $pidx === false && $eidx === false && $lidx === false) {
                             break;
                         }
@@ -673,7 +738,7 @@ class CustomerController extends Controller
                         if (isset($row[$lidx]) && trim((string) $row[$lidx]) !== '') {
                             $arl['lic_days'] = trim((string) $row[$lidx]);
                         }
-                        if (!empty(array_filter($arl))) {
+                        if (! empty(array_filter($arl))) {
                             $remoteLicensesList[] = $arl;
                         }
                     }
@@ -696,7 +761,7 @@ class CustomerController extends Controller
                             continue;
                         }
                         $headerKey = strtolower(trim($headerRaw));
-                        if (!isset($productHeaderToId[$headerKey])) {
+                        if (! isset($productHeaderToId[$headerKey])) {
                             continue;
                         }
                         $productId = $productHeaderToId[$headerKey];
@@ -748,8 +813,8 @@ class CustomerController extends Controller
                     $imported++;
                 } catch (\Exception $e) {
                     $errors++;
-                    $errorDetails[] = "Row " . ($rowIndex + 2) . ": " . $e->getMessage();
-                    Log::error("Customer import error row " . ($rowIndex + 2) . ": " . $e->getMessage());
+                    $errorDetails[] = 'Row '.($rowIndex + 2).': '.$e->getMessage();
+                    Log::error('Customer import error row '.($rowIndex + 2).': '.$e->getMessage());
                 }
             }
 
@@ -760,15 +825,15 @@ class CustomerController extends Controller
                 'imported' => $imported,
                 'errors' => $errors,
                 'error_details' => $errorDetails,
-                'message' => "Successfully imported {$imported} customers" . ($errors > 0 ? " with {$errors} errors" : ''),
+                'message' => "Successfully imported {$imported} customers".($errors > 0 ? " with {$errors} errors" : ''),
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Customer import failed: ' . $e->getMessage());
-            
+            Log::error('Customer import failed: '.$e->getMessage());
+
             return response()->json([
                 'success' => false,
-                'message' => 'Import failed: ' . $e->getMessage(),
+                'message' => 'Import failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -791,7 +856,7 @@ class CustomerController extends Controller
         $productHeaders = $products->pluck('name')->all();
         $headers = array_merge($customerHeaders, $productHeaders);
 
-        $filename = 'customers_import_template_' . date('Y-m-d') . '.csv';
+        $filename = 'customers_import_template_'.date('Y-m-d').'.csv';
         $headersResponse = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
@@ -817,25 +882,25 @@ class CustomerController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
         $customers = $query->get();
 
-        $filename = 'customers_export_' . date('Y-m-d_His') . '.csv';
+        $filename = 'customers_export_'.date('Y-m-d_His').'.csv';
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ];
 
-        $callback = function() use ($customers) {
+        $callback = function () use ($customers) {
             $file = fopen('php://output', 'w');
-            
+
             // Add headers
             fputcsv($file, ['Name', 'Phone', 'Email', 'Address', 'City', 'Postcode', 'VAT Number']);
-            
+
             // Add data
             foreach ($customers as $customer) {
                 fputcsv($file, [
@@ -848,7 +913,7 @@ class CustomerController extends Controller
                     $customer->vat_number ?? '',
                 ]);
             }
-            
+
             fclose($file);
         };
 
@@ -862,14 +927,14 @@ class CustomerController extends Controller
     {
         $data = [];
         $handle = fopen($file->getRealPath(), 'r');
-        
+
         if ($handle !== false) {
             while (($row = fgetcsv($handle, 1000, ',')) !== false) {
                 $data[] = $row;
             }
             fclose($handle);
         }
-        
+
         return $data;
     }
 
@@ -880,10 +945,11 @@ class CustomerController extends Controller
     {
         try {
             $data = Excel::toArray([], $file);
+
             return $data[0] ?? [];
         } catch (\Exception $e) {
-            Log::error('Excel read error: ' . $e->getMessage());
-            throw new \Exception('Failed to read Excel file: ' . $e->getMessage());
+            Log::error('Excel read error: '.$e->getMessage());
+            throw new \Exception('Failed to read Excel file: '.$e->getMessage());
         }
     }
 
@@ -893,7 +959,7 @@ class CustomerController extends Controller
     public function assign(Request $request, $id)
     {
         $customer = Customer::findOrFail($id);
-        
+
         $data = $request->validate([
             'user_ids' => ['required', 'array', 'min:1'],
             'user_ids.*' => ['required', 'exists:users,id'],
@@ -901,7 +967,7 @@ class CustomerController extends Controller
         ]);
 
         $assignedBy = auth()->id();
-        
+
         // Assign to multiple employees
         $customer->assignTo($data['user_ids'], $assignedBy, $data['notes'] ?? null);
 
@@ -918,17 +984,17 @@ class CustomerController extends Controller
     {
         $customer = Customer::findOrFail($id);
         $user = auth()->user();
-        
+
         // Check permission: admin/manager can unassign anyone, or user can unassign if they assigned it
         $assignment = CustomerUserAssignment::where('customer_id', $customer->id)
             ->where('user_id', $userId)
             ->firstOrFail();
-        
-        $canUnassign = $user->isRole('Admin') || 
-                       $user->isRole('Manager') || 
+
+        $canUnassign = $user->isRole('Admin') ||
+                       $user->isRole('Manager') ||
                        $assignment->assigned_by === $user->id;
-        
-        if (!$canUnassign) {
+
+        if (! $canUnassign) {
             return response()->json(['message' => 'Unauthorized to unassign this customer'], 403);
         }
 
@@ -945,7 +1011,7 @@ class CustomerController extends Controller
     public function getAssignedCustomers(Request $request)
     {
         $user = auth()->user();
-        
+
         $query = Customer::whereHas('assignedUsers', function ($q) use ($user) {
             $q->where('user_id', $user->id);
         })->with(['leads', 'invoices', 'tickets']);
@@ -954,8 +1020,8 @@ class CustomerController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -964,5 +1030,3 @@ class CustomerController extends Controller
         return response()->json($customers);
     }
 }
-
-

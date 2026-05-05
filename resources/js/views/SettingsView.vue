@@ -777,6 +777,173 @@
                 </div>
             </div>
 
+            <!-- Cold calling / Google Places -->
+            <div v-show="activeSection === 'cold_calling'" class="bg-white rounded-xl shadow-sm p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                        <span class="text-lg">📞</span>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900">Cold calling (Google Maps)</h2>
+                        <p class="text-sm text-slate-500">API key for postcode business discovery (Geocoding + Places API New)</p>
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 space-y-2 mb-6">
+                    <p class="font-medium text-slate-800">Google Cloud Console</p>
+                    <ul class="list-disc list-inside space-y-1 text-slate-600">
+                        <li>Create a project, enable billing, then enable <strong>Geocoding API</strong> and <strong>Places API (New)</strong>. The legacy <strong>Places API</strong> (old) is <em>not</em> enough — Cold calling uses <code class="text-xs bg-white px-1 rounded">places.googleapis.com</code> (SearchNearby, Text Search, Place Details).</li>
+                        <li>Credentials → your API key → <strong>API restrictions</strong> must include <strong>Places API (New)</strong> and <strong>Geocoding API</strong> (or “Don’t restrict key” while testing). If SearchNearby returns <code class="text-xs bg-white px-1 rounded">API_KEY_SERVICE_BLOCKED</code>, the new Places API is missing from that list.</li>
+                        <li>The app calls Google from your <strong>server</strong>—do not use “HTTP referrers” only (Geocoding returns <code class="text-xs bg-white px-1 rounded">REQUEST_DENIED</code>). Use <strong>IP addresses</strong> or <strong>None</strong> for testing.</li>
+                        <li>If Geocoding is denied, the CRM tries <strong>Places Text Search</strong> for the postcode centre (still requires Places API New on the key).</li>
+                    </ul>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="sm:col-span-2">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Google Maps API key</label>
+                        <input
+                            v-model="coldCallingSettings.google_maps_api_key"
+                            type="password"
+                            autocomplete="off"
+                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-sm"
+                            placeholder="AIza…"
+                        >
+                        <p class="text-xs text-slate-500 mt-1">Leave blank when saving to keep the existing key unchanged.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Default search radius (meters)</label>
+                        <input
+                            v-model.number="coldCallingSettings.cold_calling_default_radius_meters"
+                            type="number"
+                            min="500"
+                            max="50000"
+                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                        <p class="text-xs text-slate-500 mt-1">Max 50&nbsp;000 (Google limit).</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">New businesses per search (max)</label>
+                        <input
+                            v-model.number="coldCallingSettings.cold_calling_max_places_per_run"
+                            type="number"
+                            min="1"
+                            max="100"
+                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                        <p class="text-xs text-slate-500 mt-1">
+                            Each run adds up to this many <strong>new</strong> Google places (by <code class="text-xs bg-white px-1 rounded">place_id</code>). Rows already in cold calling are skipped for insert and only linked to this postcode. Text search keeps paging until the target is reached or Google has no more results.
+                        </p>
+                    </div>
+                    <div class="sm:col-span-2 rounded-xl border border-sky-200 bg-sky-50/50 p-4 space-y-3">
+                        <p class="text-sm font-semibold text-slate-900">Small cafes &amp; independent businesses</p>
+                        <p class="text-xs text-slate-600">
+                            Google does not expose “company size”. <strong>Nearby Search</strong> is limited to food &amp; drink + high-street retail types (restaurants, cafés, bakeries, bars, takeaways, clothing, gifts, florists, etc.). <strong>Text search</strong> uses an indie restaurant / café / retail query by default. You can still <strong>drop</strong> huge chains via review cap, name blocklist, and excluded place types after Place Details.
+                        </p>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Places text search query</label>
+                            <textarea
+                                v-model="coldCallingSettings.cold_calling_text_search_query"
+                                rows="3"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm"
+                                placeholder="Leave empty for built-in indie cafe / small food query. Use {postcode} for the run’s postcode."
+                            />
+                            <p class="text-xs text-slate-500 mt-1">Empty = default wording (cafes, bakeries, small restaurants, etc.). Max ~480 characters sent to Google.</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Skip new row if Google reviews over</label>
+                            <input
+                                v-model.number="coldCallingSettings.cold_calling_skip_if_reviews_over"
+                                type="number"
+                                min="0"
+                                max="500000"
+                                class="w-full max-w-xs px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            >
+                            <p class="text-xs text-slate-500 mt-1"><strong>0</strong> = off. Try <strong>80–200</strong> to reduce huge national chains (imperfect). Busy independents can also have many reviews.</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Exclude name contains (comma-separated)</label>
+                            <input
+                                v-model="coldCallingSettings.cold_calling_discovery_exclude_names"
+                                type="text"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm"
+                                placeholder="e.g. Tesco, Sainsbury's, McDonald's, Starbucks"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Exclude Google place types</label>
+                            <input
+                                v-model="coldCallingSettings.cold_calling_discovery_exclude_types"
+                                type="text"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono text-sm"
+                                placeholder="default"
+                            >
+                            <p class="text-xs text-slate-500 mt-1">
+                                <code class="bg-white px-1 rounded">default</code> or empty = large-format retail (department_store, shopping_mall, supermarket, hypermarket, discount_supermarket, etc.).
+                                <code class="bg-white px-1 rounded">none</code> = do not filter by type. Or list types yourself (comma-separated, snake_case).
+                            </p>
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2 flex items-start gap-3 p-4 border border-slate-200 rounded-xl bg-amber-50/50">
+                        <input
+                            id="cold_enrich"
+                            v-model="coldCallingSettings.cold_calling_enrich_email"
+                            type="checkbox"
+                            class="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                        >
+                        <label for="cold_enrich" class="text-sm text-slate-700 cursor-pointer">
+                            <span class="font-medium">Try to find email from business website</span>
+                            <span class="block text-slate-500 mt-0.5">Fetches homepage plus common paths like /contact (mailto, tel:, UK numbers in text). Slow; many sites block bots or hide details. Also enable per run under Marketing → Cold calling, or use “Fill from websites” on saved contacts.</span>
+                        </label>
+                    </div>
+                    <div class="sm:col-span-2 rounded-xl border border-violet-200 bg-violet-50/40 p-4 space-y-3">
+                        <p class="text-sm font-semibold text-slate-900">Claude AI (Anthropic) — extra email / phone pass</p>
+                        <p class="text-xs text-slate-600">
+                            After pages are fetched, if email or phone is still missing, the CRM sends <strong>plain text from those pages</strong> to Claude and asks for JSON <code class="text-[11px] bg-white px-1 rounded">email</code> / <code class="text-[11px] bg-white px-1 rounded">phone</code> only. Put your API key in <code class="text-[11px] bg-white px-1 rounded">.env</code> as <code class="text-[11px] bg-white px-1 rounded">ANTHROPIC_API_KEY</code> or below. <strong>Never commit keys to git.</strong> Rotate any key that was pasted into chat or tickets.
+                        </p>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Anthropic API key</label>
+                            <input
+                                v-model="coldCallingSettings.anthropic_api_key"
+                                type="password"
+                                autocomplete="off"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 font-mono text-sm"
+                                placeholder="sk-ant-api03-…"
+                            >
+                            <p class="text-xs text-slate-500 mt-1">Leave blank when saving to keep the existing key.</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Claude model ID</label>
+                            <input
+                                v-model="coldCallingSettings.anthropic_model"
+                                type="text"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 font-mono text-sm"
+                                placeholder="claude-sonnet-4-20250514"
+                            >
+                        </div>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input
+                                v-model="coldCallingSettings.cold_calling_use_claude"
+                                type="checkbox"
+                                class="rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                            >
+                            <span class="text-sm text-slate-700">Use Claude when scrape did not find email or phone (uses API credits)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end">
+                    <button
+                        type="button"
+                        @click="saveColdCallingSettings"
+                        :disabled="savingColdCalling"
+                        class="px-6 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 transition-colors disabled:opacity-50"
+                    >
+                        {{ savingColdCalling ? 'Saving…' : 'Save cold calling settings' }}
+                    </button>
+                </div>
+            </div>
+
             <!-- PWA Settings Section -->
             <div v-show="activeSection === 'pwa'" class="bg-white rounded-xl shadow-sm p-6">
                 <div class="flex items-center gap-3 mb-6">
@@ -890,6 +1057,7 @@ const whatsappCloudTestResultTextClass = computed(() => {
 });
 
 const savingFacebook = ref(false);
+const savingColdCalling = ref(false);
 const testingSmtp = ref(false);
 const uploadingLogo = ref(false);
 const uploadingFavicon = ref(false);
@@ -907,6 +1075,7 @@ const sections = [
     { id: 'sms', name: 'SMS', icon: '📱' },
     { id: 'whatsapp', name: 'WhatsApp', icon: '💬' },
     { id: 'facebook', name: 'Facebook', icon: '📘' },
+    { id: 'cold_calling', name: 'Cold calling', icon: '📞' },
     { id: 'pwa', name: 'PWA', icon: '📲' },
 ];
 
@@ -977,6 +1146,20 @@ const facebookSettings = reactive({
     facebook_pixel_id: '',
 });
 
+const coldCallingSettings = reactive({
+    google_maps_api_key: '',
+    cold_calling_default_radius_meters: 5000,
+    cold_calling_max_places_per_run: 50,
+    cold_calling_enrich_email: false,
+    cold_calling_text_search_query: '',
+    cold_calling_skip_if_reviews_over: 0,
+    cold_calling_discovery_exclude_names: '',
+    cold_calling_discovery_exclude_types: 'default',
+    anthropic_api_key: '',
+    anthropic_model: 'claude-sonnet-4-20250514',
+    cold_calling_use_claude: true,
+});
+
 const pwaStatus = reactive({
     serviceWorker: false,
     manifest: false,
@@ -1033,6 +1216,22 @@ const loadSettings = async () => {
         facebookSettings.facebook_page_id = data.facebook_page_id || '';
         facebookSettings.facebook_access_token = data.facebook_access_token || '';
         facebookSettings.facebook_pixel_id = data.facebook_pixel_id || '';
+
+        coldCallingSettings.google_maps_api_key = data.google_maps_api_key || '';
+        coldCallingSettings.cold_calling_default_radius_meters = parseInt(data.cold_calling_default_radius_meters, 10) || 5000;
+        coldCallingSettings.cold_calling_max_places_per_run = parseInt(data.cold_calling_max_places_per_run, 10) || 50;
+        coldCallingSettings.cold_calling_enrich_email = data.cold_calling_enrich_email === '1' || data.cold_calling_enrich_email === 'true';
+        coldCallingSettings.cold_calling_text_search_query = data.cold_calling_text_search_query || '';
+        coldCallingSettings.cold_calling_skip_if_reviews_over = Number.isFinite(parseInt(data.cold_calling_skip_if_reviews_over, 10))
+            ? parseInt(data.cold_calling_skip_if_reviews_over, 10)
+            : 0;
+        coldCallingSettings.cold_calling_discovery_exclude_names = data.cold_calling_discovery_exclude_names || '';
+        coldCallingSettings.cold_calling_discovery_exclude_types = data.cold_calling_discovery_exclude_types || 'default';
+        coldCallingSettings.anthropic_api_key = data.anthropic_api_key || '';
+        coldCallingSettings.anthropic_model = data.anthropic_model || 'claude-sonnet-4-20250514';
+        coldCallingSettings.cold_calling_use_claude = data.cold_calling_use_claude === undefined || data.cold_calling_use_claude === null
+            ? true
+            : (data.cold_calling_use_claude === '1' || data.cold_calling_use_claude === 'true');
     } catch (error) {
         console.error('Failed to load settings:', error);
     } finally {
@@ -1311,6 +1510,37 @@ const saveFacebookSettings = async () => {
         toast.error('Failed to save Facebook settings');
     } finally {
         savingFacebook.value = false;
+    }
+};
+
+const saveColdCallingSettings = async () => {
+    savingColdCalling.value = true;
+    try {
+        const payload = {
+            cold_calling_default_radius_meters: coldCallingSettings.cold_calling_default_radius_meters,
+            cold_calling_max_places_per_run: coldCallingSettings.cold_calling_max_places_per_run,
+            cold_calling_enrich_email: coldCallingSettings.cold_calling_enrich_email,
+            cold_calling_text_search_query: coldCallingSettings.cold_calling_text_search_query ?? '',
+            cold_calling_skip_if_reviews_over: coldCallingSettings.cold_calling_skip_if_reviews_over ?? 0,
+            cold_calling_discovery_exclude_names: coldCallingSettings.cold_calling_discovery_exclude_names ?? '',
+            cold_calling_discovery_exclude_types: coldCallingSettings.cold_calling_discovery_exclude_types ?? 'default',
+            cold_calling_use_claude: coldCallingSettings.cold_calling_use_claude,
+            anthropic_model: coldCallingSettings.anthropic_model?.trim() || 'claude-sonnet-4-20250514',
+        };
+        if (coldCallingSettings.google_maps_api_key?.trim()) {
+            payload.google_maps_api_key = coldCallingSettings.google_maps_api_key.trim();
+        }
+        if (coldCallingSettings.anthropic_api_key?.trim()) {
+            payload.anthropic_api_key = coldCallingSettings.anthropic_api_key.trim();
+        }
+        await axios.put('/api/settings/cold-calling', payload);
+        toast.success('Cold calling settings saved');
+        await loadSettings();
+    } catch (error) {
+        console.error('Failed to save cold calling settings:', error);
+        toast.error(error.response?.data?.message || 'Failed to save cold calling settings');
+    } finally {
+        savingColdCalling.value = false;
     }
 };
 

@@ -5,14 +5,15 @@ namespace App\Modules\Settings\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Settings\Models\Setting;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 
 class SettingsController extends Controller
 {
     public function index()
     {
         $settings = Setting::all()->pluck('value', 'key');
+
         return response()->json($settings);
     }
 
@@ -23,6 +24,7 @@ class SettingsController extends Controller
     {
         $publicKeys = ['logo_url', 'favicon_url', 'company_name', 'company_registration_no', 'company_vat', 'company_phone', 'company_address', 'company_email', 'company_website', 'pwa_enabled', 'social_facebook_url', 'social_twitter_url', 'social_linkedin_url', 'social_instagram_url', 'social_tiktok_url'];
         $settings = Setting::whereIn('key', $publicKeys)->pluck('value', 'key');
+
         return response()->json($settings);
     }
 
@@ -45,6 +47,7 @@ class SettingsController extends Controller
     public function get($key)
     {
         $setting = Setting::where('key', $key)->first();
+
         return response()->json(['value' => $setting?->value]);
     }
 
@@ -66,7 +69,7 @@ class SettingsController extends Controller
 
         // Store new logo
         $path = $request->file('logo')->store('logos', 'public');
-        $url = '/storage/' . $path;
+        $url = '/storage/'.$path;
 
         Setting::updateOrCreate(
             ['key' => 'logo_url'],
@@ -202,7 +205,7 @@ class SettingsController extends Controller
 
             return response()->json(['message' => 'Test email sent successfully! Check your inbox.']);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Failed to send test email: ' . $e->getMessage()], 500);
+            return response()->json(['message' => 'Failed to send test email: '.$e->getMessage()], 500);
         }
     }
 
@@ -247,17 +250,17 @@ class SettingsController extends Controller
             if ($result['success']) {
                 return response()->json([
                     'message' => 'Test SMS sent successfully!',
-                    'response' => $result['response']
+                    'response' => $result['response'],
                 ]);
             } else {
                 return response()->json([
                     'message' => $result['message'],
-                    'response' => $result['response']
+                    'response' => $result['response'],
                 ], 500);
             }
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Failed to send test SMS: ' . $e->getMessage()
+                'message' => 'Failed to send test SMS: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -285,6 +288,107 @@ class SettingsController extends Controller
         }
 
         return response()->json(['message' => 'WhatsApp settings updated successfully']);
+    }
+
+    /**
+     * Cold calling / Google Places (Geocoding + Places API New)
+     */
+    public function updateColdCalling(Request $request)
+    {
+        $request->validate([
+            'google_maps_api_key' => ['nullable', 'string', 'max:512'],
+            'cold_calling_default_radius_meters' => ['nullable', 'integer', 'min:500', 'max:50000'],
+            'cold_calling_max_places_per_run' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'cold_calling_enrich_email' => ['nullable', 'boolean'],
+            'cold_calling_text_search_query' => ['nullable', 'string', 'max:500'],
+            'cold_calling_skip_if_reviews_over' => ['nullable', 'integer', 'min:0', 'max:500000'],
+            'cold_calling_discovery_exclude_names' => ['nullable', 'string', 'max:500'],
+            'cold_calling_discovery_exclude_types' => ['nullable', 'string', 'max:500'],
+            'anthropic_api_key' => ['nullable', 'string', 'max:512'],
+            'anthropic_model' => ['nullable', 'string', 'max:128'],
+            'cold_calling_use_claude' => ['nullable', 'boolean'],
+        ]);
+
+        $key = $request->input('google_maps_api_key');
+        if ($key !== null && trim($key) !== '') {
+            Setting::updateOrCreate(
+                ['key' => 'google_maps_api_key'],
+                ['value' => trim($key)]
+            );
+        }
+
+        if ($request->filled('cold_calling_default_radius_meters')) {
+            Setting::updateOrCreate(
+                ['key' => 'cold_calling_default_radius_meters'],
+                ['value' => (string) (int) $request->input('cold_calling_default_radius_meters')]
+            );
+        }
+
+        if ($request->filled('cold_calling_max_places_per_run')) {
+            Setting::updateOrCreate(
+                ['key' => 'cold_calling_max_places_per_run'],
+                ['value' => (string) (int) $request->input('cold_calling_max_places_per_run')]
+            );
+        }
+
+        if ($request->has('cold_calling_enrich_email')) {
+            Setting::updateOrCreate(
+                ['key' => 'cold_calling_enrich_email'],
+                ['value' => $request->boolean('cold_calling_enrich_email') ? '1' : '0']
+            );
+        }
+
+        if ($request->has('cold_calling_text_search_query')) {
+            Setting::updateOrCreate(
+                ['key' => 'cold_calling_text_search_query'],
+                ['value' => trim((string) $request->input('cold_calling_text_search_query'))]
+            );
+        }
+
+        if ($request->exists('cold_calling_skip_if_reviews_over')) {
+            Setting::updateOrCreate(
+                ['key' => 'cold_calling_skip_if_reviews_over'],
+                ['value' => (string) max(0, min(500_000, (int) $request->input('cold_calling_skip_if_reviews_over')))]
+            );
+        }
+
+        if ($request->has('cold_calling_discovery_exclude_names')) {
+            Setting::updateOrCreate(
+                ['key' => 'cold_calling_discovery_exclude_names'],
+                ['value' => trim((string) $request->input('cold_calling_discovery_exclude_names'))]
+            );
+        }
+
+        if ($request->has('cold_calling_discovery_exclude_types')) {
+            Setting::updateOrCreate(
+                ['key' => 'cold_calling_discovery_exclude_types'],
+                ['value' => trim((string) $request->input('cold_calling_discovery_exclude_types'))]
+            );
+        }
+
+        $anthropic = $request->input('anthropic_api_key');
+        if ($anthropic !== null && trim($anthropic) !== '') {
+            Setting::updateOrCreate(
+                ['key' => 'anthropic_api_key'],
+                ['value' => trim($anthropic)]
+            );
+        }
+
+        if ($request->filled('anthropic_model')) {
+            Setting::updateOrCreate(
+                ['key' => 'anthropic_model'],
+                ['value' => trim((string) $request->input('anthropic_model'))]
+            );
+        }
+
+        if ($request->has('cold_calling_use_claude')) {
+            Setting::updateOrCreate(
+                ['key' => 'cold_calling_use_claude'],
+                ['value' => $request->boolean('cold_calling_use_claude') ? '1' : '0']
+            );
+        }
+
+        return response()->json(['message' => 'Cold calling settings saved successfully']);
     }
 
     /**
@@ -318,7 +422,7 @@ class SettingsController extends Controller
     public function pwa()
     {
         $enabled = Setting::where('key', 'pwa_enabled')->first();
-        
+
         return response()->json([
             'enabled' => $enabled ? filter_var($enabled->value, FILTER_VALIDATE_BOOLEAN) : true,
         ]);
@@ -347,7 +451,7 @@ class SettingsController extends Controller
     public static function getValue($key, $default = null)
     {
         $setting = Setting::where('key', $key)->first();
+
         return $setting ? $setting->value : $default;
     }
 }
-

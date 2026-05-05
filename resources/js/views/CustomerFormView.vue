@@ -18,14 +18,14 @@
             <form novalidate @submit.prevent="handleSubmit" class="form-card">
                 <div class="form-section-head-mint">
                     <h1 class="form-section-title-mint text-2xl sm:text-3xl">
-                        {{ isEdit ? 'Edit Customer' : (form.type === 'customer' ? 'Add New Customer' : 'Add New Prospect') }}
+                        {{ isEdit ? (form.type === 'customer' ? 'Edit Customer' : 'Edit Prospect') : (form.type === 'customer' ? 'Add Customer' : 'Add Prospect') }}
                     </h1>
                     <p class="form-section-desc-mint">
-                        {{ isEdit ? 'Update customer information' : (form.type === 'customer' ? 'Fill in the details to add a new customer' : 'Fill in the details to add a new prospect') }}
+                        {{ isEdit ? (form.type === 'customer' ? 'Update customer information' : 'Update prospect information') : (form.type === 'customer' ? 'Fill in the details to add a customer' : 'Fill in the details to add a prospect') }}
                     </p>
                 </div>
                 <div class="form-body space-y-6 lg:space-y-8">
-                    <div v-if="!isEdit" class="mb-2">
+                    <div v-if="!isEdit && !isSimpleCustomerCreate" class="mb-2">
                         <div class="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1">
                             <button
                                 v-for="step in createSteps"
@@ -46,7 +46,7 @@
                         </div>
                     </div>
                     <!-- Required fields -->
-                    <div v-show="isEdit || currentStep === 1">
+                    <div v-show="isEdit || isSimpleCustomerCreate || currentStep === 1">
                         <h2 class="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
                             <span class="w-6 h-6 rounded-full bg-slate-900 text-white text-xs flex items-center justify-center">1</span>
                             Basic Information
@@ -70,7 +70,7 @@
                                     class="form-input"
                                 />
                             </div>
-                            <div>
+                            <div v-if="isEdit || !isSimpleCustomerCreate">
                                 <label class="form-label">Owner Name</label>
                                 <input
                                     v-model="form.owner_name"
@@ -79,7 +79,7 @@
                                     class="form-input"
                                 />
                             </div>
-                            <div>
+                            <div v-if="isEdit || !isSimpleCustomerCreate">
                                 <label class="form-label">Contact Person 2 Name</label>
                                 <input
                                     v-model="form.contact_person_2_name"
@@ -88,7 +88,7 @@
                                     class="form-input"
                                 />
                             </div>
-                            <div>
+                            <div v-if="isEdit || !isSimpleCustomerCreate">
                                 <label class="form-label">Contact Person 2 Phone</label>
                                 <input
                                     v-model="form.contact_person_2_phone"
@@ -107,7 +107,7 @@
                                     @blur="syncPhoneToWhatsApp"
                                 />
                             </div>
-                            <div>
+                            <div v-if="isEdit || !isSimpleCustomerCreate">
                                 <label class="form-label">Customer WhatsApp</label>
                                 <input
                                     v-model="form.whatsapp_number"
@@ -118,7 +118,7 @@
                                 />
                                 <p class="text-xs text-slate-500 mt-1">Phone and WhatsApp sync when one is empty; you can change either.</p>
                             </div>
-                            <div class="sm:col-span-2">
+                            <div v-if="isEdit || !isSimpleCustomerCreate" class="sm:col-span-2">
                                 <label class="form-label">Customer Email</label>
                                 <input
                                     v-model="form.email"
@@ -127,7 +127,7 @@
                                     class="form-input"
                                 />
                             </div>
-                            <div class="sm:col-span-2">
+                            <div v-if="isEdit || !isSimpleCustomerCreate" class="sm:col-span-2">
                                 <label class="form-label">Source</label>
                                 <select
                                     v-model="form.source"
@@ -143,11 +143,49 @@
                                     <option value="organic_lead">Organic Lead</option>
                                 </select>
                             </div>
+                            <div v-if="isSimpleCustomerCreate" class="sm:col-span-2">
+                                <label class="form-label">Address</label>
+                                <textarea
+                                    v-model="form.address"
+                                    rows="2"
+                                    placeholder="Street address"
+                                    class="form-input resize-none"
+                                />
+                            </div>
+                            <div v-if="isSimpleCustomerCreate">
+                                <label class="form-label">City</label>
+                                <input
+                                    v-model="form.city"
+                                    type="text"
+                                    placeholder="City"
+                                    class="form-input"
+                                />
+                            </div>
+                            <div v-if="isSimpleCustomerCreate">
+                                <label class="form-label">Postcode</label>
+                                <input
+                                    v-model="form.postcode"
+                                    type="text"
+                                    placeholder="Postcode"
+                                    class="form-input"
+                                />
+                            </div>
+                            <div v-if="isSimpleCustomerCreate" class="sm:col-span-2">
+                                <label class="form-label">Won Product (Optional)</label>
+                                <div class="border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto bg-white">
+                                    <label v-for="p in products" :key="p.id" class="flex items-center gap-2 py-1.5 cursor-pointer">
+                                        <input type="checkbox" :value="p.id" v-model="wonProductIds" class="form-checkbox" />
+                                        <span class="text-sm">{{ p.name }}</span>
+                                    </label>
+                                    <p v-if="!products.length" class="text-sm text-slate-400 py-2">Loading products...</p>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1">If selected, these products will be recorded as won after customer creation.</p>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Optional remote/license fields (multiple) -->
-                    <div v-show="isEdit || currentStep === 2">
+                    <div v-show="isEdit || (!isSimpleCustomerCreate && currentStep === 2)">
                         <h2 class="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
                             <span class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs flex items-center justify-center">2</span>
                             Remote & License (Optional)
@@ -218,7 +256,7 @@
                     </div>
 
                     <!-- Address -->
-                    <div v-show="isEdit || currentStep === 3">
+                    <div v-show="isEdit || (!isSimpleCustomerCreate && currentStep === 3)">
                         <h2 class="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
                             <span class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs flex items-center justify-center">3</span>
                             Address & Notes
@@ -274,56 +312,43 @@
                         </div>
                     </div>
 
-                    <!-- Also create: Follow-up / Appointment / Lead (only when adding) -->
-                    <div v-if="!isEdit" v-show="currentStep === 4" ref="quickAddSectionRef" class="border-t border-slate-200 pt-6">
+                    <!-- Also create: Follow-up / Appointment / Lead (prospect flow only) -->
+                    <div v-if="!isEdit && !isSimpleCustomerCreate" v-show="currentStep === 4" ref="quickAddSectionRef" class="border-t border-slate-200 pt-6">
                         <h2 class="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
                             <span class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs flex items-center justify-center">4</span>
                             Also create (optional)
                         </h2>
                         <p class="text-sm text-slate-500 mb-4">Quickly add a follow-up, appointment, or lead when creating this customer.</p>
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                            <label
-                                class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all"
-                                :class="!quickAddType ? 'border-slate-300 bg-slate-100' : 'border-slate-200 hover:border-slate-300'"
-                            >
+                            <label class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all" :class="!quickAddType ? 'border-slate-300 bg-slate-100' : 'border-slate-200 hover:border-slate-300'">
                                 <input v-model="quickAddType" type="radio" value="" class="sr-only" />
                                 <span>—</span>
                                 <span class="font-medium text-sm">None</span>
                             </label>
-                            <label
-                                class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all"
-                                :class="quickAddType === 'follow_up' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'"
-                            >
+                            <label class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all" :class="quickAddType === 'follow_up' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'">
                                 <input v-model="quickAddType" type="radio" value="follow_up" class="sr-only" />
                                 <span>🔄</span>
                                 <span class="font-medium text-sm">Follow-up</span>
                             </label>
-                            <label
-                                class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all"
-                                :class="quickAddType === 'appointment' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'"
-                            >
+                            <label class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all" :class="quickAddType === 'appointment' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'">
                                 <input v-model="quickAddType" type="radio" value="appointment" class="sr-only" />
                                 <span>📅</span>
                                 <span class="font-medium text-sm">Appointment</span>
                             </label>
-                            <label
-                                class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all"
-                                :class="quickAddType === 'lead' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'"
-                            >
+                            <label class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all" :class="quickAddType === 'lead' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'">
                                 <input v-model="quickAddType" type="radio" value="lead" class="sr-only" />
                                 <span>➕</span>
                                 <span class="font-medium text-sm">Lead</span>
                             </label>
                         </div>
                         <div v-if="quickAddType" class="space-y-4 p-4 bg-slate-50 rounded-xl">
-                            <div v-if="quickAddType === 'follow_up' || quickAddType === 'lead' || quickAddType === 'appointment'">
+                            <div>
                                 <label class="form-label">Product(s) *</label>
                                 <div class="border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto bg-white">
                                     <label v-for="p in products" :key="p.id" class="flex items-center gap-2 py-1.5 cursor-pointer">
                                         <input type="checkbox" :value="p.id" v-model="quickAddProductIds" class="form-checkbox" />
                                         <span class="text-sm">{{ p.name }}</span>
                                     </label>
-                                    <p v-if="!products.length" class="text-sm text-slate-400 py-2">Loading products...</p>
                                 </div>
                             </div>
                             <div>
@@ -387,24 +412,10 @@
                     >
                         Cancel
                     </router-link>
+                    <button v-if="!isEdit && !isSimpleCustomerCreate && currentStep > 1" type="button" class="form-btn-cancel" @click="prevStep">Back</button>
+                    <button v-if="!isEdit && !isSimpleCustomerCreate && currentStep < 4" type="button" class="form-btn-submit" @click="nextStep">Next</button>
                     <button
-                        v-if="!isEdit && currentStep > 1"
-                        type="button"
-                        class="form-btn-cancel"
-                        @click="prevStep"
-                    >
-                        Back
-                    </button>
-                    <button
-                        v-if="!isEdit && currentStep < 4"
-                        type="button"
-                        class="form-btn-submit"
-                        @click="nextStep"
-                    >
-                        Next
-                    </button>
-                    <button
-                        v-if="isEdit || currentStep === 4"
+                        v-if="isEdit || isSimpleCustomerCreate || currentStep === 4"
                         type="submit"
                         :disabled="loading"
                         class="form-btn-submit"
@@ -421,6 +432,27 @@
                 </div>
             </form>
         </div>
+
+        <!-- Sale credit (admin/manager): after customer created with won products — notification only -->
+        <div v-if="showSaleCreditModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+            <div class="bg-white rounded-xl shadow-xl max-w-md w-full">
+                <div class="p-6 border-b border-slate-200">
+                    <h3 class="text-lg font-semibold text-slate-900">Sale Credit</h3>
+                    <p class="text-sm text-slate-600 mt-1">{{ saleCreditContextText }}</p>
+                </div>
+                <div class="p-6 space-y-3">
+                    <label class="block text-sm font-medium text-slate-700">Who should this sale go on?</label>
+                    <select v-model="selectedSaleCreditUserId" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select user...</option>
+                        <option v-for="u in users" :key="u.id" :value="String(u.id)">{{ u.name }} ({{ u.role?.name || '—' }})</option>
+                    </select>
+                </div>
+                <div class="px-6 pb-6 flex justify-end gap-3">
+                    <button type="button" class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50" @click="finishSaleCreditSkip">Skip</button>
+                    <button type="button" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50" :disabled="!selectedSaleCreditUserId" @click="finishSaleCreditConfirm">Confirm</button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -429,15 +461,22 @@ import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
+import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToastStore();
+const auth = useAuthStore();
 
 const isEdit = computed(() => !!route.params.id);
 
+/** Create mode: derive type from URL immediately so customer add never flashes prospect UI first. */
+function createTypeFromRoute() {
+    return route.query.type === 'customer' ? 'customer' : 'prospect';
+}
+
 const form = reactive({
-    type: 'prospect',
+    type: isEdit.value ? 'prospect' : createTypeFromRoute(),
     name: '',
     business_name: '',
     owner_name: '',
@@ -455,6 +494,19 @@ const form = reactive({
     remote_licenses: [{ anydesk_rustdesk: '', passwords: '', epos_type: '', lic_days: null }],
 });
 
+const isSimpleCustomerCreate = computed(() => !isEdit.value && form.type === 'customer');
+
+const isSaleCreditRole = computed(() => {
+    const r = auth.user?.role?.name;
+    return r === 'Admin' || r === 'System Admin' || r === 'Manager';
+});
+
+const showSaleCreditModal = ref(false);
+const selectedSaleCreditUserId = ref('');
+const saleCreditContextText = ref('');
+const saleCreditPendingRoute = ref(null);
+const saleCreditLeadId = ref(null);
+
 function addRemoteLicense() {
     form.remote_licenses.push({ anydesk_rustdesk: '', passwords: '', epos_type: '', lic_days: null });
 }
@@ -465,7 +517,9 @@ function removeRemoteLicense(idx) {
 
 const loading = ref(false);
 const error = ref(null);
-
+const products = ref([]);
+const users = ref([]);
+const wonProductIds = ref([]);
 const quickAddType = ref('');
 const quickAddComment = ref('');
 const quickAddFollowUpAt = ref('');
@@ -475,8 +529,6 @@ const quickAddAppointmentTime = ref('10:00');
 const quickAddStage = ref('follow_up');
 const quickAddExpectedDate = ref('');
 const quickAddProductIds = ref([]);
-const products = ref([]);
-const users = ref([]);
 const quickAddSectionRef = ref(null);
 const currentStep = ref(1);
 const createSteps = [
@@ -486,19 +538,8 @@ const createSteps = [
     { id: 4, title: 'Also Create' },
 ];
 
-/** Product ids for quick-add, matching submit logic (checkboxes or first product fallback). */
-function getQuickAddProductIds() {
-    if (quickAddProductIds.value?.length) {
-        return quickAddProductIds.value;
-    }
-    if (products.value.length) {
-        return [products.value[0].id];
-    }
-    return [];
-}
-
 /**
- * @param {number} step 1–4
+ * @param {number} step
  * @returns {string|null} Error message or null if valid
  */
 function validateStep(step) {
@@ -515,57 +556,33 @@ function validateStep(step) {
         return null;
     }
     if (step === 4) {
-        if (!quickAddType.value) {
-            return null;
-        }
-        const prodIds = getQuickAddProductIds();
-        if (quickAddType.value === 'follow_up') {
-            if (!quickAddFollowUpAt.value) {
-                return 'Please set follow-up date and time.';
-            }
-            if (!prodIds.length) {
-                return 'Please select at least one product, or add products in the system.';
-            }
-        }
-        if (quickAddType.value === 'lead') {
-            if (!prodIds.length) {
-                return 'Please select at least one product, or add products in the system.';
-            }
-        }
+        if (!quickAddType.value) return null;
+        const prodIds = quickAddProductIds.value.length ? quickAddProductIds.value : (products.value.length ? [products.value[0].id] : []);
+        if (!prodIds.length) return 'Please select at least one product, or add products in the system.';
+        if (quickAddType.value === 'follow_up' && !quickAddFollowUpAt.value) return 'Please set follow-up date and time.';
         if (quickAddType.value === 'appointment') {
-            if (!quickAddAssignedUserId.value) {
-                return 'Please select who will attend this appointment.';
-            }
-            if (!quickAddAppointmentDate.value || !quickAddAppointmentTime.value) {
-                return 'Please set appointment date and time.';
-            }
-            if (!prodIds.length) {
-                return 'Please select at least one product, or add products in the system.';
-            }
+            if (!quickAddAssignedUserId.value) return 'Please select who will attend this appointment.';
+            if (!quickAddAppointmentDate.value || !quickAddAppointmentTime.value) return 'Please set appointment date and time.';
         }
         return null;
     }
     return null;
 }
 
-/** Run steps 1–4 for create flow; returns first failing step or null. */
 function validateAllStepsForCreate() {
     for (let s = 1; s <= 4; s++) {
         const msg = validateStep(s);
-        if (msg) {
-            return { step: s, message: msg };
-        }
+        if (msg) return { step: s, message: msg };
     }
     return null;
 }
 
 function goToStep(stepId) {
-    if (isEdit.value) return;
+    if (isEdit.value || isSimpleCustomerCreate.value) return;
     if (stepId === currentStep.value) return;
     if (stepId < currentStep.value) {
         error.value = null;
         currentStep.value = stepId;
-        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
     }
     for (let s = currentStep.value; s < stepId; s++) {
@@ -574,13 +591,11 @@ function goToStep(stepId) {
             error.value = msg;
             toast.error(msg);
             currentStep.value = s;
-            window.scrollTo({ top: 0, behavior: 'smooth' });
             return;
         }
     }
     error.value = null;
     currentStep.value = stepId;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function nextStep() {
@@ -590,19 +605,12 @@ function nextStep() {
         toast.error(msg);
         return;
     }
-    error.value = null;
-    if (currentStep.value < 4) {
-        currentStep.value += 1;
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    if (currentStep.value < 4) currentStep.value += 1;
 }
 
 function prevStep() {
     error.value = null;
-    if (currentStep.value > 1) {
-        currentStep.value -= 1;
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    if (currentStep.value > 1) currentStep.value -= 1;
 }
 
 function normalizeForWhatsApp(phone) {
@@ -629,6 +637,40 @@ function syncWhatsAppToPhone() {
     const wa = (form.whatsapp_number || '').trim();
     const phone = (form.phone || '').trim();
     if (wa && !phone) form.phone = normalizeForPhone(wa);
+}
+
+function finishSaleCreditNavigate() {
+    const dest = saleCreditPendingRoute.value;
+    showSaleCreditModal.value = false;
+    selectedSaleCreditUserId.value = '';
+    saleCreditPendingRoute.value = null;
+    saleCreditLeadId.value = null;
+    if (dest) {
+        router.push(dest);
+    }
+}
+
+function finishSaleCreditSkip() {
+    finishSaleCreditNavigate();
+}
+
+async function finishSaleCreditConfirm() {
+    const selected = users.value.find((u) => String(u.id) === String(selectedSaleCreditUserId.value));
+    if (!selected) return;
+    if (saleCreditLeadId.value) {
+        try {
+            await axios.put(`/api/leads/${saleCreditLeadId.value}`, { assigned_to: selected.id });
+            await axios.post(`/api/leads/${saleCreditLeadId.value}/activity`, {
+                type: 'note',
+                description: `Sale credited to ${selected.name} by ${auth.user?.name || 'Admin'}.`,
+            });
+        } catch (e) {
+            toast.error(e?.response?.data?.message || 'Failed to save sale credit.');
+            return;
+        }
+    }
+    toast.success(`Sale will go on ${selected.name}.`);
+    finishSaleCreditNavigate();
 }
 
 const loadCustomer = async () => {
@@ -673,7 +715,10 @@ const loadCustomer = async () => {
 
 const handleSubmit = async () => {
     error.value = null;
-    if (isEdit.value) {
+    if (!auth.initialized) {
+        await auth.bootstrap();
+    }
+    if (isSimpleCustomerCreate.value || isEdit.value) {
         const msg = validateStep(1);
         if (msg) {
             error.value = msg;
@@ -686,7 +731,6 @@ const handleSubmit = async () => {
             error.value = fail.message;
             currentStep.value = fail.step;
             toast.error(fail.message);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
             return;
         }
     }
@@ -696,6 +740,7 @@ const handleSubmit = async () => {
         const payload = {
             ...form,
             type: form.type === 'customer' ? 'customer' : 'prospect',
+            won_product_ids: isSimpleCustomerCreate.value ? wonProductIds.value : [],
             remote_licenses: form.remote_licenses.map(rl => ({
                 anydesk_rustdesk: rl.anydesk_rustdesk || null,
                 passwords: rl.passwords || null,
@@ -704,27 +749,28 @@ const handleSubmit = async () => {
             })).filter(rl => rl.anydesk_rustdesk || rl.passwords || rl.epos_type || rl.lic_days !== null),
         };
         let customerId;
+        let deferRedirectForSaleCredit = false;
         if (isEdit.value) {
             await axios.put(`/api/customers/${route.params.id}`, payload);
             toast.success('Customer updated successfully');
         } else {
             const { data } = await axios.post('/api/customers', payload);
             customerId = data.id;
+            const wonLeadId = data.won_lead_id || null;
             toast.success('Customer created successfully');
-
-            if (quickAddType.value && customerId) {
-                const prodIds = quickAddProductIds.value && quickAddProductIds.value.length ? quickAddProductIds.value : (products.value.length ? [products.value[0].id] : []);
+            if (isSimpleCustomerCreate.value && isSaleCreditRole.value && customerId) {
+                deferRedirectForSaleCredit = true;
+                saleCreditPendingRoute.value = { path: '/customers', query: { type: 'customer' } };
+                saleCreditLeadId.value = wonLeadId;
+                saleCreditContextText.value = wonProductIds.value.length
+                    ? 'This customer was saved with won products. Who should this sale go on?'
+                    : 'Customer created. Who should get credit for this customer?';
+                selectedSaleCreditUserId.value = '';
+                showSaleCreditModal.value = true;
+            }
+            if (!isSimpleCustomerCreate.value && quickAddType.value && customerId) {
+                const prodIds = quickAddProductIds.value.length ? quickAddProductIds.value : (products.value.length ? [products.value[0].id] : []);
                 if (quickAddType.value === 'follow_up') {
-                    if (!quickAddFollowUpAt.value) {
-                        error.value = 'Please set follow-up date and time.';
-                        loading.value = false;
-                        return;
-                    }
-                    if (!prodIds.length) {
-                        error.value = 'Please select at least one product.';
-                        loading.value = false;
-                        return;
-                    }
                     await axios.post('/api/leads/followup-or-lead', {
                         customer_id: customerId,
                         type: 'follow_up',
@@ -732,13 +778,7 @@ const handleSubmit = async () => {
                         product_ids: prodIds,
                         follow_up_at: quickAddFollowUpAt.value,
                     });
-                    toast.success('Follow-up created');
                 } else if (quickAddType.value === 'lead') {
-                    if (!prodIds.length) {
-                        error.value = 'Please select at least one product.';
-                        loading.value = false;
-                        return;
-                    }
                     await axios.post('/api/leads/followup-or-lead', {
                         customer_id: customerId,
                         type: 'lead',
@@ -748,49 +788,26 @@ const handleSubmit = async () => {
                         expected_closing_date: quickAddExpectedDate.value || null,
                         source: form.source || null,
                     });
-                    toast.success('Lead created');
                 } else if (quickAddType.value === 'appointment') {
-                    if (!quickAddAssignedUserId.value) {
-                        error.value = 'Please select who will attend this appointment.';
-                        loading.value = false;
-                        return;
-                    }
-                    if (!quickAddAppointmentDate.value || !quickAddAppointmentTime.value) {
-                        error.value = 'Please set appointment date and time.';
-                        loading.value = false;
-                        return;
-                    }
-                    const apptProdIds = prodIds.length ? prodIds : (products.value.length ? [products.value[0].id] : []);
-                    if (!apptProdIds.length) {
-                        error.value = 'Please add products first (Products menu) or select a product above.';
-                        loading.value = false;
-                        return;
-                    }
                     const leadRes = await axios.post('/api/leads', {
                         customer_id: customerId,
                         stage: 'follow_up',
                         source: 'appointment',
-                        product_ids: apptProdIds,
+                        product_ids: prodIds,
                         comment: quickAddComment.value || `Appointment ${quickAddAppointmentDate.value} at ${quickAddAppointmentTime.value}`,
                     });
-                    const leadId = leadRes.data.id;
-                    const activityPayload = {
+                    await axios.post(`/api/leads/${leadRes.data.id}/activity`, {
                         type: 'appointment',
                         description: quickAddComment.value || `Appointment scheduled for ${quickAddAppointmentDate.value} at ${quickAddAppointmentTime.value}`,
-                        meta: {
-                            appointment_date: quickAddAppointmentDate.value,
-                            appointment_time: quickAddAppointmentTime.value,
-                        },
-                    };
-                    if (quickAddAssignedUserId.value) {
-                        activityPayload.assigned_user_id = quickAddAssignedUserId.value;
-                    }
-                    await axios.post(`/api/leads/${leadId}/activity`, activityPayload);
-                    toast.success('Appointment scheduled');
+                        meta: { appointment_date: quickAddAppointmentDate.value, appointment_time: quickAddAppointmentTime.value },
+                        assigned_user_id: quickAddAssignedUserId.value || null,
+                    });
                 }
             }
         }
-        if (customerId && quickAddType.value) {
+        if (deferRedirectForSaleCredit) {
+            // User confirms or skips in modal — see finishSaleCreditNavigate
+        } else if (customerId && !isSimpleCustomerCreate.value && quickAddType.value) {
             router.push(`/customers/${customerId}`);
         } else {
             router.push({ path: '/customers', query: { type: payload.type || 'prospect' } });
@@ -803,6 +820,9 @@ const handleSubmit = async () => {
 };
 
 onMounted(async () => {
+    if (!auth.initialized) {
+        await auth.bootstrap();
+    }
     try {
         const [{ data: productsData }, { data: usersData }] = await Promise.all([
             axios.get('/api/products'),
@@ -814,7 +834,6 @@ onMounted(async () => {
     if (isEdit.value) {
         loadCustomer();
     } else {
-        form.type = route.query.type === 'customer' ? 'customer' : 'prospect';
         const now = new Date();
         now.setHours(now.getHours() + 1);
         quickAddFollowUpAt.value = now.toISOString().slice(0, 16);
@@ -825,11 +844,20 @@ onMounted(async () => {
 });
 
 watch(quickAddType, async (type) => {
-    if (!type || isEdit.value) return;
-    if (currentStep.value !== 4) {
-        currentStep.value = 4;
-    }
+    if (!type || isEdit.value || isSimpleCustomerCreate.value) return;
+    if (currentStep.value !== 4) currentStep.value = 4;
     await nextTick();
     quickAddSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
+
+// Same component instance when switching e.g. add prospect ↔ add customer — keep type in sync with URL
+watch(
+    () => (isEdit.value ? null : String(route.query.type || 'prospect')),
+    (t) => {
+        if (isEdit.value) return;
+        form.type = t === 'customer' ? 'customer' : 'prospect';
+        currentStep.value = 1;
+        error.value = null;
+    },
+);
 </script>

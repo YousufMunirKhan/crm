@@ -20,6 +20,7 @@ export const NAV_SECTION_OPTIONS = [
     { key: 'expenses', label: 'Expenses' },
     { key: 'salary_slips', label: 'Salary Slips' },
     { key: 'salary_reports', label: 'Salary Reports' },
+    { key: 'commission_management', label: 'Commission Management' },
     { key: 'settings', label: 'Settings' },
     { key: 'access_manager', label: 'Access Manager' },
 ];

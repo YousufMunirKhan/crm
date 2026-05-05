@@ -2,17 +2,17 @@
 
 namespace App\Models;
 
+use App\Traits\HasAuditLog;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use App\Traits\HasAuditLog;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasApiTokens, HasAuditLog;
+    use HasApiTokens, HasAuditLog, HasFactory, Notifiable;
 
     protected $fillable = [
         'role_id',
@@ -31,6 +31,7 @@ class User extends Authenticatable
         'contract_sent_at',
         'contract_pdf_path',
         'is_active',
+        'commission_eligible',
         'nav_permissions',
     ];
 
@@ -47,6 +48,7 @@ class User extends Authenticatable
             'hire_date' => 'date',
             'date_of_birth' => 'date',
             'contract_sent_at' => 'datetime',
+            'commission_eligible' => 'boolean',
             'nav_permissions' => 'array',
         ];
     }
@@ -153,5 +155,10 @@ class User extends Authenticatable
         return $this->belongsToMany(\App\Modules\CRM\Models\Customer::class, 'customer_user_assignments', 'user_id', 'customer_id')
             ->withPivot('assigned_by', 'assigned_at', 'notes')
             ->withTimestamps();
+    }
+
+    public function commissionSales(): HasMany
+    {
+        return $this->hasMany(CommissionSale::class, 'credited_user_id');
     }
 }

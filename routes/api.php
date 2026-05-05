@@ -1,22 +1,24 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
-use App\Modules\POS\Http\Controllers\PosController;
-use App\Modules\CRM\Http\Controllers\CustomerController;
-use App\Modules\CRM\Http\Controllers\LeadController;
-use App\Modules\CRM\Http\Controllers\ProductController;
-use App\Modules\CRM\Http\Controllers\FollowUpController;
+use App\Http\Controllers\ColdCallingController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\UserController;
+use App\Modules\Commission\Http\Controllers\CommissionManagementController;
 use App\Modules\Communication\Http\Controllers\CommunicationController;
 use App\Modules\Communication\Http\Controllers\WebhookController;
-use App\Modules\Ticket\Http\Controllers\TicketController;
-use App\Modules\Invoice\Http\Controllers\InvoiceController;
-use App\Modules\HR\Http\Controllers\HrController;
+use App\Modules\CRM\Http\Controllers\CustomerController;
+use App\Modules\CRM\Http\Controllers\FollowUpController;
+use App\Modules\CRM\Http\Controllers\LeadController;
+use App\Modules\CRM\Http\Controllers\ProductController;
 use App\Modules\HR\Http\Controllers\ExpenseController;
-use App\Modules\Reporting\Http\Controllers\ReportingController;
+use App\Modules\HR\Http\Controllers\HrController;
 use App\Modules\ImportExport\Http\Controllers\ImportExportController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\RoleController;
+use App\Modules\Invoice\Http\Controllers\InvoiceController;
+use App\Modules\POS\Http\Controllers\PosController;
+use App\Modules\Reporting\Http\Controllers\ReportingController;
+use App\Modules\Ticket\Http\Controllers\TicketController;
+use Illuminate\Support\Facades\Route;
 
 // Public routes
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -127,7 +129,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Communications
     Route::apiResource('communications', CommunicationController::class);
-    
+
     // WhatsApp Cloud API (New Integration)
     Route::prefix('whatsapp')->group(function () {
         // Settings
@@ -236,19 +238,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/settings', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'update']);
     Route::get('/settings/{key}', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'get']);
     Route::put('/settings/pwa', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updatePwa']);
-    
+
     // Logo upload
     Route::post('/settings/logo', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'uploadLogo']);
     Route::delete('/settings/logo', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'deleteLogo']);
     Route::post('/settings/favicon', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'uploadFavicon']);
     Route::delete('/settings/favicon', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'deleteFavicon']);
-    
+
     // Integration settings
     Route::put('/settings/smtp', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateSmtp']);
     Route::post('/settings/smtp/test', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'testSmtp']);
     Route::put('/settings/sms', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateSms']);
     Route::post('/settings/sms/test', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'testSms']);
     Route::put('/settings/facebook', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateFacebook']);
+    Route::put('/settings/cold-calling', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateColdCalling']);
 
     // Email Management (filter, export, preview, send bulk, report)
     Route::prefix('email-management')->group(function () {
@@ -283,6 +286,37 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/preview-template/{templateId}', [\App\Http\Controllers\SmsManagementController::class, 'previewTemplate']);
         Route::post('/send', [\App\Http\Controllers\SmsManagementController::class, 'sendBulk']);
         Route::get('/sent-report', [\App\Http\Controllers\SmsManagementController::class, 'getSentReport']);
+    });
+
+    // Cold calling (Google Places — API key in Settings → Cold calling)
+    Route::prefix('cold-calling')->group(function () {
+        Route::get('/settings-status', [ColdCallingController::class, 'settingsStatus']);
+        Route::post('/runs', [ColdCallingController::class, 'startRun']);
+        Route::get('/runs', [ColdCallingController::class, 'indexRuns']);
+        Route::get('/runs/{id}', [ColdCallingController::class, 'showRun']);
+        Route::get('/contacts/export', [ColdCallingController::class, 'export']);
+        Route::post('/contacts/bulk-enrich-websites', [ColdCallingController::class, 'bulkEnrichFromWebsites']);
+        Route::get('/contacts', [ColdCallingController::class, 'indexContacts']);
+        Route::put('/contacts/{id}', [ColdCallingController::class, 'updateContact']);
+        Route::post('/contacts/{id}/enrich-website', [ColdCallingController::class, 'enrichSingleContactWebsite']);
+        Route::post('/contacts/{id}/mark-prospect', [ColdCallingController::class, 'markAsProspect']);
+        Route::post('/contacts/{id}/import-to-crm', [ColdCallingController::class, 'importToCrmCustomer']);
+        Route::get('/export-logs', [ColdCallingController::class, 'exportLogs']);
+    });
+
+    // Commission management (Admin/Manager/System Admin only)
+    Route::prefix('commission-management')->group(function () {
+        Route::get('/sales', [CommissionManagementController::class, 'sales']);
+        Route::get('/report', [CommissionManagementController::class, 'report']);
+        Route::get('/report/pdf/user', [CommissionManagementController::class, 'downloadUserCommissionPdf']);
+        Route::get('/report/pdf/full', [CommissionManagementController::class, 'downloadFullCommissionPdf']);
+        Route::post('/report/send-to-user', [CommissionManagementController::class, 'sendReportToUser']);
+        Route::post('/report/send-internal', [CommissionManagementController::class, 'sendInternalReport']);
+        Route::get('/users', [CommissionManagementController::class, 'users']);
+        Route::patch('/users/{id}/eligibility', [CommissionManagementController::class, 'toggleEligibility']);
+        Route::post('/allocations', [CommissionManagementController::class, 'allocate']);
+        Route::patch('/allocations/{id}/reassign', [CommissionManagementController::class, 'reassign']);
+        Route::get('/summary', [CommissionManagementController::class, 'summary']);
     });
 
     // Email Templates (Admin only - checked in controller)
@@ -343,5 +377,3 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/tickets', [\App\Http\Controllers\CustomerPortalController::class, 'createTicket']);
     });
 });
-
-

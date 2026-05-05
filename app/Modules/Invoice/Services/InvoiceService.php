@@ -2,14 +2,15 @@
 
 namespace App\Modules\Invoice\Services;
 
+use App\Mail\InvoiceEmail;
+use App\Modules\CRM\Models\Customer;
 use App\Modules\Invoice\Models\Invoice;
 use App\Modules\Invoice\Models\InvoiceItem;
-use App\Modules\CRM\Models\Customer;
 use App\Modules\Settings\Models\Setting;
-use App\Mail\InvoiceEmail;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Mail;
+use App\Support\PdfDocumentBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class InvoiceService
 {
@@ -80,7 +81,7 @@ class InvoiceService
             $updateData['amount_paid'] = $data['amount_paid'];
         }
 
-        if (!empty($data['items'])) {
+        if (! empty($data['items'])) {
             $invoice->items()->delete();
             $subtotal = 0;
             foreach ($data['items'] as $item) {
@@ -102,46 +103,33 @@ class InvoiceService
         }
 
         $invoice->update($updateData);
+
         return $invoice->fresh()->load(['customer', 'items']);
     }
 
     public function generateInvoiceNumber(): string
     {
-        return 'INV-' . date('Y') . '-' . strtoupper(Str::random(8));
+        return 'INV-'.date('Y').'-'.strtoupper(Str::random(8));
     }
 
     public function generatePDF(Invoice $invoice)
     {
         $invoice->load(['customer', 'items']);
-        
-        // Get logo and company details from settings
-        $logoUrl = \App\Modules\Settings\Models\Setting::where('key', 'logo_url')->first()?->value;
-        $settings = \App\Modules\Settings\Models\Setting::whereIn('key', [
-            'company_name',
-            'company_address',
-            'company_phone',
-            'company_email',
-            'company_website',
-            'company_registration_no',
-            'company_vat',
-            'payment_account_name',
-            'payment_sort_code',
-            'payment_account_number',
-            'payment_terms_note',
-        ])->pluck('value', 'key');
-        
+
+        $branding = PdfDocumentBranding::package();
+
         $pdf = Pdf::loadView('invoices.pdf', [
             'invoice' => $invoice,
-            'logoUrl' => $logoUrl,
-            'settings' => $settings,
+            'logoUrl' => $branding['logoUrl'],
+            'settings' => $branding['settings'],
         ])->setOption('enable-local-file-access', true)
-          ->setOption('encoding', 'UTF-8')
-          ->setPaper('a4', 'portrait')
-          ->setOption('margin-top', 10)
-          ->setOption('margin-bottom', 10)
-          ->setOption('margin-left', 10)
-          ->setOption('margin-right', 10);
-        
+            ->setOption('encoding', 'UTF-8')
+            ->setPaper('a4', 'portrait')
+            ->setOption('margin-top', 10)
+            ->setOption('margin-bottom', 10)
+            ->setOption('margin-left', 10)
+            ->setOption('margin-right', 10);
+
         return $pdf;
     }
 
@@ -155,11 +143,11 @@ class InvoiceService
         if ($logoSetting) {
             $logoUrl = str_starts_with($logoSetting, 'http')
                 ? $logoSetting
-                : rtrim(config('app.url'), '/') . '/' . ltrim($logoSetting, '/');
+                : rtrim(config('app.url'), '/').'/'.ltrim($logoSetting, '/');
             $cleanUrl = preg_replace('#^/storage/|^storage/#', '', trim($logoSetting, '/'));
             if ($cleanUrl) {
-                $sp = storage_path('app/public/' . $cleanUrl);
-                $pp = public_path('storage/' . $cleanUrl);
+                $sp = storage_path('app/public/'.$cleanUrl);
+                $pp = public_path('storage/'.$cleanUrl);
                 $logoPath = file_exists($sp) ? $sp : (file_exists($pp) ? $pp : null);
             }
         }
@@ -172,7 +160,7 @@ class InvoiceService
         $companyWebsite = Setting::where('key', 'company_website')->first()?->value ?? '';
         $companyPhone = Setting::where('key', 'company_phone')->first()?->value ?? '';
         $companyAddress = Setting::where('key', 'company_address')->first()?->value ?? '';
-        $message = $customMessage ?: "Please download your invoice from the attachment below.";
+        $message = $customMessage ?: 'Please download your invoice from the attachment below.';
         \App\Services\MailConfigFromDatabase::apply();
         Mail::to($to)->send(new InvoiceEmail(
             $invoice,
@@ -192,5 +180,3 @@ class InvoiceService
         ));
     }
 }
-
-

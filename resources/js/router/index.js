@@ -232,6 +232,22 @@ const routes = [
         meta: { requiresAuth: true, title: 'Expense Management', roles: ['Admin', 'Manager'] },
     },
     {
+        path: '/commission-management',
+        redirect: '/commission/allocate',
+    },
+    {
+        path: '/commission/allocate',
+        name: 'commission-allocate',
+        component: () => import('@/views/CommissionManagementView.vue'),
+        meta: { requiresAuth: true, title: 'Allocate Commission', roles: ['Admin', 'Manager', 'System Admin'] },
+    },
+    {
+        path: '/commission/report',
+        name: 'commission-report',
+        component: () => import('@/views/CommissionReportView.vue'),
+        meta: { requiresAuth: true, title: 'Commission Report', roles: ['Admin', 'Manager', 'System Admin'] },
+    },
+    {
         path: '/products',
         name: 'products',
         component: () => import('@/views/ProductsView.vue'),
@@ -330,6 +346,16 @@ const routes = [
         name: 'sms-management',
         component: () => import('@/views/SmsManagementView.vue'),
         meta: { requiresAuth: true, title: 'SMS Management' },
+    },
+    {
+        path: '/cold-calling',
+        name: 'cold-calling',
+        component: () => import('@/views/ColdCallingView.vue'),
+        meta: {
+            requiresAuth: true,
+            title: 'Cold calling',
+            roles: ['Admin', 'Manager', 'System Admin'],
+        },
     },
     {
         path: '/appointments',

@@ -258,6 +258,7 @@ const navItems = computed(() => {
                 { to: '/whatsapp-management', label: 'WhatsApp Management', section: 'marketing', icon: 'message' },
                 { to: '/templates', label: 'Templates', section: 'marketing', icon: 'template' },
                 { to: '/whatsapp-templates', label: 'WhatsApp Templates', section: 'marketing', icon: 'message' },
+                { to: '/cold-calling', label: 'Cold calling', section: 'marketing', icon: 'phone' },
             ],
         });
     }
@@ -268,6 +269,14 @@ const navItems = computed(() => {
         items.push({ to: '/expenses', label: 'Expenses', section: 'expenses', icon: 'currency' });
         items.push({ to: '/salaries/list', label: 'Salary Slips', section: 'salary_slips', icon: 'document' });
         items.push({ to: '/salaries/reports', label: 'Salary Reports', section: 'salary_reports', icon: 'clipboard' });
+        items.push({
+            label: 'Commission',
+            icon: 'pound',
+            children: [
+                { to: '/commission/allocate', label: 'Allocate Commission', section: 'commission_management', icon: 'pound' },
+                { to: '/commission/report', label: 'Commission Report', section: 'commission_management', icon: 'chart-bar' },
+            ],
+        });
     }
 
     if (userRole === 'Admin' || userRole === 'System Admin') {
@@ -345,7 +354,15 @@ onMounted(async () => {
 });
 
 const user = computed(() => auth.user);
-const pageTitle = computed(() => route.meta.title || 'Dashboard');
+const pageTitle = computed(() => {
+    if (route.name === 'customer-add') {
+        return route.query.type === 'prospect' ? 'Add Prospect' : 'Add Customer';
+    }
+    if (route.name === 'customer-edit') {
+        return route.query.type === 'prospect' ? 'Edit Prospect' : 'Edit Customer';
+    }
+    return route.meta.title || 'Dashboard';
+});
 
 function isNavItemActive(item) {
     if (item.to === '/leads/pipeline') {

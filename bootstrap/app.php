@@ -16,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'pos.support.key' => \App\Http\Middleware\AuthenticatePosSupportApiKey::class,
         ]);
     })
+    ->withCommands([
+        __DIR__.'/../app/Console/Commands',
+    ])
     ->withExceptions(function (Exceptions $exceptions): void {
         // Handle unauthenticated requests - return JSON for API routes
         $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, \Illuminate\Http\Request $request) {
@@ -24,7 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
                     'message' => 'Unauthenticated.',
                 ], 401);
             }
-            
+
             // For web routes, redirect to login page (Vue router will handle it)
             return redirect('/login');
         });

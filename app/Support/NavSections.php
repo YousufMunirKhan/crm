@@ -43,6 +43,7 @@ final class NavSections
             'expenses' => 'Expenses',
             'salary_slips' => 'Salary Slips',
             'salary_reports' => 'Salary Reports',
+            'commission_management' => 'Commission Management',
             'settings' => 'Settings',
             'access_manager' => 'Access Manager',
         ];

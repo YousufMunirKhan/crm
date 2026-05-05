@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use App\Models\Role;
-use App\Support\NavSections;
+use App\Models\User;
 use App\Modules\HR\Services\ContractService;
 use App\Modules\Reporting\Services\ReportingService;
+use App\Support\NavSections;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -54,8 +54,8 @@ class UserController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
@@ -63,10 +63,12 @@ class UserController extends Controller
         if ($request->has('per_page') || $request->has('page')) {
             $perPage = $request->get('per_page', 15);
             $users = $query->orderBy('name')->paginate($perPage);
+
             return response()->json($users);
         }
 
         $users = $query->orderBy('name')->get();
+
         return response()->json($users);
     }
 
@@ -97,6 +99,7 @@ class UserController extends Controller
             'bank_sort_code' => ['nullable', 'string', 'max:32'],
             'bank_account_number' => ['nullable', 'string', 'max:64'],
             'is_active' => ['nullable', 'boolean'],
+            'commission_eligible' => ['nullable', 'boolean'],
             'send_contract' => ['nullable', 'boolean'],
             'contract_data' => ['nullable', 'array'],
             'nav_permissions' => ['nullable', 'array'],
@@ -111,7 +114,7 @@ class UserController extends Controller
 
         $data['password'] = Hash::make($data['password']);
         $sendContract = $request->boolean('send_contract', false);
-        
+
         // Remove non-database fields
         $userData = array_intersect_key($data, array_flip([
             'name',
@@ -128,6 +131,7 @@ class UserController extends Controller
             'bank_sort_code',
             'bank_account_number',
             'is_active',
+            'commission_eligible',
             'nav_permissions',
         ]));
 
@@ -145,7 +149,7 @@ class UserController extends Controller
                 $contractService->generateAndSend($user, $contractData);
             } catch (\Exception $e) {
                 // Log error but don't fail user creation
-                \Log::error('Failed to send contract for user ' . $user->id . ': ' . $e->getMessage());
+                \Log::error('Failed to send contract for user '.$user->id.': '.$e->getMessage());
             }
         }
 
@@ -191,6 +195,7 @@ class UserController extends Controller
             'bank_sort_code' => ['nullable', 'string', 'max:32'],
             'bank_account_number' => ['nullable', 'string', 'max:64'],
             'is_active' => ['nullable', 'boolean'],
+            'commission_eligible' => ['nullable', 'boolean'],
             'nav_permissions' => ['nullable', 'array'],
         ]);
 
@@ -305,7 +310,7 @@ class UserController extends Controller
     public function destroy($id)
     {
         $user = User::findOrFail($id);
-        
+
         // Prevent deleting the admin user
         if ($user->email === 'admin@switchsave.com') {
             return response()->json(['message' => 'Cannot delete admin user'], 403);
