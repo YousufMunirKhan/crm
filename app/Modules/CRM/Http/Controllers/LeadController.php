@@ -3,7 +3,9 @@
 namespace App\Modules\CRM\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\SentCommunication;
 use App\Models\User;
+use App\Modules\CRM\Models\Customer;
 use App\Modules\CRM\Models\Lead;
 use App\Modules\CRM\Models\LeadActivity;
 use App\Modules\CRM\Models\LeadAssignmentLog;
@@ -12,6 +14,7 @@ use App\Modules\CRM\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class LeadController extends Controller
 {
@@ -88,6 +91,14 @@ class LeadController extends Controller
         }
         if (! $this->salesUserCanAccessLead($lead)) {
             abort(403, 'Unauthorized access to this lead');
+        }
+    }
+
+    protected function assertAdminCanDeleteLead(Request $request): void
+    {
+        $user = $request->user();
+        if (! $user || (! $user->isRole('Admin') && ! $user->isRole('System Admin'))) {
+            abort(response()->json(['message' => 'Only administrators can delete leads.'], 403));
         }
     }
 
@@ -330,9 +341,9 @@ class LeadController extends Controller
 
         // Get product IDs - support both single and multiple
         $productIds = [];
-        if (!empty($data['product_ids'])) {
+        if (! empty($data['product_ids'])) {
             $productIds = $data['product_ids'];
-        } elseif (!empty($data['product_id'])) {
+        } elseif (! empty($data['product_id'])) {
             $productIds = [$data['product_id']];
         }
 
@@ -343,7 +354,7 @@ class LeadController extends Controller
         // Ensure creator sees the lead: default assigned_to to current user if not provided
         $user = auth()->user();
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
-        
+
         if ($isSalesAgent) {
             $customer = \App\Modules\CRM\Models\Customer::findOrFail($data['customer_id']);
             if (! $customer->salesAgentHasAccess($user->id)) {
@@ -374,7 +385,7 @@ class LeadController extends Controller
         }
 
         // Add initial note/comment if provided (no need to log "lead created" activity - we display that from lead's created_at)
-        if (!empty($data['comment'])) {
+        if (! empty($data['comment'])) {
             LeadActivity::create([
                 'lead_id' => $lead->id,
                 'user_id' => auth()->id(),
@@ -430,7 +441,7 @@ class LeadController extends Controller
         if (isset($data['stage']) && $data['stage'] === 'lost' && empty($data['lost_reason'])) {
             return response()->json([
                 'message' => 'Lost reason is required when marking a lead as lost.',
-                'errors' => ['lost_reason' => ['Lost reason is required.']]
+                'errors' => ['lost_reason' => ['Lost reason is required.']],
             ], 422);
         }
 
@@ -500,7 +511,7 @@ class LeadController extends Controller
             'remind_at' => $data['remind_at'] ?? null,
             'meta' => $data['meta'] ?? null,
         ];
-        if ($data['type'] === 'appointment' && !empty($data['assigned_user_id'])) {
+        if ($data['type'] === 'appointment' && ! empty($data['assigned_user_id'])) {
             $activityData['assigned_user_id'] = $data['assigned_user_id'];
         }
         if ($data['type'] === 'appointment' && ! empty($data['meta']['appointment_date'] ?? null)) {
@@ -533,7 +544,7 @@ class LeadController extends Controller
         $lead->load('customer');
         $appointmentDate = \Carbon\Carbon::parse($data['meta']['appointment_date'])->format('l, d F Y');
         $rawTime = $data['meta']['appointment_time'] ?? '10:00';
-        $appointmentTime = \Carbon\Carbon::parse('2000-01-01 ' . $rawTime)->format('g:i A');
+        $appointmentTime = \Carbon\Carbon::parse('2000-01-01 '.$rawTime)->format('g:i A');
         $notes = $data['description'] ?? '';
 
         $adminEmail = trim(\App\Modules\Settings\Models\Setting::where('key', 'admin_notification_email')->first()?->value ?? '');
@@ -544,7 +555,7 @@ class LeadController extends Controller
                 \Illuminate\Support\Facades\Mail::to($lead->customer->email)
                     ->send(new \App\Mail\AppointmentNotification($lead, $appointmentDate, $appointmentTime, '', 'customer'));
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error('Failed to send appointment email to customer: ' . $e->getMessage());
+                \Illuminate\Support\Facades\Log::error('Failed to send appointment email to customer: '.$e->getMessage());
             }
         }
 
@@ -554,7 +565,7 @@ class LeadController extends Controller
                 \Illuminate\Support\Facades\Mail::to($adminEmail)
                     ->send(new \App\Mail\AppointmentNotification($lead, $appointmentDate, $appointmentTime, $notes, 'admin'));
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error('Failed to send appointment email to admin: ' . $e->getMessage());
+                \Illuminate\Support\Facades\Log::error('Failed to send appointment email to admin: '.$e->getMessage());
             }
         }
 
@@ -566,7 +577,7 @@ class LeadController extends Controller
                     \Illuminate\Support\Facades\Mail::to($assignee->email)
                         ->send(new \App\Mail\AppointmentAssignedNotification($activity));
                 } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error('Failed to send appointment email to assignee: ' . $e->getMessage());
+                    \Illuminate\Support\Facades\Log::error('Failed to send appointment email to assignee: '.$e->getMessage());
                 }
             }
         }
@@ -587,9 +598,9 @@ class LeadController extends Controller
 
         $lead->update(['next_follow_up_at' => $followUpDate]);
 
-        $description = 'Follow-up scheduled for ' . $followUpDate->format('d/m/Y H:i');
-        if (!empty($data['comment'])) {
-            $description .= ' - ' . $data['comment'];
+        $description = 'Follow-up scheduled for '.$followUpDate->format('d/m/Y H:i');
+        if (! empty($data['comment'])) {
+            $description .= ' - '.$data['comment'];
         }
 
         LeadActivity::create([
@@ -623,9 +634,9 @@ class LeadController extends Controller
 
         // Get product IDs - support both single and multiple
         $productIds = [];
-        if (!empty($data['product_ids'])) {
+        if (! empty($data['product_ids'])) {
             $productIds = $data['product_ids'];
-        } elseif (!empty($data['product_id'])) {
+        } elseif (! empty($data['product_id'])) {
             $productIds = [$data['product_id']];
         }
 
@@ -644,11 +655,11 @@ class LeadController extends Controller
         if ($data['type'] === 'follow_up') {
             // Determine which lead to add follow-up to
             $targetLead = null;
-            
-            if (!empty($data['lead_id'])) {
+
+            if (! empty($data['lead_id'])) {
                 // Use specified lead (must belong to customer) — "follow up this lead"
                 $targetLead = $customer->leads()->find($data['lead_id']);
-                if (!$targetLead) {
+                if (! $targetLead) {
                     return response()->json(['message' => 'Selected lead does not belong to this customer.'], 422);
                 }
                 if ($isSalesAgent) {
@@ -663,9 +674,9 @@ class LeadController extends Controller
             }
 
             // If no lead exists, CREATE a new lead with stage "follow_up"
-            if (!$targetLead) {
+            if (! $targetLead) {
                 $followUpDate = \Carbon\Carbon::parse($data['follow_up_at']);
-                
+
                 $targetLead = Lead::create([
                     'customer_id' => $data['customer_id'],
                     'product_id' => $productIds[0], // Primary product
@@ -691,14 +702,14 @@ class LeadController extends Controller
                     'lead_id' => $targetLead->id,
                     'user_id' => auth()->id(),
                     'type' => 'stage_change',
-                    'description' => 'Lead created in follow_up stage with products: ' . $productNames,
+                    'description' => 'Lead created in follow_up stage with products: '.$productNames,
                     'meta' => ['stage' => 'follow_up', 'product_ids' => $productIds],
                 ]);
 
                 // Add the follow-up activity (include date/time + notes in description)
-                $followUpDescription = 'Follow-up scheduled for ' . $followUpDate->format('d/m/Y H:i');
-                if (!empty($data['comment'])) {
-                    $followUpDescription .= ' - ' . $data['comment'];
+                $followUpDescription = 'Follow-up scheduled for '.$followUpDate->format('d/m/Y H:i');
+                if (! empty($data['comment'])) {
+                    $followUpDescription .= ' - '.$data['comment'];
                 }
 
                 LeadActivity::create([
@@ -715,7 +726,7 @@ class LeadController extends Controller
             // Add new products to existing lead if not already present
             $existingProductIds = $targetLead->items()->pluck('product_id')->toArray();
             foreach ($productIds as $productId) {
-                if (!in_array($productId, $existingProductIds)) {
+                if (! in_array($productId, $existingProductIds)) {
                     LeadItem::create([
                         'lead_id' => $targetLead->id,
                         'product_id' => $productId,
@@ -735,9 +746,9 @@ class LeadController extends Controller
             $targetLead->update($updateData);
 
             // Add follow-up activity for existing lead (include date/time + notes)
-            $followUpDescription = 'Follow-up scheduled for ' . $followUpDate->format('d/m/Y H:i');
-            if (!empty($data['comment'])) {
-                $followUpDescription .= ' - ' . $data['comment'];
+            $followUpDescription = 'Follow-up scheduled for '.$followUpDate->format('d/m/Y H:i');
+            if (! empty($data['comment'])) {
+                $followUpDescription .= ' - '.$data['comment'];
             }
 
             LeadActivity::create([
@@ -774,7 +785,7 @@ class LeadController extends Controller
             }
 
             // If this lead was converted from a follow-up activity, mark that activity
-            if (!empty($data['converted_from_activity_id'])) {
+            if (! empty($data['converted_from_activity_id'])) {
                 LeadActivity::where('id', $data['converted_from_activity_id'])
                     ->update(['converted_to_lead_id' => $lead->id]);
             }
@@ -784,8 +795,8 @@ class LeadController extends Controller
                 'lead_id' => $lead->id,
                 'user_id' => auth()->id(),
                 'type' => 'stage_change',
-                'description' => 'Lead created in ' . $lead->stage . ' stage with products: ' . $productNames . 
-                    (!empty($data['converted_from_activity_id']) ? ' (converted from follow-up)' : ''),
+                'description' => 'Lead created in '.$lead->stage.' stage with products: '.$productNames.
+                    (! empty($data['converted_from_activity_id']) ? ' (converted from follow-up)' : ''),
                 'meta' => ['stage' => $lead->stage, 'product_ids' => $productIds],
             ]);
 
@@ -809,11 +820,22 @@ class LeadController extends Controller
         }
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $lead = Lead::findOrFail($id);
-        $this->assertSalesAgentLeadAccess($lead);
-        $lead->delete();
+        $this->assertAdminCanDeleteLead($request);
+
+        $lead = Lead::query()->findOrFail($id);
+        $customerId = (int) $lead->customer_id;
+
+        DB::transaction(function () use ($lead, $customerId) {
+            SentCommunication::query()->where('lead_id', $lead->id)->update(['lead_id' => null]);
+
+            $lead->update(['converted_from_activity_id' => null]);
+
+            $lead->delete();
+
+            Customer::query()->find($customerId)?->syncTypeFromLeads();
+        });
 
         return response()->noContent();
     }
@@ -824,7 +846,7 @@ class LeadController extends Controller
 
         $user = auth()->user();
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
-        
+
         $stages = ['follow_up', 'lead', 'hot_lead', 'quotation', 'won', 'lost'];
         $pipeline = [];
 
@@ -935,9 +957,9 @@ class LeadController extends Controller
     {
         $user = auth()->user();
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
-        
+
         $customer = \App\Modules\CRM\Models\Customer::findOrFail($customerId);
-        
+
         // Check access for sales agents
         if ($isSalesAgent && ! $customer->salesAgentHasAccess($user->id)) {
             return response()->json(['message' => 'Unauthorized access to this customer'], 403);
@@ -959,9 +981,9 @@ class LeadController extends Controller
     {
         $user = auth()->user();
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
-        
+
         $customer = \App\Modules\CRM\Models\Customer::findOrFail($customerId);
-        
+
         // Check access for sales agents
         if ($isSalesAgent && ! $customer->salesAgentHasAccess($user->id)) {
             return response()->json(['message' => 'Unauthorized access to this customer'], 403);
@@ -969,13 +991,13 @@ class LeadController extends Controller
 
         // Get all follow-up activities (type='reminder') that haven't been converted yet
         $query = LeadActivity::whereHas('lead', function ($q) use ($customerId) {
-                $q->where('customer_id', $customerId);
-            })
+            $q->where('customer_id', $customerId);
+        })
             ->where('type', 'reminder')
             ->whereNull('converted_to_lead_id')
             ->with(['lead', 'user'])
             ->orderBy('remind_at', 'desc');
-        
+
         $followUps = $query->get();
 
         return response()->json($followUps);
@@ -1037,16 +1059,16 @@ class LeadController extends Controller
 
         $item->status = $data['status'];
         $item->closed_at = now();
-        
+
         if ($data['status'] === 'won') {
             $item->quantity = $data['quantity'];
             $item->unit_price = $data['unit_price'];
         }
-        
-        if (!empty($data['notes'])) {
+
+        if (! empty($data['notes'])) {
             $item->notes = $data['notes'];
         }
-        
+
         $item->save();
 
         // Log activity
@@ -1054,9 +1076,9 @@ class LeadController extends Controller
         if ($data['status'] === 'won') {
             $description = "Product '{$productName}' closed as WON - Qty: {$data['quantity']}, Price: £{$data['unit_price']}";
         } else {
-            $description = "Product '{$productName}' closed as LOST - Reason: " . ($data['lost_reason'] ?? 'Not specified');
+            $description = "Product '{$productName}' closed as LOST - Reason: ".($data['lost_reason'] ?? 'Not specified');
         }
-        
+
         LeadActivity::create([
             'lead_id' => $lead->id,
             'user_id' => auth()->id(),
@@ -1107,9 +1129,9 @@ class LeadController extends Controller
     {
         $user = auth()->user();
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
-        
+
         $lead = Lead::findOrFail($id);
-        
+
         // Check access for sales agents
         if ($isSalesAgent && ! $this->salesUserCanAccessLead($lead)) {
             return response()->json(['message' => 'Unauthorized access to this lead'], 403);
@@ -1149,7 +1171,7 @@ class LeadController extends Controller
             ->where('created_at', '>=', now()->subMinutes(2))
             ->exists();
 
-        if (!$hasRecentDuplicate) {
+        if (! $hasRecentDuplicate) {
             LeadActivity::create([
                 'lead_id' => $lead->id,
                 'user_id' => auth()->id(),
@@ -1171,7 +1193,7 @@ class LeadController extends Controller
     public function getNextProductsToSell($customerId)
     {
         $customer = \App\Modules\CRM\Models\Customer::findOrFail($customerId);
-        
+
         // Get all products customer already has (from won leads with items)
         $wonLeads = $customer->leads()
             ->where('stage', 'won')
@@ -1194,7 +1216,7 @@ class LeadController extends Controller
                 $suggestions = $product->getSuggestedProducts();
                 foreach ($suggestions as $suggestion) {
                     // Only suggest if customer doesn't already have it
-                    if (!$ownedProductIds->contains($suggestion->id)) {
+                    if (! $ownedProductIds->contains($suggestion->id)) {
                         $suggestedProducts->push([
                             'product' => $suggestion,
                             'suggested_by' => $product->name,
@@ -1216,5 +1238,3 @@ class LeadController extends Controller
         ]);
     }
 }
-
-

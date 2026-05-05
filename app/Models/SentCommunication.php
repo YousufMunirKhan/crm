@@ -18,12 +18,16 @@ class SentCommunication extends Model
         'content',
         'status',
         'error_message',
+        'opened_at',
+        'open_count',
+        'failure_category',
         'sent_at',
         'sent_by',
     ];
 
     protected $casts = [
         'sent_at' => 'datetime',
+        'opened_at' => 'datetime',
     ];
 
     public function customer()

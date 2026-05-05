@@ -303,6 +303,7 @@
                                                         </svg>
                                                     </button>
                                                     <button
+                                                        v-if="canDeleteLeads"
                                                         type="button"
                                                         class="no-drag h-8 w-8 inline-flex items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600"
                                                         title="Delete lead"
@@ -345,7 +346,7 @@
         <DeleteConfirm
             v-if="showDeleteConfirm"
             title="Delete Lead"
-            :message="`Are you sure you want to delete this lead?`"
+            :message="deleteLeadConfirmMessage"
             :loading="deleting"
             @confirm="confirmDelete"
             @cancel="closeDeleteConfirm"
@@ -544,6 +545,14 @@ const isAdmin = computed(() => {
     const role = auth.user?.role?.name;
     return role === 'Admin' || role === 'System Admin' || role === 'Manager';
 });
+
+const canDeleteLeads = computed(() => {
+    const role = auth.user?.role?.name;
+    return role === 'Admin' || role === 'System Admin';
+});
+
+const deleteLeadConfirmMessage =
+    'This permanently removes the lead and related CRM data (line items, activities, assignment history, linked communications, and commission rows for this lead). The customer record is kept. Continue?';
 
 const loadEmployees = async () => {
     if (!isAdmin.value) return;
@@ -753,10 +762,12 @@ const confirmDelete = async () => {
     try {
         await axios.delete(`/api/leads/${leadToDelete.value.id}`);
         closeDeleteConfirm();
+        toast.success('Lead deleted.');
         loadPipeline();
     } catch (error) {
         console.error('Failed to delete lead:', error);
-        toast.error('Failed to delete lead. Please try again.');
+        const msg = error?.response?.data?.message || 'Failed to delete lead. Please try again.';
+        toast.error(msg);
     } finally {
         deleting.value = false;
     }

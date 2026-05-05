@@ -67,7 +67,14 @@
                                     View
                                 </router-link>
                                 <button type="button" class="listing-link-edit" @click="openEditForm(lead)">Edit</button>
-                                <button type="button" class="listing-link-delete" @click="openDeleteConfirm(lead)">Delete</button>
+                                <button
+                                    v-if="canDeleteLeads"
+                                    type="button"
+                                    class="listing-link-delete"
+                                    @click="openDeleteConfirm(lead)"
+                                >
+                                    Delete
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -94,7 +101,7 @@
                     <button type="button" class="text-violet-600 hover:text-violet-800 font-medium text-sm" @click="openActivityModal(lead)">Log</button>
                     <router-link v-if="lead.customer_id" :to="`/customers/${lead.customer_id}`" class="listing-link-edit">View</router-link>
                     <button type="button" class="listing-link-edit" @click="openEditForm(lead)">Edit</button>
-                    <button type="button" class="listing-link-delete" @click="openDeleteConfirm(lead)">Delete</button>
+                    <button v-if="canDeleteLeads" type="button" class="listing-link-delete" @click="openDeleteConfirm(lead)">Delete</button>
                 </div>
             </div>
         </div>
@@ -121,7 +128,7 @@
     <DeleteConfirm
         v-if="showDeleteConfirm"
         title="Delete Lead"
-        :message="`Are you sure you want to delete this lead? This will also delete all associated activities.`"
+        :message="deleteConfirmMessage"
         :loading="deleting"
         @confirm="confirmDelete"
         @cancel="closeDeleteConfirm"
@@ -146,8 +153,18 @@ import ListingPageShell from '@/components/ListingPageShell.vue';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
 import { formatLeadStage } from '@/utils/displayFormat';
 import { useToastStore } from '@/stores/toast';
+import { useAuthStore } from '@/stores/auth';
 
 const toast = useToastStore();
+const auth = useAuthStore();
+
+const canDeleteLeads = computed(() => {
+    const role = auth.user?.role?.name;
+    return role === 'Admin' || role === 'System Admin';
+});
+
+const deleteConfirmMessage =
+    'This permanently removes the lead and related CRM data (line items, activities, assignment history, linked communications, and commission rows tied to this lead). The customer record is kept. Continue?';
 const leads = ref([]);
 const filters = ref({ stage: '', assigned_by_me: false });
 const pagination = ref(null);
@@ -236,10 +253,12 @@ const confirmDelete = async () => {
     try {
         await axios.delete(`/api/leads/${leadToDelete.value.id}`);
         closeDeleteConfirm();
+        toast.success('Lead deleted.');
         loadLeads(pagination.value?.current_page || 1);
     } catch (error) {
         console.error('Failed to delete lead:', error);
-        toast.error('Failed to delete lead. Please try again.');
+        const msg = error?.response?.data?.message || 'Failed to delete lead. Please try again.';
+        toast.error(msg);
     } finally {
         deleting.value = false;
     }

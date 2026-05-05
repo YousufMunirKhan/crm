@@ -7,10 +7,13 @@ use App\Models\EmailListRecipient;
 use App\Models\EmailTemplate;
 use App\Models\SentCommunication;
 use App\Modules\CRM\Models\Customer;
+use App\Services\EmailFailureClassifier;
+use App\Services\MarketingEmailOpenTracker;
 use App\Modules\CRM\Models\Lead;
 use App\Modules\CRM\Models\LeadItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmailManagementController extends Controller
@@ -251,31 +254,40 @@ class EmailManagementController extends Controller
                         'subject' => $template->subject ?? '',
                         'content' => '',
                         'status' => 'failed',
+                        'failure_category' => 'validation',
                         'error_message' => $errorMsg,
                         'sent_by' => auth()->id(),
                     ]);
                     continue;
                 }
 
+                $subject = $this->replaceVariables($template->subject, $customer);
+                $pending = SentCommunication::create([
+                    'type' => 'email',
+                    'template_type' => 'email_template',
+                    'template_id' => $template->id,
+                    'customer_id' => $customer->id,
+                    'recipient_email' => $customer->email,
+                    'subject' => $subject,
+                    'content' => '',
+                    'status' => 'pending',
+                    'sent_by' => auth()->id(),
+                ]);
+
                 try {
-                    $subject = $this->replaceVariables($template->subject, $customer);
                     $content = $this->renderTemplateForPreview($template, $customer);
+                    $content = MarketingEmailOpenTracker::appendPixel($content, $pending->id);
                     \Illuminate\Support\Facades\Mail::send([], [], function ($message) use ($customer, $subject, $content) {
                         $message->to($customer->email)
                             ->subject($subject)
                             ->html($content);
                     });
-                    SentCommunication::create([
-                        'type' => 'email',
-                        'template_type' => 'email_template',
-                        'template_id' => $template->id,
-                        'customer_id' => $customer->id,
-                        'recipient_email' => $customer->email,
-                        'subject' => $subject,
+                    $pending->update([
                         'content' => $content,
                         'status' => 'sent',
                         'sent_at' => now(),
-                        'sent_by' => auth()->id(),
+                        'error_message' => null,
+                        'failure_category' => null,
                     ]);
                     $sent++;
                     $sentList[] = ['email' => $customer->email, 'name' => $customer->name];
@@ -283,17 +295,13 @@ class EmailManagementController extends Controller
                     $failed++;
                     $errMsg = strlen($e->getMessage()) > 200 ? substr($e->getMessage(), 0, 200) . '...' : $e->getMessage();
                     $failedList[] = ['email' => $customer->email, 'name' => $customer->name, 'error' => $errMsg];
-                    SentCommunication::create([
-                        'type' => 'email',
-                        'template_type' => 'email_template',
-                        'template_id' => $template->id,
-                        'customer_id' => $customer->id,
-                        'recipient_email' => $customer->email,
-                        'subject' => $template->subject ?? '',
-                        'content' => '',
-                        'status' => 'failed',
+                    $category = EmailFailureClassifier::classify($e->getMessage());
+                    $status = $category === 'bounce' ? 'bounced' : 'failed';
+                    $pending->update([
+                        'status' => $status,
+                        'failure_category' => $category,
                         'error_message' => $e->getMessage(),
-                        'sent_by' => auth()->id(),
+                        'content' => '',
                     ]);
                 }
             }
@@ -316,7 +324,9 @@ class EmailManagementController extends Controller
     }
 
     /**
-     * Report: paginated list of sent emails (who received, when, template, status).
+     * Report: paginated list of sent emails (who received, when, template, status, opens).
+     *
+     * @queryParam scope string Optional: all|bounces|retry_queue|sent
      */
     public function getSentReport(Request $request)
     {
@@ -325,33 +335,56 @@ class EmailManagementController extends Controller
             'per_page' => 'nullable|integer|min:1|max:100',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
+            'scope' => 'nullable|in:all,bounces,retry_queue,sent',
         ]);
 
         $perPage = min((int) $request->input('per_page', 20), 100);
+        $scope = $request->input('scope', 'all');
+
         $query = SentCommunication::query()
             ->where('type', 'email')
             ->with(['customer:id,name,email,type', 'sender:id,name'])
-            ->orderByDesc('sent_at');
+            ->orderByDesc(DB::raw('COALESCE(sent_at, created_at)'));
 
-        if ($request->filled('date_from')) {
-            $query->whereDate('sent_at', '>=', $request->date_from);
-        }
-        if ($request->filled('date_to')) {
-            $query->whereDate('sent_at', '<=', $request->date_to);
+        $this->applySentReportDateFilter($query, $request);
+
+        if ($scope === 'bounces') {
+            $query->where(function ($q) {
+                $q->where('status', 'bounced')
+                    ->orWhere(function ($q2) {
+                        $q2->where('status', 'failed')->where('failure_category', 'bounce');
+                    });
+            });
+        } elseif ($scope === 'retry_queue') {
+            $query->where('status', 'failed')
+                ->where(function ($q) {
+                    $q->whereNull('failure_category')
+                        ->orWhereNotIn('failure_category', ['validation', 'bounce']);
+                });
+        } elseif ($scope === 'sent') {
+            $query->where('status', 'sent');
         }
 
         $paginator = $query->paginate($perPage);
 
-        // Summary: total sent vs failed (same filter)
         $summaryQuery = SentCommunication::query()->where('type', 'email');
-        if ($request->filled('date_from')) {
-            $summaryQuery->whereDate('sent_at', '>=', $request->date_from);
-        }
-        if ($request->filled('date_to')) {
-            $summaryQuery->whereDate('sent_at', '<=', $request->date_to);
-        }
+        $this->applySentReportDateFilter($summaryQuery, $request);
+
         $totalSent = (clone $summaryQuery)->where('status', 'sent')->count();
-        $totalFailed = (clone $summaryQuery)->where('status', 'failed')->count();
+        $totalBounced = (clone $summaryQuery)->where(function ($q) {
+            $q->where('status', 'bounced')
+                ->orWhere(function ($q2) {
+                    $q2->where('status', 'failed')->where('failure_category', 'bounce');
+                });
+        })->count();
+        $totalFailedRetryable = (clone $summaryQuery)->where('status', 'failed')
+            ->where(function ($q) {
+                $q->whereNull('failure_category')
+                    ->orWhereNotIn('failure_category', ['validation', 'bounce']);
+            })->count();
+        $totalFailedValidation = (clone $summaryQuery)->where('status', 'failed')
+            ->where('failure_category', 'validation')->count();
+        $totalOpened = (clone $summaryQuery)->where('status', 'sent')->whereNotNull('opened_at')->count();
 
         $templateIds = collect($paginator->items())->pluck('template_id')->filter()->unique()->values()->all();
         $templates = $templateIds ? EmailTemplate::whereIn('id', $templateIds)->pluck('name', 'id') : collect();
@@ -365,9 +398,14 @@ class EmailManagementController extends Controller
                 'template_name' => $templates[$row->template_id] ?? 'Template #' . $row->template_id,
                 'subject' => $row->subject,
                 'status' => $row->status,
+                'failure_category' => $row->failure_category,
                 'error_message' => $row->error_message,
                 'sent_at' => $row->sent_at?->format('c'),
                 'sent_by_name' => $row->sender?->name,
+                'opened_at' => $row->opened_at?->format('c'),
+                'open_count' => (int) ($row->open_count ?? 0),
+                'seen' => $row->status === 'sent' && $row->opened_at !== null,
+                'can_resend' => $this->sentEmailCanResend($row),
             ];
         });
 
@@ -379,9 +417,134 @@ class EmailManagementController extends Controller
             'last_page' => $paginator->lastPage(),
             'summary' => [
                 'total_sent' => $totalSent,
-                'total_failed' => $totalFailed,
+                'total_failed' => $totalFailedRetryable + $totalFailedValidation,
+                'total_failed_retryable' => $totalFailedRetryable,
+                'total_failed_validation' => $totalFailedValidation,
+                'total_bounced' => $totalBounced,
+                'total_opened' => $totalOpened,
             ],
         ]);
+    }
+
+    /**
+     * Retry a single failed bulk email (not bounces, not template validation skips).
+     */
+    public function resendSentEmail(Request $request, int $id)
+    {
+        $row = SentCommunication::query()
+            ->where('type', 'email')
+            ->findOrFail($id);
+
+        if (! $this->sentEmailCanResend($row)) {
+            return response()->json([
+                'message' => 'This message cannot be resent (bounce, validation skip, or not in a failed state).',
+            ], 422);
+        }
+
+        if (! $row->template_id) {
+            return response()->json(['message' => 'Original send has no template on file.'], 422);
+        }
+
+        $template = EmailTemplate::find($row->template_id);
+        if (! $template) {
+            return response()->json(['message' => 'Email template no longer exists.'], 422);
+        }
+
+        $email = $row->recipient_email;
+        if (! $email || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return response()->json(['message' => 'Invalid recipient email on record.'], 422);
+        }
+
+        if (\App\Models\EmailUnsubscribe::isUnsubscribed($email)) {
+            return response()->json(['message' => 'This address has unsubscribed from marketing emails.'], 422);
+        }
+
+        $customer = $row->customer_id
+            ? Customer::query()->find($row->customer_id)
+            : null;
+        if (! $customer) {
+            $customer = $this->fakeCustomerForRecipient($email, $row->customer?->name);
+        }
+
+        [$valid, $missingVars] = $this->validateRecipientForTemplate($customer, $template);
+        if (! $valid) {
+            return response()->json([
+                'message' => 'Cannot resend: missing data for variable(s): ' . implode(', ', $missingVars),
+            ], 422);
+        }
+
+        \App\Services\MailConfigFromDatabase::apply();
+
+        $subject = $this->replaceVariables($template->subject, $customer);
+        $pending = SentCommunication::create([
+            'type' => 'email',
+            'template_type' => 'email_template',
+            'template_id' => $template->id,
+            'customer_id' => $row->customer_id,
+            'lead_id' => $row->lead_id,
+            'recipient_email' => $email,
+            'subject' => $subject,
+            'content' => '',
+            'status' => 'pending',
+            'sent_by' => auth()->id(),
+        ]);
+
+        try {
+            $content = $this->renderTemplateForPreview($template, $customer);
+            $content = MarketingEmailOpenTracker::appendPixel($content, $pending->id);
+            \Illuminate\Support\Facades\Mail::send([], [], function ($message) use ($email, $subject, $content) {
+                $message->to($email)->subject($subject)->html($content);
+            });
+            $pending->update([
+                'content' => $content,
+                'status' => 'sent',
+                'sent_at' => now(),
+                'error_message' => null,
+                'failure_category' => null,
+            ]);
+
+            return response()->json(['message' => 'Email sent successfully.', 'new_id' => $pending->id]);
+        } catch (\Exception $e) {
+            $category = EmailFailureClassifier::classify($e->getMessage());
+            $status = $category === 'bounce' ? 'bounced' : 'failed';
+            $pending->update([
+                'status' => $status,
+                'failure_category' => $category,
+                'error_message' => $e->getMessage(),
+                'content' => '',
+            ]);
+
+            return response()->json([
+                'message' => 'Resend failed: ' . $e->getMessage(),
+                'new_id' => $pending->id,
+                'status' => $status,
+            ], 422);
+        }
+    }
+
+    private function applySentReportDateFilter(Builder $query, Request $request): void
+    {
+        if ($request->filled('date_from')) {
+            $query->whereDate(DB::raw('COALESCE(sent_at, created_at)'), '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate(DB::raw('COALESCE(sent_at, created_at)'), '<=', $request->date_to);
+        }
+    }
+
+    private function sentEmailCanResend(SentCommunication $row): bool
+    {
+        if ($row->type !== 'email') {
+            return false;
+        }
+        if ($row->status !== 'failed') {
+            return false;
+        }
+        if (in_array($row->failure_category, ['validation', 'bounce'], true)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -591,49 +754,53 @@ class EmailManagementController extends Controller
                     'subject' => $template->subject ?? '',
                     'content' => '',
                     'status' => 'failed',
+                    'failure_category' => 'validation',
                     'error_message' => $errorMsg,
                     'sent_by' => auth()->id(),
                 ]);
                 continue;
             }
+            $subject = $this->replaceVariables($template->subject, $fakeCustomer);
+            $pending = SentCommunication::create([
+                'type' => 'email',
+                'template_type' => 'email_template',
+                'template_id' => $template->id,
+                'customer_id' => null,
+                'recipient_email' => $recipient->email,
+                'subject' => $subject,
+                'content' => '',
+                'status' => 'pending',
+                'sent_by' => auth()->id(),
+            ]);
             try {
-                $subject = $this->replaceVariables($template->subject, $fakeCustomer);
                 $content = $this->renderTemplateForPreview($template, $fakeCustomer);
+                $content = MarketingEmailOpenTracker::appendPixel($content, $pending->id);
                 \Illuminate\Support\Facades\Mail::send([], [], function ($message) use ($recipient, $subject, $content) {
                     $message->to($recipient->email)
                         ->subject($subject)
                         ->html($content);
                 });
-                SentCommunication::create([
-                    'type' => 'email',
-                    'template_type' => 'email_template',
-                    'template_id' => $template->id,
-                    'customer_id' => null,
-                    'recipient_email' => $recipient->email,
-                    'subject' => $subject,
+                $pending->update([
                     'content' => $content,
                     'status' => 'sent',
                     'sent_at' => now(),
-                    'sent_by' => auth()->id(),
+                    'error_message' => null,
+                    'failure_category' => null,
                 ]);
                 $recipient->update(['status' => EmailListRecipient::STATUS_SENT, 'sent_at' => now()]);
                 $sent++;
             } catch (\Exception $e) {
+                $category = EmailFailureClassifier::classify($e->getMessage());
+                $status = $category === 'bounce' ? 'bounced' : 'failed';
                 $recipient->update([
                     'status' => EmailListRecipient::STATUS_FAILED,
                     'error_message' => $e->getMessage(),
                 ]);
-                SentCommunication::create([
-                    'type' => 'email',
-                    'template_type' => 'email_template',
-                    'template_id' => $template->id,
-                    'customer_id' => null,
-                    'recipient_email' => $recipient->email,
-                    'subject' => $template->subject ?? '',
-                    'content' => '',
-                    'status' => 'failed',
+                $pending->update([
+                    'status' => $status,
+                    'failure_category' => $category,
                     'error_message' => $e->getMessage(),
-                    'sent_by' => auth()->id(),
+                    'content' => '',
                 ]);
                 $failed++;
             }

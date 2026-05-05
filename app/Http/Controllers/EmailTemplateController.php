@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\EmailTemplate;
+use App\Models\SentCommunication;
+use App\Services\EmailFailureClassifier;
+use App\Services\MarketingEmailOpenTracker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -304,45 +307,48 @@ class EmailTemplateController extends Controller
         }
 
         $subject = $this->replaceVariables($template->subject, $customer);
-        $content = $this->renderTemplate($template, $customer);
 
         \App\Services\MailConfigFromDatabase::apply();
 
+        $pending = SentCommunication::create([
+            'type' => 'email',
+            'template_type' => 'email_template',
+            'template_id' => $template->id,
+            'customer_id' => $customer->id,
+            'lead_id' => $leadId,
+            'recipient_email' => $customer->email,
+            'subject' => $subject,
+            'content' => '',
+            'status' => 'pending',
+            'sent_by' => auth()->id(),
+        ]);
+
         try {
+            $content = $this->renderTemplate($template, $customer);
+            $content = MarketingEmailOpenTracker::appendPixel($content, $pending->id);
             \Illuminate\Support\Facades\Mail::send([], [], function ($message) use ($customer, $subject, $content) {
                 $message->to($customer->email)
                     ->subject($subject)
                     ->html($content);
             });
 
-            \App\Models\SentCommunication::create([
-                'type' => 'email',
-                'template_type' => 'email_template',
-                'template_id' => $template->id,
-                'customer_id' => $customer->id,
-                'lead_id' => $leadId,
-                'recipient_email' => $customer->email,
-                'subject' => $subject,
+            $pending->update([
                 'content' => $content,
                 'status' => 'sent',
                 'sent_at' => now(),
-                'sent_by' => auth()->id(),
+                'error_message' => null,
+                'failure_category' => null,
             ]);
 
             return response()->json(['message' => 'Email sent successfully']);
         } catch (\Exception $e) {
-            \App\Models\SentCommunication::create([
-                'type' => 'email',
-                'template_type' => 'email_template',
-                'template_id' => $template->id,
-                'customer_id' => $customer->id,
-                'lead_id' => $leadId,
-                'recipient_email' => $customer->email,
-                'subject' => $subject,
-                'content' => $content,
-                'status' => 'failed',
+            $category = EmailFailureClassifier::classify($e->getMessage());
+            $status = $category === 'bounce' ? 'bounced' : 'failed';
+            $pending->update([
+                'status' => $status,
+                'failure_category' => $category,
                 'error_message' => $e->getMessage(),
-                'sent_by' => auth()->id(),
+                'content' => '',
             ]);
 
             return response()->json(['message' => 'Failed to send email: ' . $e->getMessage()], 500);

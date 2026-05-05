@@ -1,6 +1,11 @@
 <?php
 
+use App\Http\Controllers\EmailOpenTrackingController;
 use Illuminate\Support\Facades\Route;
+
+// Public tracking pixel (signed URL); must be before SPA catch-all
+Route::get('/email/track/open/{id}', [EmailOpenTrackingController::class, 'pixel'])
+    ->name('email.track.open');
 
 // API routes are handled in routes/api.php
 // All other routes should serve the Vue SPA
@@ -22,4 +27,4 @@ Route::get('/downloads/email-merge-tags-guide.md', function () {
 
 Route::get('/{any}', function () {
     return view('welcome');
-})->where('any', '^(?!api|build|storage|downloads).*$');
+})->where('any', '^(?!api|build|storage|downloads|email/track).*$');

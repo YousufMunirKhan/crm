@@ -243,6 +243,7 @@ class CustomerController extends Controller
             });
 
         $sent = \App\Models\SentCommunication::where('customer_id', $customer->id)
+            ->where('status', '!=', 'pending')
             ->orderBy('sent_at', 'desc')
             ->get()
             ->map(function ($s) {

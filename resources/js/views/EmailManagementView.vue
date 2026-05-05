@@ -445,7 +445,25 @@
         <template v-if="activeTab === 'report'">
             <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
                 <h2 class="text-lg font-semibold text-slate-900 mb-4">Sent email report</h2>
-                <p class="text-sm text-slate-600 mb-4">Who received emails, when, and which template. Filter by date range.</p>
+                <p class="text-sm text-slate-600 mb-4">
+                    Filter by date range. Opens use a small tracking image when the inbox loads images (not 100% accurate). Bounces are classified from the mail server error when possible; do not resend to bounced addresses.
+                </p>
+                <div class="flex flex-wrap gap-2 mb-4 border-b border-slate-200 pb-3">
+                    <button
+                        v-for="opt in reportScopeOptions"
+                        :key="opt.value"
+                        type="button"
+                        @click="setReportScope(opt.value)"
+                        :class="[
+                            'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
+                            reportScope === opt.value
+                                ? 'bg-slate-900 text-white'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        ]"
+                    >
+                        {{ opt.label }}
+                    </button>
+                </div>
                 <div class="flex flex-wrap gap-3 mb-4 items-end">
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">From</label>
@@ -464,18 +482,34 @@
                         {{ loadingReport ? 'Loading...' : 'Apply' }}
                     </button>
                 </div>
-                <div v-if="reportSummary" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                <div v-if="reportSummary" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
                     <div class="bg-slate-50 rounded-lg p-4">
-                        <div class="text-xs text-slate-500 uppercase">Total sent</div>
+                        <div class="text-xs text-slate-500 uppercase">Delivered</div>
                         <div class="text-xl font-semibold text-green-600">{{ reportSummary.total_sent }}</div>
                     </div>
                     <div class="bg-slate-50 rounded-lg p-4">
-                        <div class="text-xs text-slate-500 uppercase">Total failed</div>
-                        <div class="text-xl font-semibold text-red-600">{{ reportSummary.total_failed }}</div>
+                        <div class="text-xs text-slate-500 uppercase">Opened</div>
+                        <div class="text-xl font-semibold text-teal-600">{{ reportSummary.total_opened ?? 0 }}</div>
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-4">
+                        <div class="text-xs text-slate-500 uppercase">Retry queue</div>
+                        <div class="text-xl font-semibold text-amber-600">{{ reportSummary.total_failed_retryable ?? 0 }}</div>
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-4">
+                        <div class="text-xs text-slate-500 uppercase">Bounced</div>
+                        <div class="text-xl font-semibold text-orange-700">{{ reportSummary.total_bounced ?? 0 }}</div>
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-4">
+                        <div class="text-xs text-slate-500 uppercase">Skipped (data)</div>
+                        <div class="text-xl font-semibold text-slate-600">{{ reportSummary.total_failed_validation ?? 0 }}</div>
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-4">
+                        <div class="text-xs text-slate-500 uppercase">All issues</div>
+                        <div class="text-xl font-semibold text-red-600">{{ reportSummary.total_failed ?? 0 }}</div>
                     </div>
                 </div>
                 <div v-if="loadingReport" class="text-sm text-slate-500 py-4">Loading report...</div>
-                <div v-else-if="reportData.length === 0" class="text-sm text-slate-500 py-4">No sent emails in this period.</div>
+                <div v-else-if="reportData.length === 0" class="text-sm text-slate-500 py-4">{{ reportEmptyMessage }}</div>
                 <div v-else>
                     <div class="border border-slate-200 rounded-lg overflow-x-auto">
                         <table class="w-full text-sm">
@@ -485,8 +519,10 @@
                                     <th class="text-left px-4 py-2 font-medium text-slate-700">Email</th>
                                     <th class="text-left px-4 py-2 font-medium text-slate-700">Template</th>
                                     <th class="text-left px-4 py-2 font-medium text-slate-700">Status</th>
+                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Opened</th>
                                     <th class="text-left px-4 py-2 font-medium text-slate-700">Sent at</th>
                                     <th class="text-left px-4 py-2 font-medium text-slate-700">Sent by</th>
+                                    <th class="text-left px-4 py-2 font-medium text-slate-700 w-28">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -495,11 +531,40 @@
                                     <td class="px-4 py-2">{{ row.recipient_email }}</td>
                                     <td class="px-4 py-2">{{ row.template_name }}</td>
                                     <td class="px-4 py-2">
-                                        <span :class="row.status === 'sent' ? 'text-green-600' : 'text-red-600'">{{ formatCommLogStatus(row.status) }}</span>
-                                        <span v-if="row.error_message" class="block text-xs text-slate-500 truncate max-w-[200px]" :title="row.error_message">{{ row.error_message }}</span>
+                                        <span
+                                            :class="
+                                                row.status === 'sent'
+                                                    ? 'text-green-600'
+                                                    : row.status === 'bounced'
+                                                      ? 'text-orange-700'
+                                                      : 'text-red-600'
+                                            "
+                                            >{{ formatCommLogStatus(row.status) }}</span
+                                        >
+                                        <span v-if="row.error_message" class="block text-xs text-slate-500 truncate max-w-[220px]" :title="row.error_message">{{ row.error_message }}</span>
+                                    </td>
+                                    <td class="px-4 py-2">
+                                        <template v-if="row.status === 'sent'">
+                                            <span v-if="row.seen" class="text-teal-700 font-medium" :title="row.opened_at ? 'First opened: ' + formatDate(row.opened_at) : ''">Opened</span>
+                                            <span v-else class="text-slate-400">Not opened</span>
+                                            <span v-if="row.open_count > 1" class="block text-xs text-slate-500">({{ row.open_count }} loads)</span>
+                                        </template>
+                                        <span v-else class="text-slate-400">—</span>
                                     </td>
                                     <td class="px-4 py-2 text-slate-600">{{ formatDate(row.sent_at) }}</td>
                                     <td class="px-4 py-2 text-slate-600">{{ row.sent_by_name || '—' }}</td>
+                                    <td class="px-4 py-2">
+                                        <button
+                                            v-if="row.can_resend"
+                                            type="button"
+                                            :disabled="resendingId === row.id"
+                                            @click="resendSentEmail(row)"
+                                            class="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                                        >
+                                            {{ resendingId === row.id ? 'Sending…' : 'Resend' }}
+                                        </button>
+                                        <span v-else class="text-slate-300 text-xs">—</span>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -680,6 +745,9 @@
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { formatCommLogStatus } from '@/utils/displayFormat';
+import { useToastStore } from '@/stores/toast';
+
+const toast = useToastStore();
 
 const activeTab = ref('send');
 const audience = ref('both');
@@ -710,6 +778,22 @@ const reportLastPage = ref(1);
 const reportDateFrom = ref('');
 const reportDateTo = ref('');
 const loadingReport = ref(false);
+const reportScope = ref('all');
+const resendingId = ref(null);
+
+const reportScopeOptions = [
+    { value: 'all', label: 'All activity' },
+    { value: 'sent', label: 'Delivered only' },
+    { value: 'retry_queue', label: 'Retry queue' },
+    { value: 'bounces', label: 'Bounces' },
+];
+
+const reportEmptyMessage = computed(() => {
+    if (reportScope.value === 'bounces') return 'No bounces in this period.';
+    if (reportScope.value === 'retry_queue') return 'Nothing in the retry queue for this period.';
+    if (reportScope.value === 'sent') return 'No delivered emails in this period.';
+    return 'No email activity in this period.';
+});
 
 const uploadListName = ref('');
 const uploadTemplateId = ref(null);
@@ -933,16 +1017,28 @@ function formatDate(iso) {
     }
 }
 
+function setReportScope(scope) {
+    reportScope.value = scope;
+    loadReport(1);
+}
+
 async function loadReport(page = 1) {
     loadingReport.value = true;
     reportPage.value = page;
     try {
-        const params = { page, per_page: 20 };
+        const params = { page, per_page: 20, scope: reportScope.value };
         if (reportDateFrom.value) params.date_from = reportDateFrom.value;
         if (reportDateTo.value) params.date_to = reportDateTo.value;
         const { data } = await axios.get('/api/email-management/sent-report', { params });
         reportData.value = data.data || [];
-        reportSummary.value = data.summary || { total_sent: 0, total_failed: 0 };
+        reportSummary.value = data.summary || {
+            total_sent: 0,
+            total_failed: 0,
+            total_failed_retryable: 0,
+            total_failed_validation: 0,
+            total_bounced: 0,
+            total_opened: 0,
+        };
         reportLastPage.value = data.last_page ?? 1;
     } catch (e) {
         console.error(e);
@@ -950,6 +1046,21 @@ async function loadReport(page = 1) {
         reportSummary.value = null;
     } finally {
         loadingReport.value = false;
+    }
+}
+
+async function resendSentEmail(row) {
+    if (!row?.id || !row.can_resend) return;
+    resendingId.value = row.id;
+    try {
+        const { data } = await axios.post(`/api/email-management/sent/${row.id}/resend`);
+        toast.success(data.message || 'Email sent.');
+        await loadReport(reportPage.value);
+    } catch (e) {
+        const msg = e.response?.data?.message || e.message || 'Resend failed';
+        toast.error(msg);
+    } finally {
+        resendingId.value = null;
     }
 }
 

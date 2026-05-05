@@ -50,7 +50,7 @@ class CustomerTimelineService
             ]);
         }
 
-        foreach (SentCommunication::where('customer_id', $customer->id)->orderByDesc('sent_at')->orderByDesc('created_at')->get() as $sent) {
+        foreach (SentCommunication::where('customer_id', $customer->id)->where('status', '!=', 'pending')->orderByDesc('sent_at')->orderByDesc('created_at')->get() as $sent) {
             if (! $this->matchesLeadFilter($filterLeadId, $sent->lead_id, 'communication')) {
                 continue;
             }
