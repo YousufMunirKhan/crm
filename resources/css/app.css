@@ -148,3 +148,17 @@
         @apply px-4 py-3 bg-emerald-50/80 text-sm text-emerald-950/90 space-y-2;
     }
 }
+
+/*
+ * Native date/datetime inputs often show a lowercase format hint (mm/dd/yyyy).
+ * Uppercase so the hint reads MM/DD/YYYY where the browser respects it.
+ */
+@layer base {
+    input[type='date'],
+    input[type='datetime-local'],
+    input[type='time'],
+    input[type='month'],
+    input[type='week'] {
+        text-transform: uppercase;
+    }
+}

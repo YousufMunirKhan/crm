@@ -410,6 +410,7 @@
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { formatCommLogStatus } from '@/utils/displayFormat';
+import { formatDateTimeUsDisplay } from '@/utils/dateFormatUi';
 
 const activeTab = ref('send');
 const audience = ref('both');
@@ -650,12 +651,7 @@ async function sendBulk() {
 }
 
 function formatDate(iso) {
-    if (!iso) return '—';
-    try {
-        return new Date(iso).toLocaleString();
-    } catch {
-        return iso;
-    }
+    return formatDateTimeUsDisplay(iso);
 }
 
 async function loadReport(page = 1) {

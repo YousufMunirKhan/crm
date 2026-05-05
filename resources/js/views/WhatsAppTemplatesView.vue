@@ -90,7 +90,7 @@
                             </div>
                         </td>
                         <td class="px-6 py-4 text-sm text-slate-500">
-                            {{ new Date(template.created_at).toLocaleDateString() }}
+                            {{ formatDateUsDisplay(template.created_at) }}
                         </td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex justify-end gap-2">
@@ -283,6 +283,7 @@ import { ref, reactive, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
 import { formatApiEnumLabel } from '@/utils/displayFormat';
+import { formatDateUsDisplay } from '@/utils/dateFormatUi';
 
 const toast = useToastStore();
 

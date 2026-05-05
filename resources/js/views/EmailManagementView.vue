@@ -764,6 +764,7 @@
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { formatCommLogStatus } from '@/utils/displayFormat';
+import { formatDateTimeUsDisplay } from '@/utils/dateFormatUi';
 import { useToastStore } from '@/stores/toast';
 
 const toast = useToastStore();
@@ -1029,13 +1030,7 @@ async function sendBulk() {
 }
 
 function formatDate(iso) {
-    if (!iso) return '—';
-    try {
-        const d = new Date(iso);
-        return d.toLocaleString();
-    } catch {
-        return iso;
-    }
+    return formatDateTimeUsDisplay(iso);
 }
 
 function setReportScope(scope) {
