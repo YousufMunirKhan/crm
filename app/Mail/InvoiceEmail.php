@@ -68,7 +68,7 @@ class InvoiceEmail extends Mailable
         $pdf = $invoiceService->generatePDF($this->invoice);
 
         return [
-            Attachment::fromData(fn () => $pdf->output(), "invoice-{$this->invoice->invoice_number}.pdf")
+            Attachment::fromData(fn () => $pdf->output(), $invoiceService->pdfFileName($this->invoice))
                 ->withMime('application/pdf'),
         ];
     }

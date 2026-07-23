@@ -4,6 +4,7 @@ namespace App\Modules\Invoice\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Invoice\Models\Invoice;
+use App\Modules\Invoice\Models\InvoicePayment;
 use App\Modules\Invoice\Services\InvoiceService;
 use App\Modules\CRM\Models\Customer;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ class InvoiceController extends Controller
         $user = auth()->user();
         $isSalesAgent = $user->isRole('Sales') || $user->isRole('CallAgent');
 
-        $query = Invoice::with(['customer', 'items', 'creator']);
+        $query = Invoice::with(['customer', 'items', 'creator', 'payments.receivedBy']);
 
         // For sales agents: show invoices they created OR for their assigned customers
         if ($isSalesAgent) {
@@ -73,7 +74,7 @@ class InvoiceController extends Controller
 
     public function show($id)
     {
-        $invoice = Invoice::with(['customer', 'items', 'creator'])->findOrFail($id);
+        $invoice = Invoice::with(['customer', 'items', 'creator', 'payments.receivedBy'])->findOrFail($id);
         return response()->json($invoice);
     }
 
@@ -129,7 +130,7 @@ class InvoiceController extends Controller
 
         $invoice = $this->invoiceService->create($data, auth()->id());
 
-        return response()->json($invoice->load(['customer', 'items']), 201);
+        return response()->json($invoice->load(['customer', 'items', 'payments.receivedBy']), 201);
     }
 
     public function update(Request $request, $id)
@@ -150,7 +151,7 @@ class InvoiceController extends Controller
         ]);
 
         if (isset($data['amount_paid'])) {
-            $total = $data['items'] ? null : $invoice->total;
+            $total = array_key_exists('items', $data) ? null : $invoice->total;
             if ($total === null && !empty($data['items'])) {
                 $subtotal = collect($data['items'])->sum(fn ($i) => $i['quantity'] * $i['unit_price']);
                 $total = $subtotal + round($subtotal * ($data['vat_rate'] ?? $invoice->vat_rate) / 100, 2);
@@ -166,8 +167,60 @@ class InvoiceController extends Controller
         }
 
         $invoice = $this->invoiceService->update($invoice, $data);
+        if ($invoice->payments()->exists()) {
+            $this->syncInvoicePaymentTotals($invoice);
+            $invoice = $invoice->fresh(['customer', 'items', 'creator', 'payments.receivedBy']);
+        }
 
         return response()->json($invoice);
+    }
+
+    public function storePayment(Request $request, int $id)
+    {
+        $invoice = Invoice::with('payments')->findOrFail($id);
+
+        $data = $request->validate([
+            'payment_date' => ['required', 'date'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'method' => ['nullable', 'string', 'max:64'],
+            'reference' => ['nullable', 'string', 'max:160'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $outstanding = max(0, (float) $invoice->total - (float) $invoice->amount_paid);
+        if ((float) $data['amount'] > $outstanding + 0.01) {
+            return response()->json([
+                'message' => 'Payment amount cannot be greater than the outstanding invoice balance.',
+            ], 422);
+        }
+
+        InvoicePayment::create([
+            'invoice_id' => $invoice->id,
+            'received_by_user_id' => auth()->id(),
+            'payment_date' => $data['payment_date'],
+            'amount' => $data['amount'],
+            'method' => $data['method'] ?? null,
+            'reference' => $data['reference'] ?? null,
+            'notes' => $data['notes'] ?? null,
+        ]);
+
+        $this->syncInvoicePaymentTotals($invoice);
+
+        return response()->json($invoice->fresh(['customer', 'items', 'creator', 'payments.receivedBy']));
+    }
+
+    public function destroyPayment(int $id, int $paymentId)
+    {
+        $invoice = Invoice::findOrFail($id);
+        $payment = InvoicePayment::query()
+            ->where('invoice_id', $invoice->id)
+            ->where('id', $paymentId)
+            ->firstOrFail();
+
+        $payment->delete();
+        $this->syncInvoicePaymentTotals($invoice);
+
+        return response()->json($invoice->fresh(['customer', 'items', 'creator', 'payments.receivedBy']));
     }
 
     public function destroy($id)
@@ -180,10 +233,10 @@ class InvoiceController extends Controller
 
     public function generatePDF($id)
     {
-        $invoice = Invoice::with(['customer', 'items'])->findOrFail($id);
+        $invoice = Invoice::with(['customer', 'items', 'payments.receivedBy'])->findOrFail($id);
         $pdf = $this->invoiceService->generatePDF($invoice);
 
-        return $pdf->download("invoice-{$invoice->invoice_number}.pdf");
+        return $pdf->download($this->invoiceService->pdfFileName($invoice));
     }
 
     public function sendEmail(Request $request, $id)
@@ -202,6 +255,26 @@ class InvoiceController extends Controller
         );
 
         return response()->json(['message' => 'Invoice sent successfully']);
+    }
+
+    private function syncInvoicePaymentTotals(Invoice $invoice): void
+    {
+        $amountPaid = round((float) $invoice->payments()->sum('amount'), 2);
+        $total = round((float) $invoice->total, 2);
+        $status = $invoice->status;
+
+        if ($amountPaid >= $total && $total > 0) {
+            $status = 'paid';
+        } elseif ($amountPaid > 0) {
+            $status = 'partially_paid';
+        } elseif (in_array($status, ['paid', 'partially_paid'], true)) {
+            $status = 'sent';
+        }
+
+        $invoice->update([
+            'amount_paid' => $amountPaid,
+            'status' => $status,
+        ]);
     }
 }
 

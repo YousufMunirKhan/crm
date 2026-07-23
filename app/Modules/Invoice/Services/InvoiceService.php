@@ -10,7 +10,6 @@ use App\Modules\Settings\Models\Setting;
 use App\Support\PdfDocumentBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 
 class InvoiceService
 {
@@ -109,12 +108,33 @@ class InvoiceService
 
     public function generateInvoiceNumber(): string
     {
-        return 'INV-'.date('Y').'-'.strtoupper(Str::random(8));
+        $year = date('Y');
+        $max = Invoice::query()
+            ->where('invoice_number', 'like', "%{$year}%")
+            ->pluck('invoice_number')
+            ->map(function ($number) use ($year) {
+                if (preg_match('/^INV[\/_-]'.preg_quote($year, '/').'[\/_-](\d+)$/', (string) $number, $m)) {
+                    return (int) $m[1];
+                }
+
+                return 0;
+            })
+            ->max() ?? 0;
+
+        return 'INV/'.$year.'/'.str_pad((string) ($max + 1), 5, '0', STR_PAD_LEFT);
+    }
+
+    public function pdfFileName(Invoice $invoice): string
+    {
+        $safe = preg_replace('/[^A-Za-z0-9_-]+/', '_', $invoice->invoice_number);
+        $safe = trim((string) $safe, '_') ?: 'invoice';
+
+        return "invoice-{$safe}.pdf";
     }
 
     public function generatePDF(Invoice $invoice)
     {
-        $invoice->load(['customer', 'items']);
+        $invoice->load(['customer', 'items', 'payments.receivedBy']);
 
         $branding = PdfDocumentBranding::package();
 

@@ -211,6 +211,91 @@
                 </div>
 
                 <!-- Line items -->
+                <div v-if="isEditMode" class="form-card">
+                    <div class="form-section-head flex flex-wrap justify-between items-center gap-2">
+                        <div>
+                            <h2 class="form-section-title">Payment history</h2>
+                            <p class="form-section-desc !mt-0.5">Record each client payment separately. The invoice number stays the same.</p>
+                        </div>
+                    </div>
+                    <div class="form-body space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+                            <div>
+                                <div class="text-xs text-slate-500">Total</div>
+                                <div class="font-semibold text-slate-900">GBP {{ formatNumber(invoiceTotalForPayments) }}</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-slate-500">Paid</div>
+                                <div class="font-semibold text-emerald-700">GBP {{ formatNumber(invoiceAmountPaid) }}</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-slate-500">Outstanding</div>
+                                <div class="font-semibold" :class="invoiceOutstanding > 0 ? 'text-rose-700' : 'text-slate-700'">GBP {{ formatNumber(invoiceOutstanding) }}</div>
+                            </div>
+                        </div>
+
+                        <div v-if="invoicePayments.length" class="overflow-x-auto rounded-lg border border-slate-200">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-slate-50 text-slate-600">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">Date</th>
+                                        <th class="px-3 py-2 text-right">Amount</th>
+                                        <th class="px-3 py-2 text-left">Method</th>
+                                        <th class="px-3 py-2 text-left">Reference</th>
+                                        <th class="px-3 py-2 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <tr v-for="payment in invoicePayments" :key="payment.id">
+                                        <td class="px-3 py-2">{{ formatDate(payment.payment_date) }}</td>
+                                        <td class="px-3 py-2 text-right font-semibold">GBP {{ formatNumber(payment.amount) }}</td>
+                                        <td class="px-3 py-2">{{ payment.method || '-' }}</td>
+                                        <td class="px-3 py-2">{{ payment.reference || '-' }}</td>
+                                        <td class="px-3 py-2 text-right">
+                                            <button type="button" class="text-red-600 hover:text-red-800 font-medium" :disabled="deletingPaymentId === payment.id" @click="deletePayment(payment)">
+                                                {{ deletingPaymentId === payment.id ? 'Removing...' : 'Remove' }}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div v-else class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                            No payments recorded yet.
+                        </div>
+
+                        <div v-if="invoiceOutstanding > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="form-label">Payment date</label>
+                                <input v-model="paymentForm.payment_date" type="date" class="form-input" />
+                            </div>
+                            <div>
+                                <label class="form-label">Amount</label>
+                                <input v-model.number="paymentForm.amount" type="number" min="0.01" step="0.01" class="form-input" />
+                            </div>
+                            <div>
+                                <label class="form-label">Method</label>
+                                <input v-model="paymentForm.method" type="text" class="form-input" placeholder="Bank transfer, cash..." />
+                            </div>
+                            <div>
+                                <label class="form-label">Reference</label>
+                                <input v-model="paymentForm.reference" type="text" class="form-input" placeholder="Optional reference" />
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="form-label">Notes</label>
+                                <textarea v-model="paymentForm.notes" class="form-input min-h-24 resize-y" placeholder="Optional internal note"></textarea>
+                            </div>
+                            <div class="sm:col-span-2 flex justify-end">
+                                <button type="button" class="form-btn-submit w-full sm:w-auto" :disabled="savingPayment" @click="savePayment">
+                                    {{ savingPayment ? 'Saving payment...' : 'Record payment' }}
+                                </button>
+                            </div>
+                        </div>
+                        <p v-if="paymentError" class="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-100">{{ paymentError }}</p>
+                    </div>
+                </div>
+
+                <!-- Line items -->
                 <div class="form-card">
                     <div class="form-section-head flex flex-wrap justify-between items-center gap-2">
                         <div>
@@ -380,6 +465,17 @@ const productSearchLoading = ref(false);
 const showProductDropdown = ref(false);
 const productInputRefs = ref({});
 const productDropdownRef = ref(null);
+const invoicePayments = ref([]);
+const savingPayment = ref(false);
+const deletingPaymentId = ref(null);
+const paymentError = ref('');
+const paymentForm = ref({
+    payment_date: '',
+    amount: '',
+    method: '',
+    reference: '',
+    notes: '',
+});
 let searchTimeout = null;
 let productSearchTimeout = null;
 
@@ -390,6 +486,9 @@ const vatAmount = computed(() => {
     return subtotal.value * (form.value.vat_rate || 20) / 100;
 });
 const total = computed(() => subtotal.value + vatAmount.value);
+const invoiceAmountPaid = computed(() => invoicePayments.value.reduce((sum, payment) => sum + Number(payment.amount || 0), 0));
+const invoiceTotalForPayments = computed(() => total.value);
+const invoiceOutstanding = computed(() => Math.max(0, Number(invoiceTotalForPayments.value || 0) - Number(invoiceAmountPaid.value || 0)));
 
 const canSubmit = computed(() => {
     if (form.value.items.length === 0) return false;
@@ -407,6 +506,36 @@ const dropdownStyle = computed(() => {
         width: `${Math.max(dropdownRect.value.width, 280)}px`,
     };
 });
+
+function todayYmd() {
+    return new Date().toISOString().split('T')[0];
+}
+
+function formatNumber(value) {
+    return new Intl.NumberFormat('en-GB', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(Number(value || 0));
+}
+
+function formatDate(date) {
+    if (!date) return '-';
+    return new Date(date).toLocaleDateString('en-GB', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
+}
+
+function resetPaymentForm() {
+    paymentForm.value = {
+        payment_date: todayYmd(),
+        amount: invoiceOutstanding.value > 0 ? invoiceOutstanding.value.toFixed(2) : '',
+        method: '',
+        reference: '',
+        notes: '',
+    };
+}
 
 function updateDropdownPosition() {
     if (customerSelectRef.value) {
@@ -475,10 +604,64 @@ async function loadInvoiceForEdit() {
                 unit_price: parseFloat(i.unit_price),
             })) : [{ description: '', quantity: 1, unit_price: 0 }],
         };
+        invoicePayments.value = Array.isArray(data.payments) ? data.payments : [];
+        resetPaymentForm();
     } catch (err) {
         submitError.value = err.response?.data?.message || 'Failed to load invoice';
     } finally {
         loadingInvoice.value = false;
+    }
+}
+
+async function refreshInvoiceAfterPayment(data) {
+    invoicePayments.value = Array.isArray(data.payments) ? data.payments : [];
+    form.value.status = data.status || form.value.status;
+    resetPaymentForm();
+}
+
+async function savePayment() {
+    if (!invoiceId.value || savingPayment.value) return;
+    paymentError.value = '';
+    const amount = Number(paymentForm.value.amount || 0);
+    if (!paymentForm.value.payment_date || amount <= 0) {
+        paymentError.value = 'Enter a valid payment date and amount.';
+        return;
+    }
+    if (amount > invoiceOutstanding.value + 0.01) {
+        paymentError.value = 'Payment amount cannot be greater than the outstanding balance.';
+        return;
+    }
+
+    savingPayment.value = true;
+    try {
+        const { data } = await axios.post(`/api/invoices/${invoiceId.value}/payments`, {
+            payment_date: paymentForm.value.payment_date,
+            amount,
+            method: paymentForm.value.method || null,
+            reference: paymentForm.value.reference || null,
+            notes: paymentForm.value.notes || null,
+        });
+        await refreshInvoiceAfterPayment(data);
+        toast.success('Payment recorded');
+    } catch (err) {
+        paymentError.value = err.response?.data?.message || 'Failed to record payment.';
+    } finally {
+        savingPayment.value = false;
+    }
+}
+
+async function deletePayment(payment) {
+    if (!invoiceId.value || !payment?.id || deletingPaymentId.value) return;
+    deletingPaymentId.value = payment.id;
+    paymentError.value = '';
+    try {
+        const { data } = await axios.delete(`/api/invoices/${invoiceId.value}/payments/${payment.id}`);
+        await refreshInvoiceAfterPayment(data);
+        toast.success('Payment removed');
+    } catch (err) {
+        paymentError.value = err.response?.data?.message || 'Failed to remove payment.';
+    } finally {
+        deletingPaymentId.value = null;
     }
 }
 

@@ -51,6 +51,11 @@ class Invoice extends Model
         return $this->hasMany(InvoiceItem::class);
     }
 
+    public function payments(): HasMany
+    {
+        return $this->hasMany(InvoicePayment::class)->orderBy('payment_date')->orderBy('id');
+    }
+
     public function getOutstandingAttribute(): float
     {
         return max(0, $this->total - $this->amount_paid);

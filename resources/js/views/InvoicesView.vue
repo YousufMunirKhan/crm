@@ -118,6 +118,8 @@
                         <th class="listing-th">Customer</th>
                         <th class="listing-th">Date</th>
                         <th class="listing-th">Total</th>
+                        <th class="listing-th">Paid</th>
+                        <th class="listing-th">Due</th>
                         <th class="listing-th">Status</th>
                         <th class="listing-th">Created By</th>
                         <th class="listing-th">Actions</th>
@@ -125,16 +127,20 @@
                 </thead>
                 <tbody>
                     <tr v-if="loading">
-                        <td colspan="7" class="listing-td text-center text-slate-500 py-10">Loading invoices...</td>
+                        <td colspan="9" class="listing-td text-center text-slate-500 py-10">Loading invoices...</td>
                     </tr>
                     <tr v-else-if="invoices.length === 0">
-                        <td colspan="7" class="listing-td text-center text-slate-500 py-10">No invoices found</td>
+                        <td colspan="9" class="listing-td text-center text-slate-500 py-10">No invoices found</td>
                     </tr>
                     <tr v-for="invoice in invoices" :key="invoice.id" class="listing-row">
                         <td class="listing-td-strong">{{ invoice.invoice_number }}</td>
                         <td class="listing-td">{{ invoice.customer?.name || '—' }}</td>
                         <td class="listing-td text-slate-600">{{ formatDate(invoice.invoice_date) }}</td>
                         <td class="listing-td font-semibold text-slate-900">£{{ formatNumber(invoice.total) }}</td>
+                        <td class="listing-td font-semibold text-emerald-700">GBP {{ formatNumber(invoice.amount_paid) }}</td>
+                        <td class="listing-td font-semibold" :class="outstanding(invoice) > 0 ? 'text-rose-700' : 'text-slate-700'">
+                            GBP {{ formatNumber(outstanding(invoice)) }}
+                        </td>
                         <td class="listing-td">
                             <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium" :class="getStatusClass(invoice.status)">
                                 {{ formatStatus(invoice.status) }}
@@ -145,6 +151,9 @@
                             <div class="flex flex-wrap gap-x-3 gap-y-1">
                                 <button type="button" class="text-indigo-600 hover:text-indigo-800 font-medium text-sm" @click="openSendEmail(invoice)">
                                     Send email
+                                </button>
+                                <button type="button" class="text-emerald-700 hover:text-emerald-900 font-medium text-sm disabled:opacity-40" :disabled="outstanding(invoice) <= 0" @click="openPaymentModal(invoice)">
+                                    Record payment
                                 </button>
                                 <router-link :to="`/invoices/${invoice.id}/edit`" class="listing-link-edit">Edit</router-link>
                                 <button type="button" class="listing-link-edit" @click="generatePDF(invoice.id)">PDF</button>
@@ -172,8 +181,19 @@
                 <div class="text-sm text-slate-600">Date: {{ formatDate(invoice.invoice_date) }}</div>
                 <div class="text-sm font-semibold text-slate-900">Total: £{{ formatNumber(invoice.total) }}</div>
                 <div class="text-sm text-slate-600">Created By: {{ invoice.creator?.name || '—' }}</div>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                        <div class="text-xs text-slate-500">Paid</div>
+                        <div class="font-semibold text-emerald-700">GBP {{ formatNumber(invoice.amount_paid) }}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500">Due</div>
+                        <div class="font-semibold" :class="outstanding(invoice) > 0 ? 'text-rose-700' : 'text-slate-700'">GBP {{ formatNumber(outstanding(invoice)) }}</div>
+                    </div>
+                </div>
                 <div class="flex flex-wrap gap-3 pt-1">
                     <button type="button" class="text-indigo-600 hover:text-indigo-800 font-medium text-sm" @click="openSendEmail(invoice)">Send email</button>
+                    <button type="button" class="text-emerald-700 hover:text-emerald-900 font-medium text-sm disabled:opacity-40" :disabled="outstanding(invoice) <= 0" @click="openPaymentModal(invoice)">Record payment</button>
                     <router-link :to="`/invoices/${invoice.id}/edit`" class="listing-link-edit">Edit</router-link>
                     <button type="button" class="listing-link-edit" @click="generatePDF(invoice.id)">PDF</button>
                     <button type="button" class="listing-link-delete" @click="openDeleteConfirm(invoice)">Delete</button>
@@ -201,6 +221,50 @@
         @close="closeSendEmail"
         @sent="handleEmailSent"
     />
+
+    <div v-if="showPaymentModal" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
+        <div class="w-full max-w-lg rounded-xl bg-white shadow-xl">
+            <div class="border-b border-slate-200 px-5 py-4">
+                <h2 class="text-lg font-semibold text-slate-900">Record payment</h2>
+                <p class="mt-1 text-sm text-slate-500">
+                    {{ paymentInvoice?.invoice_number }} - outstanding GBP {{ formatNumber(outstanding(paymentInvoice)) }}
+                </p>
+            </div>
+            <div class="space-y-4 p-5">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="listing-label">Payment date</label>
+                        <input v-model="paymentForm.payment_date" type="date" class="listing-input" />
+                    </div>
+                    <div>
+                        <label class="listing-label">Amount</label>
+                        <input v-model.number="paymentForm.amount" type="number" min="0.01" step="0.01" class="listing-input" />
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="listing-label">Method</label>
+                        <input v-model="paymentForm.method" type="text" class="listing-input" placeholder="Bank transfer, cash..." />
+                    </div>
+                    <div>
+                        <label class="listing-label">Reference</label>
+                        <input v-model="paymentForm.reference" type="text" class="listing-input" placeholder="Optional reference" />
+                    </div>
+                </div>
+                <div>
+                    <label class="listing-label">Notes</label>
+                    <textarea v-model="paymentForm.notes" class="listing-input min-h-24 resize-y" placeholder="Optional internal note"></textarea>
+                </div>
+                <p v-if="paymentError" class="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ paymentError }}</p>
+            </div>
+            <div class="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
+                <button type="button" class="listing-btn-outline w-full sm:w-auto" :disabled="savingPayment" @click="closePaymentModal">Cancel</button>
+                <button type="button" class="listing-btn-primary w-full sm:w-auto" :disabled="savingPayment" @click="savePayment">
+                    {{ savingPayment ? 'Saving...' : 'Save payment' }}
+                </button>
+            </div>
+        </div>
+    </div>
 
     <InvoiceForm
         v-if="showForm"
@@ -260,6 +324,17 @@ const showDeleteConfirm = ref(false);
 const invoiceToDelete = ref(null);
 const deleting = ref(false);
 const loading = ref(false);
+const showPaymentModal = ref(false);
+const paymentInvoice = ref(null);
+const savingPayment = ref(false);
+const paymentError = ref('');
+const paymentForm = ref({
+    payment_date: '',
+    amount: '',
+    method: '',
+    reference: '',
+    notes: '',
+});
 let searchTimeout = null;
 
 const invoicesBadge = computed(() =>
@@ -267,7 +342,17 @@ const invoicesBadge = computed(() =>
 );
 
 const formatNumber = (num) => {
-    return new Intl.NumberFormat('en-GB').format(num || 0);
+    return new Intl.NumberFormat('en-GB', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(Number(num || 0));
+};
+
+const todayYmd = () => new Date().toISOString().split('T')[0];
+
+const outstanding = (invoice) => {
+    if (!invoice) return 0;
+    return Math.max(0, Number(invoice.total || 0) - Number(invoice.amount_paid || 0));
 };
 
 const formatDate = (date) => {
@@ -366,6 +451,8 @@ const loadInvoices = async (page = 1) => {
             summary.value = {
                 total: data.total || 0,
                 total_amount: invoices.value.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0),
+                total_paid: invoices.value.reduce((sum, inv) => sum + parseFloat(inv.amount_paid || 0), 0),
+                total_outstanding: invoices.value.reduce((sum, inv) => sum + outstanding(inv), 0),
             };
         }
     } catch (error) {
@@ -426,6 +513,58 @@ const closeSendEmail = () => {
 
 const handleEmailSent = () => {
     loadInvoices(pagination.value?.current_page || 1);
+};
+
+const openPaymentModal = (invoice) => {
+    paymentInvoice.value = invoice;
+    paymentError.value = '';
+    paymentForm.value = {
+        payment_date: todayYmd(),
+        amount: outstanding(invoice).toFixed(2),
+        method: '',
+        reference: '',
+        notes: '',
+    };
+    showPaymentModal.value = true;
+};
+
+const closePaymentModal = () => {
+    if (savingPayment.value) return;
+    showPaymentModal.value = false;
+    paymentInvoice.value = null;
+    paymentError.value = '';
+};
+
+const savePayment = async () => {
+    if (!paymentInvoice.value || savingPayment.value) return;
+    paymentError.value = '';
+    const amount = Number(paymentForm.value.amount || 0);
+    if (!paymentForm.value.payment_date || amount <= 0) {
+        paymentError.value = 'Enter a valid payment date and amount.';
+        return;
+    }
+    if (amount > outstanding(paymentInvoice.value) + 0.01) {
+        paymentError.value = 'Payment amount cannot be greater than the outstanding balance.';
+        return;
+    }
+
+    savingPayment.value = true;
+    try {
+        await axios.post(`/api/invoices/${paymentInvoice.value.id}/payments`, {
+            payment_date: paymentForm.value.payment_date,
+            amount,
+            method: paymentForm.value.method || null,
+            reference: paymentForm.value.reference || null,
+            notes: paymentForm.value.notes || null,
+        });
+        toast.success('Payment recorded');
+        closePaymentModal();
+        await loadInvoices(pagination.value?.current_page || 1);
+    } catch (error) {
+        paymentError.value = error.response?.data?.message || 'Failed to record payment.';
+    } finally {
+        savingPayment.value = false;
+    }
 };
 
 const openEditForm = (invoice) => {

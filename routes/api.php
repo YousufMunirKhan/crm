@@ -168,6 +168,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Invoices
     Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'generatePDF'])->name('invoices.pdf');
     Route::post('/invoices/{id}/send-email', [InvoiceController::class, 'sendEmail'])->name('invoices.send-email');
+    Route::post('/invoices/{id}/payments', [InvoiceController::class, 'storePayment'])->name('invoices.payments.store');
+    Route::delete('/invoices/{id}/payments/{paymentId}', [InvoiceController::class, 'destroyPayment'])->name('invoices.payments.destroy');
     Route::apiResource('invoices', InvoiceController::class);
 
     // HR
