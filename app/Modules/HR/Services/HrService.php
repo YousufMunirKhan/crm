@@ -9,7 +9,7 @@ use Carbon\Carbon;
 
 class HrService
 {
-    public function checkIn(int $userId): Attendance
+    public function checkIn(int $userId, array $proof = []): Attendance
     {
         $today = now()->toDateString();
 
@@ -23,12 +23,20 @@ class HrService
         }
 
         $attendance->check_in_at = now();
+        $attendance->fill([
+            'check_in_photo_path' => $proof['photo_path'] ?? null,
+            'check_in_latitude' => $proof['latitude'] ?? null,
+            'check_in_longitude' => $proof['longitude'] ?? null,
+            'check_in_location_name' => $proof['location_name'] ?? null,
+            'check_in_location_accuracy' => $proof['accuracy'] ?? null,
+            'check_in_location_captured_at' => $proof['captured_at'] ?? now(),
+        ]);
         $attendance->save();
 
         return $attendance;
     }
 
-    public function checkOut(int $userId): Attendance
+    public function checkOut(int $userId, array $proof = []): Attendance
     {
         $today = now()->toDateString();
 
@@ -45,6 +53,14 @@ class HrService
         }
 
         $attendance->check_out_at = now();
+        $attendance->fill([
+            'check_out_photo_path' => $proof['photo_path'] ?? null,
+            'check_out_latitude' => $proof['latitude'] ?? null,
+            'check_out_longitude' => $proof['longitude'] ?? null,
+            'check_out_location_name' => $proof['location_name'] ?? null,
+            'check_out_location_accuracy' => $proof['accuracy'] ?? null,
+            'check_out_location_captured_at' => $proof['captured_at'] ?? now(),
+        ]);
         $attendance->work_hours = $attendance->check_in_at->diffInHours($attendance->check_out_at, true);
         $attendance->save();
 

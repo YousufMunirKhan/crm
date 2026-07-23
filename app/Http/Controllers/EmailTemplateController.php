@@ -357,6 +357,16 @@ class EmailTemplateController extends Controller
         }
     }
 
+    public function sendTemplateEmailToCustomerRecord(int $templateId, \App\Modules\CRM\Models\Customer $customer, ?int $leadId = null): array
+    {
+        $response = $this->sendTemplateEmail($templateId, $customer, $leadId);
+
+        return [
+            'status_code' => $response->getStatusCode(),
+            'body' => $response->getData(true),
+        ];
+    }
+
     public function store(Request $request)
     {
         $this->checkAdmin();

@@ -12,6 +12,7 @@ use App\Modules\HR\Services\HrService;
 use App\Modules\Reporting\Services\ReportingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
@@ -29,7 +30,8 @@ class HrController extends Controller
         $userId = $user->id;
 
         try {
-            $attendance = $this->hrService->checkIn($userId);
+            $proof = $this->attendanceProofFromRequest($request, $userId, 'check-in');
+            $attendance = $this->hrService->checkIn($userId, $proof);
             return response()->json($attendance, 201);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 400);
@@ -42,17 +44,75 @@ class HrController extends Controller
         $userId = $user->id;
 
         try {
-            $attendance = $this->hrService->checkOut($userId);
+            $proof = $this->attendanceProofFromRequest($request, $userId, 'check-out');
+            $attendance = $this->hrService->checkOut($userId, $proof);
             return response()->json($attendance);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 400);
         }
     }
 
+    private function attendanceProofFromRequest(Request $request, int $userId, string $action): array
+    {
+        $data = $request->validate([
+            'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'location_name' => ['nullable', 'string', 'max:500'],
+            'accuracy' => ['nullable', 'numeric', 'min:0', 'max:100000'],
+            'captured_at' => ['nullable', 'date'],
+        ]);
+
+        $date = now()->toDateString();
+        $directory = "attendance-proof/{$userId}/{$date}";
+        $photoPath = $request->file('photo')->store($directory, 'public');
+
+        if (! $photoPath) {
+            throw new \Exception('Could not save attendance photo. Please try again.');
+        }
+
+        return [
+            'photo_path' => $photoPath,
+            'latitude' => (float) $data['latitude'],
+            'longitude' => (float) $data['longitude'],
+            'location_name' => $data['location_name'] ?? $this->resolveLocationName((float) $data['latitude'], (float) $data['longitude']),
+            'accuracy' => isset($data['accuracy']) ? (float) $data['accuracy'] : null,
+            'captured_at' => isset($data['captured_at']) ? Carbon::parse($data['captured_at']) : now(),
+        ];
+    }
+
+    private function resolveLocationName(float $latitude, float $longitude): string
+    {
+        $fallback = number_format($latitude, 7, '.', '') . ', ' . number_format($longitude, 7, '.', '');
+
+        try {
+            $response = Http::timeout(4)
+                ->withHeaders([
+                    'User-Agent' => 'SwitchSaveCRM-Attendance/1.0',
+                ])
+                ->get('https://nominatim.openstreetmap.org/reverse', [
+                    'format' => 'jsonv2',
+                    'lat' => $latitude,
+                    'lon' => $longitude,
+                    'zoom' => 18,
+                    'addressdetails' => 1,
+                ]);
+
+            if (! $response->ok()) {
+                return $fallback;
+            }
+
+            $name = trim((string) ($response->json('display_name') ?? ''));
+            return $name !== '' ? mb_substr($name, 0, 500) : $fallback;
+        } catch (\Throwable) {
+            return $fallback;
+        }
+    }
+
     public function attendance(Request $request)
     {
         $user = $request->user();
-        $isAdmin = $user->isRole('Admin') || $user->isRole('Manager');
+        $isAdmin = $user->isRole('Admin') || $user->isRole('Manager') || $user->isRole('System Admin');
         
         $query = Attendance::with('user');
 
@@ -77,10 +137,148 @@ class HrController extends Controller
                   ->whereMonth('date', $month->month);
         }
 
+        if ($request->has('proof')) {
+            match ($request->get('proof')) {
+                'with_check_in' => $query->whereNotNull('check_in_photo_path')
+                    ->whereNotNull('check_in_latitude')
+                    ->whereNotNull('check_in_longitude'),
+                'missing_check_in' => $query->where(function ($q) {
+                    $q->whereNull('check_in_photo_path')
+                        ->orWhereNull('check_in_latitude')
+                        ->orWhereNull('check_in_longitude');
+                }),
+                'with_check_out' => $query->whereNotNull('check_out_photo_path')
+                    ->whereNotNull('check_out_latitude')
+                    ->whereNotNull('check_out_longitude'),
+                'missing_check_out' => $query->whereNotNull('check_out_at')
+                    ->where(function ($q) {
+                        $q->whereNull('check_out_photo_path')
+                            ->orWhereNull('check_out_latitude')
+                            ->orWhereNull('check_out_longitude');
+                    }),
+                default => null,
+            };
+        }
+
         $attendance = $query->orderBy('date', 'desc')
             ->paginate($request->get('per_page', 15));
 
         return response()->json($attendance);
+    }
+
+    public function attendanceMonthlyReport(Request $request)
+    {
+        $data = $request->validate([
+            'month' => ['nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
+            'from_date' => ['nullable', 'date'],
+            'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'proof' => ['nullable', 'in:with_check_in,missing_check_in,with_check_out,missing_check_out'],
+        ]);
+
+        $user = $request->user();
+        $isAdmin = $user->isRole('Admin') || $user->isRole('Manager') || $user->isRole('System Admin');
+
+        if (! $isAdmin) {
+            $data['user_id'] = $user->id;
+        }
+
+        if (! empty($data['month'])) {
+            $month = Carbon::parse($data['month'] . '-01');
+            $from = $month->copy()->startOfMonth();
+            $to = $month->copy()->endOfMonth();
+        } else {
+            $from = ! empty($data['from_date'])
+                ? Carbon::parse($data['from_date'])->startOfDay()
+                : now()->copy()->startOfMonth();
+            $to = ! empty($data['to_date'])
+                ? Carbon::parse($data['to_date'])->endOfDay()
+                : now()->copy()->endOfMonth();
+        }
+
+        $query = Attendance::query()
+            ->with(['user:id,name,email'])
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()]);
+
+        if (! empty($data['user_id'])) {
+            $query->where('user_id', $data['user_id']);
+        }
+
+        if (! empty($data['proof'])) {
+            match ($data['proof']) {
+                'with_check_in' => $query->whereNotNull('check_in_photo_path')
+                    ->whereNotNull('check_in_latitude')
+                    ->whereNotNull('check_in_longitude'),
+                'missing_check_in' => $query->where(function ($q) {
+                    $q->whereNull('check_in_photo_path')
+                        ->orWhereNull('check_in_latitude')
+                        ->orWhereNull('check_in_longitude');
+                }),
+                'with_check_out' => $query->whereNotNull('check_out_photo_path')
+                    ->whereNotNull('check_out_latitude')
+                    ->whereNotNull('check_out_longitude'),
+                'missing_check_out' => $query->whereNotNull('check_out_at')
+                    ->where(function ($q) {
+                        $q->whereNull('check_out_photo_path')
+                            ->orWhereNull('check_out_latitude')
+                            ->orWhereNull('check_out_longitude');
+                    }),
+            };
+        }
+
+        $rows = $query
+            ->select('user_id')
+            ->selectRaw('COUNT(*) as record_count')
+            ->selectRaw('SUM(CASE WHEN check_in_at IS NOT NULL THEN 1 ELSE 0 END) as present_days')
+            ->selectRaw('SUM(CASE WHEN check_out_at IS NOT NULL THEN 1 ELSE 0 END) as completed_shifts')
+            ->selectRaw('SUM(CASE WHEN check_in_at IS NOT NULL AND check_out_at IS NULL THEN 1 ELSE 0 END) as open_shifts')
+            ->selectRaw('SUM(CASE WHEN check_in_photo_path IS NULL OR check_in_latitude IS NULL OR check_in_longitude IS NULL THEN 1 ELSE 0 END) as missing_check_in_proof')
+            ->selectRaw('SUM(CASE WHEN check_out_at IS NOT NULL AND (check_out_photo_path IS NULL OR check_out_latitude IS NULL OR check_out_longitude IS NULL) THEN 1 ELSE 0 END) as missing_check_out_proof')
+            ->selectRaw('SUM(COALESCE(work_hours, 0)) as total_hours')
+            ->selectRaw('AVG(CASE WHEN check_out_at IS NOT NULL THEN work_hours ELSE NULL END) as average_completed_shift_hours')
+            ->selectRaw('MIN(date) as first_attendance_date')
+            ->selectRaw('MAX(date) as last_attendance_date')
+            ->groupBy('user_id')
+            ->orderByDesc('total_hours')
+            ->get();
+
+        $employees = $rows->map(function (Attendance $row) {
+            $presentDays = (int) $row->present_days;
+            $completedShifts = (int) $row->completed_shifts;
+            $totalHours = round((float) $row->total_hours, 2);
+
+            return [
+                'user_id' => (int) $row->user_id,
+                'employee_name' => $row->user?->name ?? 'Unknown employee',
+                'employee_email' => $row->user?->email,
+                'record_count' => (int) $row->record_count,
+                'present_days' => $presentDays,
+                'completed_shifts' => $completedShifts,
+                'open_shifts' => (int) $row->open_shifts,
+                'missing_check_in_proof' => (int) $row->missing_check_in_proof,
+                'missing_check_out_proof' => (int) $row->missing_check_out_proof,
+                'total_hours' => $totalHours,
+                'average_hours_per_present_day' => $presentDays > 0 ? round($totalHours / $presentDays, 2) : 0,
+                'average_completed_shift_hours' => $completedShifts > 0 ? round((float) $row->average_completed_shift_hours, 2) : 0,
+                'first_attendance_date' => $row->first_attendance_date,
+                'last_attendance_date' => $row->last_attendance_date,
+            ];
+        })->values();
+
+        return response()->json([
+            'from_date' => $from->toDateString(),
+            'to_date' => $to->toDateString(),
+            'employee_count' => $employees->count(),
+            'totals' => [
+                'present_days' => $employees->sum('present_days'),
+                'completed_shifts' => $employees->sum('completed_shifts'),
+                'open_shifts' => $employees->sum('open_shifts'),
+                'missing_check_in_proof' => $employees->sum('missing_check_in_proof'),
+                'missing_check_out_proof' => $employees->sum('missing_check_out_proof'),
+                'total_hours' => round($employees->sum('total_hours'), 2),
+            ],
+            'employees' => $employees,
+        ]);
     }
 
     /**

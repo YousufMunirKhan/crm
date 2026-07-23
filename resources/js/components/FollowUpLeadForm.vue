@@ -79,6 +79,74 @@
                             />
                         </div>
                     </div>
+
+                    <div v-if="customerLeads.length > 0" class="mt-4">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Sales opportunity for this appointment</label>
+                        <select
+                            v-model="form.lead_id"
+                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                        >
+                            <option value="">Create a new opportunity for this appointment</option>
+                            <option v-for="lead in customerLeads" :key="lead.id" :value="lead.id">
+                                Lead #{{ lead.id }} - {{ formatLeadStage(lead.stage) }} - {{ leadProductNames(lead) || 'No products selected' }}
+                            </option>
+                        </select>
+                        <p class="text-xs text-blue-700 mt-1">Select the exact lead if this visit is for an existing opportunity.</p>
+                    </div>
+
+                    <div v-if="form.lead_id" class="mt-4 rounded-lg bg-white border border-blue-100 p-3">
+                        <div class="text-xs font-medium text-blue-800 mb-1">Products on selected lead</div>
+                        <div v-if="selectedAppointmentLeadProducts.length" class="flex flex-wrap gap-1.5">
+                            <span
+                                v-for="product in selectedAppointmentLeadProducts"
+                                :key="product"
+                                class="px-2 py-1 rounded bg-blue-50 text-blue-800 border border-blue-100 text-xs font-medium"
+                            >
+                                {{ product }}
+                            </span>
+                        </div>
+                        <div v-else class="text-xs text-amber-700">
+                            This lead has no products. Choose "Create a new opportunity" and select products, or add products on the lead page first.
+                        </div>
+                    </div>
+
+                    <div v-if="!form.lead_id" class="mt-4">
+                        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mb-2">
+                            <label class="text-sm font-medium text-slate-700">Product(s) to sell *</label>
+                            <router-link
+                                to="/products"
+                                target="_blank"
+                                class="text-xs text-blue-600 hover:text-blue-800 underline"
+                            >
+                                + Add New Product
+                            </router-link>
+                        </div>
+                        <div class="border border-blue-100 rounded-xl p-3 sm:p-4 bg-white max-h-52 overflow-y-auto">
+                            <div v-if="!products || products.length === 0" class="text-sm text-slate-500 text-center py-4">
+                                Loading products...
+                            </div>
+                            <div v-else class="space-y-1">
+                                <label
+                                    v-for="product in products"
+                                    :key="product.id"
+                                    class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors min-h-[44px] touch-manipulation"
+                                    :class="{ 'bg-blue-50 border border-blue-200': form.product_ids.includes(Number(product.id)), 'hover:bg-slate-50': !form.product_ids.includes(Number(product.id)) }"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :value="Number(product.id)"
+                                        v-model="form.product_ids"
+                                        @change="loadSuggestedProducts"
+                                        class="w-5 h-5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 flex-shrink-0"
+                                    />
+                                    <span class="text-sm text-slate-700">{{ product.name }}</span>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="text-xs text-blue-700 mt-2">
+                            These products will appear in the agent's appointment brief and email.
+                        </p>
+                    </div>
                     
                     <p class="text-xs text-blue-700 mt-3 flex items-start gap-1">
                         <span>ℹ️</span>
@@ -391,7 +459,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import axios from 'axios';
 import { formatLeadStage } from '@/utils/displayFormat';
 
@@ -434,10 +502,33 @@ const products = ref([]);
 const suggestedProducts = ref([]);
 const users = ref([]);
 
+const selectedAppointmentLead = computed(() => {
+    if (!form.value.lead_id) return null;
+    return customerLeads.value.find((lead) => String(lead.id) === String(form.value.lead_id)) || null;
+});
+
+const selectedAppointmentLeadProducts = computed(() => {
+    const lead = selectedAppointmentLead.value;
+    if (!lead) return [];
+    return leadProductNames(lead)
+        .split(', ')
+        .filter(Boolean);
+});
+
 const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const leadProductNames = (lead) => {
+    const fromItems = (lead?.items || [])
+        .map((item) => item.product?.name)
+        .filter(Boolean);
+    if (fromItems.length) {
+        return [...new Set(fromItems)].join(', ');
+    }
+    return lead?.product?.name || '';
 };
 
 const loadCustomerLeads = async () => {
@@ -542,22 +633,30 @@ const handleSubmit = async () => {
                 return;
             }
 
-            // Find or create a lead for this customer
-            let leadId = null;
-            
-            // Try to find an existing active lead
-            if (customerLeads.value.length > 0) {
-                // Use the most recent lead
-                leadId = customerLeads.value[0].id;
+            // Use the chosen lead, or create a new opportunity with selected products.
+            let leadId = form.value.lead_id || null;
+            if (leadId && selectedAppointmentLeadProducts.value.length === 0) {
+                error.value = 'The selected lead has no products. Add products to that lead or create a new opportunity with products.';
+                loading.value = false;
+                return;
             }
-            
-            // If no lead exists, create one automatically
+
             if (!leadId) {
+                const selectedProductIds = form.value.product_ids && form.value.product_ids.length > 0
+                    ? form.value.product_ids
+                    : (form.value.product_id ? [form.value.product_id] : []);
+
+                if (selectedProductIds.length === 0) {
+                    error.value = 'Please select what product(s) this appointment is for.';
+                    loading.value = false;
+                    return;
+                }
+
                 const leadResponse = await axios.post('/api/leads', {
                     customer_id: props.customerId,
                     stage: 'follow_up',
                     source: 'appointment',
-                    product_ids: products.value.length > 0 ? [products.value[0].id] : [],
+                    product_ids: selectedProductIds,
                     comment: `Appointment scheduled for ${form.value.appointment_date} at ${form.value.appointment_time}`,
                 });
                 leadId = leadResponse.data.id;

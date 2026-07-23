@@ -57,6 +57,14 @@ class TemplateAssignmentController extends Controller
             'template_id' => ['nullable', 'integer'],
         ]);
 
+        if (empty($data['template_id'])) {
+            TemplateAssignment::where('function_type', $data['function_type'])
+                ->where('template_type', $data['template_type'])
+                ->delete();
+
+            return response()->json(['message' => 'Template assignment cleared successfully']);
+        }
+
         TemplateAssignment::updateOrCreate(
             [
                 'function_type' => $data['function_type'],

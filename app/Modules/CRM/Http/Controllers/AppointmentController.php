@@ -26,7 +26,7 @@ class AppointmentController extends Controller
                             ->orWhereHas('customer', fn ($cq) => $cq->forSalesAgent($user->id));
                     });
             })
-            ->with(['lead.customer', 'lead.assignee', 'user', 'assignee']);
+            ->with(['lead.customer', 'lead.assignee', 'lead.items.product', 'user', 'assignee']);
 
         $activities = $query->get();
 
@@ -45,7 +45,10 @@ class AppointmentController extends Controller
             return [
                 'id' => $a->id,
                 'lead_id' => $a->lead_id,
+                'lead' => $this->leadSummary($a->lead),
                 'customer' => $a->lead?->customer,
+                'products_to_sell' => $this->productNames($a->lead),
+                'business_name' => $a->lead?->customer?->business_name,
                 'description' => $a->description,
                 'appointment_date' => $this->appointmentDateFrom($a),
                 'appointment_time' => $this->appointmentTimeFrom($a),
@@ -108,6 +111,8 @@ class AppointmentController extends Controller
             'lead_id' => $activity->lead_id,
             'lead' => $activity->lead,
             'customer' => $activity->lead->customer,
+            'products_to_sell' => $this->productNames($activity->lead),
+            'business_name' => $activity->lead->customer?->business_name,
             'description' => $activity->description,
             'appointment_date' => $this->appointmentDateFrom($activity),
             'appointment_time' => $this->appointmentTimeFrom($activity),
@@ -243,5 +248,45 @@ class AppointmentController extends Controller
         $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
 
         return $meta['appointment_time'] ?? '10:00';
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function productNames(?Lead $lead): array
+    {
+        if (! $lead) {
+            return [];
+        }
+
+        $lead->loadMissing('items.product', 'product');
+        $names = $lead->items
+            ->map(fn (LeadItem $item) => $item->product?->name)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($names === [] && $lead->product?->name) {
+            $names[] = $lead->product->name;
+        }
+
+        return $names;
+    }
+
+    private function leadSummary(?Lead $lead): ?array
+    {
+        if (! $lead) {
+            return null;
+        }
+
+        return [
+            'id' => $lead->id,
+            'stage' => $lead->stage,
+            'source' => $lead->source,
+            'pipeline_value' => $lead->pipeline_value,
+            'assignee' => $lead->assignee,
+            'items' => $lead->items,
+        ];
     }
 }

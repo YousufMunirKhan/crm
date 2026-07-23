@@ -15,6 +15,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Models\EmailTemplate;
+use App\Models\TemplateAssignment;
 
 class CustomerController extends Controller
 {
@@ -369,6 +371,7 @@ class CustomerController extends Controller
             'category' => ['nullable', 'string', 'max:100'],
             'latitude' => ['nullable', 'numeric'],
             'longitude' => ['nullable', 'numeric'],
+            'welcome_email_template_id' => ['nullable', 'integer', 'exists:email_templates,id'],
         ]);
 
         $data['type'] = $data['type'] ?? Customer::TYPE_PROSPECT;
@@ -376,6 +379,7 @@ class CustomerController extends Controller
         $remoteLicenses = $data['remote_licenses'] ?? [];
         $wonProductIds = array_values(array_unique($data['won_product_ids'] ?? []));
         $saleCreditUserId = isset($data['sale_credit_user_id']) ? (int) $data['sale_credit_user_id'] : null;
+        $welcomeEmailTemplateId = isset($data['welcome_email_template_id']) ? (int) $data['welcome_email_template_id'] : null;
         $actor = auth()->user();
         $canChooseSaleCredit = $actor && ($actor->isRole('Admin') || $actor->isRole('Manager') || $actor->isRole('System Admin'));
         if (! $canChooseSaleCredit) {
@@ -384,6 +388,7 @@ class CustomerController extends Controller
         unset($data['remote_licenses']);
         unset($data['won_product_ids']);
         unset($data['sale_credit_user_id']);
+        unset($data['welcome_email_template_id']);
 
         $createdWonLeadId = null;
         $customer = DB::transaction(function () use ($data, $remoteLicenses, $wonProductIds, $saleCreditUserId, &$createdWonLeadId) {
@@ -462,11 +467,92 @@ class CustomerController extends Controller
             }
         }
 
+        $welcomeEmail = $this->sendWelcomeEmailAfterCustomerCreate($customer, $createdWonLeadId, $welcomeEmailTemplateId);
+
         return response()->json([
             'id' => $customer->id,
             'customer' => $customer->load('creator'),
             'won_lead_id' => $createdWonLeadId,
+            'welcome_email' => $welcomeEmail,
         ], 201);
+    }
+
+    private function sendWelcomeEmailAfterCustomerCreate(Customer $customer, ?int $leadId = null, ?int $templateId = null): array
+    {
+        if ($customer->type !== Customer::TYPE_CUSTOMER) {
+            return [
+                'status' => 'skipped',
+                'reason' => 'welcome_email_only_sends_for_customer_records',
+            ];
+        }
+
+        if (blank($customer->email)) {
+            return [
+                'status' => 'skipped',
+                'reason' => 'customer_has_no_email',
+            ];
+        }
+
+        $template = $this->resolveCustomerWelcomeEmailTemplate($templateId);
+        if (! $template) {
+            return [
+                'status' => 'skipped',
+                'reason' => 'welcome_template_not_found',
+            ];
+        }
+
+        try {
+            $result = app(\App\Http\Controllers\EmailTemplateController::class)
+                ->sendTemplateEmailToCustomerRecord($template->id, $customer->fresh(['leads.items.product', 'leads.product']), $leadId);
+
+            $sent = (int) ($result['status_code'] ?? 500) >= 200 && (int) ($result['status_code'] ?? 500) < 300;
+
+            return [
+                'status' => $sent ? 'sent' : 'failed',
+                'template_id' => $template->id,
+                'template_name' => $template->name,
+                'message' => $result['body']['message'] ?? null,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Customer welcome email failed', [
+                'customer_id' => $customer->id,
+                'template_id' => $template->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'status' => 'failed',
+                'template_id' => $template->id,
+                'template_name' => $template->name,
+                'message' => 'Failed to send welcome email.',
+            ];
+        }
+    }
+
+    private function resolveCustomerWelcomeEmailTemplate(?int $templateId = null): ?EmailTemplate
+    {
+        if ($templateId) {
+            $requestedTemplate = EmailTemplate::where('is_active', true)->find($templateId);
+            if ($requestedTemplate) {
+                return $requestedTemplate;
+            }
+        }
+
+        $assignment = TemplateAssignment::where('function_type', 'customer_welcome')
+            ->where('template_type', 'email')
+            ->where('is_active', true)
+            ->first();
+
+        if ($assignment?->template_id) {
+            $assignedTemplate = EmailTemplate::where('is_active', true)->find($assignment->template_id);
+            if ($assignedTemplate) {
+                return $assignedTemplate;
+            }
+        }
+
+        return EmailTemplate::where('is_active', true)
+            ->where('name', 'Welcome Template (Generic For All User)')
+            ->first();
     }
 
     public function update(Request $request, $id)

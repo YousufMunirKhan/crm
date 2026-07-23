@@ -432,6 +432,51 @@
                     </div>
                 </div>
 
+                <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <h3 class="text-base font-semibold text-slate-900">Customer welcome email</h3>
+                            <p class="text-sm text-slate-500">
+                                Sent automatically when a new customer record is created with an email address.
+                            </p>
+                        </div>
+                        <span class="text-xs font-medium text-slate-500 sm:text-right">
+                            Default: Welcome Template (Generic For All User)
+                        </span>
+                    </div>
+
+                    <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1fr,auto] lg:items-end">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Template</label>
+                            <select
+                                v-model="welcomeEmailTemplateId"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">Use default generic welcome template</option>
+                                <option
+                                    v-for="template in emailTemplates"
+                                    :key="template.id"
+                                    :value="String(template.id)"
+                                >
+                                    {{ template.name }}{{ template.subject ? ` - ${template.subject}` : '' }}
+                                </option>
+                            </select>
+                            <p class="mt-1 text-xs text-slate-500">
+                                If no custom template is selected, the CRM will send the active template named
+                                "Welcome Template (Generic For All User)".
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            @click="saveWelcomeEmailTemplate"
+                            :disabled="savingWelcomeEmailTemplate"
+                            class="w-full px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50 lg:w-auto"
+                        >
+                            {{ savingWelcomeEmailTemplate ? 'Saving...' : 'Save welcome template' }}
+                        </button>
+                    </div>
+                </div>
+
                 <div class="mt-6 flex items-center gap-4">
                     <button
                         @click="saveSmtpSettings"
@@ -1062,6 +1107,9 @@ const testingSmtp = ref(false);
 const uploadingLogo = ref(false);
 const uploadingFavicon = ref(false);
 const testEmail = ref('');
+const emailTemplates = ref([]);
+const welcomeEmailTemplateId = ref('');
+const savingWelcomeEmailTemplate = ref(false);
 const logoInput = ref(null);
 const faviconInput = ref(null);
 const webhookUrl = ref(`${window.location.origin}/api/whatsapp/webhook`);
@@ -1242,6 +1290,23 @@ const loadSettings = async () => {
     loadWhatsappCloudSettings();
 };
 
+const loadEmailTemplateSettings = async () => {
+    try {
+        const [templatesResponse, assignmentResponse] = await Promise.all([
+            axios.get('/api/email-templates-for-sending'),
+            axios.get('/api/template-assignments/customer_welcome/email'),
+        ]);
+
+        emailTemplates.value = templatesResponse.data || [];
+        welcomeEmailTemplateId.value = assignmentResponse.data?.template_id
+            ? String(assignmentResponse.data.template_id)
+            : '';
+    } catch (error) {
+        console.error('Failed to load email template settings:', error);
+        emailTemplates.value = [];
+    }
+};
+
 const loadWhatsappCloudSettings = async () => {
     whatsappCloudLoading.value = true;
     try {
@@ -1402,6 +1467,23 @@ const saveSmtpSettings = async () => {
     }
 };
 
+const saveWelcomeEmailTemplate = async () => {
+    savingWelcomeEmailTemplate.value = true;
+    try {
+        await axios.put('/api/template-assignments', {
+            function_type: 'customer_welcome',
+            template_type: 'email',
+            template_id: welcomeEmailTemplateId.value ? Number(welcomeEmailTemplateId.value) : null,
+        });
+        toast.success('Customer welcome email template saved');
+    } catch (error) {
+        console.error('Failed to save welcome email template:', error);
+        toast.error(error.response?.data?.message || 'Failed to save welcome email template');
+    } finally {
+        savingWelcomeEmailTemplate.value = false;
+    }
+};
+
 const testSmtpConnection = async () => {
     if (!testEmail.value) {
         toast.error('Please enter a test email address');
@@ -1546,6 +1628,7 @@ const saveColdCallingSettings = async () => {
 
 onMounted(() => {
     loadSettings();
+    loadEmailTemplateSettings();
     checkPwaStatus();
     setTimeout(checkPwaStatus, 2000);
 });

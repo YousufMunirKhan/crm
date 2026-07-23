@@ -161,7 +161,7 @@ const routes = [
         path: '/reports',
         name: 'reports',
         component: ReportsView,
-        meta: { requiresAuth: true, title: 'Reports & Analytics', roles: ['Admin', 'Manager', 'System Admin'] },
+        meta: { requiresAuth: true, title: 'Business Reports', roles: ['Admin', 'Manager', 'System Admin'] },
     },
     {
         path: '/hr',
@@ -174,6 +174,12 @@ const routes = [
                 name: 'employee-list',
                 component: () => import('@/views/EmployeeListView.vue'),
                 meta: { requiresAuth: true, title: 'Employees', roles: ['Admin', 'Manager', 'System Admin'] },
+            },
+            {
+                path: 'attendance-report',
+                name: 'attendance-report',
+                component: () => import('@/views/AttendanceReportView.vue'),
+                meta: { requiresAuth: true, title: 'Attendance Report', roles: ['Admin', 'Manager', 'System Admin'] },
             },
             {
                 path: 'employees/:id',

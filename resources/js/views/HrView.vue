@@ -13,25 +13,13 @@
         >
             <template #actions>
                 <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-stretch sm:justify-end">
-                    <button
-                        v-if="!checkedIn"
-                        type="button"
-                        class="inline-flex flex-1 sm:flex-none items-center justify-center px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
-                        @click="checkIn"
-                    >
-                        Check in
-                    </button>
-                    <button
-                        v-else
-                        type="button"
-                        class="inline-flex flex-1 sm:flex-none items-center justify-center px-4 py-2.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
-                        @click="checkOut"
-                    >
-                        Check out
-                    </button>
                     <button type="button" class="listing-btn-outline flex-1 sm:flex-initial" @click="exportAttendance">Export CSV</button>
                 </div>
             </template>
+
+            <div class="px-3 pb-4 sm:px-5">
+                <AttendanceClock @updated="loadAttendance(1)" />
+            </div>
 
             <div v-if="attendanceList.length === 0" class="px-5 py-12 text-center text-slate-500 text-sm">
                 No attendance records found
@@ -40,15 +28,65 @@
                 <div
                     v-for="attendance in attendanceList"
                     :key="attendance.id"
-                    class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-xl border border-slate-200 bg-slate-50/40 gap-2"
+                    class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/40 p-4 sm:flex-row sm:items-start sm:justify-between"
                 >
-                    <div class="flex-1">
+                    <div class="min-w-0 flex-1">
                         <div class="font-medium text-slate-900">{{ formatDate(attendance.date) }}</div>
+                        <div class="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                            <div class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2">
+                                <img
+                                    v-if="attendance.check_in_photo_url"
+                                    :src="attendance.check_in_photo_url"
+                                    alt="Check-in proof"
+                                    class="h-10 w-10 rounded object-cover"
+                                />
+                                <div>
+                                    <div class="font-medium text-slate-700">Check-in proof</div>
+                                    <div v-if="attendance.check_in_location_name" class="break-words text-slate-600">
+                                        {{ attendance.check_in_location_name }}
+                                    </div>
+                                    <a
+                                        v-if="attendance.check_in_map_url"
+                                        :href="attendance.check_in_map_url"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="inline-flex min-h-8 items-center text-blue-700 hover:underline"
+                                    >
+                                        Open map
+                                    </a>
+                                    <div v-else class="text-slate-500">Not captured</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2">
+                                <img
+                                    v-if="attendance.check_out_photo_url"
+                                    :src="attendance.check_out_photo_url"
+                                    alt="Check-out proof"
+                                    class="h-10 w-10 rounded object-cover"
+                                />
+                                <div>
+                                    <div class="font-medium text-slate-700">Check-out proof</div>
+                                    <div v-if="attendance.check_out_location_name" class="break-words text-slate-600">
+                                        {{ attendance.check_out_location_name }}
+                                    </div>
+                                    <a
+                                        v-if="attendance.check_out_map_url"
+                                        :href="attendance.check_out_map_url"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="inline-flex min-h-8 items-center text-blue-700 hover:underline"
+                                    >
+                                        Open map
+                                    </a>
+                                    <div v-else class="text-slate-500">Not captured</div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="text-xs text-slate-500">
                             {{ formatTime(attendance.check_in_at) }} – {{ attendance.check_out_at ? formatTime(attendance.check_out_at) : 'In progress' }}
                         </div>
                     </div>
-                    <div class="text-sm font-semibold text-slate-700">{{ parseFloat(attendance.work_hours || 0).toFixed(2) }}h</div>
+                    <div class="text-sm font-semibold text-slate-700 sm:pt-1">{{ parseFloat(attendance.work_hours || 0).toFixed(2) }}h</div>
                 </div>
             </div>
 
@@ -259,6 +297,7 @@ import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import AttendanceClock from '@/components/AttendanceClock.vue';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
@@ -565,6 +604,18 @@ const exportAttendance = async () => {
             { key: 'check_in_at', label: 'Check In' },
             { key: 'check_out_at', label: 'Check Out' },
             { key: 'work_hours', label: 'Work Hours' },
+            { key: 'check_in_latitude', label: 'Check In Latitude' },
+            { key: 'check_in_longitude', label: 'Check In Longitude' },
+            { key: 'check_in_location_name', label: 'Check In Location Name' },
+            { key: 'check_in_location_accuracy', label: 'Check In Accuracy' },
+            { key: 'check_in_photo_url', label: 'Check In Photo' },
+            { key: 'check_in_map_url', label: 'Check In Map' },
+            { key: 'check_out_latitude', label: 'Check Out Latitude' },
+            { key: 'check_out_longitude', label: 'Check Out Longitude' },
+            { key: 'check_out_location_name', label: 'Check Out Location Name' },
+            { key: 'check_out_location_accuracy', label: 'Check Out Accuracy' },
+            { key: 'check_out_photo_url', label: 'Check Out Photo' },
+            { key: 'check_out_map_url', label: 'Check Out Map' },
         ];
         
         exportCSV(allAttendance, columns, `attendance_export_${new Date().toISOString().split('T')[0]}.csv`);

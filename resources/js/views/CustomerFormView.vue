@@ -118,7 +118,7 @@
                                 />
                                 <p class="text-xs text-slate-500 mt-1">Phone and WhatsApp sync when one is empty; you can change either.</p>
                             </div>
-                            <div v-if="isEdit || !isSimpleCustomerCreate" class="sm:col-span-2">
+                            <div class="sm:col-span-2">
                                 <label class="form-label">Customer Email</label>
                                 <input
                                     v-model="form.email"
@@ -126,6 +126,28 @@
                                     placeholder="customer@example.com"
                                     class="form-input"
                                 />
+                                <p v-if="isSimpleCustomerCreate" class="text-xs text-slate-500 mt-1">
+                                    The welcome email will be sent to this address after the customer is created.
+                                </p>
+                            </div>
+                            <div v-if="isSimpleCustomerCreate" class="sm:col-span-2">
+                                <label class="form-label">Welcome Email Template</label>
+                                <select
+                                    v-model="welcomeEmailTemplateId"
+                                    class="form-input bg-white"
+                                >
+                                    <option value="">Use default generic welcome template</option>
+                                    <option
+                                        v-for="template in emailTemplates"
+                                        :key="template.id"
+                                        :value="String(template.id)"
+                                    >
+                                        {{ template.name }}{{ template.subject ? ` - ${template.subject}` : '' }}
+                                    </option>
+                                </select>
+                                <p class="text-xs text-slate-500 mt-1">
+                                    Email is optional. If an email is entered, this template will be sent. Leave unchanged to use the generic welcome template.
+                                </p>
                             </div>
                             <div v-if="isEdit || !isSimpleCustomerCreate" class="sm:col-span-2">
                                 <label class="form-label">Source</label>
@@ -520,6 +542,8 @@ const error = ref(null);
 const products = ref([]);
 const users = ref([]);
 const wonProductIds = ref([]);
+const emailTemplates = ref([]);
+const welcomeEmailTemplateId = ref('');
 const quickAddType = ref('');
 const quickAddComment = ref('');
 const quickAddFollowUpAt = ref('');
@@ -639,6 +663,24 @@ function syncWhatsAppToPhone() {
     if (wa && !phone) form.phone = normalizeForPhone(wa);
 }
 
+async function loadWelcomeEmailTemplates() {
+    if (!isSimpleCustomerCreate.value) return;
+
+    try {
+        const [templatesRes, assignmentRes] = await Promise.all([
+            axios.get('/api/email-templates-for-sending'),
+            axios.get('/api/template-assignments/customer_welcome/email'),
+        ]);
+        emailTemplates.value = templatesRes.data || [];
+        const assignedTemplateId = assignmentRes.data?.template_id ? String(assignmentRes.data.template_id) : '';
+        const genericTemplate = emailTemplates.value.find((template) => template.name === 'Welcome Template (Generic For All User)');
+        welcomeEmailTemplateId.value = assignedTemplateId || (genericTemplate ? String(genericTemplate.id) : '');
+    } catch (err) {
+        emailTemplates.value = [];
+        welcomeEmailTemplateId.value = '';
+    }
+}
+
 function finishSaleCreditNavigate() {
     const dest = saleCreditPendingRoute.value;
     showSaleCreditModal.value = false;
@@ -740,6 +782,9 @@ const handleSubmit = async () => {
         const payload = {
             ...form,
             type: form.type === 'customer' ? 'customer' : 'prospect',
+            welcome_email_template_id: isSimpleCustomerCreate.value && form.email && welcomeEmailTemplateId.value
+                ? Number(welcomeEmailTemplateId.value)
+                : null,
             won_product_ids: isSimpleCustomerCreate.value ? wonProductIds.value : [],
             remote_licenses: form.remote_licenses.map(rl => ({
                 anydesk_rustdesk: rl.anydesk_rustdesk || null,
@@ -840,6 +885,7 @@ onMounted(async () => {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         quickAddAppointmentDate.value = tomorrow.toISOString().slice(0, 10);
+        await loadWelcomeEmailTemplates();
     }
 });
 
@@ -858,6 +904,11 @@ watch(
         form.type = t === 'customer' ? 'customer' : 'prospect';
         currentStep.value = 1;
         error.value = null;
+        if (form.type === 'customer') {
+            loadWelcomeEmailTemplates();
+        } else {
+            welcomeEmailTemplateId.value = '';
+        }
     },
 );
 </script>

@@ -1,9 +1,10 @@
 <template>
-    <div class="max-w-2xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+    <div class="max-w-3xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         <div class="flex items-center gap-2 sm:gap-3 min-w-0">
             <router-link
                 to="/appointments"
                 class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg shrink-0 touch-manipulation"
+                aria-label="Back to appointments"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -17,21 +18,20 @@
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
                 <div>
                     <div class="text-sm text-slate-500">{{ appointmentCustomerTypeLabel }}</div>
-                    <div class="font-semibold text-slate-900">{{ appointment.customer?.name || '—' }}</div>
+                    <div class="font-semibold text-slate-900">
+                        {{ appointment.business_name || appointment.customer?.business_name || appointment.customer?.name || '-' }}
+                    </div>
+                    <div v-if="appointment.business_name || appointment.customer?.business_name" class="text-sm text-slate-600">
+                        Contact: {{ appointment.customer?.name || 'N/A' }}
+                    </div>
                     <div class="text-sm text-slate-600">
                         {{ appointment.customer?.phone || '' }}
                         {{ appointment.customer?.email || '' }}
                     </div>
-                    <div
-                        v-if="appointment.customer?.address"
-                        class="text-sm text-slate-600"
-                    >
+                    <div v-if="appointment.customer?.address" class="text-sm text-slate-600">
                         {{ appointment.customer?.address }}
                     </div>
-                    <div
-                        v-if="appointment.customer?.city || appointment.customer?.postcode"
-                        class="text-sm text-slate-600"
-                    >
+                    <div v-if="appointment.customer?.city || appointment.customer?.postcode" class="text-sm text-slate-600">
                         {{ appointment.customer?.city || '' }}
                         {{ appointment.customer?.postcode || '' }}
                     </div>
@@ -42,15 +42,60 @@
                         </div>
                     </div>
                 </div>
+
                 <div>
                     <div class="text-sm text-slate-500">Lead #</div>
                     <router-link :to="`/leads/${appointment.lead_id}`" class="text-blue-600 hover:underline">
                         {{ appointment.lead_id }}
                     </router-link>
                 </div>
+
+                <div class="rounded-lg border border-teal-100 bg-teal-50/70 p-4 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <div class="text-sm font-semibold text-teal-900">Sales brief</div>
+                            <div class="text-xs text-teal-700">Who this is for, what to sell, and where the lead stands.</div>
+                        </div>
+                        <span class="px-2 py-1 rounded bg-white text-xs font-medium text-teal-800 border border-teal-100">
+                            {{ formatStage(appointment.lead?.stage) || 'No stage' }}
+                        </span>
+                    </div>
+
+                    <div>
+                        <div class="text-xs font-medium text-teal-800 mb-1">What to sell</div>
+                        <div v-if="productsToSell.length" class="flex flex-wrap gap-1.5">
+                            <span
+                                v-for="product in productsToSell"
+                                :key="product"
+                                class="px-2 py-1 rounded bg-white text-teal-800 border border-teal-100 text-xs font-medium"
+                            >
+                                {{ product }}
+                            </span>
+                        </div>
+                        <div v-else class="text-sm text-amber-700">
+                            No product is attached to this lead yet. Open the lead and add the product before attending.
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                        <div>
+                            <div class="text-xs text-teal-800">Source</div>
+                            <div class="font-medium text-slate-900">{{ appointment.lead?.source || 'Not set' }}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-teal-800">Lead owner</div>
+                            <div class="font-medium text-slate-900">{{ appointment.lead?.assignee?.name || 'Unassigned' }}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-teal-800">Pipeline value</div>
+                            <div class="font-medium text-slate-900">GBP {{ money(appointment.lead?.pipeline_value || 0) }}</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div v-if="appointment.description">
                     <div class="text-sm text-slate-500">Notes</div>
-                    <p class="text-slate-700">{{ appointment.description }}</p>
+                    <p class="text-slate-700 whitespace-pre-line">{{ appointment.description }}</p>
                 </div>
             </div>
 
@@ -96,6 +141,7 @@
                         placeholder="Summarise what happened at the appointment..."
                     />
                 </div>
+
                 <div class="border-t border-slate-200 pt-4 space-y-4">
                     <div class="text-sm font-medium text-slate-700">Lead outcome (optional)</div>
                     <div class="flex flex-wrap gap-4">
@@ -112,9 +158,10 @@
                             <span>No change</span>
                         </label>
                     </div>
+
                     <div v-if="form.lead_stage === 'won'" class="mt-4 space-y-4">
-                        <div class="text-sm font-medium text-slate-700">Products achieved (select and add quantity/price)</div>
-                        <p class="text-xs text-slate-500">These will appear in "What Customer Has" on the customer profile.</p>
+                        <div class="text-sm font-medium text-slate-700">Products achieved</div>
+                        <p class="text-xs text-slate-500">Select products that were sold during this appointment.</p>
                         <div v-if="!pendingItems.length && !wonItemsList.length" class="text-sm text-slate-500 py-4 bg-slate-50 rounded-lg px-4">
                             No products on this lead. Add products on the <router-link :to="`/leads/${appointment.lead_id}`" class="text-blue-600 hover:underline">Lead page</router-link> first.
                         </div>
@@ -133,10 +180,7 @@
                                     />
                                     <span class="font-medium text-slate-900">{{ item.product?.name || 'Product' }}</span>
                                 </label>
-                                <div
-                                    v-if="isItemSelected(item.id)"
-                                    class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1"
-                                >
+                                <div v-if="isItemSelected(item.id)" class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1">
                                     <div class="flex-1 min-w-0 w-full sm:w-auto">
                                         <label class="block text-xs text-slate-500 mb-0.5">Quantity</label>
                                         <input
@@ -148,7 +192,7 @@
                                         />
                                     </div>
                                     <div class="flex-1 min-w-0 w-full sm:w-auto">
-                                        <label class="block text-xs text-slate-500 mb-0.5">Unit price (£)</label>
+                                        <label class="block text-xs text-slate-500 mb-0.5">Unit price (GBP)</label>
                                         <input
                                             type="number"
                                             min="0"
@@ -165,15 +209,16 @@
                                 :key="'won-' + item.id"
                                 class="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-100"
                             >
-                                <span class="text-green-600">✓</span>
+                                <span class="font-medium text-green-700">Won</span>
                                 <span class="font-medium text-slate-900">{{ item.product?.name || 'Product' }}</span>
                                 <span class="text-sm text-slate-600">
-                                    {{ item.quantity }} × £{{ parseFloat(item.unit_price || 0).toFixed(2) }}
+                                    {{ item.quantity }} x GBP {{ parseFloat(item.unit_price || 0).toFixed(2) }}
                                 </span>
                                 <span class="text-xs text-slate-500 ml-auto">Already achieved</span>
                             </div>
                         </div>
                     </div>
+
                     <div v-if="form.lead_stage === 'lost'">
                         <label class="block text-sm font-medium text-slate-700 mb-1">Lost reason</label>
                         <input
@@ -184,6 +229,7 @@
                         />
                     </div>
                 </div>
+
                 <div v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{{ error }}</div>
                 <div class="flex justify-end pt-2">
                     <button
@@ -221,7 +267,8 @@ const form = ref({
     lead_stage: '',
     lost_reason: '',
 });
-const wonItems = ref({}); // { lead_item_id: { quantity, unit_price } }
+const wonItems = ref({});
+
 const appointmentCustomerTypeLabel = computed(() => {
     const type = appointment.value?.customer?.type;
     return type === 'customer' ? 'Customer' : 'Prospect';
@@ -238,6 +285,28 @@ const wonItemsList = computed(() => {
     if (!lead?.items) return [];
     return lead.items.filter((i) => i.status === 'won');
 });
+
+const productsToSell = computed(() => {
+    if (Array.isArray(appointment.value?.products_to_sell) && appointment.value.products_to_sell.length) {
+        return appointment.value.products_to_sell;
+    }
+
+    const items = appointment.value?.lead?.items || [];
+    return [...new Set(items.map((item) => item.product?.name).filter(Boolean))];
+});
+
+function formatStage(stage) {
+    return String(stage || '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function money(value) {
+    return Number(value || 0).toLocaleString('en-GB', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+}
 
 function isItemSelected(id) {
     return id in wonItems.value;
@@ -262,7 +331,10 @@ function getWonItemQty(id) {
 
 function setWonItemQty(id, val) {
     const qty = Math.max(1, parseInt(val, 10) || 1);
-    wonItems.value = { ...wonItems.value, [id]: { ...wonItems.value[id], quantity: qty, unit_price: wonItems.value[id]?.unit_price ?? 0 } };
+    wonItems.value = {
+        ...wonItems.value,
+        [id]: { ...wonItems.value[id], quantity: qty, unit_price: wonItems.value[id]?.unit_price ?? 0 },
+    };
 }
 
 function getWonItemPrice(id) {
@@ -271,7 +343,10 @@ function getWonItemPrice(id) {
 
 function setWonItemPrice(id, val) {
     const price = Math.max(0, parseFloat(val) || 0);
-    wonItems.value = { ...wonItems.value, [id]: { ...wonItems.value[id], quantity: wonItems.value[id]?.quantity ?? 1, unit_price: price } };
+    wonItems.value = {
+        ...wonItems.value,
+        [id]: { ...wonItems.value[id], quantity: wonItems.value[id]?.quantity ?? 1, unit_price: price },
+    };
 }
 
 async function load() {

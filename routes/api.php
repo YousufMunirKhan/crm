@@ -175,6 +175,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/hr/attendance/check-in', [HrController::class, 'checkIn']);
     Route::post('/hr/attendance/check-out', [HrController::class, 'checkOut']);
     Route::get('/hr/attendance/chart-summary', [HrController::class, 'attendanceChartSummary']);
+    Route::get('/hr/attendance/monthly-report', [HrController::class, 'attendanceMonthlyReport']);
     Route::get('/hr/attendance', [HrController::class, 'attendance']);
     Route::delete('/hr/attendance/{id}', [HrController::class, 'deleteAttendance']);
     Route::get('/hr/salaries', [HrController::class, 'salaries']);

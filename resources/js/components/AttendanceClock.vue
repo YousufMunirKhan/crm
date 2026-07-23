@@ -23,7 +23,6 @@
         </div>
 
         <div v-else class="space-y-4">
-            <!-- Status Display -->
             <div class="flex min-w-0 items-center gap-3 rounded-lg p-3 sm:gap-4 sm:p-4" :class="statusBgClass">
                 <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12" :class="statusIconClass">
                     <svg v-if="status.checked_in && !status.checked_out" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,7 +46,6 @@
                 </div>
             </div>
 
-            <!-- Action Button -->
             <div class="flex gap-3">
                 <button
                     v-if="!status.checked_in"
@@ -55,8 +53,7 @@
                     :disabled="actionLoading"
                     class="min-h-11 flex-1 rounded-lg bg-green-600 px-4 py-3 font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
                 >
-                    <span v-if="actionLoading">Processing...</span>
-                    <span v-else>🕐 Time In</span>
+                    {{ actionLoading ? 'Capturing proof...' : 'Time In' }}
                 </button>
                 <button
                     v-else-if="!status.checked_out"
@@ -64,15 +61,86 @@
                     :disabled="actionLoading"
                     class="min-h-11 flex-1 rounded-lg bg-red-600 px-4 py-3 font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
                 >
-                    <span v-if="actionLoading">Processing...</span>
-                    <span v-else>🕐 Time Out</span>
+                    {{ actionLoading ? 'Capturing proof...' : 'Time Out' }}
                 </button>
                 <div v-else class="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-lg text-center font-medium">
-                    ✅ Shift Complete
+                    Shift Complete
                 </div>
             </div>
 
-            <!-- Working Hours -->
+            <p class="text-xs text-slate-500">
+                Camera and location permission are required for attendance proof.
+            </p>
+
+            <div v-if="proofError" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {{ proofError }}
+            </div>
+
+            <div v-if="status.attendance" class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                <div class="rounded-lg border border-slate-200 p-3">
+                    <div class="font-medium text-slate-900">Check-in proof</div>
+                    <div class="mt-2 flex items-center gap-3">
+                        <img
+                            v-if="status.attendance.check_in_photo_url"
+                            :src="status.attendance.check_in_photo_url"
+                            alt="Check-in proof"
+                            class="h-14 w-14 rounded object-cover"
+                        />
+                        <div class="min-w-0 text-xs text-slate-500">
+                            <a
+                                v-if="status.attendance.check_in_map_url"
+                                :href="status.attendance.check_in_map_url"
+                                target="_blank"
+                                rel="noopener"
+                                class="font-medium text-blue-700 hover:underline"
+                            >
+                                Open map
+                            </a>
+                            <div v-if="status.attendance.check_in_location_name" class="break-words font-medium text-slate-700">
+                                {{ status.attendance.check_in_location_name }}
+                            </div>
+                            <div v-if="status.attendance.check_in_location_accuracy">
+                                Accuracy {{ Math.round(Number(status.attendance.check_in_location_accuracy)) }}m
+                            </div>
+                            <div v-if="!status.attendance.check_in_photo_url && !status.attendance.check_in_map_url">
+                                Not captured
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="rounded-lg border border-slate-200 p-3">
+                    <div class="font-medium text-slate-900">Check-out proof</div>
+                    <div class="mt-2 flex items-center gap-3">
+                        <img
+                            v-if="status.attendance.check_out_photo_url"
+                            :src="status.attendance.check_out_photo_url"
+                            alt="Check-out proof"
+                            class="h-14 w-14 rounded object-cover"
+                        />
+                        <div class="min-w-0 text-xs text-slate-500">
+                            <a
+                                v-if="status.attendance.check_out_map_url"
+                                :href="status.attendance.check_out_map_url"
+                                target="_blank"
+                                rel="noopener"
+                                class="font-medium text-blue-700 hover:underline"
+                            >
+                                Open map
+                            </a>
+                            <div v-if="status.attendance.check_out_location_name" class="break-words font-medium text-slate-700">
+                                {{ status.attendance.check_out_location_name }}
+                            </div>
+                            <div v-if="status.attendance.check_out_location_accuracy">
+                                Accuracy {{ Math.round(Number(status.attendance.check_out_location_accuracy)) }}m
+                            </div>
+                            <div v-if="!status.attendance.check_out_photo_url && !status.attendance.check_out_map_url">
+                                Not captured
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div v-if="status.checked_in && status.check_in_time" class="text-center">
                 <div class="text-sm text-slate-500">Working Hours</div>
                 <div class="text-2xl font-bold text-slate-900">{{ workingHours }}</div>
@@ -86,27 +154,30 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
 
+const emit = defineEmits(['updated']);
+const toast = useToastStore();
+
 const loading = ref(true);
 const actionLoading = ref(false);
+const proofError = ref('');
 const status = ref({
     checked_in: false,
     checked_out: false,
     check_in_time: null,
     check_out_time: null,
+    attendance: null,
 });
 const serverDate = ref('');
-
-let workingTimer = null;
 const elapsedSeconds = ref(0);
 
-const currentDate = computed(() => {
-    return new Date().toLocaleDateString('en-GB', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-});
+let workingTimer = null;
+
+const currentDate = computed(() => new Date().toLocaleDateString('en-GB', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+}));
 
 const statusText = computed(() => {
     if (status.value.checked_out) return 'Shift Completed';
@@ -128,11 +199,11 @@ const statusIconClass = computed(() => {
 
 const workingHours = computed(() => {
     if (!status.value.check_in_time) return '00:00:00';
-    
+
     const hours = Math.floor(elapsedSeconds.value / 3600);
     const minutes = Math.floor((elapsedSeconds.value % 3600) / 60);
     const seconds = elapsedSeconds.value % 60;
-    
+
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 });
 
@@ -144,20 +215,18 @@ const formatTime = (timeString) => {
 
 const calculateElapsed = () => {
     if (!status.value.check_in_time) return 0;
-    
+
     const checkIn = new Date(status.value.check_in_time);
-    const endTime = status.value.check_out_time 
-        ? new Date(status.value.check_out_time) 
-        : new Date();
-    
+    const endTime = status.value.check_out_time ? new Date(status.value.check_out_time) : new Date();
+
     return Math.floor((endTime - checkIn) / 1000);
 };
 
 const startTimer = () => {
     if (workingTimer) clearInterval(workingTimer);
-    
+
     elapsedSeconds.value = calculateElapsed();
-    
+
     if (status.value.checked_in && !status.value.checked_out) {
         workingTimer = setInterval(() => {
             elapsedSeconds.value++;
@@ -165,11 +234,105 @@ const startTimer = () => {
     }
 };
 
+const getLocation = () => new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+        reject(new Error('Location is not available in this browser.'));
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => resolve(position),
+        () => reject(new Error('Please allow location permission to record attendance.')),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+});
+
+const capturePhoto = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+        return capturePhotoFromFileInput();
+    }
+
+    let stream = null;
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } },
+            audio: false,
+        });
+
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
+        await video.play();
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        const sourceWidth = video.videoWidth || 720;
+        const sourceHeight = video.videoHeight || 540;
+        const maxWidth = 960;
+        const scale = Math.min(1, maxWidth / sourceWidth);
+        const width = Math.round(sourceWidth * scale);
+        const height = Math.round(sourceHeight * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(video, 0, 0, width, height);
+
+        return await new Promise((resolve, reject) => {
+            canvas.toBlob((blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error('Could not capture photo. Please try again.'));
+            }, 'image/jpeg', 0.82);
+        });
+    } catch (error) {
+        if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
+            throw new Error('Please allow camera permission to record attendance.');
+        }
+        throw error;
+    } finally {
+        if (stream) stream.getTracks().forEach((track) => track.stop());
+    }
+};
+
+const capturePhotoFromFileInput = () => new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'user';
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+
+    input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        document.body.removeChild(input);
+        if (file) {
+            resolve(file);
+        } else {
+            reject(new Error('Please capture a photo to record attendance.'));
+        }
+    }, { once: true });
+
+    input.click();
+});
+
+const collectProof = async () => {
+    proofError.value = '';
+    const [photo, position] = await Promise.all([capturePhoto(), getLocation()]);
+    const formData = new FormData();
+    formData.append('photo', photo, `attendance-${Date.now()}.jpg`);
+    formData.append('latitude', String(position.coords.latitude));
+    formData.append('longitude', String(position.coords.longitude));
+    formData.append('accuracy', String(position.coords.accuracy || 0));
+    formData.append('captured_at', new Date().toISOString());
+    return formData;
+};
+
 const fetchStatus = async () => {
     try {
-        // Add timestamp to prevent caching
         const response = await axios.get('/api/hr/attendance/today', {
-            params: { _t: Date.now() }
+            params: { _t: Date.now() },
         });
         status.value = response.data;
         serverDate.value = response.data.server_date || '';
@@ -181,44 +344,36 @@ const fetchStatus = async () => {
     }
 };
 
-const toast = useToastStore();
-
-const checkIn = async () => {
+const submitAttendance = async (url, successMessage, title) => {
     actionLoading.value = true;
     try {
-        await axios.post('/api/hr/attendance/check-in');
+        const proof = await collectProof();
+        await axios.post(url, proof);
         await fetchStatus();
-        toast.success('Successfully checked in!', 'Time In');
+        emit('updated');
+        toast.success(successMessage, title);
     } catch (error) {
-        console.error('Check-in failed:', error);
-        toast.error(error.response?.data?.error || 'Check-in failed', 'Error');
+        console.error(`${title} failed:`, error);
+        const message = error.response?.data?.error || error.message || `${title} failed`;
+        proofError.value = message;
+        toast.error(message, 'Error');
     } finally {
         actionLoading.value = false;
     }
 };
 
-const checkOut = async () => {
-    actionLoading.value = true;
-    try {
-        await axios.post('/api/hr/attendance/check-out');
-        await fetchStatus();
-        toast.success('Successfully checked out!', 'Time Out');
-    } catch (error) {
-        console.error('Check-out failed:', error);
-        toast.error(error.response?.data?.error || 'Check-out failed', 'Error');
-    } finally {
-        actionLoading.value = false;
-    }
-};
+const checkIn = () => submitAttendance('/api/hr/attendance/check-in', 'Successfully checked in!', 'Time In');
+
+const checkOut = () => submitAttendance('/api/hr/attendance/check-out', 'Successfully checked out!', 'Time Out');
 
 const refreshStatus = async () => {
     loading.value = true;
-    // Reset status to default before fetching
     status.value = {
         checked_in: false,
         checked_out: false,
         check_in_time: null,
         check_out_time: null,
+        attendance: null,
     };
     elapsedSeconds.value = 0;
     if (workingTimer) {
@@ -236,4 +391,3 @@ onUnmounted(() => {
     if (workingTimer) clearInterval(workingTimer);
 });
 </script>
-

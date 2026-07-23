@@ -224,7 +224,7 @@
                     <div class="flex flex-col sm:flex-row gap-2">
                         <select
                             v-model="monthFilter"
-                            @change="loadAttendance"
+                            @change="loadAttendanceReport"
                             class="w-full sm:w-auto px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
                         >
                             <option value="">All Months</option>
@@ -238,6 +238,32 @@
                         >
                             Export CSV
                         </button>
+                    </div>
+                </div>
+
+                <div
+                    v-if="employeeMonthlySummary"
+                    class="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-5"
+                >
+                    <div>
+                        <MetricLabel label="Total Hours" tooltip="Total completed work hours in the selected month. Open shifts are not counted until check-out." />
+                        <div class="mt-1 text-lg font-bold text-slate-900">{{ formatHours(employeeMonthlySummary.total_hours) }}h</div>
+                    </div>
+                    <div>
+                        <MetricLabel label="Present Days" tooltip="Number of days where this employee checked in during the selected month." />
+                        <div class="mt-1 text-lg font-bold text-slate-900">{{ employeeMonthlySummary.present_days }}</div>
+                    </div>
+                    <div>
+                        <MetricLabel label="Completed Shifts" tooltip="Attendance records with both check-in and check-out. These records calculate work hours." />
+                        <div class="mt-1 text-lg font-bold text-slate-900">{{ employeeMonthlySummary.completed_shifts }}</div>
+                    </div>
+                    <div>
+                        <MetricLabel label="Avg / Day" tooltip="Total completed hours divided by checked-in days." />
+                        <div class="mt-1 text-lg font-bold text-slate-900">{{ formatHours(employeeMonthlySummary.average_hours_per_present_day) }}h</div>
+                    </div>
+                    <div class="sm:col-span-2 lg:col-span-1">
+                        <MetricLabel label="Open Shifts" tooltip="Checked-in records that do not have a check-out yet. Hours are not final for these records." />
+                        <div class="mt-1 text-lg font-bold text-slate-900">{{ employeeMonthlySummary.open_shifts }}</div>
                     </div>
                 </div>
 
@@ -271,6 +297,56 @@
                                     <span class="text-slate-500">Hours:</span>
                                     <span class="ml-2 font-medium text-slate-900">{{ parseFloat(attendance.work_hours || 0).toFixed(2) }}h</span>
                                 </div>
+                                <div class="col-span-2 grid grid-cols-1 gap-2 pt-2 sm:grid-cols-2">
+                                    <div class="flex items-center gap-2 rounded border border-slate-200 bg-white p-2">
+                                        <img
+                                            v-if="attendance.check_in_photo_url"
+                                            :src="attendance.check_in_photo_url"
+                                            alt="Check-in proof"
+                                            class="h-10 w-10 rounded object-cover"
+                                        />
+                                        <div class="text-xs">
+                                            <div class="font-medium text-slate-700">Check-in proof</div>
+                                            <div v-if="attendance.check_in_location_name" class="break-words text-slate-600">
+                                                {{ attendance.check_in_location_name }}
+                                            </div>
+                                            <a
+                                                v-if="attendance.check_in_map_url"
+                                                :href="attendance.check_in_map_url"
+                                                target="_blank"
+                                                rel="noopener"
+                                                class="text-blue-700 hover:underline"
+                                            >
+                                                Open map
+                                            </a>
+                                            <div v-else class="text-slate-500">Not captured</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2 rounded border border-slate-200 bg-white p-2">
+                                        <img
+                                            v-if="attendance.check_out_photo_url"
+                                            :src="attendance.check_out_photo_url"
+                                            alt="Check-out proof"
+                                            class="h-10 w-10 rounded object-cover"
+                                        />
+                                        <div class="text-xs">
+                                            <div class="font-medium text-slate-700">Check-out proof</div>
+                                            <div v-if="attendance.check_out_location_name" class="break-words text-slate-600">
+                                                {{ attendance.check_out_location_name }}
+                                            </div>
+                                            <a
+                                                v-if="attendance.check_out_map_url"
+                                                :href="attendance.check_out_map_url"
+                                                target="_blank"
+                                                rel="noopener"
+                                                class="text-blue-700 hover:underline"
+                                            >
+                                                Open map
+                                            </a>
+                                            <div v-else class="text-slate-500">Not captured</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -284,6 +360,7 @@
                                 <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Check In</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Check Out</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Work Hours</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Proof</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
                             </tr>
                         </thead>
@@ -300,6 +377,46 @@
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-900 font-medium">
                                     {{ parseFloat(attendance.work_hours || 0).toFixed(2) }}h
+                                </td>
+                                <td class="px-4 py-3 text-sm text-slate-600">
+                                    <div class="flex flex-wrap gap-3">
+                                        <div class="flex items-center gap-2">
+                                            <img
+                                                v-if="attendance.check_in_photo_url"
+                                                :src="attendance.check_in_photo_url"
+                                                alt="Check-in proof"
+                                                class="h-9 w-9 rounded object-cover"
+                                            />
+                                            <a
+                                                v-if="attendance.check_in_map_url"
+                                                :href="attendance.check_in_map_url"
+                                                target="_blank"
+                                                rel="noopener"
+                                                class="text-xs font-medium text-blue-700 hover:underline"
+                                            >
+                                                In map
+                                            </a>
+                                            <span v-if="!attendance.check_in_photo_url && !attendance.check_in_map_url" class="text-xs text-slate-400">No in proof</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <img
+                                                v-if="attendance.check_out_photo_url"
+                                                :src="attendance.check_out_photo_url"
+                                                alt="Check-out proof"
+                                                class="h-9 w-9 rounded object-cover"
+                                            />
+                                            <a
+                                                v-if="attendance.check_out_map_url"
+                                                :href="attendance.check_out_map_url"
+                                                target="_blank"
+                                                rel="noopener"
+                                                class="text-xs font-medium text-blue-700 hover:underline"
+                                            >
+                                                Out map
+                                            </a>
+                                            <span v-if="!attendance.check_out_photo_url && !attendance.check_out_map_url" class="text-xs text-slate-400">No out proof</span>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap">
                                     <span
@@ -326,7 +443,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, defineComponent, h } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import Pagination from '@/components/Pagination.vue';
@@ -341,8 +458,14 @@ const employee = ref(null);
 const stats = ref({});
 const attendanceList = ref([]);
 const attendancePagination = ref(null);
+const monthlyReport = ref(null);
 const loading = ref(false);
-const monthFilter = ref('');
+const dateToMonth = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+};
+const monthFilter = ref(dateToMonth(new Date()));
 const documents = ref([]);
 const newDocName = ref('');
 const uploading = ref(false);
@@ -385,6 +508,34 @@ const formatTime = (datetime) => {
 const formatHours = (hours) => {
     return parseFloat(hours || 0).toFixed(1);
 };
+
+const employeeMonthlySummary = computed(() => monthlyReport.value?.employees?.[0] || null);
+
+const MetricLabel = defineComponent({
+    name: 'MetricLabel',
+    props: {
+        label: { type: String, required: true },
+        tooltip: { type: String, required: true },
+    },
+    setup(props) {
+        return () => h('div', {
+            class: 'flex min-w-0 items-center gap-1 text-xs font-medium text-slate-500',
+            title: props.tooltip,
+        }, [
+            h('span', { class: 'min-w-0 truncate' }, props.label),
+            h('span', { class: 'group relative inline-flex shrink-0' }, [
+                h('button', {
+                    type: 'button',
+                    class: 'grid h-4 w-4 place-items-center rounded-full border border-slate-300 bg-white text-[10px] font-bold leading-none text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-200',
+                    'aria-label': `${props.label}: ${props.tooltip}`,
+                }, '?'),
+                h('span', {
+                    class: 'pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-56 rounded-md bg-slate-900 px-3 py-2 text-left text-[11px] font-medium normal-case leading-4 tracking-normal text-white shadow-lg group-hover:block group-focus-within:block',
+                }, props.tooltip),
+            ]),
+        ]);
+    },
+});
 
 const loadEmployee = async () => {
     loading.value = true;
@@ -433,6 +584,33 @@ const loadAttendance = async (page = 1) => {
     }
 };
 
+const loadMonthlyReport = async () => {
+    if (!monthFilter.value) {
+        monthlyReport.value = null;
+        return;
+    }
+
+    try {
+        const { data } = await axios.get('/api/hr/attendance/monthly-report', {
+            params: {
+                user_id: route.params.id,
+                month: monthFilter.value,
+            },
+        });
+        monthlyReport.value = data;
+    } catch (error) {
+        console.error('Failed to load monthly attendance report:', error);
+        monthlyReport.value = null;
+    }
+};
+
+const loadAttendanceReport = async () => {
+    await Promise.all([
+        loadAttendance(1),
+        loadMonthlyReport(),
+    ]);
+};
+
 const exportAttendance = async () => {
     try {
         const params = { user_id: route.params.id, per_page: 10000 };
@@ -447,6 +625,18 @@ const exportAttendance = async () => {
             { key: 'check_in_at', label: 'Check In' },
             { key: 'check_out_at', label: 'Check Out' },
             { key: 'work_hours', label: 'Work Hours' },
+            { key: 'check_in_latitude', label: 'Check In Latitude' },
+            { key: 'check_in_longitude', label: 'Check In Longitude' },
+            { key: 'check_in_location_name', label: 'Check In Location Name' },
+            { key: 'check_in_location_accuracy', label: 'Check In Accuracy' },
+            { key: 'check_in_photo_url', label: 'Check In Photo' },
+            { key: 'check_in_map_url', label: 'Check In Map' },
+            { key: 'check_out_latitude', label: 'Check Out Latitude' },
+            { key: 'check_out_longitude', label: 'Check Out Longitude' },
+            { key: 'check_out_location_name', label: 'Check Out Location Name' },
+            { key: 'check_out_location_accuracy', label: 'Check Out Accuracy' },
+            { key: 'check_out_photo_url', label: 'Check Out Photo' },
+            { key: 'check_out_map_url', label: 'Check Out Map' },
         ];
         
         exportCSV(allAttendance, columns, `attendance_${employee.value?.name}_${new Date().toISOString().split('T')[0]}.csv`);
@@ -507,7 +697,7 @@ const goToEdit = () => {
 onMounted(() => {
     loadEmployee();
     loadStats();
-    loadAttendance();
+    loadAttendanceReport();
     loadDocuments();
 });
 </script>

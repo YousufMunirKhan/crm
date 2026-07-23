@@ -32,6 +32,14 @@
                 </span>
             </div>
 
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+                <div v-for="card in activityCards" :key="card.label" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                    <div class="text-sm font-medium text-slate-500 mb-1">{{ card.label }}</div>
+                    <div class="text-2xl font-bold text-slate-900">{{ card.value }}</div>
+                    <div class="mt-1 text-xs text-slate-500">{{ card.help }}</div>
+                </div>
+            </div>
+
             <!-- Target vs Achievement cards -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
@@ -142,7 +150,14 @@ import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 
-const selectedMonth = ref(new Date().toISOString().slice(0, 7));
+const formatMonth = (date) => {
+    const d = date instanceof Date ? date : new Date(date);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+};
+
+const selectedMonth = ref(formatMonth(new Date()));
 const loading = ref(false);
 const self = ref(null);
 const totalEmployeesWithTargets = ref(0);
@@ -159,7 +174,7 @@ const monthOptions = (() => {
     for (let i = 0; i < 12; i++) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         opts.push({
-            value: d.toISOString().slice(0, 7),
+            value: formatMonth(d),
             label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
         });
     }
@@ -167,6 +182,34 @@ const monthOptions = (() => {
 })();
 
 const formatNumber = (n) => new Intl.NumberFormat('en-GB').format(n);
+
+const activityCards = computed(() => [
+    {
+        label: 'New leads',
+        value: self.value?.new_leads || 0,
+        help: 'Assigned this month',
+    },
+    {
+        label: 'Open pipeline',
+        value: `£${formatNumber(self.value?.open_pipeline || 0)}`,
+        help: 'Not won or lost yet',
+    },
+    {
+        label: 'Appointments',
+        value: self.value?.achieved_appointments || 0,
+        help: 'Booked or handled',
+    },
+    {
+        label: 'Won products',
+        value: self.value?.achieved_sales || 0,
+        help: 'Closed product lines',
+    },
+    {
+        label: 'Revenue',
+        value: `£${formatNumber(self.value?.achieved_revenue || 0)}`,
+        help: 'Won products plus invoices',
+    },
+]);
 
 const lineProgress = (ln) => {
     const t = Number(ln.target_quantity || 0);

@@ -16,14 +16,15 @@ use App\Modules\HR\Models\EmployeeTargetLine;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class ReportingService
 {
     /**
-     * Won line items credited to an agent (lead assignee OR customer-assigned rep).
+     * Won line items in a reporting period.
      * Period: closed_at in range, or (legacy) closed_at null and lead created in range.
      */
-    private function baseWonLeadItemsForAgentInPeriod(int $agentId, Carbon $from, Carbon $to): Builder
+    private function baseWonLeadItemsInPeriod(Carbon $from, Carbon $to): Builder
     {
         return LeadItem::query()
             ->where('status', LeadItem::STATUS_WON)
@@ -33,7 +34,16 @@ class ReportingService
                         $o->whereNull('closed_at')
                             ->whereHas('lead', fn ($l) => $l->whereBetween('created_at', [$from, $to]));
                     });
-            })
+            });
+    }
+
+    /**
+     * Won line items credited to an agent (lead assignee OR customer-assigned rep).
+     * Period: closed_at in range, or (legacy) closed_at null and lead created in range.
+     */
+    private function baseWonLeadItemsForAgentInPeriod(int $agentId, Carbon $from, Carbon $to): Builder
+    {
+        return $this->baseWonLeadItemsInPeriod($from, $to)
             ->whereHas('lead', function ($q) use ($agentId) {
                 $q->where(function ($subQ) use ($agentId) {
                     $subQ->where('assigned_to', $agentId)
@@ -68,8 +78,20 @@ class ReportingService
         $ticketQuery = Ticket::whereBetween('created_at', [$from, $to]);
 
         if (isset($filters['agent_id'])) {
-            $aid = $filters['agent_id'];
-            $leadQuery->where('assigned_to', $aid);
+            $aid = (int) $filters['agent_id'];
+            $leadQuery->where(function ($q) use ($aid) {
+                $q->where('assigned_to', $aid)
+                    ->orWhereHas('customer.assignedUsers', function ($userQ) use ($aid) {
+                        $userQ->where('user_id', $aid);
+                    });
+            });
+            $invoiceQuery->whereHas('customer', function ($q) use ($aid) {
+                $q->whereHas('assignedUsers', function ($subQuery) use ($aid) {
+                    $subQuery->where('user_id', $aid);
+                })->orWhereHas('leads', function ($subQuery) use ($aid) {
+                    $subQuery->where('assigned_to', $aid);
+                });
+            });
             $ticketQuery->where(function ($q) use ($aid) {
                 $q->where('assigned_to', $aid)
                     ->orWhereHas('assignees', function ($q2) use ($aid) {
@@ -79,31 +101,20 @@ class ReportingService
         }
 
         $leadsCount = $leadQuery->count();
-        
-        // Count leads with at least one won item OR stage = won
-        $wonLeadsCount = (clone $leadQuery)->where(function($q) {
-            $q->where('stage', 'won')
-              ->orWhereHas('items', function($itemQ) {
-                  $itemQ->where('status', LeadItem::STATUS_WON);
-              });
-        })->count();
+
+        $wonItemsQuery = isset($filters['agent_id'])
+            ? $this->baseWonLeadItemsForAgentInPeriod((int) $filters['agent_id'], $from, $to)
+            : $this->baseWonLeadItemsInPeriod($from, $to);
+
+        $wonLeadsCount = (clone $wonItemsQuery)->distinct('lead_id')->count('lead_id');
         
         $conversionRate = $leadsCount > 0 ? round($wonLeadsCount / $leadsCount * 100, 2) : 0;
 
         $pipelineValue = (clone $leadQuery)->whereNotIn('stage', ['won', 'lost'])->sum('pipeline_value');
-        
-        // Calculate revenue from WON items (status = 'won') in lead_items
-        $wonItems = LeadItem::whereHas('lead', function($q) use ($from, $to, $filters) {
-            $q->whereBetween('created_at', [$from, $to]);
-            if (isset($filters['agent_id'])) {
-                $q->where('assigned_to', $filters['agent_id']);
-            }
-        })->where('status', LeadItem::STATUS_WON)->sum('total_price');
-        
-        $revenue = $wonItems;
-        
-        // Also add invoice revenue
-        $revenue += (clone $invoiceQuery)->sum('total');
+
+        $leadRevenue = (float) (clone $wonItemsQuery)->sum('total_price');
+        $invoiceRevenue = (float) (clone $invoiceQuery)->sum('total');
+        $revenue = $leadRevenue + $invoiceRevenue;
 
         $tickets = [
             'total' => $ticketQuery->count(),
@@ -111,13 +122,7 @@ class ReportingService
             'closed' => (clone $ticketQuery)->whereIn('status', ['resolved', 'closed'])->count(),
         ];
 
-        // Product statistics
-        $wonProductsCount = LeadItem::whereHas('lead', function($q) use ($from, $to, $filters) {
-            $q->whereBetween('created_at', [$from, $to]);
-            if (isset($filters['agent_id'])) {
-                $q->where('assigned_to', $filters['agent_id']);
-            }
-        })->where('status', LeadItem::STATUS_WON)->count();
+        $wonProductsCount = (clone $wonItemsQuery)->count();
         
         $lostProductsCount = LeadItem::whereHas('lead', function($q) use ($from, $to, $filters) {
             $q->whereBetween('created_at', [$from, $to]);
@@ -138,12 +143,15 @@ class ReportingService
             'conversion_rate' => $conversionRate,
             'pipeline_value' => $pipelineValue,
             'revenue' => $revenue,
+            'lead_revenue' => $leadRevenue,
+            'invoice_revenue' => $invoiceRevenue,
             'tickets' => $tickets,
             'products' => [
                 'won' => $wonProductsCount,
                 'lost' => $lostProductsCount,
                 'pending' => $pendingProductsCount,
             ],
+            'sales_basis' => 'won_product_line_closed_at',
         ];
     }
 
@@ -233,9 +241,22 @@ class ReportingService
 
         $query = Communication::whereBetween('created_at', [$from, $to]);
         
-        // Filter by agent if provided
         if (isset($filters['agent_id'])) {
-            $query->where('user_id', $filters['agent_id']);
+            $agentId = (int) $filters['agent_id'];
+            if (Schema::hasColumn('communications', 'user_id')) {
+                $query->where('user_id', $agentId);
+            } else {
+                $query->where(function ($q) use ($agentId) {
+                    $q->whereHas('lead', function ($leadQ) use ($agentId) {
+                        $leadQ->where('assigned_to', $agentId)
+                            ->orWhereHas('customer.assignedUsers', function ($userQ) use ($agentId) {
+                                $userQ->where('user_id', $agentId);
+                            });
+                    })->orWhereHas('customer.assignedUsers', function ($userQ) use ($agentId) {
+                        $userQ->where('user_id', $agentId);
+                    });
+                });
+            }
         }
 
         $sent = (clone $query)->where('direction', 'outbound')->count();
@@ -346,10 +367,12 @@ class ReportingService
 
         $pipeline = [];
         foreach ($agents as $agent) {
-            $leads = Lead::where('assigned_to', $agent->id)
-                ->orWhereHas('customer.assignedUsers', function ($q) use ($agent) {
-                    $q->where('user_id', $agent->id);
-                })
+            $leads = Lead::where(function ($q) use ($agent) {
+                $q->where('assigned_to', $agent->id)
+                    ->orWhereHas('customer.assignedUsers', function ($userQ) use ($agent) {
+                        $userQ->where('user_id', $agent->id);
+                    });
+            })
                 ->whereBetween('created_at', [$from, $to])
                 ->with('items')
                 ->get();
@@ -377,6 +400,14 @@ class ReportingService
             
             $wonRevenue = (float) $this->baseWonLeadItemsForAgentInPeriod((int) $agent->id, $from, $to)->sum('total_price');
 
+            $appointmentsCount = LeadActivity::where('type', 'appointment')
+                ->whereBetween('created_at', [$from, $to])
+                ->where(function ($q) use ($agent) {
+                    $q->where('assigned_user_id', $agent->id)
+                        ->orWhere('user_id', $agent->id);
+                })
+                ->count();
+
             $pipeline[] = [
                 'employee_id' => $agent->id,
                 'employee_name' => $agent->name,
@@ -384,6 +415,7 @@ class ReportingService
                 'lead' => $leads->where('stage', 'lead')->count(),
                 'hot_lead' => $leads->where('stage', 'hot_lead')->count(),
                 'quotation' => $leads->where('stage', 'quotation')->count(),
+                'appointments' => $appointmentsCount,
                 'won' => $leads->where('stage', 'won')->count(),
                 'lost' => $leads->where('stage', 'lost')->count(),
                 'total_value' => $leads->sum('pipeline_value'),
@@ -432,15 +464,6 @@ class ReportingService
         $period = $filters['period'] ?? 'month'; // day, week, month
         $agentId = $filters['agent_id'] ?? null;
 
-        $query = Lead::query();
-        
-        if ($agentId) {
-            $query->where('assigned_to', $agentId)
-                ->orWhereHas('customer.assignedUsers', function ($q) use ($agentId) {
-                    $q->where('user_id', $agentId);
-                });
-        }
-
         $data = [];
         
         switch ($period) {
@@ -448,9 +471,9 @@ class ReportingService
                 for ($i = 6; $i >= 0; $i--) {
                     $date = now()->subDays($i)->startOfDay();
                     $endDate = $date->copy()->endOfDay();
-                    $count = (clone $query)->whereBetween('created_at', [$date, $endDate])
-                        ->where('stage', 'won')
-                        ->count();
+                    $count = $agentId
+                        ? $this->baseWonLeadItemsForAgentInPeriod((int) $agentId, $date, $endDate)->count()
+                        : $this->baseWonLeadItemsInPeriod($date, $endDate)->count();
                     $data[] = [
                         'date' => $date->format('Y-m-d'),
                         'label' => $date->format('D'),
@@ -462,9 +485,9 @@ class ReportingService
                 for ($i = 11; $i >= 0; $i--) {
                     $weekStart = now()->subWeeks($i)->startOfWeek();
                     $weekEnd = $weekStart->copy()->endOfWeek();
-                    $count = (clone $query)->whereBetween('created_at', [$weekStart, $weekEnd])
-                        ->where('stage', 'won')
-                        ->count();
+                    $count = $agentId
+                        ? $this->baseWonLeadItemsForAgentInPeriod((int) $agentId, $weekStart, $weekEnd)->count()
+                        : $this->baseWonLeadItemsInPeriod($weekStart, $weekEnd)->count();
                     $data[] = [
                         'date' => $weekStart->format('Y-m-d'),
                         'label' => 'Week ' . $weekStart->format('W'),
@@ -477,9 +500,9 @@ class ReportingService
                 for ($i = 11; $i >= 0; $i--) {
                     $monthStart = now()->subMonths($i)->startOfMonth();
                     $monthEnd = $monthStart->copy()->endOfMonth();
-                    $count = (clone $query)->whereBetween('created_at', [$monthStart, $monthEnd])
-                        ->where('stage', 'won')
-                        ->count();
+                    $count = $agentId
+                        ? $this->baseWonLeadItemsForAgentInPeriod((int) $agentId, $monthStart, $monthEnd)->count()
+                        : $this->baseWonLeadItemsInPeriod($monthStart, $monthEnd)->count();
                     $data[] = [
                         'date' => $monthStart->format('Y-m-d'),
                         'label' => $monthStart->format('M Y'),
@@ -490,6 +513,29 @@ class ReportingService
         }
 
         return $data;
+    }
+
+    private function leadPipelineTotalsForAgent(int $agentId, Carbon $from, Carbon $to): array
+    {
+        $leads = Lead::where(function ($q) use ($agentId) {
+            $q->where('assigned_to', $agentId)
+                ->orWhereHas('customer.assignedUsers', function ($userQ) use ($agentId) {
+                    $userQ->where('user_id', $agentId);
+                });
+        })
+            ->whereBetween('created_at', [$from, $to])
+            ->get(['id', 'stage', 'pipeline_value']);
+
+        return [
+            'new_leads' => $leads->count(),
+            'follow_up' => $leads->where('stage', 'follow_up')->count(),
+            'lead' => $leads->where('stage', 'lead')->count(),
+            'hot_lead' => $leads->where('stage', 'hot_lead')->count(),
+            'quotation' => $leads->where('stage', 'quotation')->count(),
+            'won_leads' => $leads->where('stage', 'won')->count(),
+            'lost_leads' => $leads->where('stage', 'lost')->count(),
+            'open_pipeline' => $leads->whereNotIn('stage', ['won', 'lost'])->sum('pipeline_value'),
+        ];
     }
 
     public function getRevenueByEmployee(array $filters = []): array
@@ -849,6 +895,7 @@ class ReportingService
             $target = $targetsByUser->get($agent->id);
             $targetAppts = $target?->target_appointments ?? 0;
             $targetRevenue = (float) ($target?->target_revenue ?? 0);
+            $pipelineTotals = $this->leadPipelineTotalsForAgent((int) $agent->id, $from, $to);
 
             $appointmentsCount = LeadActivity::where('type', 'appointment')
                 ->whereBetween('created_at', [$from, $to])
@@ -889,6 +936,7 @@ class ReportingService
                 'target_revenue' => $targetRevenue,
                 'achieved_revenue' => $totalRevenue,
                 'revenue_progress' => $revPct,
+                ...$pipelineTotals,
             ];
         }
 
@@ -942,6 +990,7 @@ class ReportingService
 
             $totals = $this->getEmployeeAchievementTotals($userId, $from, $to);
             $salesResolved = $this->resolveSalesTargetAndAchieved($target, $userId, $from, $to);
+            $pipelineTotals = $this->leadPipelineTotalsForAgent($userId, $from, $to);
 
             $targetAppts = $target?->target_appointments ?? 0;
             $targetSales = $salesResolved['target_sales'];
@@ -962,6 +1011,7 @@ class ReportingService
                 'revenue_progress' => $targetRevenue > 0 ? round($totalRevenue / $targetRevenue * 100, 1) : ($totalRevenue > 0 ? 100 : 0),
                 'overall_progress' => 0,
                 'rank' => null,
+                ...$pipelineTotals,
             ];
             $ap = $myRow['appointment_progress'];
             $sp = $myRow['sales_progress'];

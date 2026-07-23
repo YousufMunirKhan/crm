@@ -237,10 +237,7 @@ const navItems = computed(() => {
         { to: '/report/my-report', label: 'My Report', section: 'report', icon: 'chart-bar' },
     ];
     if (isAdmin) {
-        reportChildren.push({ to: '/report/target-achievement', label: 'Target vs Achievement', section: 'report', icon: 'target' });
-        reportChildren.push({ to: '/report/products-by-employee', label: 'Products by Employee', section: 'report', icon: 'shopping' });
-        reportChildren.push({ to: '/report/employee-performance', label: 'Employee performance', section: 'report', icon: 'document' });
-        reportChildren.push({ to: '/reports', label: 'Reports & Analytics', section: 'report', icon: 'chart-pie' });
+        reportChildren.push({ to: '/reports', label: 'Business Reports', section: 'report', icon: 'chart-pie' });
     }
     items.push({
         label: 'Report',
@@ -264,11 +261,18 @@ const navItems = computed(() => {
     }
 
     if (isAdmin) {
-        items.push({ to: '/employees', label: 'Employees', section: 'employees', icon: 'id-card' });
-        items.push({ to: '/hr', label: 'HR', section: 'hr', icon: 'briefcase' });
+        items.push({
+            label: 'HR',
+            icon: 'briefcase',
+            children: [
+                { to: '/employees', label: 'Employee Management', section: 'employees', icon: 'id-card' },
+                { to: '/hr', label: 'Employee Records', section: 'hr', icon: 'users', activeExact: ['/hr'], activePrefixes: ['/hr/employees'] },
+                { to: '/hr/attendance-report', label: 'Attendance Management', section: 'hr', icon: 'clipboard' },
+                { to: '/salaries/list', label: 'Salary Slips', section: 'salary_slips', icon: 'document' },
+                { to: '/salaries/reports', label: 'Salary Reports', section: 'salary_reports', icon: 'chart-bar' },
+            ],
+        });
         items.push({ to: '/expenses', label: 'Expenses', section: 'expenses', icon: 'currency' });
-        items.push({ to: '/salaries/list', label: 'Salary Slips', section: 'salary_slips', icon: 'document' });
-        items.push({ to: '/salaries/reports', label: 'Salary Reports', section: 'salary_reports', icon: 'clipboard' });
         items.push({
             label: 'Commission',
             icon: 'pound',
@@ -307,7 +311,7 @@ const navItemsVisible = computed(() => {
 function ensureActiveGroupExpanded() {
     const items = navItemsVisible.value;
     for (const item of items) {
-        if (item.children && item.children.some(c => route.path === c.to || (c.to !== '/' && route.path.startsWith(c.to)))) {
+        if (item.children && item.children.some(c => navItemMatchesCurrentRoute(c))) {
             expandedGroups.value = new Set([...expandedGroups.value, item.label]);
             return;
         }
@@ -328,14 +332,11 @@ function isGroupExpanded(label) {
 }
 
 function isGroupActive(item) {
-    return item.children && item.children.some(c => route.path === c.to || (c.to !== '/' && route.path.startsWith(c.to)));
+    return item.children && item.children.some(c => navItemMatchesCurrentRoute(c));
 }
 
 function isChildActive(child) {
-    if (child.to === '/leads') {
-        return route.path === '/leads';
-    }
-    return route.path === child.to || (child.to !== '/' && route.path.startsWith(child.to));
+    return navItemMatchesCurrentRoute(child);
 }
 
 // Ensure auth is initialized, load logo, appointment count, and expand active nav group
@@ -365,6 +366,13 @@ const pageTitle = computed(() => {
 });
 
 function isNavItemActive(item) {
+    return navItemMatchesCurrentRoute(item);
+}
+
+function navItemMatchesCurrentRoute(item) {
+    if (!item?.to) {
+        return false;
+    }
     if (item.to === '/leads/pipeline') {
         return route.path.startsWith('/leads/pipeline');
     }
@@ -375,7 +383,13 @@ function isNavItemActive(item) {
         const type = item.to.includes('type=prospect') ? 'prospect' : 'customer';
         return route.path === '/customers' && (route.query.type || 'prospect') === type;
     }
-    return route.path === item.to || (item.to !== '/' && route.path.startsWith(item.to));
+    if (item.activeExact?.includes(route.path)) {
+        return true;
+    }
+    if (item.activePrefixes?.some(path => route.path === path || route.path.startsWith(`${path}/`))) {
+        return true;
+    }
+    return route.path === item.to || (item.to !== '/' && route.path.startsWith(`${item.to}/`));
 }
 // Keep CRM navigation visible on customer / lead workspace so Leads and other sections stay reachable
 const showSidebar = computed(() => true);

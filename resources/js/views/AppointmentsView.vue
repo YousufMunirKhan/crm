@@ -40,10 +40,30 @@
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <div class="font-semibold text-slate-900">
-                                {{ apt.customer?.name || 'Customer' }}
+                                {{ apt.business_name || apt.customer?.business_name || apt.customer?.name || 'Customer' }}
+                            </div>
+                            <div v-if="apt.business_name || apt.customer?.business_name" class="text-sm text-slate-600 mt-0.5">
+                                Contact: {{ apt.customer?.name || 'N/A' }}
                             </div>
                             <div class="text-sm text-slate-600 mt-1">
                                 {{ formatDate(apt.appointment_date) }} at {{ apt.appointment_time || '10:00' }}
+                            </div>
+                            <div v-if="apt.products_to_sell?.length" class="flex flex-wrap gap-1.5 mt-2">
+                                <span
+                                    v-for="product in apt.products_to_sell"
+                                    :key="product"
+                                    class="px-2 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-100 text-xs font-medium"
+                                >
+                                    {{ product }}
+                                </span>
+                            </div>
+                            <div v-else class="text-xs text-amber-700 mt-2">
+                                No product selected on this lead.
+                            </div>
+                            <div class="text-xs text-slate-500 mt-2">
+                                Lead #{{ apt.lead_id }}
+                                <span v-if="apt.lead?.stage"> - {{ formatStage(apt.lead.stage) }}</span>
+                                <span v-if="apt.lead?.source"> - {{ apt.lead.source }}</span>
                             </div>
                             <div class="text-xs text-slate-500 mt-1">
                                 <span>Created by: {{ apt.user?.name || 'Unknown' }}</span>
@@ -114,6 +134,12 @@ function statusClass(s) {
         rescheduled: 'bg-blue-100 text-blue-800',
     };
     return map[s] || 'bg-slate-100 text-slate-600';
+}
+
+function formatStage(stage) {
+    return String(stage || '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 async function loadAppointments() {

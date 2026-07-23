@@ -51,6 +51,36 @@
                         <span>📅 Appointment Details</span>
                         <span class="text-xs font-normal text-blue-700">(Email sent to customer, admin & assignee)</span>
                     </h3>
+                    <div class="rounded-lg bg-white border border-blue-100 p-3 space-y-2">
+                        <div class="text-xs font-semibold text-blue-900 uppercase tracking-wide">Sales context sent to agent</div>
+                        <div class="text-sm text-slate-700">
+                            <span class="font-medium">Business:</span>
+                            {{ lead?.customer?.business_name || lead?.customer?.name || 'Not provided' }}
+                        </div>
+                        <div v-if="lead?.customer?.business_name" class="text-sm text-slate-700">
+                            <span class="font-medium">Contact:</span>
+                            {{ lead?.customer?.name || 'N/A' }}
+                        </div>
+                        <div class="text-sm text-slate-700">
+                            <span class="font-medium">Lead:</span>
+                            #{{ lead?.id }} - {{ formatStage(lead?.stage) || 'No stage' }}
+                        </div>
+                        <div>
+                            <div class="text-xs font-medium text-blue-800 mb-1">What to sell</div>
+                            <div v-if="leadProducts.length" class="flex flex-wrap gap-1.5">
+                                <span
+                                    v-for="product in leadProducts"
+                                    :key="product"
+                                    class="px-2 py-1 rounded bg-blue-50 text-blue-800 border border-blue-100 text-xs font-medium"
+                                >
+                                    {{ product }}
+                                </span>
+                            </div>
+                            <div v-else class="text-xs text-amber-700">
+                                No product is attached to this lead yet. Add products before scheduling if possible.
+                            </div>
+                        </div>
+                    </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Assign to (who will attend) *</label>
                         <select
@@ -119,7 +149,7 @@
                         rows="3"
                         required
                         class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                        placeholder="What was discussed? What was the outcome?"
+                        :placeholder="form.activity_type === 'appointment' ? 'Add appointment brief: customer need, pain point, what to sell, and any instructions for the agent.' : 'What was discussed? What was the outcome?'"
                     />
                 </div>
 
@@ -233,7 +263,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
 
@@ -274,6 +304,22 @@ const outcomes = [
     { value: 'negative', label: 'Negative', activeClass: 'border-red-500 bg-red-50 text-red-700' },
     { value: 'no_answer', label: 'No Answer', activeClass: 'border-slate-500 bg-slate-100 text-slate-700' },
 ];
+
+const leadProducts = computed(() => {
+    const names = (props.lead?.items || [])
+        .map((item) => item.product?.name)
+        .filter(Boolean);
+    if (names.length) {
+        return [...new Set(names)];
+    }
+    return props.lead?.product?.name ? [props.lead.product.name] : [];
+});
+
+function formatStage(stage) {
+    return String(stage || '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const form = ref({
     activity_type: 'call',
