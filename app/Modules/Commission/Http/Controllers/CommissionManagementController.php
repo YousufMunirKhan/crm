@@ -194,6 +194,15 @@ class CommissionManagementController extends Controller
             return response()->json(['message' => 'One or more selected users are not commission eligible.'], 422);
         }
 
+        $allocationKeys = collect($data['allocations'])->map(function (array $allocation) use ($data) {
+            $role = $allocation['commission_role'] ?? (count($data['allocations']) > 1 ? 'closer' : 'single_owner');
+
+            return ((int) $allocation['credited_user_id']).'|'.$role.'|'.$allocation['commission_currency'];
+        });
+        if ($allocationKeys->unique()->count() !== $allocationKeys->count()) {
+            return response()->json(['message' => 'Duplicate commission split rows are not allowed for the same user, role, and currency.'], 422);
+        }
+
         $customerId = $leadItem?->lead?->customer_id;
         if (! $customerId) {
             $customerId = DB::table('leads')->where('id', $data['lead_id'])->value('customer_id');

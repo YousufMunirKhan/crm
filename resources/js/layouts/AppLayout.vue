@@ -50,6 +50,7 @@
                         <button
                             type="button"
                             @click="toggleGroup(item.label)"
+                            :title="item.description || item.label"
                             :class="[
                                 'w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm hover:bg-white/10 transition-colors text-left rounded-lg mx-2 border-l-4',
                                 isGroupActive(item)
@@ -79,6 +80,7 @@
                                 v-for="child in item.children"
                                 :key="child.to"
                                 :to="child.to"
+                                :title="child.description || child.label"
                                 @click="mobileMenuOpen = false"
                                 :class="[
                                     'flex items-center gap-3 px-3 py-2 text-sm transition-colors rounded-lg mx-1 pl-4 border-l-4',
@@ -96,6 +98,7 @@
                     <router-link
                         v-else
                         :to="item.to"
+                        :title="item.description || item.label"
                         @click="mobileMenuOpen = false"
                         :class="[
                             'flex items-center gap-3 mx-2 px-3 py-2.5 text-sm rounded-lg transition-colors border-l-4',
@@ -274,11 +277,24 @@ const navItems = computed(() => {
         });
         items.push({ to: '/expenses', label: 'Expenses', section: 'expenses', icon: 'currency' });
         items.push({
-            label: 'Commission',
+            label: 'Commissions',
             icon: 'pound',
+            description: 'Allocate commission for won sales and review commission reports.',
             children: [
-                { to: '/commission/allocate', label: 'Allocate Commission', section: 'commission_management', icon: 'pound' },
-                { to: '/commission/report', label: 'Commission Report', section: 'commission_management', icon: 'chart-bar' },
+                {
+                    to: '/commission/allocate',
+                    label: 'Commission Workspace',
+                    section: 'commission_management',
+                    icon: 'pound',
+                    description: 'Use this queue to allocate commission for won product sales.',
+                },
+                {
+                    to: '/commission/report',
+                    label: 'Commission Reports',
+                    section: 'commission_management',
+                    icon: 'chart-bar',
+                    description: 'Review monthly user totals, download PDFs, and email commission reports.',
+                },
             ],
         });
     }

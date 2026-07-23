@@ -245,13 +245,13 @@ const routes = [
         path: '/commission/allocate',
         name: 'commission-allocate',
         component: () => import('@/views/CommissionManagementView.vue'),
-        meta: { requiresAuth: true, title: 'Allocate Commission', roles: ['Admin', 'Manager', 'System Admin'] },
+        meta: { requiresAuth: true, title: 'Commission Workspace', roles: ['Admin', 'Manager', 'System Admin'] },
     },
     {
         path: '/commission/report',
         name: 'commission-report',
         component: () => import('@/views/CommissionReportView.vue'),
-        meta: { requiresAuth: true, title: 'Commission Report', roles: ['Admin', 'Manager', 'System Admin'] },
+        meta: { requiresAuth: true, title: 'Commission Reports', roles: ['Admin', 'Manager', 'System Admin'] },
     },
     {
         path: '/products',
