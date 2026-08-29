@@ -90,29 +90,40 @@ class InstallMarketingAgentTemplates extends Command
      * One column, inline styles, no floats - this has to survive Outlook and a
      * phone screen, which is where the old templates fell apart.
      */
-    private function wrap(string $inner, string $preheader = ''): string
+    /**
+     * The stored shape the renderer expects: a list of sections, not a string.
+     *
+     * `content` written as plain HTML has no ['sections'], so
+     * renderTemplateForPreview() found nothing to render and produced the brand
+     * footer alone - these templates would have sent as an empty email. One
+     * raw_html section keeps the hand-written markup and puts it somewhere the
+     * renderer will actually look.
+     *
+     * `preview_line` is the inbox preheader; the renderer handles hiding it, so
+     * there is no hand-rolled div. The brand footer is appended by the renderer
+     * too, which is why there is not one here.
+     *
+     * @return array<string, mixed>
+     */
+    private function wrap(string $inner, string $preheader = ''): array
     {
-        // Hidden preheader. Without it the inbox preview scrapes the <h1>, so
-        // every email previews as its own subject line said twice.
-        $pre = $preheader === '' ? '' :
-            '<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">'.$preheader
-            .str_repeat('&#847;&zwnj;&nbsp;', 40).'</div>';
-
-        return <<<HTML
-        {$pre}
+        $html = <<<HTML
         <div style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;">
             <tr><td style="padding:32px 28px;">
               <img src="{{header_logo_url}}" alt="{{company_name}}" width="150" style="display:block;max-width:150px;height:auto;margin-bottom:28px;border:0;">
               {$inner}
-              <p style="margin:28px 0 0;padding-top:20px;border-top:1px solid #e2e8f0;font-size:13px;line-height:20px;color:#64748b;">
-                {{company_name}} &middot; <a href="tel:{{company_phone}}" style="color:#2563eb;text-decoration:none;">{{company_phone}}</a><br>
-                <a href="{{company_website}}" style="color:#2563eb;text-decoration:none;">{{company_website}}</a>
-              </p>
             </td></tr>
           </table>
         </div>
         HTML;
+
+        return [
+            'preview_line' => $preheader,
+            'sections' => [
+                ['type' => 'raw_html', 'content' => ['html' => $html]],
+            ],
+        ];
     }
 
     private function p(string $text): string
@@ -144,6 +155,7 @@ class InstallMarketingAgentTemplates extends Command
             // ---------------------------------------------------- customers
             [
                 'purpose' => 'welcome-onboarding',
+                'preheader' => 'Our support line goes to people who know your setup, not a call centre.',
                 'name' => 'Agent · Welcome (new customer)',
                 'when' => 'Sent once, shortly after a customer\'s first order is marked won.',
                 'subject' => 'Save this number before you need it',
@@ -156,6 +168,7 @@ class InstallMarketingAgentTemplates extends Command
             ],
             [
                 'purpose' => 'licence-renewal',
+                'preheader' => 'Two minutes on the phone and it is done for another year.',
                 'name' => 'Agent · Licence renewal reminder',
                 'when' => 'Sent about 30 days before a software licence expires.',
                 'subject' => '{{first_name}}, your licence expires soon',
@@ -168,6 +181,7 @@ class InstallMarketingAgentTemplates extends Command
             ],
             [
                 'purpose' => 'birthday',
+                'preheader' => 'No pitch, just a birthday note.',
                 'name' => 'Agent · Birthday',
                 'when' => 'Sent on the contact\'s birthday, if one is recorded.',
                 'subject' => 'Happy birthday, {{first_name}}',
@@ -178,6 +192,7 @@ class InstallMarketingAgentTemplates extends Command
             ],
             [
                 'purpose' => 'check-in',
+                'preheader' => 'A free card-rate review and free retraining, whenever you want them.',
                 'name' => 'Agent · Quiet customer check-in',
                 'when' => 'Sent to a customer with no contact for roughly six months.',
                 'subject' => 'All still running OK?',
@@ -193,6 +208,7 @@ class InstallMarketingAgentTemplates extends Command
             // ------------------------------------------------- product gaps
             [
                 'purpose' => 'epos-upsell',
+                'preheader' => 'It plugs into the terminal you already have.',
                 'name' => 'Agent · ePOS upsell (has card machine, no ePOS)',
                 'when' => 'Customer takes card payments through us but has no ePOS system.',
                 'subject' => 'You know the total. Not the items.',
@@ -205,6 +221,7 @@ class InstallMarketingAgentTemplates extends Command
             ],
             [
                 'purpose' => 'website-upsell',
+                'preheader' => 'Orders come straight into the till you already run.',
                 'name' => 'Agent · Website / online ordering upsell',
                 'when' => 'Customer has an ePOS with us but no online ordering site.',
                 'subject' => 'Stop paying commission on your regulars',
@@ -217,6 +234,7 @@ class InstallMarketingAgentTemplates extends Command
             ],
             [
                 'purpose' => 'bundle-upsell',
+                'preheader' => 'One invoice, one support number, one renewal date.',
                 'name' => 'Agent · Bundle consolidation',
                 'when' => 'Customer has pieces bought separately that a bundle would cover.',
                 'subject' => 'Your services, on one bill',
@@ -229,6 +247,7 @@ class InstallMarketingAgentTemplates extends Command
             ],
             [
                 'purpose' => 'funding-offer',
+                'preheader' => 'Assessed on your takings, repaid as you trade.',
                 'name' => 'Agent · Business funding',
                 'when' => 'Sent to established customers who may need working capital.',
                 'subject' => 'Funding that repays as you trade',
@@ -243,6 +262,7 @@ class InstallMarketingAgentTemplates extends Command
             // ---------------------------------------------------- prospects
             [
                 'purpose' => 'quote-followup',
+                'preheader' => 'If it is a no, say so and we will stop chasing.',
                 'name' => 'Agent · Quotation follow-up',
                 'when' => 'A quote was sent and there has been no reply for a couple of weeks.',
                 'subject' => 'Shall I close this one off?',
@@ -255,6 +275,7 @@ class InstallMarketingAgentTemplates extends Command
             ],
             [
                 'purpose' => 'winback',
+                'preheader' => 'Most agreements roll over unless you give notice.',
                 'name' => 'Agent · Win-back (lost lead)',
                 'when' => 'A lead was marked lost some months ago.',
                 'subject' => 'Is your contract up yet?',
@@ -267,6 +288,7 @@ class InstallMarketingAgentTemplates extends Command
             ],
             [
                 'purpose' => 'prospect-nurture',
+                'preheader' => 'Three things to check before you talk to anyone about switching.',
                 'name' => 'Agent · New prospect nurture',
                 'when' => 'A prospect is on file but no lead has been created yet.',
                 'subject' => 'Worth re-reading your card statement',
