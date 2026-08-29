@@ -2,6 +2,8 @@
 
 namespace App\Modules\ImportExport\Exports;
 
+use Illuminate\Support\Collection;
+use Illuminate\Support\Enumerable;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -10,9 +12,11 @@ class TicketsExport implements FromCollection, WithHeadings, WithMapping
 {
     public function __construct(private $tickets) {}
 
-    public function collection()
+    public function collection(): Enumerable
     {
-        return $this->tickets;
+        return $this->tickets instanceof Enumerable
+            ? $this->tickets
+            : Collection::make($this->tickets);
     }
 
     public function headings(): array

@@ -2,6 +2,8 @@
 
 namespace App\Modules\ImportExport\Exports;
 
+use Illuminate\Support\Collection;
+use Illuminate\Support\Enumerable;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -10,9 +12,11 @@ class LeadsExport implements FromCollection, WithHeadings, WithMapping
 {
     public function __construct(private $leads) {}
 
-    public function collection()
+    public function collection(): Enumerable
     {
-        return $this->leads;
+        return $this->leads instanceof Enumerable
+            ? $this->leads
+            : Collection::make($this->leads);
     }
 
     public function headings(): array
