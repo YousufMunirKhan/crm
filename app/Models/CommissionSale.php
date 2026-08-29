@@ -5,11 +5,15 @@ namespace App\Models;
 use App\Modules\CRM\Models\Customer;
 use App\Modules\CRM\Models\Lead;
 use App\Modules\CRM\Models\LeadItem;
+use App\Traits\HasAuditLog;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CommissionSale extends Model
 {
+    use SoftDeletes, HasAuditLog;
+
     protected $fillable = [
         'lead_id',
         'lead_item_id',

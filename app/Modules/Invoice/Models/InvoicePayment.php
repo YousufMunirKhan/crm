@@ -5,11 +5,12 @@ namespace App\Modules\Invoice\Models;
 use App\Models\User;
 use App\Traits\HasAuditLog;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class InvoicePayment extends Model
 {
-    use HasAuditLog;
+    use HasAuditLog, SoftDeletes;
 
     protected $fillable = [
         'invoice_id',

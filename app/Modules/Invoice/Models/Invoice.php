@@ -3,17 +3,19 @@
 namespace App\Modules\Invoice\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\HasAuditLog;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Invoice extends Model
 {
-    use HasAuditLog;
+    use HasAuditLog, SoftDeletes;
 
     protected $fillable = [
         'invoice_number',
         'customer_id',
+        'lead_id',
         'created_by',
         'invoice_date',
         'due_date',
@@ -49,6 +51,16 @@ class Invoice extends Model
     public function items(): HasMany
     {
         return $this->hasMany(InvoiceItem::class);
+    }
+
+    /**
+     * The won lead this invoice was raised from, when it came through the
+     * pipeline. Without this, lead revenue and invoice revenue cannot be
+     * de-duplicated in reporting.
+     */
+    public function lead(): BelongsTo
+    {
+        return $this->belongsTo(\App\Modules\CRM\Models\Lead::class);
     }
 
     public function payments(): HasMany

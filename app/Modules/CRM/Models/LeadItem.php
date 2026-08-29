@@ -3,12 +3,13 @@
 namespace App\Modules\CRM\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\HasAuditLog;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LeadItem extends Model
 {
-    use HasAuditLog;
+    use HasAuditLog, SoftDeletes;
 
     protected $fillable = [
         'lead_id',

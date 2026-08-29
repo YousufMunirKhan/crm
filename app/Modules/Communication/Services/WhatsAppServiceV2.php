@@ -11,6 +11,8 @@ use App\Modules\Communication\Models\WhatsAppTemplate;
 use App\Modules\CRM\Models\Customer;
 use App\Modules\CRM\Models\Lead;
 use Illuminate\Support\Facades\Log;
+use App\Models\ContactConsent;
+use App\Services\SuppressionService;
 
 class WhatsAppServiceV2
 {
@@ -950,8 +952,11 @@ class WhatsAppServiceV2
                 return null;
             }
 
+            $suppression = app(SuppressionService::class);
+            $isOptOut = $suppression->isOptOutKeyword($bodySummary);
+
             $customer = $this->findCustomerForWhatsAppFrom($from);
-            if (!$customer) {
+            if (!$customer && !$isOptOut) {
                 $profileName = is_array($contacts) ? ($contacts['profile']['name'] ?? null) : null;
                 $customer = Customer::firstOrCreate(
                     ['whatsapp_number' => $from],
@@ -960,6 +965,22 @@ class WhatsAppServiceV2
                         'phone' => $from,
                     ]
                 );
+            }
+
+            // Replying STOP must never create a record that then matches the
+            // bulk-send audience filters.
+            if ($isOptOut) {
+                $suppression->optOut(
+                    $from,
+                    ContactConsent::CHANNEL_WHATSAPP,
+                    'inbound_keyword',
+                    $bodySummary,
+                    $customer?->id
+                );
+
+                if (!$customer) {
+                    return null;
+                }
             }
 
             // Get or create conversation

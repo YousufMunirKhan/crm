@@ -3,6 +3,7 @@
 namespace App\Modules\CRM\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\HasAuditLog;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,12 +13,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Customer extends Model
 {
-    use HasAuditLog, HasApiTokens;
+    use HasAuditLog, HasApiTokens, SoftDeletes;
 
     public const TYPE_PROSPECT = 'prospect';
     public const TYPE_CUSTOMER = 'customer';
 
     protected $fillable = [
+        'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+        'referrer', 'landing_page', 'gclid', 'fbclid',
         'type',
         'name',
         'business_name',
@@ -47,7 +50,11 @@ class Customer extends Model
         'created_by',
     ];
 
-    protected $hidden = ['portal_password'];
+    /**
+     * Never serialise credentials. 'passwords' and 'anydesk_rustdesk' are
+     * customer remote-access credentials and must not reach the API.
+     */
+    protected $hidden = ['portal_password', 'passwords', 'anydesk_rustdesk'];
 
     protected $attributes = [
         'type' => self::TYPE_PROSPECT,

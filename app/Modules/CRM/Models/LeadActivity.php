@@ -3,12 +3,13 @@
 namespace App\Modules\CRM\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\HasAuditLog;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LeadActivity extends Model
 {
-    use HasAuditLog;
+    use HasAuditLog, SoftDeletes;
 
     const APPOINTMENT_STATUS_PENDING = 'pending';
     const APPOINTMENT_STATUS_COMPLETED = 'completed';

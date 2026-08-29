@@ -3,15 +3,18 @@
 namespace App\Modules\CRM\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\HasAuditLog;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Lead extends Model
 {
-    use HasAuditLog;
+    use HasAuditLog, SoftDeletes;
 
     protected $fillable = [
+        'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+        'referrer', 'landing_page', 'gclid', 'fbclid',
         'customer_id',
         'product_id',
         'converted_from_activity_id',
@@ -53,6 +56,24 @@ class Lead extends Model
             if ($lead->created_by === null && auth()->check()) {
                 $lead->created_by = auth()->id();
             }
+        });
+
+        // Children follow the lead. The database cascade no longer fires now
+        // that leads are soft-deleted, so retire activities and line items
+        // alongside the lead - otherwise they linger in follow-up lists and
+        // pipeline totals for a lead nobody can see.
+        static::deleting(function (Lead $lead) {
+            if ($lead->isForceDeleting()) {
+                return;
+            }
+
+            $lead->activities()->delete();
+            $lead->items()->delete();
+        });
+
+        static::restoring(function (Lead $lead) {
+            $lead->activities()->withTrashed()->restore();
+            $lead->items()->withTrashed()->restore();
         });
     }
 
