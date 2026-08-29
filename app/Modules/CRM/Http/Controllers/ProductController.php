@@ -5,6 +5,7 @@ namespace App\Modules\CRM\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\CRM\Models\Product;
 use App\Modules\CRM\Models\ProductCategory;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 
@@ -185,6 +186,56 @@ class ProductController extends Controller
         $product = Product::findOrFail($id);
         $suggested = $product->getSuggestedProducts();
         return response()->json($suggested);
+    }
+
+    /**
+     * Creates a category from the products screen.
+     *
+     * Deliberately not silent about duplicates. The whole reason categories
+     * moved out of a free-text column is that "ePOS" and "epos" became two
+     * categories and split the reporting, so a name that resolves to an
+     * existing category returns that category with a note rather than making
+     * a second one - and the caller can tell the two cases apart by `created`.
+     */
+    public function storeCategory(Request $request)
+    {
+        Gate::authorize('create', ProductCategory::class);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $name = trim(preg_replace('/\s+/u', ' ', $data['name']));
+        $slug = Str::slug($name);
+
+        if ($slug === '') {
+            return response()->json([
+                'message' => 'That name has no letters or numbers in it.',
+            ], 422);
+        }
+
+        $existing = ProductCategory::withTrashed()->where('slug', $slug)->first();
+
+        if ($existing && ! $existing->trashed()) {
+            return response()->json([
+                'created' => false,
+                'message' => "\"{$existing->name}\" already exists.",
+                'category' => $existing->only(['id', 'name', 'slug']),
+            ], 200);
+        }
+
+        $category = ProductCategory::findOrCreateByName($name);
+
+        if ($category && ! empty($data['description'])) {
+            $category->update(['description' => $data['description']]);
+        }
+
+        return response()->json([
+            'created' => true,
+            'message' => "\"{$category->name}\" added.",
+            'category' => $category->only(['id', 'name', 'slug']),
+        ], 201);
     }
 
     /**

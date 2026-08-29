@@ -121,6 +121,61 @@ class ProductCategoryTest extends TestCase
         $this->assertContains($empty->id, array_column($body['categories'], 'id'));
     }
 
+    public function test_a_manager_can_add_a_category_from_the_products_screen(): void
+    {
+        $role = Role::query()->firstOrCreate(['name' => 'Manager'], ['description' => 'Manager']);
+        $manager = User::factory()->create(['role_id' => $role->id]);
+
+        $response = $this->actingAs($manager)
+            ->postJson('/api/products/categories', ['name' => 'Card Terminal'])
+            ->assertCreated();
+
+        $this->assertTrue($response->json('created'));
+        $this->assertSame('Card Terminal', $response->json('category.name'));
+    }
+
+    /**
+     * Typing a name that already exists must not quietly make a second row -
+     * that is exactly the split the table was built to prevent.
+     */
+    public function test_adding_an_existing_category_returns_it_instead_of_duplicating(): void
+    {
+        ProductCategory::create(['name' => 'ePOS Bundle']);
+
+        $role = Role::query()->firstOrCreate(['name' => 'Manager'], ['description' => 'Manager']);
+        $manager = User::factory()->create(['role_id' => $role->id]);
+
+        $response = $this->actingAs($manager)
+            ->postJson('/api/products/categories', ['name' => '  epos   bundle '])
+            ->assertOk();
+
+        $this->assertFalse($response->json('created'));
+        $this->assertSame('ePOS Bundle', $response->json('category.name'));
+        $this->assertSame(1, ProductCategory::where('slug', 'epos-bundle')->count());
+    }
+
+    public function test_a_sales_agent_cannot_add_a_category(): void
+    {
+        $role = Role::query()->firstOrCreate(['name' => 'Sales'], ['description' => 'Sales']);
+        $agent = User::factory()->create(['role_id' => $role->id]);
+
+        $this->actingAs($agent)
+            ->postJson('/api/products/categories', ['name' => 'Invented'])
+            ->assertForbidden();
+
+        $this->assertSame(0, ProductCategory::where('slug', 'invented')->count());
+    }
+
+    public function test_a_name_with_no_letters_or_numbers_is_rejected(): void
+    {
+        $role = Role::query()->firstOrCreate(['name' => 'Manager'], ['description' => 'Manager']);
+        $manager = User::factory()->create(['role_id' => $role->id]);
+
+        $this->actingAs($manager)
+            ->postJson('/api/products/categories', ['name' => '---'])
+            ->assertStatus(422);
+    }
+
     public function test_a_category_coming_back_into_use_is_restored_not_duplicated(): void
     {
         $category = ProductCategory::create(['name' => 'Seasonal']);

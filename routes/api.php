@@ -123,6 +123,7 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     Route::get('/leads/export', [LeadController::class, 'exportCsv']);
     Route::apiResource('leads', LeadController::class);
     Route::get('/products/categories', [ProductController::class, 'categories']);
+    Route::post('/products/categories', [ProductController::class, 'storeCategory']);
     Route::apiResource('products', ProductController::class);
     Route::get('/products/{id}/suggested', [ProductController::class, 'getSuggestedProducts']);
     Route::get('/products/{id}/relationships', [ProductController::class, 'relationships']);

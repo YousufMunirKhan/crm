@@ -41,6 +41,21 @@
                 <BaseButton variant="soft" block-mobile class="shrink-0" @click="productListPage = 1">
                     Filter
                 </BaseButton>
+                <!--
+                    Adding a category meant leaving for the admin panel, which
+                    is why people typed a new one into the old free-text box
+                    instead. It belongs where the products are.
+                -->
+                <BaseButton
+                    v-if="canManageCategories"
+                    variant="outline"
+                    block-mobile
+                    class="shrink-0"
+                    @click="openCategoryModal"
+                >
+                    <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                    Add category
+                </BaseButton>
             </div>
         </template>
 
@@ -141,7 +156,15 @@
                     <input id="product-sku" v-model="form.sku" type="text" class="form-input" placeholder="Optional" />
                 </div>
                 <div>
-                    <label for="product-category" class="form-label">Category</label>
+                    <div class="flex items-center justify-between gap-2">
+                        <label for="product-category" class="form-label mb-0">Category</label>
+                        <button
+                            v-if="canManageCategories"
+                            type="button"
+                            class="link text-xs"
+                            @click="openCategoryModal"
+                        >+ New category</button>
+                    </div>
                     <!--
                         Was a free-text box, so "ePOS" and "epos" became two
                         categories and target reporting split between them.
@@ -151,7 +174,7 @@
                         <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
                     </select>
                     <p class="form-hint">
-                        Categories are managed in the admin panel. Products with no category are grouped under Uncategorized.
+                        Products with no category are grouped under Uncategorized.
                     </p>
                 </div>
             </div>
@@ -270,6 +293,53 @@
         </template>
     </BaseModal>
 
+    <BaseModal
+        v-model="showCategoryModal"
+        title="Add a category"
+        description="Check the list below first - a near-duplicate splits your reporting between two categories that mean the same thing."
+        size="sm"
+        :close-on-backdrop="false"
+        @close="closeCategoryModal"
+    >
+        <form id="category-form" class="space-y-4" novalidate @submit.prevent="submitCategory">
+            <div>
+                <label class="form-label" for="new-category-name">Category name *</label>
+                <input
+                    id="new-category-name"
+                    ref="categoryNameInput"
+                    v-model="newCategoryName"
+                    type="text"
+                    required
+                    class="form-input"
+                    placeholder="e.g. Card Terminal"
+                />
+                <p v-if="categoryError" class="form-error">{{ categoryError }}</p>
+                <p v-else class="form-hint">Capitalisation is kept exactly as you type it.</p>
+            </div>
+
+            <div v-if="categories.length">
+                <p class="text-eyebrow uppercase text-slate-500 mb-1.5">Already there</p>
+                <div class="flex flex-wrap gap-1.5">
+                    <span v-for="c in categories" :key="c.id" class="chip">{{ c.name }}</span>
+                </div>
+            </div>
+        </form>
+
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="closeCategoryModal">Cancel</BaseButton>
+            <BaseButton
+                variant="primary"
+                type="submit"
+                form="category-form"
+                block-mobile
+                :disabled="!newCategoryName.trim()"
+                :loading="categorySaving"
+            >
+                Add category
+            </BaseButton>
+        </template>
+    </BaseModal>
+
     <ConfirmDialog
         v-model="confirmDeleteOpen"
         title="Delete product?"
@@ -281,9 +351,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, nextTick, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { CubeIcon, MagnifyingGlassIcon, PlusIcon } from '@heroicons/vue/24/outline';
+import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import Pagination from '@/components/Pagination.vue';
@@ -296,6 +367,7 @@ import {
     EmptyState,
 } from '@/components/base';
 
+const auth = useAuthStore();
 const toast = useToastStore();
 const products = ref([]);
 const loading = ref(false);
@@ -331,6 +403,65 @@ const form = ref({
 
 const categories = ref([]);
 const categoryFilter = ref('');
+
+const showCategoryModal = ref(false);
+const newCategoryName = ref('');
+const categoryError = ref('');
+const categorySaving = ref(false);
+const categoryNameInput = ref(null);
+
+// Sales staff read categories but do not create them - a rep inventing a
+// category is the problem the table was built to stop.
+const canManageCategories = computed(() => {
+    const role = auth.user?.role?.name;
+    return role === 'Admin' || role === 'System Admin' || role === 'Manager';
+});
+
+function openCategoryModal() {
+    newCategoryName.value = '';
+    categoryError.value = '';
+    showCategoryModal.value = true;
+    nextTick(() => categoryNameInput.value?.focus());
+}
+
+function closeCategoryModal() {
+    showCategoryModal.value = false;
+    categoryError.value = '';
+}
+
+const submitCategory = async () => {
+    const name = newCategoryName.value.trim();
+    if (!name || categorySaving.value) return;
+
+    categorySaving.value = true;
+    categoryError.value = '';
+
+    try {
+        const { data } = await axios.post('/api/products/categories', { name });
+        await loadCategories();
+
+        // A name that resolves to an existing category comes back as
+        // created:false rather than a second row, so say so rather than
+        // pretending something new was made.
+        toast.success(data.message);
+
+        // Either way, this is the category the user was reaching for.
+        if (showForm.value) {
+            form.value.category_id = data.category.id;
+        } else {
+            categoryFilter.value = String(data.category.id);
+            productListPage.value = 1;
+        }
+
+        closeCategoryModal();
+    } catch (err) {
+        categoryError.value = err?.response?.status === 403
+            ? 'Only managers and admins can add categories.'
+            : err?.response?.data?.message || 'Could not add the category.';
+    } finally {
+        categorySaving.value = false;
+    }
+};
 
 /** The API still sends the legacy string, so fall back to it while both exist. */
 function categoryNameOf(product) {
