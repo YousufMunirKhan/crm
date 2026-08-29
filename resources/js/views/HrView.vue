@@ -1,9 +1,6 @@
 <template>
     <div class="w-full min-w-0">
-        <div v-if="isAdmin" class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 lg:py-6 space-y-4">
-            <h1 class="text-xl lg:text-2xl font-bold text-slate-800 tracking-tight">HR management</h1>
-            <router-view />
-        </div>
+        <router-view v-if="isAdmin" />
 
         <ListingPageShell
             v-else
@@ -12,83 +9,166 @@
             :badge="attendanceShellBadge"
         >
             <template #actions>
-                <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-stretch sm:justify-end">
-                    <button type="button" class="listing-btn-outline flex-1 sm:flex-initial" @click="exportAttendance">Export CSV</button>
-                </div>
+                <BaseButton variant="outline" block-mobile @click="exportAttendance">
+                    <template #icon><ArrowDownTrayIcon class="icon" aria-hidden="true" /></template>
+                    Export CSV
+                </BaseButton>
             </template>
 
-            <div class="px-3 pb-4 sm:px-5">
+            <template #toolbar>
                 <AttendanceClock @updated="loadAttendance(1)" />
-            </div>
+            </template>
 
-            <div v-if="attendanceList.length === 0" class="px-5 py-12 text-center text-slate-500 text-sm">
-                No attendance records found
-            </div>
-            <div v-else class="space-y-3 px-3 pb-2 sm:px-5">
-                <div
-                    v-for="attendance in attendanceList"
-                    :key="attendance.id"
-                    class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/40 p-4 sm:flex-row sm:items-start sm:justify-between"
-                >
-                    <div class="min-w-0 flex-1">
-                        <div class="font-medium text-slate-900">{{ formatDate(attendance.date) }}</div>
-                        <div class="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-                            <div class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2">
-                                <img
-                                    v-if="attendance.check_in_photo_url"
-                                    :src="attendance.check_in_photo_url"
-                                    alt="Check-in proof"
-                                    class="h-10 w-10 rounded object-cover"
-                                />
-                                <div>
-                                    <div class="font-medium text-slate-700">Check-in proof</div>
-                                    <div v-if="attendance.check_in_location_name" class="break-words text-slate-600">
-                                        {{ attendance.check_in_location_name }}
-                                    </div>
-                                    <a
-                                        v-if="attendance.check_in_map_url"
-                                        :href="attendance.check_in_map_url"
-                                        target="_blank"
-                                        rel="noopener"
-                                        class="inline-flex min-h-8 items-center text-blue-700 hover:underline"
-                                    >
-                                        Open map
-                                    </a>
-                                    <div v-else class="text-slate-500">Not captured</div>
-                                </div>
+            <BaseTable
+                :columns="attendanceColumns"
+                :rows="attendanceList"
+                :loading="loadingAttendance"
+                row-key="id"
+                min-width="720px"
+                caption="Your attendance records: date, check-in proof, check-out proof and hours worked."
+            >
+                <template #cell-date="{ row }">
+                    <span class="font-semibold text-slate-800">{{ formatDate(row.date) }}</span>
+                </template>
+
+                <template #cell-check_in="{ row }">
+                    <div class="flex items-start gap-2">
+                        <img
+                            v-if="row.check_in_photo_url"
+                            :src="row.check_in_photo_url"
+                            alt="Check-in proof"
+                            class="h-10 w-10 shrink-0 rounded object-cover"
+                        />
+                        <div class="min-w-0">
+                            <div class="font-medium text-slate-800">{{ formatTime(row.check_in_at) }}</div>
+                            <div v-if="row.check_in_location_name" class="break-words text-xs text-slate-600">
+                                {{ row.check_in_location_name }}
                             </div>
-                            <div class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2">
-                                <img
-                                    v-if="attendance.check_out_photo_url"
-                                    :src="attendance.check_out_photo_url"
-                                    alt="Check-out proof"
-                                    class="h-10 w-10 rounded object-cover"
-                                />
-                                <div>
-                                    <div class="font-medium text-slate-700">Check-out proof</div>
-                                    <div v-if="attendance.check_out_location_name" class="break-words text-slate-600">
-                                        {{ attendance.check_out_location_name }}
-                                    </div>
-                                    <a
-                                        v-if="attendance.check_out_map_url"
-                                        :href="attendance.check_out_map_url"
-                                        target="_blank"
-                                        rel="noopener"
-                                        class="inline-flex min-h-8 items-center text-blue-700 hover:underline"
-                                    >
-                                        Open map
-                                    </a>
-                                    <div v-else class="text-slate-500">Not captured</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="text-xs text-slate-500">
-                            {{ formatTime(attendance.check_in_at) }} – {{ attendance.check_out_at ? formatTime(attendance.check_out_at) : 'In progress' }}
+                            <a
+                                v-if="row.check_in_map_url"
+                                :href="row.check_in_map_url"
+                                target="_blank"
+                                rel="noopener"
+                                class="link inline-flex min-h-8 items-center gap-1 text-xs"
+                            >
+                                <MapPinIcon class="icon-sm" aria-hidden="true" />
+                                Open map
+                            </a>
+                            <div v-else class="text-xs text-slate-500">Location not captured</div>
                         </div>
                     </div>
-                    <div class="text-sm font-semibold text-slate-700 sm:pt-1">{{ parseFloat(attendance.work_hours || 0).toFixed(2) }}h</div>
-                </div>
-            </div>
+                </template>
+
+                <template #cell-check_out="{ row }">
+                    <div class="flex items-start gap-2">
+                        <img
+                            v-if="row.check_out_photo_url"
+                            :src="row.check_out_photo_url"
+                            alt="Check-out proof"
+                            class="h-10 w-10 shrink-0 rounded object-cover"
+                        />
+                        <div class="min-w-0">
+                            <div class="font-medium text-slate-800">
+                                {{ row.check_out_at ? formatTime(row.check_out_at) : 'In progress' }}
+                            </div>
+                            <div v-if="row.check_out_location_name" class="break-words text-xs text-slate-600">
+                                {{ row.check_out_location_name }}
+                            </div>
+                            <a
+                                v-if="row.check_out_map_url"
+                                :href="row.check_out_map_url"
+                                target="_blank"
+                                rel="noopener"
+                                class="link inline-flex min-h-8 items-center gap-1 text-xs"
+                            >
+                                <MapPinIcon class="icon-sm" aria-hidden="true" />
+                                Open map
+                            </a>
+                            <div v-else class="text-xs text-slate-500">Location not captured</div>
+                        </div>
+                    </div>
+                </template>
+
+                <template #cell-work_hours="{ row }">
+                    <span class="font-semibold text-slate-800">{{ parseFloat(row.work_hours || 0).toFixed(2) }}h</span>
+                </template>
+
+                <template #mobile="{ row }">
+                    <div class="table-card">
+                        <div class="flex items-start justify-between gap-3">
+                            <span class="font-semibold text-slate-900">{{ formatDate(row.date) }}</span>
+                            <span class="text-sm font-semibold text-slate-700">
+                                {{ parseFloat(row.work_hours || 0).toFixed(2) }}h
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                            <div class="flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-2">
+                                <img
+                                    v-if="row.check_in_photo_url"
+                                    :src="row.check_in_photo_url"
+                                    alt="Check-in proof"
+                                    class="h-10 w-10 shrink-0 rounded object-cover"
+                                />
+                                <div class="min-w-0">
+                                    <div class="text-eyebrow uppercase text-slate-500">Check-in</div>
+                                    <div class="font-medium text-slate-800">{{ formatTime(row.check_in_at) }}</div>
+                                    <div v-if="row.check_in_location_name" class="break-words text-slate-600">
+                                        {{ row.check_in_location_name }}
+                                    </div>
+                                    <a
+                                        v-if="row.check_in_map_url"
+                                        :href="row.check_in_map_url"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="link inline-flex min-h-8 items-center gap-1"
+                                    >
+                                        <MapPinIcon class="icon-sm" aria-hidden="true" />
+                                        Open map
+                                    </a>
+                                    <div v-else class="text-slate-500">Location not captured</div>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-2">
+                                <img
+                                    v-if="row.check_out_photo_url"
+                                    :src="row.check_out_photo_url"
+                                    alt="Check-out proof"
+                                    class="h-10 w-10 shrink-0 rounded object-cover"
+                                />
+                                <div class="min-w-0">
+                                    <div class="text-eyebrow uppercase text-slate-500">Check-out</div>
+                                    <div class="font-medium text-slate-800">
+                                        {{ row.check_out_at ? formatTime(row.check_out_at) : 'In progress' }}
+                                    </div>
+                                    <div v-if="row.check_out_location_name" class="break-words text-slate-600">
+                                        {{ row.check_out_location_name }}
+                                    </div>
+                                    <a
+                                        v-if="row.check_out_map_url"
+                                        :href="row.check_out_map_url"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="link inline-flex min-h-8 items-center gap-1"
+                                    >
+                                        <MapPinIcon class="icon-sm" aria-hidden="true" />
+                                        Open map
+                                    </a>
+                                    <div v-else class="text-slate-500">Location not captured</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <template #empty>
+                    <EmptyState
+                        heading="No attendance records found"
+                        description="Your check-ins will appear here once you clock in for the day."
+                    >
+                        <template #icon><ClockIcon class="icon" aria-hidden="true" /></template>
+                    </EmptyState>
+                </template>
+            </BaseTable>
 
             <template #pagination>
                 <Pagination
@@ -103,201 +183,244 @@
         </ListingPageShell>
 
         <!-- Salary Form Modal -->
-        <div
-            v-if="showSalaryForm"
-            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
-            @click.self="closeSalaryForm"
+        <BaseModal
+            v-model="showSalaryForm"
+            :title="editingSalary ? 'Edit Salary' : 'Add Salary'"
+            size="lg"
+            :close-on-backdrop="false"
+            @close="closeSalaryForm"
         >
-            <div class="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl my-8">
-                <h2 class="text-xl font-semibold text-slate-900 mb-4">
-                    {{ editingSalary ? 'Edit Salary' : 'Add Salary' }}
-                </h2>
-                <form @submit.prevent="saveSalary" class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Employee *</label>
-                            <select
-                                v-model="salaryForm.user_id"
-                                required
-                                :disabled="editingSalary"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                            >
-                                <option value="">Select employee...</option>
-                                <option v-for="user in users" :key="user.id" :value="user.id">
-                                    {{ user.name }}
-                                </option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Month *</label>
-                            <input
-                                v-model="salaryForm.month"
-                                type="month"
-                                required
-                                :disabled="editingSalary"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                            />
-                        </div>
-                    </div>
+            <form id="hr-salary-form" class="space-y-4" novalidate @submit.prevent="saveSalary">
+                <div class="form-grid-2">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Currency *</label>
+                        <label class="form-label" for="hrview-employee">
+                            Employee<span class="form-required" aria-hidden="true">*</span>
+                        </label>
                         <select
-                            v-model="salaryForm.currency"
+                            id="hrview-employee"
+                            v-model="salaryForm.user_id"
                             required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            :disabled="editingSalary"
+                            class="form-select"
                         >
-                            <option value="GBP">GBP (£)</option>
-                            <option value="PKR">PKR (₨)</option>
+                            <option value="">Select employee...</option>
+                            <option v-for="user in users" :key="user.id" :value="user.id">
+                                {{ user.name }}
+                            </option>
                         </select>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Base Salary *</label>
-                            <input
-                                v-model.number="salaryForm.base_salary"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                required
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                            />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Traveling Allowance</label>
-                            <input
-                                v-model.number="salaryForm.allowances"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                placeholder="Enter amount or 0"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                            />
-                            <p class="text-xs text-slate-500 mt-1">This amount will be added to the base salary</p>
-                        </div>
-                    </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Attendance Days</label>
+                        <label class="form-label" for="hrview-month">
+                            Month<span class="form-required" aria-hidden="true">*</span>
+                        </label>
                         <input
-                            v-model.number="salaryForm.attendance_days"
+                            id="hrview-month"
+                            v-model="salaryForm.month"
+                            type="month"
+                            required
+                            :disabled="editingSalary"
+                            class="form-input"
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="form-label" for="hrview-currency">
+                        Currency<span class="form-required" aria-hidden="true">*</span>
+                    </label>
+                    <select id="hrview-currency" v-model="salaryForm.currency" required class="form-select">
+                        <option value="GBP">GBP (£)</option>
+                        <option value="PKR">PKR (₨)</option>
+                    </select>
+                </div>
+
+                <div class="form-grid-2">
+                    <div>
+                        <label class="form-label" for="hrview-base-salary">
+                            Base Salary<span class="form-required" aria-hidden="true">*</span>
+                        </label>
+                        <input
+                            id="hrview-base-salary"
+                            v-model.number="salaryForm.base_salary"
                             type="number"
+                            step="0.01"
                             min="0"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                            placeholder="Auto-calculated if not set"
+                            required
+                            class="form-input"
                         />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Bonuses</label>
-                        <div v-for="(bonus, index) in salaryForm.bonuses" :key="index" class="flex gap-2 mb-2">
+                        <label class="form-label" for="hrview-traveling-allowance">Traveling Allowance</label>
+                        <input
+                            id="hrview-traveling-allowance"
+                            v-model.number="salaryForm.allowances"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="Enter amount or 0"
+                            class="form-input"
+                            aria-describedby="hrview-traveling-allowance-hint"
+                        />
+                        <p id="hrview-traveling-allowance-hint" class="form-hint">
+                            This amount will be added to the base salary
+                        </p>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="form-label" for="hrview-attendance-days">Attendance Days</label>
+                    <input
+                        id="hrview-attendance-days"
+                        v-model.number="salaryForm.attendance_days"
+                        type="number"
+                        min="0"
+                        class="form-input"
+                        placeholder="Auto-calculated if not set"
+                    />
+                </div>
+
+                <fieldset class="form-fieldset">
+                    <legend class="form-legend">Bonuses</legend>
+                    <div v-for="(bonus, index) in salaryForm.bonuses" :key="index" class="mb-2 flex flex-wrap gap-2">
+                        <div class="min-w-0 flex-1">
+                            <label class="sr-only" :for="`hrview-bonus-name-${index}`">Bonus {{ index + 1 }} name</label>
                             <input
+                                :id="`hrview-bonus-name-${index}`"
                                 v-model="bonus.name"
                                 type="text"
                                 placeholder="Bonus name"
-                                class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                class="form-input"
                             />
+                        </div>
+                        <div class="w-32">
+                            <label class="sr-only" :for="`hrview-bonus-amount-${index}`">Bonus {{ index + 1 }} amount</label>
                             <input
+                                :id="`hrview-bonus-amount-${index}`"
                                 v-model.number="bonus.amount"
                                 type="number"
                                 step="0.01"
                                 min="0"
                                 placeholder="Amount"
-                                class="w-32 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                class="form-input"
                             />
-                            <button
-                                type="button"
-                                @click="removeBonus(index)"
-                                class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                            >
-                                Remove
-                            </button>
                         </div>
-                        <button
-                            type="button"
-                            @click="addBonus"
-                            class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
+                        <BaseButton
+                            variant="danger"
+                            size="icon"
+                            :label="`Remove bonus ${index + 1}`"
+                            @click="removeBonus(index)"
                         >
-                            + Add Bonus
-                        </button>
+                            <template #icon><TrashIcon class="icon" aria-hidden="true" /></template>
+                        </BaseButton>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Deductions Detail</label>
-                        <div v-for="(deduction, index) in salaryForm.deductions_detail" :key="index" class="flex gap-2 mb-2">
+                    <BaseButton variant="outline" size="sm" @click="addBonus">
+                        <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                        Add Bonus
+                    </BaseButton>
+                </fieldset>
+
+                <fieldset class="form-fieldset">
+                    <legend class="form-legend">Deductions Detail</legend>
+                    <div
+                        v-for="(deduction, index) in salaryForm.deductions_detail"
+                        :key="index"
+                        class="mb-2 flex flex-wrap gap-2"
+                    >
+                        <div class="min-w-0 flex-1">
+                            <label class="sr-only" :for="`hrview-deduction-name-${index}`">
+                                Deduction {{ index + 1 }} name
+                            </label>
                             <input
+                                :id="`hrview-deduction-name-${index}`"
                                 v-model="deduction.name"
                                 type="text"
                                 placeholder="Deduction name"
-                                class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                class="form-input"
                             />
+                        </div>
+                        <div class="w-32">
+                            <label class="sr-only" :for="`hrview-deduction-amount-${index}`">
+                                Deduction {{ index + 1 }} amount
+                            </label>
                             <input
+                                :id="`hrview-deduction-amount-${index}`"
                                 v-model.number="deduction.amount"
                                 type="number"
                                 step="0.01"
                                 min="0"
                                 placeholder="Amount"
-                                class="w-32 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                class="form-input"
                             />
-                            <button
-                                type="button"
-                                @click="removeDeduction(index)"
-                                class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                            >
-                                Remove
-                            </button>
                         </div>
-                        <button
-                            type="button"
-                            @click="addDeduction"
-                            class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
+                        <BaseButton
+                            variant="danger"
+                            size="icon"
+                            :label="`Remove deduction ${index + 1}`"
+                            @click="removeDeduction(index)"
                         >
-                            + Add Deduction
-                        </button>
+                            <template #icon><TrashIcon class="icon" aria-hidden="true" /></template>
+                        </BaseButton>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-                        <textarea
-                            v-model="salaryForm.notes"
-                            rows="3"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                            placeholder="Additional notes..."
-                        ></textarea>
+                    <BaseButton variant="outline" size="sm" @click="addDeduction">
+                        <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                        Add Deduction
+                    </BaseButton>
+                </fieldset>
+
+                <div>
+                    <label class="form-label" for="hrview-notes">Notes</label>
+                    <textarea
+                        id="hrview-notes"
+                        v-model="salaryForm.notes"
+                        rows="3"
+                        class="form-textarea"
+                        placeholder="Additional notes..."
+                    ></textarea>
+                </div>
+
+                <div class="rounded-control border border-slate-200 bg-slate-50 p-3">
+                    <div class="text-eyebrow uppercase text-slate-500">Net Salary</div>
+                    <div class="mt-1 text-lg font-semibold text-slate-900 tabular-nums">
+                        {{ salaryForm.currency === 'PKR' ? '₨' : '£' }}{{ formatNumber(calculateNetSalary()) }}
+                        <span class="ml-2 text-sm font-normal text-slate-500">({{ salaryForm.currency }})</span>
                     </div>
-                    <div class="bg-slate-50 p-3 rounded-lg">
-                        <div class="text-sm text-slate-600">Net Salary:</div>
-                        <div class="text-lg font-semibold text-slate-900">
-                            {{ salaryForm.currency === 'PKR' ? '₨' : '£' }}{{ formatNumber(calculateNetSalary()) }}
-                            <span class="text-sm text-slate-500 ml-2">({{ salaryForm.currency }})</span>
-                        </div>
-                    </div>
-                    <div v-if="salaryError" class="text-sm text-red-600 bg-red-50 p-3 rounded">
-                        {{ salaryError }}
-                    </div>
-                    <div class="flex justify-end gap-3 pt-4 border-t border-slate-200">
-                        <button
-                            type="button"
-                            @click="closeSalaryForm"
-                            class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            :disabled="savingSalary"
-                            class="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
-                        >
-                            {{ savingSalary ? 'Saving...' : (editingSalary ? 'Update' : 'Create') }}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                </div>
+
+                <p v-if="salaryError" class="callout callout-danger" role="alert">
+                    {{ salaryError }}
+                </p>
+            </form>
+
+            <template #actions>
+                <BaseButton variant="outline" block-mobile @click="closeSalaryForm">Cancel</BaseButton>
+                <BaseButton
+                    variant="primary"
+                    type="submit"
+                    form="hr-salary-form"
+                    block-mobile
+                    :loading="savingSalary"
+                >
+                    {{ editingSalary ? 'Update' : 'Create' }}
+                </BaseButton>
+            </template>
+        </BaseModal>
     </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
+import {
+    ArrowDownTrayIcon,
+    ClockIcon,
+    MapPinIcon,
+    PlusIcon,
+    TrashIcon,
+} from '@heroicons/vue/24/outline';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import AttendanceClock from '@/components/AttendanceClock.vue';
+import { BaseButton, BaseModal, BaseTable, EmptyState } from '@/components/base';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
@@ -317,10 +440,18 @@ const attendanceShellBadge = computed(() => {
     return `${t} ${t === 1 ? 'record' : 'records'}`;
 });
 
+const attendanceColumns = [
+    { key: 'date', label: 'Date' },
+    { key: 'check_in', label: 'Check-in' },
+    { key: 'check_out', label: 'Check-out' },
+    { key: 'work_hours', label: 'Hours', align: 'right' },
+];
+
 const checkedIn = ref(false);
 const attendanceList = ref([]);
 const attendancePagination = ref(null);
 const attendanceFilter = ref({ user_id: '' });
+const loadingAttendance = ref(true);
 const salaries = ref([]);
 const salaryPagination = ref(null);
 const users = ref([]);
@@ -389,6 +520,7 @@ const checkOut = async () => {
 };
 
 const loadAttendance = async (page = 1) => {
+    loadingAttendance.value = true;
     try {
         const params = { per_page: 10, page };
         if (isAdmin.value && attendanceFilter.value.user_id) {
@@ -402,7 +534,7 @@ const loadAttendance = async (page = 1) => {
             per_page: data.per_page || 10,
             total: data.total || 0,
         };
-        
+
         // Check if user is currently checked in (non-admin only)
         if (!isAdmin.value && data.data && data.data.length > 0) {
             const today = new Date().toISOString().split('T')[0];
@@ -417,6 +549,8 @@ const loadAttendance = async (page = 1) => {
         }
     } catch (error) {
         console.error('Failed to load attendance:', error);
+    } finally {
+        loadingAttendance.value = false;
     }
 };
 
@@ -528,7 +662,7 @@ const calculateNetSalary = () => {
 const saveSalary = async () => {
     savingSalary.value = true;
     salaryError.value = null;
-    
+
     try {
         const payload = {
             ...salaryForm.value,
@@ -597,7 +731,7 @@ const exportAttendance = async () => {
         }
         const { data } = await axios.get('/api/hr/attendance', { params });
         const allAttendance = data.data || [];
-        
+
         const columns = [
             { key: 'date', label: 'Date' },
             { key: 'user.name', label: 'Employee' },
@@ -617,7 +751,7 @@ const exportAttendance = async () => {
             { key: 'check_out_photo_url', label: 'Check Out Photo' },
             { key: 'check_out_map_url', label: 'Check Out Map' },
         ];
-        
+
         exportCSV(allAttendance, columns, `attendance_export_${new Date().toISOString().split('T')[0]}.csv`);
     } catch (error) {
         console.error('Export failed:', error);
@@ -629,7 +763,7 @@ const exportSalaries = async () => {
     try {
         const { data } = await axios.get('/api/hr/salaries', { params: { per_page: 10000 } });
         const allSalaries = data.data || [];
-        
+
         const columns = [
             { key: 'month', label: 'Month' },
             { key: 'user.name', label: 'Employee' },
@@ -639,7 +773,7 @@ const exportSalaries = async () => {
             { key: 'net_salary', label: 'Net Salary' },
             { key: 'attendance_days', label: 'Attendance Days' },
         ];
-        
+
         exportCSV(allSalaries, columns, `salaries_export_${new Date().toISOString().split('T')[0]}.csv`);
     } catch (error) {
         console.error('Export failed:', error);

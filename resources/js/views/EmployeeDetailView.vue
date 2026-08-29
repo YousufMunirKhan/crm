@@ -2,248 +2,273 @@
     <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 lg:p-6">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 min-w-0">
             <div class="flex items-center gap-3 lg:gap-4 min-w-0">
-                <button
+                <BaseButton
+                    variant="ghost"
+                    size="icon"
+                    label="Go back"
+                    class="shrink-0"
                     @click="$router.back()"
-                    class="p-2 hover:bg-slate-100 rounded-lg transition touch-manipulation shrink-0"
                 >
-                    <svg class="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                    </svg>
-                </button>
+                    <template #icon>
+                        <ArrowLeftIcon class="icon" aria-hidden="true" />
+                    </template>
+                </BaseButton>
                 <h1 class="text-xl lg:text-2xl font-bold text-slate-900 break-words">Employee Details</h1>
             </div>
-            <button
+            <BaseButton
                 v-if="employee"
+                variant="primary"
+                block-mobile
+                class="shrink-0"
                 @click="goToEdit"
-                class="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 touch-manipulation w-full sm:w-auto text-center shrink-0"
             >
+                <template #icon>
+                    <PencilSquareIcon class="icon" aria-hidden="true" />
+                </template>
                 Edit Employee
-            </button>
+            </BaseButton>
         </div>
 
-        <div v-if="loading" class="text-center py-12">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
-            <p class="mt-2 text-slate-600">Loading employee details...</p>
+        <div v-if="loading" class="card card-body space-y-3" aria-busy="true">
+            <span class="sr-only">Loading employee details…</span>
+            <div class="skeleton-text w-1/3"></div>
+            <div class="skeleton-text w-2/3"></div>
+            <div class="skeleton-text w-1/2"></div>
+            <div class="skeleton-text w-3/4"></div>
         </div>
 
         <div v-else-if="employee" class="space-y-6">
             <!-- Employee Info Card -->
-            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6 min-w-0">
-                    <div class="min-w-0">
-                        <h2 class="text-xl font-semibold text-slate-900 break-words">{{ employee.name }}</h2>
-                        <p class="text-slate-500 mt-1">{{ employee.role?.name || 'No Role' }}</p>
-                    </div>
-                    <span
-                        class="px-3 py-1 text-sm font-medium rounded shrink-0 self-start"
-                        :class="getRoleBadgeClass(employee.role?.name)"
-                    >
+            <BaseCard class="min-w-0">
+                <template #header>
+                    <h2 class="card-title break-words">{{ employee.name }}</h2>
+                    <p class="card-subtitle">{{ employee.role?.name || 'No Role' }}</p>
+                </template>
+                <template #actions>
+                    <BaseBadge :tone="getRoleTone(employee.role?.name)">
                         {{ employee.role?.name || 'N/A' }}
-                    </span>
-                </div>
+                    </BaseBadge>
+                </template>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="text-sm text-slate-500">Email</label>
+                        <span class="text-eyebrow text-slate-500 uppercase">Email</span>
                         <p class="text-slate-900 font-medium">{{ employee.email || 'N/A' }}</p>
                     </div>
                     <div>
-                        <label class="text-sm text-slate-500">Phone</label>
+                        <span class="text-eyebrow text-slate-500 uppercase">Phone</span>
                         <p class="text-slate-900 font-medium">{{ employee.phone || 'N/A' }}</p>
                     </div>
                     <div>
-                        <label class="text-sm text-slate-500">Employee ID</label>
+                        <span class="text-eyebrow text-slate-500 uppercase">Employee ID</span>
                         <p class="text-slate-900 font-medium">EMP{{ String(employee.id).padStart(3, '0') }}</p>
                     </div>
                     <div>
-                        <label class="text-sm text-slate-500">Joined Date</label>
+                        <span class="text-eyebrow text-slate-500 uppercase">Joined Date</span>
                         <p class="text-slate-900 font-medium">
                             {{ employee.created_at ? formatDate(employee.created_at) : 'N/A' }}
                         </p>
                     </div>
                     <div>
-                        <label class="text-sm text-slate-500">Date of Birth</label>
+                        <span class="text-eyebrow text-slate-500 uppercase">Date of Birth</span>
                         <p class="text-slate-900 font-medium">
                             {{ employee.date_of_birth ? formatDate(employee.date_of_birth) : 'N/A' }}
                         </p>
                     </div>
                     <div>
-                        <label class="text-sm text-slate-500">Status</label>
-                        <p class="text-slate-900 font-medium">
-                            <span
+                        <span class="text-eyebrow text-slate-500 uppercase">Status</span>
+                        <p class="mt-0.5">
+                            <BaseBadge
                                 v-if="employee.is_active === false || employee.is_active === 0"
-                                class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-medium"
+                                tone="danger"
                             >
                                 Inactive
-                            </span>
-                            <span
-                                v-else
-                                class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium"
-                            >
-                                Active
-                            </span>
+                            </BaseBadge>
+                            <BaseBadge v-else tone="success">Active</BaseBadge>
                         </p>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- Bank details -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <h3 class="text-base font-semibold text-slate-900 mb-4">Bank details</h3>
+            <BaseCard title="Bank details">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
-                        <label class="text-xs text-slate-500">Account holder name</label>
+                        <span class="text-eyebrow text-slate-500 uppercase">Account holder name</span>
                         <p class="text-slate-900 font-medium">
                             {{ employee.bank_account_name || 'N/A' }}
                         </p>
                     </div>
                     <div>
-                        <label class="text-xs text-slate-500">Bank name</label>
+                        <span class="text-eyebrow text-slate-500 uppercase">Bank name</span>
                         <p class="text-slate-900 font-medium">
                             {{ employee.bank_name || 'N/A' }}
                         </p>
                     </div>
                     <div>
-                        <label class="text-xs text-slate-500">Sort code</label>
+                        <span class="text-eyebrow text-slate-500 uppercase">Sort code</span>
                         <p class="text-slate-900 font-medium">
                             {{ employee.bank_sort_code || 'N/A' }}
                         </p>
                     </div>
                     <div>
-                        <label class="text-xs text-slate-500">Account number</label>
+                        <span class="text-eyebrow text-slate-500 uppercase">Account number</span>
                         <p class="text-slate-900 font-medium">
                             {{ employee.bank_account_number || 'N/A' }}
                         </p>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- Documents -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-base font-semibold text-slate-900">Documents</h3>
+            <BaseCard title="Documents">
+                <div
+                    v-if="documentError"
+                    ref="documentErrorRef"
+                    class="callout callout-danger mb-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-600/40"
+                    role="alert"
+                    tabindex="-1"
+                >
+                    {{ documentError }}
                 </div>
+
                 <form
-                    class="grid grid-cols-1 md:grid-cols-[2fr,2fr,auto] gap-3 mb-4"
+                    id="employee-document-form"
+                    novalidate
+                    class="grid grid-cols-1 md:grid-cols-[2fr,2fr,auto] gap-3 mb-4 items-end"
                     @submit.prevent="uploadDocument"
                 >
-                    <input
-                        v-model="newDocName"
-                        type="text"
-                        placeholder="Document name (e.g. Passport, Contract)"
-                        class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                    />
-                    <input
-                        ref="fileInput"
-                        type="file"
-                        class="text-sm"
-                    />
-                    <button
+                    <div>
+                        <label class="form-label" for="employeedetailview-document-name">Document name</label>
+                        <input
+                            id="employeedetailview-document-name"
+                            v-model="newDocName"
+                            type="text"
+                            placeholder="e.g. Passport, Contract"
+                            class="form-input"
+                        />
+                    </div>
+                    <div>
+                        <label class="form-label" for="employeedetailview-document-file">Document file</label>
+                        <input
+                            id="employeedetailview-document-file"
+                            ref="fileInput"
+                            type="file"
+                            class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded-control"
+                        />
+                    </div>
+                    <BaseButton
                         type="submit"
-                        :disabled="uploading"
-                        class="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
+                        variant="soft"
+                        block-mobile
+                        :loading="uploading"
+                        form="employee-document-form"
                     >
+                        <template #icon>
+                            <ArrowUpTrayIcon class="icon" aria-hidden="true" />
+                        </template>
                         {{ uploading ? 'Uploading...' : 'Add' }}
-                    </button>
+                    </BaseButton>
                 </form>
-                <div v-if="documents.length === 0" class="text-sm text-slate-500">
-                    No documents uploaded yet.
-                </div>
+
+                <EmptyState
+                    v-if="documents.length === 0"
+                    heading="No documents uploaded yet"
+                    description="Add a name and a file above to attach the first document to this employee."
+                >
+                    <template #icon>
+                        <DocumentTextIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
                 <div v-else class="space-y-2">
                     <div
                         v-for="doc in documents"
                         :key="doc.id"
-                        class="flex items-center justify-between text-sm border border-slate-200 rounded-lg px-3 py-2"
+                        class="flex items-center justify-between gap-3 text-sm border border-slate-200 rounded-card px-3 py-2"
                     >
-                        <div>
-                            <div class="font-medium text-slate-900">{{ doc.name }}</div>
+                        <div class="min-w-0">
+                            <div class="font-medium text-slate-900 break-words">{{ doc.name }}</div>
                             <div class="text-xs text-slate-500">
                                 Added {{ formatDate(doc.created_at) }}
                             </div>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 shrink-0">
                             <a
                                 :href="doc.file_path"
                                 target="_blank"
                                 rel="noopener"
-                                class="text-blue-600 hover:underline text-xs"
+                                class="link text-xs"
                             >
                                 View
                             </a>
-                            <button
-                                class="text-red-600 hover:underline text-xs"
-                                @click="deleteDocument(doc)"
+                            <BaseButton
+                                variant="ghost"
+                                size="sm"
+                                :label="`Delete ${doc.name}`"
+                                @click="requestDeleteDocument(doc)"
                             >
+                                <template #icon>
+                                    <TrashIcon class="icon-sm" aria-hidden="true" />
+                                </template>
                                 Delete
-                            </button>
+                            </BaseButton>
                         </div>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- Attendance Statistics -->
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
-                <div class="bg-white rounded-xl shadow-sm p-6">
-                    <div class="flex items-center justify-between mb-2">
-                        <h3 class="text-sm font-medium text-slate-500">This Month</h3>
-                        <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                    </div>
-                    <p class="text-3xl font-bold text-slate-900">{{ stats.this_month || 0 }}</p>
-                    <p class="text-sm text-slate-500 mt-1">Days Present</p>
-                </div>
-
-                <div class="bg-white rounded-xl shadow-sm p-6">
-                    <div class="flex items-center justify-between mb-2">
-                        <h3 class="text-sm font-medium text-slate-500">This Year</h3>
-                        <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                    </div>
-                    <p class="text-3xl font-bold text-slate-900">{{ stats.this_year || 0 }}</p>
-                    <p class="text-sm text-slate-500 mt-1">Days Present</p>
-                </div>
-
-                <div class="bg-white rounded-xl shadow-sm p-6">
-                    <div class="flex items-center justify-between mb-2">
-                        <h3 class="text-sm font-medium text-slate-500">Total Hours</h3>
-                        <svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <p class="text-3xl font-bold text-slate-900">{{ formatHours(stats.total_hours || 0) }}</p>
-                    <p class="text-sm text-slate-500 mt-1">This Month</p>
-                </div>
+                <StatCard label="This Month" :value="stats.this_month || 0" caption="Days Present" tone="primary">
+                    <template #icon>
+                        <CalendarDaysIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
+                <StatCard label="This Year" :value="stats.this_year || 0" caption="Days Present" tone="success">
+                    <template #icon>
+                        <ChartBarIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
+                <StatCard label="Total Hours" :value="formatHours(stats.total_hours || 0)" caption="This Month" tone="neutral">
+                    <template #icon>
+                        <ClockIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
             </div>
 
             <!-- Attendance Records -->
-            <div class="bg-white rounded-xl shadow-sm p-4 lg:p-6">
-                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-                    <h3 class="text-lg font-semibold text-slate-900">Attendance Records</h3>
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <select
-                            v-model="monthFilter"
-                            @change="loadAttendanceReport"
-                            class="w-full sm:w-auto px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        >
-                            <option value="">All Months</option>
-                            <option v-for="month in recentMonths" :key="month.value" :value="month.value">
-                                {{ month.label }}
-                            </option>
-                        </select>
-                        <button
-                            @click="exportAttendance"
-                            class="w-full sm:w-auto px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700"
-                        >
+            <BaseCard>
+                <template #header>
+                    <h2 class="card-title">Attendance Records</h2>
+                </template>
+                <template #actions>
+                    <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        <div>
+                            <label class="form-label sr-only" for="employeedetailview-month-filter">Filter by month</label>
+                            <select
+                                id="employeedetailview-month-filter"
+                                v-model="monthFilter"
+                                class="form-select w-full sm:w-auto"
+                                @change="loadAttendanceReport"
+                            >
+                                <option value="">All Months</option>
+                                <option v-for="month in recentMonths" :key="month.value" :value="month.value">
+                                    {{ month.label }}
+                                </option>
+                            </select>
+                        </div>
+                        <BaseButton variant="outline" block-mobile @click="exportAttendance">
+                            <template #icon>
+                                <ArrowDownTrayIcon class="icon" aria-hidden="true" />
+                            </template>
                             Export CSV
-                        </button>
+                        </BaseButton>
                     </div>
-                </div>
+                </template>
 
                 <div
                     v-if="employeeMonthlySummary"
-                    class="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-5"
+                    class="mb-4 grid grid-cols-1 gap-3 rounded-card border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-5"
                 >
                     <div>
                         <MetricLabel label="Total Hours" tooltip="Total completed work hours in the selected month. Open shifts are not counted until check-out." />
@@ -267,22 +292,25 @@
                     </div>
                 </div>
 
-                <div v-if="attendanceList.length === 0" class="text-center py-8 text-slate-400 text-sm">
-                    No attendance records found
-                </div>
-                
+                <EmptyState
+                    v-if="attendanceList.length === 0"
+                    heading="No attendance records found"
+                    description="Nothing was recorded for this employee in the selected period."
+                >
+                    <template #icon>
+                        <CalendarDaysIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
+
                 <template v-else>
                     <!-- Mobile Card View -->
                     <div class="lg:hidden space-y-3">
-                        <div v-for="attendance in attendanceList" :key="attendance.id" class="p-4 bg-slate-50 rounded-lg">
+                        <div v-for="attendance in attendanceList" :key="attendance.id" class="table-card">
                             <div class="flex justify-between items-start mb-2">
                                 <div class="font-medium text-slate-900">{{ formatDate(attendance.date) }}</div>
-                                <span
-                                    class="px-2 py-1 text-xs font-medium rounded"
-                                    :class="attendance.check_out_at ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
-                                >
+                                <BaseBadge :tone="attendance.check_out_at ? 'success' : 'warning'">
                                     {{ attendance.check_out_at ? 'Completed' : 'In Progress' }}
-                                </span>
+                                </BaseBadge>
                             </div>
                             <div class="grid grid-cols-2 gap-2 text-sm">
                                 <div>
@@ -298,7 +326,7 @@
                                     <span class="ml-2 font-medium text-slate-900">{{ parseFloat(attendance.work_hours || 0).toFixed(2) }}h</span>
                                 </div>
                                 <div class="col-span-2 grid grid-cols-1 gap-2 pt-2 sm:grid-cols-2">
-                                    <div class="flex items-center gap-2 rounded border border-slate-200 bg-white p-2">
+                                    <div class="flex items-center gap-2 rounded-control border border-slate-200 bg-white p-2">
                                         <img
                                             v-if="attendance.check_in_photo_url"
                                             :src="attendance.check_in_photo_url"
@@ -315,14 +343,14 @@
                                                 :href="attendance.check_in_map_url"
                                                 target="_blank"
                                                 rel="noopener"
-                                                class="text-blue-700 hover:underline"
+                                                class="link"
                                             >
                                                 Open map
                                             </a>
                                             <div v-else class="text-slate-500">Not captured</div>
                                         </div>
                                     </div>
-                                    <div class="flex items-center gap-2 rounded border border-slate-200 bg-white p-2">
+                                    <div class="flex items-center gap-2 rounded-control border border-slate-200 bg-white p-2">
                                         <img
                                             v-if="attendance.check_out_photo_url"
                                             :src="attendance.check_out_photo_url"
@@ -339,7 +367,7 @@
                                                 :href="attendance.check_out_map_url"
                                                 target="_blank"
                                                 rel="noopener"
-                                                class="text-blue-700 hover:underline"
+                                                class="link"
                                             >
                                                 Open map
                                             </a>
@@ -352,83 +380,81 @@
                     </div>
 
                     <!-- Desktop Table View -->
-                    <div class="hidden lg:block overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-slate-50">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Check In</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Check Out</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Work Hours</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Proof</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-slate-200">
-                            <tr v-for="attendance in attendanceList" :key="attendance.id" class="hover:bg-slate-50">
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-900">
-                                    {{ formatDate(attendance.date) }}
-                                </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">
-                                    {{ formatTime(attendance.check_in_at) }}
-                                </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">
-                                    {{ attendance.check_out_at ? formatTime(attendance.check_out_at) : '-' }}
-                                </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-900 font-medium">
-                                    {{ parseFloat(attendance.work_hours || 0).toFixed(2) }}h
-                                </td>
-                                <td class="px-4 py-3 text-sm text-slate-600">
-                                    <div class="flex flex-wrap gap-3">
-                                        <div class="flex items-center gap-2">
-                                            <img
-                                                v-if="attendance.check_in_photo_url"
-                                                :src="attendance.check_in_photo_url"
-                                                alt="Check-in proof"
-                                                class="h-9 w-9 rounded object-cover"
-                                            />
-                                            <a
-                                                v-if="attendance.check_in_map_url"
-                                                :href="attendance.check_in_map_url"
-                                                target="_blank"
-                                                rel="noopener"
-                                                class="text-xs font-medium text-blue-700 hover:underline"
-                                            >
-                                                In map
-                                            </a>
-                                            <span v-if="!attendance.check_in_photo_url && !attendance.check_in_map_url" class="text-xs text-slate-400">No in proof</span>
+                    <div class="hidden lg:block table-wrap">
+                        <table class="table">
+                            <caption class="sr-only">Attendance records for {{ employee.name }}</caption>
+                            <thead class="table-thead">
+                                <tr>
+                                    <th scope="col" class="table-th">Date</th>
+                                    <th scope="col" class="table-th">Check In</th>
+                                    <th scope="col" class="table-th">Check Out</th>
+                                    <th scope="col" class="table-th">Work Hours</th>
+                                    <th scope="col" class="table-th">Proof</th>
+                                    <th scope="col" class="table-th">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="attendance in attendanceList" :key="attendance.id" class="table-row">
+                                    <td class="table-td-strong whitespace-nowrap">
+                                        {{ formatDate(attendance.date) }}
+                                    </td>
+                                    <td class="table-td whitespace-nowrap">
+                                        {{ formatTime(attendance.check_in_at) }}
+                                    </td>
+                                    <td class="table-td whitespace-nowrap">
+                                        {{ attendance.check_out_at ? formatTime(attendance.check_out_at) : '-' }}
+                                    </td>
+                                    <td class="table-td-strong whitespace-nowrap">
+                                        {{ parseFloat(attendance.work_hours || 0).toFixed(2) }}h
+                                    </td>
+                                    <td class="table-td">
+                                        <div class="flex flex-wrap gap-3">
+                                            <div class="flex items-center gap-2">
+                                                <img
+                                                    v-if="attendance.check_in_photo_url"
+                                                    :src="attendance.check_in_photo_url"
+                                                    alt="Check-in proof"
+                                                    class="h-9 w-9 rounded object-cover"
+                                                />
+                                                <a
+                                                    v-if="attendance.check_in_map_url"
+                                                    :href="attendance.check_in_map_url"
+                                                    target="_blank"
+                                                    rel="noopener"
+                                                    class="link text-xs"
+                                                >
+                                                    In map
+                                                </a>
+                                                <span v-if="!attendance.check_in_photo_url && !attendance.check_in_map_url" class="text-xs text-slate-500">No in proof</span>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <img
+                                                    v-if="attendance.check_out_photo_url"
+                                                    :src="attendance.check_out_photo_url"
+                                                    alt="Check-out proof"
+                                                    class="h-9 w-9 rounded object-cover"
+                                                />
+                                                <a
+                                                    v-if="attendance.check_out_map_url"
+                                                    :href="attendance.check_out_map_url"
+                                                    target="_blank"
+                                                    rel="noopener"
+                                                    class="link text-xs"
+                                                >
+                                                    Out map
+                                                </a>
+                                                <span v-if="!attendance.check_out_photo_url && !attendance.check_out_map_url" class="text-xs text-slate-500">No out proof</span>
+                                            </div>
                                         </div>
-                                        <div class="flex items-center gap-2">
-                                            <img
-                                                v-if="attendance.check_out_photo_url"
-                                                :src="attendance.check_out_photo_url"
-                                                alt="Check-out proof"
-                                                class="h-9 w-9 rounded object-cover"
-                                            />
-                                            <a
-                                                v-if="attendance.check_out_map_url"
-                                                :href="attendance.check_out_map_url"
-                                                target="_blank"
-                                                rel="noopener"
-                                                class="text-xs font-medium text-blue-700 hover:underline"
-                                            >
-                                                Out map
-                                            </a>
-                                            <span v-if="!attendance.check_out_photo_url && !attendance.check_out_map_url" class="text-xs text-slate-400">No out proof</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-4 py-3 whitespace-nowrap">
-                                    <span
-                                        class="px-2 py-1 text-xs font-medium rounded"
-                                        :class="attendance.check_out_at ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
-                                    >
-                                        {{ attendance.check_out_at ? 'Completed' : 'In Progress' }}
-                                    </span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                                    </td>
+                                    <td class="table-td whitespace-nowrap">
+                                        <BaseBadge :tone="attendance.check_out_at ? 'success' : 'warning'">
+                                            {{ attendance.check_out_at ? 'Completed' : 'In Progress' }}
+                                        </BaseBadge>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </template>
 
@@ -437,15 +463,46 @@
                     :pagination="attendancePagination"
                     @page-change="loadAttendance"
                 />
-            </div>
+            </BaseCard>
         </div>
+
+        <ConfirmDialog
+            v-model="confirmDeleteDocOpen"
+            title="Delete this document?"
+            :message="documentToDelete ? `“${documentToDelete.name}” will be permanently removed from this employee.` : 'Delete this document?'"
+            confirm-label="Delete document"
+            cancel-label="Keep document"
+            tone="danger"
+            :loading="deletingDocument"
+            @confirm="confirmDeleteDocument"
+            @cancel="cancelDeleteDocument"
+        />
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, defineComponent, h } from 'vue';
+import { ref, onMounted, computed, defineComponent, h, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
+import {
+    ArrowDownTrayIcon,
+    ArrowLeftIcon,
+    ArrowUpTrayIcon,
+    CalendarDaysIcon,
+    ChartBarIcon,
+    ClockIcon,
+    DocumentTextIcon,
+    PencilSquareIcon,
+    TrashIcon,
+} from '@heroicons/vue/24/outline';
+import {
+    BaseBadge,
+    BaseButton,
+    BaseCard,
+    ConfirmDialog,
+    EmptyState,
+    StatCard,
+} from '@/components/base';
 import Pagination from '@/components/Pagination.vue';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
 import { useToastStore } from '@/stores/toast';
@@ -470,6 +527,11 @@ const documents = ref([]);
 const newDocName = ref('');
 const uploading = ref(false);
 const fileInput = ref(null);
+const documentError = ref(null);
+const documentErrorRef = ref(null);
+const confirmDeleteDocOpen = ref(false);
+const documentToDelete = ref(null);
+const deletingDocument = ref(false);
 
 const recentMonths = computed(() => {
     const months = [];
@@ -484,15 +546,16 @@ const recentMonths = computed(() => {
     return months;
 });
 
-const getRoleBadgeClass = (roleName) => {
-    const classes = {
-        'Admin': 'bg-purple-100 text-purple-700',
-        'Manager': 'bg-blue-100 text-blue-700',
-        'Sales': 'bg-green-100 text-green-700',
-        'CallAgent': 'bg-yellow-100 text-yellow-700',
-        'System Admin': 'bg-red-100 text-red-700',
+/** Visual tone only — the role name itself is unchanged. */
+const getRoleTone = (roleName) => {
+    const tones = {
+        'Admin': 'primary',
+        'Manager': 'primary',
+        'Sales': 'success',
+        'CallAgent': 'warning',
+        'System Admin': 'danger',
     };
-    return classes[roleName] || 'bg-slate-100 text-slate-700';
+    return tones[roleName] || 'neutral';
 };
 
 const formatDate = (date) => {
@@ -526,11 +589,11 @@ const MetricLabel = defineComponent({
             h('span', { class: 'group relative inline-flex shrink-0' }, [
                 h('button', {
                     type: 'button',
-                    class: 'grid h-4 w-4 place-items-center rounded-full border border-slate-300 bg-white text-[10px] font-bold leading-none text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-200',
+                    class: 'grid h-4 w-4 place-items-center rounded-full border border-slate-300 bg-white text-[10px] font-bold leading-none text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
                     'aria-label': `${props.label}: ${props.tooltip}`,
                 }, '?'),
                 h('span', {
-                    class: 'pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-56 rounded-md bg-slate-900 px-3 py-2 text-left text-[11px] font-medium normal-case leading-4 tracking-normal text-white shadow-lg group-hover:block group-focus-within:block',
+                    class: 'pointer-events-none absolute bottom-full left-0 z-dropdown mb-2 hidden w-56 rounded-md bg-slate-900 px-3 py-2 text-left text-[11px] font-medium normal-case leading-4 tracking-normal text-white shadow-dropdown group-hover:block group-focus-within:block',
                 }, props.tooltip),
             ]),
         ]);
@@ -566,7 +629,7 @@ const loadAttendance = async (page = 1) => {
             per_page: 15,
             page,
         };
-        
+
         if (monthFilter.value) {
             params.month = monthFilter.value;
         }
@@ -619,7 +682,7 @@ const exportAttendance = async () => {
         }
         const { data } = await axios.get('/api/hr/attendance', { params });
         const allAttendance = data.data || [];
-        
+
         const columns = [
             { key: 'date', label: 'Date' },
             { key: 'check_in_at', label: 'Check In' },
@@ -638,7 +701,7 @@ const exportAttendance = async () => {
             { key: 'check_out_photo_url', label: 'Check Out Photo' },
             { key: 'check_out_map_url', label: 'Check Out Map' },
         ];
-        
+
         exportCSV(allAttendance, columns, `attendance_${employee.value?.name}_${new Date().toISOString().split('T')[0]}.csv`);
         toast.success('Attendance exported successfully!');
     } catch (error) {
@@ -657,7 +720,14 @@ const loadDocuments = async () => {
 };
 
 const uploadDocument = async () => {
-    if (!newDocName.value || !fileInput.value?.files?.length) {
+    documentError.value = null;
+    const missing = [];
+    if (!newDocName.value) missing.push('a document name');
+    if (!fileInput.value?.files?.length) missing.push('a file to upload');
+    if (missing.length) {
+        documentError.value = `Please provide ${missing.join(' and ')} before adding the document.`;
+        await nextTick();
+        documentErrorRef.value?.focus();
         return;
     }
     uploading.value = true;
@@ -679,14 +749,31 @@ const uploadDocument = async () => {
     }
 };
 
-const deleteDocument = async (doc) => {
-    if (!window.confirm(`Delete document "${doc.name}"?`)) return;
+const requestDeleteDocument = (doc) => {
+    documentToDelete.value = doc;
+    confirmDeleteDocOpen.value = true;
+};
+
+const cancelDeleteDocument = () => {
+    if (deletingDocument.value) return;
+    confirmDeleteDocOpen.value = false;
+    documentToDelete.value = null;
+};
+
+const confirmDeleteDocument = async () => {
+    const doc = documentToDelete.value;
+    if (!doc) return;
+    deletingDocument.value = true;
     try {
         await axios.delete(`/api/hr/employees/${route.params.id}/documents/${doc.id}`);
         await loadDocuments();
     } catch (e) {
         console.error('Failed to delete document', e);
         toast.error('Failed to delete document');
+    } finally {
+        deletingDocument.value = false;
+        confirmDeleteDocOpen.value = false;
+        documentToDelete.value = null;
     }
 };
 
@@ -701,4 +788,3 @@ onMounted(() => {
     loadDocuments();
 });
 </script>
-

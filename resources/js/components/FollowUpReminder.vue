@@ -1,143 +1,126 @@
 <template>
-    <div class="bg-white rounded-xl shadow-sm p-4 md:p-6">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-slate-900">Follow-up Reminders</h3>
-            <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                {{ todayFollowUps.length }} Today
-            </span>
-        </div>
+    <BaseCard title="Follow-up Reminders">
+        <template #actions>
+            <BaseBadge tone="primary">{{ todayFollowUps.length }} Today</BaseBadge>
+        </template>
 
-        <div v-if="loading" class="text-center py-8 text-slate-500">
+        <div v-if="loading" class="py-8 text-center text-sm text-slate-500" role="status" aria-live="polite">
             Loading...
         </div>
 
-        <div v-else-if="todayFollowUps.length === 0" class="text-center py-8 text-slate-500">
-            No follow-ups scheduled for today
-        </div>
+        <EmptyState
+            v-else-if="todayFollowUps.length === 0"
+            heading="No follow-ups scheduled for today"
+            description="New follow-ups appear here as soon as they are due."
+        >
+            <template #icon>
+                <CalendarDaysIcon class="icon" aria-hidden="true" />
+            </template>
+        </EmptyState>
 
         <div v-else class="space-y-3">
             <div
                 v-for="followUp in todayFollowUps"
                 :key="followUp.id"
-                class="border border-slate-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
+                class="rounded-card border border-slate-200 p-4 transition-colors hover:border-primary-300"
             >
-                <div class="flex items-start justify-between mb-3">
-                    <div class="flex-1">
+                <div class="mb-3 flex items-start justify-between gap-3">
+                    <div class="min-w-0 flex-1">
                         <div class="font-medium text-slate-900">{{ followUp.customer?.name }}</div>
-                        <div class="text-sm text-slate-600 mt-1">
+                        <div class="mt-1 text-sm text-slate-600">
                             {{ followUp.product?.name || (followUp.items && followUp.items.length > 0 ? followUp.items.map(i => i.product?.name).join(', ') : '-') }}
                         </div>
-                        <div class="text-xs text-slate-500 mt-1">
+                        <div class="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                            <ClockIcon class="icon-sm" aria-hidden="true" />
                             {{ formatDateTime(followUp.next_follow_up_at) }}
                         </div>
                     </div>
-                    <router-link
-                        :to="`/customers/${followUp.customer_id}`"
-                        class="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 ml-3"
-                    >
+                    <BaseButton variant="primary" :to="`/customers/${followUp.customer_id}`">
                         View
-                    </router-link>
+                    </BaseButton>
                 </div>
 
-                <div v-if="!followUp.completed" class="mt-3 pt-3 border-t border-slate-200 flex gap-2">
-                    <button
-                        @click="openActivityModal(followUp)"
-                        class="flex-1 px-4 py-2 border border-purple-500 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors"
-                    >
+                <div v-if="!followUp.completed" class="mt-3 flex flex-col gap-2 border-t border-slate-200 pt-3 sm:flex-row">
+                    <BaseButton variant="outline" class="sm:flex-1" @click="openActivityModal(followUp)">
+                        <template #icon>
+                            <PencilSquareIcon class="icon" aria-hidden="true" />
+                        </template>
                         Log Activity
-                    </button>
-                    <button
-                        @click="showCompleteModal(followUp)"
-                        class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                    >
+                    </BaseButton>
+                    <BaseButton variant="success" class="sm:flex-1" @click="showCompleteModal(followUp)">
+                        <template #icon>
+                            <CheckIcon class="icon" aria-hidden="true" />
+                        </template>
                         Mark as Done
-                    </button>
+                    </BaseButton>
                 </div>
             </div>
         </div>
 
         <!-- Complete Follow-up Modal -->
-        <div
-            v-if="showModal"
-            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-            @click.self="closeModal"
+        <BaseModal
+            :model-value="showModal"
+            title="Complete Follow-up"
+            size="md"
+            :close-on-backdrop="false"
+            @close="closeModal"
         >
-            <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div class="p-6 border-b border-slate-200">
-                    <h3 class="text-xl font-semibold text-slate-900">Complete Follow-up</h3>
+            <form id="complete-follow-up-form" class="space-y-4" @submit.prevent="completeFollowUp">
+                <BaseInput
+                    v-model="form.remarks"
+                    label="Remarks / Notes"
+                    type="textarea"
+                    rows="4"
+                    required
+                    placeholder="Enter your remarks about the follow-up..."
+                />
+
+                <div>
+                    <label class="form-choice" for="follow-up-sale-happened">
+                        <input
+                            id="follow-up-sale-happened"
+                            v-model="form.saleHappened"
+                            type="checkbox"
+                            class="form-checkbox"
+                        />
+                        <span>Sale happened</span>
+                    </label>
                 </div>
 
-                <form @submit.prevent="completeFollowUp" class="p-6 space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-2">
-                            Remarks / Notes *
-                        </label>
-                        <textarea
-                            v-model="form.remarks"
-                            rows="4"
-                            required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Enter your remarks about the follow-up..."
-                        ></textarea>
-                    </div>
+                <BaseSelect
+                    v-if="form.saleHappened"
+                    v-model="form.newStage"
+                    label="New Stage"
+                    :options="stageOptions"
+                />
 
-                    <div>
-                        <label class="flex items-center space-x-2">
-                            <input
-                                v-model="form.saleHappened"
-                                type="checkbox"
-                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span class="text-sm text-slate-700">Sale happened</span>
-                        </label>
-                    </div>
+                <BaseInput
+                    v-model="form.nextFollowUpAt"
+                    label="Next Follow-up Date (Optional)"
+                    type="datetime-local"
+                />
+            </form>
 
-                    <div v-if="form.saleHappened">
-                        <label class="block text-sm font-medium text-slate-700 mb-2">
-                            New Stage
-                        </label>
-                        <select
-                            v-model="form.newStage"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="lead">Lead</option>
-                            <option value="hot_lead">Hot Lead</option>
-                            <option value="quotation">Quotation</option>
-                            <option value="won">Won</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-2">
-                            Next Follow-up Date (Optional)
-                        </label>
-                        <input
-                            v-model="form.nextFollowUpAt"
-                            type="datetime-local"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-
-                    <div class="flex justify-end space-x-3 pt-4">
-                        <button
-                            type="button"
-                            @click="closeModal"
-                            :disabled="completingFollowUp"
-                            class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            :disabled="completingFollowUp"
-                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                        >
-                            {{ completingFollowUp ? 'Saving...' : 'Complete Follow-up' }}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+            <template #actions>
+                <BaseButton
+                    variant="outline"
+                    block-mobile
+                    :disabled="completingFollowUp"
+                    @click="closeModal"
+                >
+                    Cancel
+                </BaseButton>
+                <BaseButton
+                    variant="primary"
+                    type="submit"
+                    form="complete-follow-up-form"
+                    block-mobile
+                    :loading="completingFollowUp"
+                >
+                    {{ completingFollowUp ? 'Saving...' : 'Complete Follow-up' }}
+                </BaseButton>
+            </template>
+        </BaseModal>
 
         <!-- Log Activity Modal -->
         <LogActivityModal
@@ -146,12 +129,14 @@
             @close="closeActivityModal"
             @saved="handleActivitySaved"
         />
-    </div>
+    </BaseCard>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import { CalendarDaysIcon, CheckIcon, ClockIcon, PencilSquareIcon } from '@heroicons/vue/24/outline';
+import { BaseBadge, BaseButton, BaseCard, BaseInput, BaseModal, BaseSelect, EmptyState } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 import LogActivityModal from '@/components/LogActivityModal.vue';
 
@@ -170,6 +155,13 @@ const form = ref({
     newStage: 'lead',
     nextFollowUpAt: '',
 });
+
+const stageOptions = [
+    { value: 'lead', label: 'Lead' },
+    { value: 'hot_lead', label: 'Hot Lead' },
+    { value: 'quotation', label: 'Quotation' },
+    { value: 'won', label: 'Won' },
+];
 
 const formatDateTime = (dateString) => {
     if (!dateString) return '';
@@ -229,14 +221,14 @@ const completeFollowUp = async () => {
         }
 
         await axios.post(`/api/leads/${selectedFollowUp.value.id}/complete-followup`, payload);
-        
+
         // Remove from list
         todayFollowUps.value = todayFollowUps.value.filter(
             fu => fu.id !== selectedFollowUp.value.id
         );
-        
+
         closeModal();
-        
+
         // Reload to get updated data
         loadFollowUps();
     } catch (error) {
@@ -264,4 +256,3 @@ const handleActivitySaved = () => {
 
 onMounted(loadFollowUps);
 </script>
-

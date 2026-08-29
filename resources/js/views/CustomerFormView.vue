@@ -3,19 +3,16 @@
         <div class="max-w-4xl mx-auto px-3 sm:px-6 py-6 lg:py-8 w-full min-w-0">
             <!-- Header -->
             <div class="mb-6 lg:mb-8">
-                <router-link
-                    :to="form.type === 'prospect' ? { path: '/customers', query: { type: 'prospect' } } : { path: '/customers', query: { type: 'customer' } }"
-                    class="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 text-sm mb-4"
-                >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
+                <BaseButton :to="backRoute" variant="ghost" size="sm">
+                    <template #icon>
+                        <ArrowLeftIcon class="icon" aria-hidden="true" />
+                    </template>
                     {{ form.type === 'prospect' ? 'Back to Prospects' : 'Back to Customers' }}
-                </router-link>
+                </BaseButton>
             </div>
 
             <!-- Form Card -->
-            <form novalidate @submit.prevent="handleSubmit" class="form-card">
+            <form id="customer-form" novalidate class="form-card" @submit.prevent="handleSubmit">
                 <div class="form-section-head-mint">
                     <h1 class="form-section-title-mint text-2xl sm:text-3xl">
                         {{ isEdit ? (form.type === 'customer' ? 'Edit Customer' : 'Edit Prospect') : (form.type === 'customer' ? 'Add Customer' : 'Add Prospect') }}
@@ -25,26 +22,47 @@
                     </p>
                 </div>
                 <div class="form-body space-y-6 lg:space-y-8">
-                    <div v-if="!isEdit && !isSimpleCustomerCreate" class="mb-2">
+                    <!-- Validation summary: focused on a failed submit -->
+                    <div
+                        v-if="error || errorFields.length"
+                        ref="errorSummaryRef"
+                        class="callout callout-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-600/40"
+                        role="alert"
+                        tabindex="-1"
+                    >
+                        <p class="font-semibold">
+                            {{ errorFields.length ? 'Please fix the following before saving:' : 'This customer could not be saved' }}
+                        </p>
+                        <ul v-if="errorFields.length" class="mt-1.5 list-disc pl-5 space-y-0.5">
+                            <li v-for="failed in errorFields" :key="failed.field">
+                                <span class="font-medium">{{ failed.label }}</span> — {{ failed.message }}
+                            </li>
+                        </ul>
+                        <p v-else class="mt-1">{{ error }}</p>
+                    </div>
+
+                    <nav v-if="!isEdit && !isSimpleCustomerCreate" class="mb-2" aria-label="Create customer steps">
                         <div class="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1">
                             <button
                                 v-for="step in createSteps"
                                 :key="step.id"
                                 type="button"
+                                class="inline-flex items-center gap-2 px-3 py-2 rounded-control border text-xs sm:text-sm whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                                :class="currentStep === step.id ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'"
+                                :aria-current="currentStep === step.id ? 'step' : undefined"
                                 @click="goToStep(step.id)"
-                                class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-xs sm:text-sm whitespace-nowrap transition-colors"
-                                :class="currentStep === step.id ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'"
                             >
                                 <span
-                                    class="w-5 h-5 rounded-full text-[11px] flex items-center justify-center"
-                                    :class="currentStep === step.id ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'"
+                                    class="w-5 h-5 rounded-full text-[11px] flex items-center justify-center shrink-0"
+                                    :class="currentStep === step.id ? 'bg-primary-600 text-white' : 'bg-slate-200 text-slate-700'"
+                                    aria-hidden="true"
                                 >
                                     {{ step.id }}
                                 </span>
                                 {{ step.title }}
                             </button>
                         </div>
-                    </div>
+                    </nav>
                     <!-- Required fields -->
                     <div v-show="isEdit || isSimpleCustomerCreate || currentStep === 1">
                         <h2 class="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
@@ -53,17 +71,24 @@
                         </h2>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="sm:col-span-2">
-                                <label class="form-label">Customer Name *</label>
-                                <input
+                                <label class="form-label" for="customerformview-customer-name">
+                                    Customer Name <span class="form-required" aria-hidden="true">*</span>
+                                </label>
+                                <input id="customerformview-customer-name"
                                     v-model="form.name"
                                     type="text"
                                     placeholder="Full name or primary contact"
                                     class="form-input"
+                                    :aria-invalid="fieldErrors.name ? 'true' : undefined"
+                                    :aria-describedby="fieldErrors.name ? 'customerformview-customer-name-error' : undefined"
                                 />
+                                <p v-if="fieldErrors.name" id="customerformview-customer-name-error" class="form-error">
+                                    {{ fieldErrors.name }}
+                                </p>
                             </div>
                             <div>
-                                <label class="form-label">Business Name</label>
-                                <input
+                                <label class="form-label" for="customerformview-business-name">Business Name</label>
+                                <input id="customerformview-business-name"
                                     v-model="form.business_name"
                                     type="text"
                                     placeholder="Company or business name"
@@ -71,8 +96,8 @@
                                 />
                             </div>
                             <div v-if="isEdit || !isSimpleCustomerCreate">
-                                <label class="form-label">Owner Name</label>
-                                <input
+                                <label class="form-label" for="customerformview-owner-name">Owner Name</label>
+                                <input id="customerformview-owner-name"
                                     v-model="form.owner_name"
                                     type="text"
                                     placeholder="Owner or director name"
@@ -80,8 +105,8 @@
                                 />
                             </div>
                             <div v-if="isEdit || !isSimpleCustomerCreate">
-                                <label class="form-label">Contact Person 2 Name</label>
-                                <input
+                                <label class="form-label" for="customerformview-contact-person-2-name">Contact Person 2 Name</label>
+                                <input id="customerformview-contact-person-2-name"
                                     v-model="form.contact_person_2_name"
                                     type="text"
                                     placeholder="Second contact name"
@@ -89,8 +114,8 @@
                                 />
                             </div>
                             <div v-if="isEdit || !isSimpleCustomerCreate">
-                                <label class="form-label">Contact Person 2 Phone</label>
-                                <input
+                                <label class="form-label" for="customerformview-contact-person-2-phone">Contact Person 2 Phone</label>
+                                <input id="customerformview-contact-person-2-phone"
                                     v-model="form.contact_person_2_phone"
                                     type="tel"
                                     placeholder="e.g. 07700900123"
@@ -98,43 +123,55 @@
                                 />
                             </div>
                             <div>
-                                <label class="form-label">Phone *</label>
-                                <input
+                                <label class="form-label" for="customerformview-phone">
+                                    Phone <span class="form-required" aria-hidden="true">*</span>
+                                </label>
+                                <input id="customerformview-phone"
                                     v-model="form.phone"
                                     type="tel"
                                     placeholder="e.g. 07700900123"
                                     class="form-input"
+                                    :aria-invalid="fieldErrors.phone ? 'true' : undefined"
+                                    :aria-describedby="fieldErrors.phone ? 'customerformview-phone-error' : undefined"
                                     @blur="syncPhoneToWhatsApp"
                                 />
+                                <p v-if="fieldErrors.phone" id="customerformview-phone-error" class="form-error">
+                                    {{ fieldErrors.phone }}
+                                </p>
                             </div>
                             <div v-if="isEdit || !isSimpleCustomerCreate">
-                                <label class="form-label">Customer WhatsApp</label>
-                                <input
+                                <label class="form-label" for="customerformview-customer-whatsapp">Customer WhatsApp</label>
+                                <input id="customerformview-customer-whatsapp"
                                     v-model="form.whatsapp_number"
                                     type="tel"
                                     placeholder="e.g. 447700900123"
                                     class="form-input"
+                                    aria-describedby="customerformview-customer-whatsapp-hint"
                                     @blur="syncWhatsAppToPhone"
                                 />
-                                <p class="text-xs text-slate-500 mt-1">Phone and WhatsApp sync when one is empty; you can change either.</p>
+                                <p id="customerformview-customer-whatsapp-hint" class="form-hint">
+                                    Phone and WhatsApp sync when one is empty; you can change either.
+                                </p>
                             </div>
                             <div class="sm:col-span-2">
-                                <label class="form-label">Customer Email</label>
-                                <input
+                                <label class="form-label" for="customerformview-customer-email">Customer Email</label>
+                                <input id="customerformview-customer-email"
                                     v-model="form.email"
                                     type="email"
                                     placeholder="customer@example.com"
                                     class="form-input"
+                                    :aria-describedby="isSimpleCustomerCreate ? 'customerformview-customer-email-hint' : undefined"
                                 />
-                                <p v-if="isSimpleCustomerCreate" class="text-xs text-slate-500 mt-1">
+                                <p v-if="isSimpleCustomerCreate" id="customerformview-customer-email-hint" class="form-hint">
                                     The welcome email will be sent to this address after the customer is created.
                                 </p>
                             </div>
                             <div v-if="isSimpleCustomerCreate" class="sm:col-span-2">
-                                <label class="form-label">Welcome Email Template</label>
-                                <select
+                                <label class="form-label" for="customerformview-welcome-email-template">Welcome Email Template</label>
+                                <select id="customerformview-welcome-email-template"
                                     v-model="welcomeEmailTemplateId"
-                                    class="form-input bg-white"
+                                    class="form-select"
+                                    aria-describedby="customerformview-welcome-email-template-hint"
                                 >
                                     <option value="">Use default generic welcome template</option>
                                     <option
@@ -145,15 +182,16 @@
                                         {{ template.name }}{{ template.subject ? ` - ${template.subject}` : '' }}
                                     </option>
                                 </select>
-                                <p class="text-xs text-slate-500 mt-1">
+                                <p id="customerformview-welcome-email-template-hint" class="form-hint">
                                     Email is optional. If an email is entered, this template will be sent. Leave unchanged to use the generic welcome template.
                                 </p>
                             </div>
                             <div v-if="isEdit || !isSimpleCustomerCreate" class="sm:col-span-2">
-                                <label class="form-label">Source</label>
+                                <label class="form-label" for="customerformview-source">Source</label>
                                 <select
+                                    id="customerformview-source"
                                     v-model="form.source"
-                                    class="form-input"
+                                    class="form-select"
                                 >
                                     <option value="">Select Source</option>
                                     <option value="call_center">Call Center</option>
@@ -166,17 +204,17 @@
                                 </select>
                             </div>
                             <div v-if="isSimpleCustomerCreate" class="sm:col-span-2">
-                                <label class="form-label">Address</label>
-                                <textarea
+                                <label class="form-label" for="customerformview-address">Address</label>
+                                <textarea id="customerformview-address"
                                     v-model="form.address"
                                     rows="2"
                                     placeholder="Street address"
-                                    class="form-input resize-none"
+                                    class="form-textarea min-h-0"
                                 />
                             </div>
                             <div v-if="isSimpleCustomerCreate">
-                                <label class="form-label">City</label>
-                                <input
+                                <label class="form-label" for="customerformview-city">City</label>
+                                <input id="customerformview-city"
                                     v-model="form.city"
                                     type="text"
                                     placeholder="City"
@@ -184,25 +222,25 @@
                                 />
                             </div>
                             <div v-if="isSimpleCustomerCreate">
-                                <label class="form-label">Postcode</label>
-                                <input
+                                <label class="form-label" for="customerformview-postcode">Postcode</label>
+                                <input id="customerformview-postcode"
                                     v-model="form.postcode"
                                     type="text"
                                     placeholder="Postcode"
                                     class="form-input"
                                 />
                             </div>
-                            <div v-if="isSimpleCustomerCreate" class="sm:col-span-2">
-                                <label class="form-label">Won Product (Optional)</label>
-                                <div class="border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto bg-white">
-                                    <label v-for="p in products" :key="p.id" class="flex items-center gap-2 py-1.5 cursor-pointer">
-                                        <input type="checkbox" :value="p.id" v-model="wonProductIds" class="form-checkbox" />
-                                        <span class="text-sm">{{ p.name }}</span>
+                            <fieldset v-if="isSimpleCustomerCreate" class="form-fieldset sm:col-span-2">
+                                <legend class="form-label">Won Product (Optional)</legend>
+                                <div class="border border-slate-200 rounded-control p-3 max-h-40 overflow-y-auto bg-white">
+                                    <label v-for="p in products" :key="p.id" class="form-choice py-1.5 w-full">
+                                        <input v-model="wonProductIds" type="checkbox" :value="p.id" class="form-checkbox" />
+                                        <span class="text-sm font-normal">{{ p.name }}</span>
                                     </label>
-                                    <p v-if="!products.length" class="text-sm text-slate-400 py-2">Loading products...</p>
+                                    <p v-if="!products.length" class="text-sm text-slate-500 py-2">Loading products...</p>
                                 </div>
-                                <p class="text-xs text-slate-500 mt-1">If selected, these products will be recorded as won after customer creation.</p>
-                            </div>
+                                <p class="form-hint">If selected, these products will be recorded as won after customer creation.</p>
+                            </fieldset>
                         </div>
                     </div>
 
@@ -216,23 +254,27 @@
                         <div
                             v-for="(rl, idx) in form.remote_licenses"
                             :key="idx"
-                            class="mb-6 p-4 border border-slate-200 rounded-xl bg-slate-50/50 space-y-4"
+                            class="mb-6 p-4 border border-slate-200 rounded-card bg-slate-50/50 space-y-4"
                         >
                             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <span class="text-sm font-medium text-slate-700">Entry {{ idx + 1 }}</span>
-                                <button
+                                <BaseButton
                                     v-if="form.remote_licenses.length > 1"
-                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    class="text-danger-700 hover:bg-danger-50 hover:text-danger-800"
                                     @click="removeRemoteLicense(idx)"
-                                    class="text-red-600 hover:text-red-800 text-sm"
                                 >
+                                    <template #icon>
+                                        <TrashIcon class="icon-sm" aria-hidden="true" />
+                                    </template>
                                     Remove
-                                </button>
+                                </BaseButton>
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <div class="sm:col-span-2 lg:col-span-1">
-                                    <label class="form-label">Anydesk or Rustdesk</label>
-                                    <input
+                                    <label class="form-label" :for="`customerformview-anydesk-or-rustdesk-${idx}`">Anydesk or Rustdesk</label>
+                                    <input :id="`customerformview-anydesk-or-rustdesk-${idx}`"
                                         v-model="rl.anydesk_rustdesk"
                                         type="text"
                                         placeholder="ID or connection details"
@@ -240,8 +282,8 @@
                                     />
                                 </div>
                                 <div class="sm:col-span-2 lg:col-span-1">
-                                    <label class="form-label">Passwords</label>
-                                    <input
+                                    <label class="form-label" :for="`customerformview-passwords-${idx}`">Passwords</label>
+                                    <input :id="`customerformview-passwords-${idx}`"
                                         v-model="rl.passwords"
                                         type="text"
                                         placeholder="Relevant passwords"
@@ -249,8 +291,8 @@
                                     />
                                 </div>
                                 <div>
-                                    <label class="form-label">ePOS Type</label>
-                                    <input
+                                    <label class="form-label" :for="`customerformview-epos-type-${idx}`">ePOS Type</label>
+                                    <input :id="`customerformview-epos-type-${idx}`"
                                         v-model="rl.epos_type"
                                         type="text"
                                         placeholder="e.g. TouchBistro, Square"
@@ -258,8 +300,8 @@
                                     />
                                 </div>
                                 <div>
-                                    <label class="form-label">Lic-days (Optional)</label>
-                                    <input
+                                    <label class="form-label" :for="`customerformview-lic-days-optional-${idx}`">Lic-days (Optional)</label>
+                                    <input :id="`customerformview-lic-days-optional-${idx}`"
                                         v-model="rl.lic_days"
                                         type="text"
                                         placeholder="e.g. 30, 90, 1 Year"
@@ -268,13 +310,12 @@
                                 </div>
                             </div>
                         </div>
-                        <button
-                            type="button"
-                            @click="addRemoteLicense"
-                            class="text-sm font-medium text-emerald-700 hover:text-emerald-900"
-                        >
-                            + Add Remote & License
-                        </button>
+                        <BaseButton variant="outline" size="sm" @click="addRemoteLicense">
+                            <template #icon>
+                                <PlusIcon class="icon-sm" aria-hidden="true" />
+                            </template>
+                            Add Remote &amp; License
+                        </BaseButton>
                     </div>
 
                     <!-- Address -->
@@ -285,18 +326,18 @@
                         </h2>
                         <div class="space-y-4">
                             <div>
-                                <label class="form-label">Address</label>
-                                <textarea
+                                <label class="form-label" for="customerformview-address-2">Address</label>
+                                <textarea id="customerformview-address-2"
                                     v-model="form.address"
                                     rows="2"
                                     placeholder="Street address"
-                                    class="form-input resize-none"
+                                    class="form-textarea min-h-0"
                                 />
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="form-label">City</label>
-                                    <input
+                                    <label class="form-label" for="customerformview-city-2">City</label>
+                                    <input id="customerformview-city-2"
                                         v-model="form.city"
                                         type="text"
                                         placeholder="City"
@@ -304,8 +345,8 @@
                                     />
                                 </div>
                                 <div>
-                                    <label class="form-label">Postcode</label>
-                                    <input
+                                    <label class="form-label" for="customerformview-postcode-2">Postcode</label>
+                                    <input id="customerformview-postcode-2"
                                         v-model="form.postcode"
                                         type="text"
                                         placeholder="Postcode"
@@ -314,8 +355,8 @@
                                 </div>
                             </div>
                             <div>
-                                <label class="form-label">VAT Number</label>
-                                <input
+                                <label class="form-label" for="customerformview-vat-number">VAT Number</label>
+                                <input id="customerformview-vat-number"
                                     v-model="form.vat_number"
                                     type="text"
                                     placeholder="VAT number"
@@ -323,12 +364,12 @@
                                 />
                             </div>
                             <div>
-                                <label class="form-label">Notes</label>
-                                <textarea
+                                <label class="form-label" for="customerformview-notes">Notes</label>
+                                <textarea id="customerformview-notes"
                                     v-model="form.notes"
                                     rows="3"
                                     placeholder="Additional notes"
-                                    class="form-input resize-none"
+                                    class="form-textarea"
                                 />
                             </div>
                         </div>
@@ -341,71 +382,130 @@
                             Also create (optional)
                         </h2>
                         <p class="text-sm text-slate-500 mb-4">Quickly add a follow-up, appointment, or lead when creating this customer.</p>
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                            <label class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all" :class="!quickAddType ? 'border-slate-300 bg-slate-100' : 'border-slate-200 hover:border-slate-300'">
-                                <input v-model="quickAddType" type="radio" value="" class="sr-only" />
-                                <span>—</span>
-                                <span class="font-medium text-sm">None</span>
-                            </label>
-                            <label class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all" :class="quickAddType === 'follow_up' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'">
-                                <input v-model="quickAddType" type="radio" value="follow_up" class="sr-only" />
-                                <span>🔄</span>
-                                <span class="font-medium text-sm">Follow-up</span>
-                            </label>
-                            <label class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all" :class="quickAddType === 'appointment' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'">
-                                <input v-model="quickAddType" type="radio" value="appointment" class="sr-only" />
-                                <span>📅</span>
-                                <span class="font-medium text-sm">Appointment</span>
-                            </label>
-                            <label class="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all" :class="quickAddType === 'lead' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'">
-                                <input v-model="quickAddType" type="radio" value="lead" class="sr-only" />
-                                <span>➕</span>
-                                <span class="font-medium text-sm">Lead</span>
-                            </label>
-                        </div>
-                        <div v-if="quickAddType" class="space-y-4 p-4 bg-slate-50 rounded-xl">
-                            <div>
-                                <label class="form-label">Product(s) *</label>
-                                <div class="border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto bg-white">
-                                    <label v-for="p in products" :key="p.id" class="flex items-center gap-2 py-1.5 cursor-pointer">
-                                        <input type="checkbox" :value="p.id" v-model="quickAddProductIds" class="form-checkbox" />
-                                        <span class="text-sm">{{ p.name }}</span>
+                        <fieldset class="form-fieldset mb-4">
+                            <legend class="sr-only">What would you like to also create?</legend>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <label
+                                    class="flex items-center gap-2 p-3 rounded-card border-2 cursor-pointer transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary-500/40"
+                                    :class="!quickAddType ? 'border-slate-300 bg-slate-100' : 'border-slate-200 hover:border-slate-300'"
+                                >
+                                    <input v-model="quickAddType" type="radio" value="" class="sr-only" />
+                                    <MinusIcon class="icon-sm text-slate-500" aria-hidden="true" />
+                                    <span class="font-medium text-sm">None</span>
+                                </label>
+                                <label
+                                    class="flex items-center gap-2 p-3 rounded-card border-2 cursor-pointer transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary-500/40"
+                                    :class="quickAddType === 'follow_up' ? 'border-primary-500 bg-primary-50' : 'border-slate-200 hover:border-slate-300'"
+                                >
+                                    <input v-model="quickAddType" type="radio" value="follow_up" class="sr-only" />
+                                    <ArrowPathIcon class="icon-sm text-slate-500" aria-hidden="true" />
+                                    <span class="font-medium text-sm">Follow-up</span>
+                                </label>
+                                <label
+                                    class="flex items-center gap-2 p-3 rounded-card border-2 cursor-pointer transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary-500/40"
+                                    :class="quickAddType === 'appointment' ? 'border-primary-500 bg-primary-50' : 'border-slate-200 hover:border-slate-300'"
+                                >
+                                    <input v-model="quickAddType" type="radio" value="appointment" class="sr-only" />
+                                    <CalendarDaysIcon class="icon-sm text-slate-500" aria-hidden="true" />
+                                    <span class="font-medium text-sm">Appointment</span>
+                                </label>
+                                <label
+                                    class="flex items-center gap-2 p-3 rounded-card border-2 cursor-pointer transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary-500/40"
+                                    :class="quickAddType === 'lead' ? 'border-primary-500 bg-primary-50' : 'border-slate-200 hover:border-slate-300'"
+                                >
+                                    <input v-model="quickAddType" type="radio" value="lead" class="sr-only" />
+                                    <PlusIcon class="icon-sm text-slate-500" aria-hidden="true" />
+                                    <span class="font-medium text-sm">Lead</span>
+                                </label>
+                            </div>
+                        </fieldset>
+                        <div v-if="quickAddType" class="space-y-4 p-4 bg-slate-50 rounded-card">
+                            <fieldset class="form-fieldset">
+                                <legend class="form-label">
+                                    Product(s) <span class="form-required" aria-hidden="true">*</span>
+                                </legend>
+                                <div class="border border-slate-200 rounded-control p-3 max-h-40 overflow-y-auto bg-white">
+                                    <label v-for="p in products" :key="p.id" class="form-choice py-1.5 w-full">
+                                        <input v-model="quickAddProductIds" type="checkbox" :value="p.id" class="form-checkbox" />
+                                        <span class="text-sm font-normal">{{ p.name }}</span>
                                     </label>
                                 </div>
-                            </div>
+                                <p v-if="fieldErrors.quickAddProducts" class="form-error">{{ fieldErrors.quickAddProducts }}</p>
+                            </fieldset>
                             <div>
-                                <label class="form-label">Notes</label>
-                                <textarea v-model="quickAddComment" rows="2" class="form-input resize-none" placeholder="Comment or notes..." />
+                                <label class="form-label" for="customerformview-quick-add-notes">Notes</label>
+                                <textarea
+                                    id="customerformview-quick-add-notes"
+                                    v-model="quickAddComment"
+                                    rows="2"
+                                    class="form-textarea min-h-0"
+                                    placeholder="Comment or notes..."
+                                />
                             </div>
                             <div v-if="quickAddType === 'follow_up'" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="form-label">Follow-up Date & Time *</label>
-                                    <input v-model="quickAddFollowUpAt" type="datetime-local" class="form-input" />
+                                    <label class="form-label" for="customerformview-follow-up-at">
+                                        Follow-up Date &amp; Time <span class="form-required" aria-hidden="true">*</span>
+                                    </label>
+                                    <input
+                                        id="customerformview-follow-up-at"
+                                        v-model="quickAddFollowUpAt"
+                                        type="datetime-local"
+                                        class="form-input"
+                                        :aria-invalid="fieldErrors.quickAddFollowUpAt ? 'true' : undefined"
+                                    />
+                                    <p v-if="fieldErrors.quickAddFollowUpAt" class="form-error">{{ fieldErrors.quickAddFollowUpAt }}</p>
                                 </div>
                             </div>
                             <div v-if="quickAddType === 'appointment'" class="space-y-4">
                                 <div>
-                                    <label class="form-label">Assign to (who will attend) *</label>
-                                    <select v-model="quickAddAssignedUserId" class="form-input">
+                                    <label class="form-label" for="customerformview-assign-to-who-will-attend">
+                                        Assign to (who will attend) <span class="form-required" aria-hidden="true">*</span>
+                                    </label>
+                                    <select
+                                        id="customerformview-assign-to-who-will-attend"
+                                        v-model="quickAddAssignedUserId"
+                                        class="form-select"
+                                        :aria-invalid="fieldErrors.quickAddAssignedUserId ? 'true' : undefined"
+                                    >
                                         <option value="">Select team member...</option>
                                         <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }} ({{ u.role?.name || '—' }})</option>
                                     </select>
+                                    <p v-if="fieldErrors.quickAddAssignedUserId" class="form-error">{{ fieldErrors.quickAddAssignedUserId }}</p>
                                 </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
-                                        <label class="form-label">Date *</label>
-                                        <input v-model="quickAddAppointmentDate" type="date" class="form-input" />
+                                        <label class="form-label" for="customerformview-appointment-date">
+                                            Date <span class="form-required" aria-hidden="true">*</span>
+                                        </label>
+                                        <input
+                                            id="customerformview-appointment-date"
+                                            v-model="quickAddAppointmentDate"
+                                            type="date"
+                                            class="form-input"
+                                            :aria-invalid="fieldErrors.quickAddAppointmentDate ? 'true' : undefined"
+                                        />
+                                        <p v-if="fieldErrors.quickAddAppointmentDate" class="form-error">{{ fieldErrors.quickAddAppointmentDate }}</p>
                                     </div>
                                     <div>
-                                        <label class="form-label">Time *</label>
-                                        <input v-model="quickAddAppointmentTime" type="time" class="form-input" />
+                                        <label class="form-label" for="customerformview-appointment-time">
+                                            Time <span class="form-required" aria-hidden="true">*</span>
+                                        </label>
+                                        <input
+                                            id="customerformview-appointment-time"
+                                            v-model="quickAddAppointmentTime"
+                                            type="time"
+                                            class="form-input"
+                                            :aria-invalid="fieldErrors.quickAddAppointmentTime ? 'true' : undefined"
+                                        />
+                                        <p v-if="fieldErrors.quickAddAppointmentTime" class="form-error">{{ fieldErrors.quickAddAppointmentTime }}</p>
                                     </div>
                                 </div>
                             </div>
                             <div v-if="quickAddType === 'lead'" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="form-label">Stage</label>
-                                    <select v-model="quickAddStage" class="form-input">
+                                    <label class="form-label" for="customerformview-stage">Stage</label>
+                                    <select id="customerformview-stage" v-model="quickAddStage" class="form-select">
                                         <option value="follow_up">Follow-up</option>
                                         <option value="lead">Lead</option>
                                         <option value="hot_lead">Hot Lead</option>
@@ -413,68 +513,87 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="form-label">Expected Closing Date</label>
-                                    <input v-model="quickAddExpectedDate" type="date" class="form-input" />
+                                    <label class="form-label" for="customerformview-expected-closing-date">Expected Closing Date</label>
+                                    <input id="customerformview-expected-closing-date" v-model="quickAddExpectedDate" type="date" class="form-input" />
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Error message -->
-                    <div v-if="error" class="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                        {{ error }}
                     </div>
                 </div>
 
                 <!-- Footer actions -->
                 <div class="form-actions">
-                    <router-link
-                        :to="form.type === 'prospect' ? { path: '/customers', query: { type: 'prospect' } } : { path: '/customers', query: { type: 'customer' } }"
-                        class="form-btn-cancel text-center"
+                    <BaseButton :to="backRoute" variant="outline" block-mobile>Cancel</BaseButton>
+                    <BaseButton
+                        v-if="!isEdit && !isSimpleCustomerCreate && currentStep > 1"
+                        variant="outline"
+                        block-mobile
+                        @click="prevStep"
                     >
-                        Cancel
-                    </router-link>
-                    <button v-if="!isEdit && !isSimpleCustomerCreate && currentStep > 1" type="button" class="form-btn-cancel" @click="prevStep">Back</button>
-                    <button v-if="!isEdit && !isSimpleCustomerCreate && currentStep < 4" type="button" class="form-btn-submit" @click="nextStep">Next</button>
-                    <button
+                        <template #icon>
+                            <ArrowLeftIcon class="icon" aria-hidden="true" />
+                        </template>
+                        Back
+                    </BaseButton>
+                    <BaseButton
+                        v-if="!isEdit && !isSimpleCustomerCreate && currentStep < 4"
+                        variant="soft"
+                        block-mobile
+                        @click="nextStep"
+                    >
+                        <template #icon>
+                            <ArrowRightIcon class="icon" aria-hidden="true" />
+                        </template>
+                        Next
+                    </BaseButton>
+                    <BaseButton
                         v-if="isEdit || isSimpleCustomerCreate || currentStep === 4"
+                        variant="primary"
                         type="submit"
-                        :disabled="loading"
-                        class="form-btn-submit"
+                        form="customer-form"
+                        block-mobile
+                        :loading="loading"
                     >
-                        <span v-if="loading" class="inline-flex items-center gap-2">
-                            <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Saving...
-                        </span>
-                        <span v-else>{{ isEdit ? 'Update Customer' : (form.type === 'customer' ? 'Create Customer' : 'Create Prospect') }}</span>
-                    </button>
+                        {{ isEdit ? 'Update Customer' : (form.type === 'customer' ? 'Create Customer' : 'Create Prospect') }}
+                    </BaseButton>
                 </div>
             </form>
         </div>
 
         <!-- Sale credit (admin/manager): after customer created with won products — notification only -->
-        <div v-if="showSaleCreditModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white rounded-xl shadow-xl max-w-md w-full">
-                <div class="p-6 border-b border-slate-200">
-                    <h3 class="text-lg font-semibold text-slate-900">Sale Credit</h3>
-                    <p class="text-sm text-slate-600 mt-1">{{ saleCreditContextText }}</p>
-                </div>
-                <div class="p-6 space-y-3">
-                    <label class="block text-sm font-medium text-slate-700">Who should this sale go on?</label>
-                    <select v-model="selectedSaleCreditUserId" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500">
+        <BaseModal
+            v-model="showSaleCreditModal"
+            title="Sale Credit"
+            :description="saleCreditContextText"
+            size="sm"
+            :close-on-backdrop="false"
+            @close="finishSaleCreditSkip"
+        >
+            <div class="space-y-3">
+                <div>
+                    <label class="form-label" for="customerformview-who-should-this-sale-go-on">Who should this sale go on?</label>
+                    <select
+                        id="customerformview-who-should-this-sale-go-on"
+                        v-model="selectedSaleCreditUserId"
+                        class="form-select"
+                    >
                         <option value="">Select user...</option>
                         <option v-for="u in users" :key="u.id" :value="String(u.id)">{{ u.name }} ({{ u.role?.name || '—' }})</option>
                     </select>
                 </div>
-                <div class="px-6 pb-6 flex justify-end gap-3">
-                    <button type="button" class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50" @click="finishSaleCreditSkip">Skip</button>
-                    <button type="button" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50" :disabled="!selectedSaleCreditUserId" @click="finishSaleCreditConfirm">Confirm</button>
-                </div>
             </div>
-        </div>
+            <template #actions>
+                <BaseButton variant="outline" block-mobile @click="finishSaleCreditSkip">Skip</BaseButton>
+                <BaseButton
+                    variant="success"
+                    block-mobile
+                    :disabled="!selectedSaleCreditUserId"
+                    @click="finishSaleCreditConfirm"
+                >
+                    Confirm
+                </BaseButton>
+            </template>
+        </BaseModal>
     </div>
 </template>
 
@@ -482,6 +601,16 @@
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
+import {
+    ArrowLeftIcon,
+    ArrowPathIcon,
+    ArrowRightIcon,
+    CalendarDaysIcon,
+    MinusIcon,
+    PlusIcon,
+    TrashIcon,
+} from '@heroicons/vue/24/outline';
+import { BaseButton, BaseModal } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
 
@@ -517,6 +646,13 @@ const form = reactive({
 });
 
 const isSimpleCustomerCreate = computed(() => !isEdit.value && form.type === 'customer');
+
+/** Same destination the Cancel link and the back link have always used. */
+const backRoute = computed(() =>
+    form.type === 'prospect'
+        ? { path: '/customers', query: { type: 'prospect' } }
+        : { path: '/customers', query: { type: 'customer' } },
+);
 
 const isSaleCreditRole = computed(() => {
     const r = auth.user?.role?.name;
@@ -562,78 +698,155 @@ const createSteps = [
     { id: 4, title: 'Also Create' },
 ];
 
+/** Error summary is focused whenever a submit or a step change fails. */
+const errorSummaryRef = ref(null);
+const errorFields = ref([]);
+const fieldErrors = reactive({
+    name: '',
+    phone: '',
+    quickAddProducts: '',
+    quickAddFollowUpAt: '',
+    quickAddAssignedUserId: '',
+    quickAddAppointmentDate: '',
+    quickAddAppointmentTime: '',
+});
+
+const FIELD_LABELS = {
+    name: 'Customer Name',
+    phone: 'Phone',
+    quickAddProducts: 'Product(s)',
+    quickAddFollowUpAt: 'Follow-up Date & Time',
+    quickAddAssignedUserId: 'Assign to (who will attend)',
+    quickAddAppointmentDate: 'Appointment date',
+    quickAddAppointmentTime: 'Appointment time',
+};
+
+function clearValidation() {
+    Object.keys(fieldErrors).forEach((key) => {
+        fieldErrors[key] = '';
+    });
+    errorFields.value = [];
+}
+
+async function focusErrorSummary() {
+    await nextTick();
+    errorSummaryRef.value?.focus();
+}
+
+/** Publishes the failed fields to the summary + the per-field messages, then takes focus. */
+async function reportValidation(failures) {
+    clearValidation();
+    failures.forEach((failure) => {
+        if (failure.field in fieldErrors) fieldErrors[failure.field] = failure.message;
+    });
+    errorFields.value = failures.map((failure) => ({
+        ...failure,
+        label: FIELD_LABELS[failure.field] || failure.field,
+    }));
+    await focusErrorSummary();
+}
+
+/**
+ * Every failure for a step, in the original first-fail order.
+ * @param {number} step
+ * @returns {{field: string, message: string}[]}
+ */
+function collectStepErrors(step) {
+    const failures = [];
+    if (step === 1) {
+        if (!form.name?.trim()) {
+            failures.push({ field: 'name', message: 'Customer name is required.' });
+        }
+        if (!form.phone?.trim()) {
+            failures.push({ field: 'phone', message: 'Phone is required.' });
+        }
+        return failures;
+    }
+    if (step === 2 || step === 3) {
+        return failures;
+    }
+    if (step === 4) {
+        if (!quickAddType.value) return failures;
+        const prodIds = quickAddProductIds.value.length ? quickAddProductIds.value : (products.value.length ? [products.value[0].id] : []);
+        if (!prodIds.length) {
+            failures.push({ field: 'quickAddProducts', message: 'Please select at least one product, or add products in the system.' });
+        }
+        if (quickAddType.value === 'follow_up' && !quickAddFollowUpAt.value) {
+            failures.push({ field: 'quickAddFollowUpAt', message: 'Please set follow-up date and time.' });
+        }
+        if (quickAddType.value === 'appointment') {
+            if (!quickAddAssignedUserId.value) {
+                failures.push({ field: 'quickAddAssignedUserId', message: 'Please select who will attend this appointment.' });
+            }
+            if (!quickAddAppointmentDate.value) {
+                failures.push({ field: 'quickAddAppointmentDate', message: 'Please set appointment date and time.' });
+            }
+            if (!quickAddAppointmentTime.value) {
+                failures.push({ field: 'quickAddAppointmentTime', message: 'Please set appointment date and time.' });
+            }
+        }
+        return failures;
+    }
+    return failures;
+}
+
 /**
  * @param {number} step
  * @returns {string|null} Error message or null if valid
  */
 function validateStep(step) {
-    if (step === 1) {
-        if (!form.name?.trim()) {
-            return 'Customer name is required.';
-        }
-        if (!form.phone?.trim()) {
-            return 'Phone is required.';
-        }
-        return null;
-    }
-    if (step === 2 || step === 3) {
-        return null;
-    }
-    if (step === 4) {
-        if (!quickAddType.value) return null;
-        const prodIds = quickAddProductIds.value.length ? quickAddProductIds.value : (products.value.length ? [products.value[0].id] : []);
-        if (!prodIds.length) return 'Please select at least one product, or add products in the system.';
-        if (quickAddType.value === 'follow_up' && !quickAddFollowUpAt.value) return 'Please set follow-up date and time.';
-        if (quickAddType.value === 'appointment') {
-            if (!quickAddAssignedUserId.value) return 'Please select who will attend this appointment.';
-            if (!quickAddAppointmentDate.value || !quickAddAppointmentTime.value) return 'Please set appointment date and time.';
-        }
-        return null;
-    }
-    return null;
+    const failures = collectStepErrors(step);
+    return failures.length ? failures[0].message : null;
 }
 
 function validateAllStepsForCreate() {
     for (let s = 1; s <= 4; s++) {
-        const msg = validateStep(s);
-        if (msg) return { step: s, message: msg };
+        const failures = collectStepErrors(s);
+        if (failures.length) return { step: s, message: failures[0].message, failures };
     }
     return null;
 }
 
-function goToStep(stepId) {
+async function goToStep(stepId) {
     if (isEdit.value || isSimpleCustomerCreate.value) return;
     if (stepId === currentStep.value) return;
     if (stepId < currentStep.value) {
         error.value = null;
+        clearValidation();
         currentStep.value = stepId;
         return;
     }
     for (let s = currentStep.value; s < stepId; s++) {
-        const msg = validateStep(s);
-        if (msg) {
-            error.value = msg;
-            toast.error(msg);
+        const failures = collectStepErrors(s);
+        if (failures.length) {
+            error.value = failures[0].message;
+            toast.error(failures[0].message);
             currentStep.value = s;
+            await reportValidation(failures);
             return;
         }
     }
     error.value = null;
+    clearValidation();
     currentStep.value = stepId;
 }
 
-function nextStep() {
-    const msg = validateStep(currentStep.value);
-    if (msg) {
-        error.value = msg;
-        toast.error(msg);
+async function nextStep() {
+    const failures = collectStepErrors(currentStep.value);
+    if (failures.length) {
+        error.value = failures[0].message;
+        toast.error(failures[0].message);
+        await reportValidation(failures);
         return;
     }
+    error.value = null;
+    clearValidation();
     if (currentStep.value < 4) currentStep.value += 1;
 }
 
 function prevStep() {
     error.value = null;
+    clearValidation();
     if (currentStep.value > 1) currentStep.value -= 1;
 }
 
@@ -757,14 +970,16 @@ const loadCustomer = async () => {
 
 const handleSubmit = async () => {
     error.value = null;
+    clearValidation();
     if (!auth.initialized) {
         await auth.bootstrap();
     }
     if (isSimpleCustomerCreate.value || isEdit.value) {
-        const msg = validateStep(1);
-        if (msg) {
-            error.value = msg;
-            toast.error(msg);
+        const failures = collectStepErrors(1);
+        if (failures.length) {
+            error.value = failures[0].message;
+            toast.error(failures[0].message);
+            await reportValidation(failures);
             return;
         }
     } else {
@@ -773,6 +988,7 @@ const handleSubmit = async () => {
             error.value = fail.message;
             currentStep.value = fail.step;
             toast.error(fail.message);
+            await reportValidation(fail.failures);
             return;
         }
     }
@@ -859,6 +1075,7 @@ const handleSubmit = async () => {
         }
     } catch (err) {
         error.value = err.response?.data?.message || err.response?.data?.errors ? Object.values(err.response.data.errors || {}).flat().join(', ') : 'Failed to save';
+        await focusErrorSummary();
     } finally {
         loading.value = false;
     }
@@ -904,6 +1121,7 @@ watch(
         form.type = t === 'customer' ? 'customer' : 'prospect';
         currentStep.value = 1;
         error.value = null;
+        clearValidation();
         if (form.type === 'customer') {
             loadWelcomeEmailTemplates();
         } else {

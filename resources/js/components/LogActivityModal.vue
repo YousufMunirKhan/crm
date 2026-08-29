@@ -1,271 +1,228 @@
 <template>
-    <div class="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 overflow-y-auto">
-        <div class="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto flex flex-col">
-            <div class="sticky top-0 bg-white p-4 sm:p-6 border-b border-slate-200 flex-shrink-0">
-                <div class="flex items-start justify-between gap-4">
-                    <div>
-                        <h2 class="text-lg sm:text-xl font-semibold text-slate-900 flex items-center gap-2">
-                            <svg class="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            Log Activity
-                        </h2>
-                        <p class="text-sm text-slate-500 mt-1">
-                            {{ lead?.customer?.name || 'Customer' }} — Lead #{{ lead?.id }}
-                        </p>
+    <BaseModal
+        :model-value="true"
+        title="Log Activity"
+        :description="headerDescription"
+        size="md"
+        :close-on-backdrop="false"
+        @close="$emit('close')"
+    >
+        <form id="log-activity-form" class="space-y-5" @submit.prevent="handleSubmit">
+            <!-- Activity Type -->
+            <fieldset class="form-fieldset">
+                <legend class="form-legend">Activity Type <span class="form-required" aria-hidden="true">*</span></legend>
+                <div class="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                    <label
+                        v-for="type in activityTypes"
+                        :key="type.value"
+                        class="flex min-h-[56px] cursor-pointer flex-col items-center justify-center gap-1 rounded-card border-2 p-3 transition-all touch-manipulation sm:flex-row sm:gap-2"
+                        :class="form.activity_type === type.value ? 'border-primary-500 bg-primary-50 shadow-sm' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'"
+                    >
+                        <input
+                            type="radio"
+                            v-model="form.activity_type"
+                            :value="type.value"
+                            class="sr-only"
+                        />
+                        <span class="text-xl sm:text-2xl" aria-hidden="true">{{ type.icon }}</span>
+                        <span class="text-center text-xs font-medium text-slate-700 sm:text-sm">{{ type.label }}</span>
+                    </label>
+                </div>
+            </fieldset>
+
+            <!-- Appointment: Assign to (first step) -->
+            <div v-if="form.activity_type === 'appointment'" class="space-y-4 rounded-card border border-primary-200 bg-primary-50/80 p-4 sm:p-5">
+                <h3 class="flex flex-col gap-1 font-semibold text-primary-900 sm:flex-row sm:items-center">
+                    <span class="flex items-center gap-2">
+                        <CalendarDaysIcon class="icon shrink-0" aria-hidden="true" />
+                        Appointment Details
+                    </span>
+                    <span class="text-xs font-normal text-primary-700">(Email sent to customer, admin &amp; assignee)</span>
+                </h3>
+                <div class="space-y-2 rounded-control border border-primary-100 bg-white p-3">
+                    <div class="text-eyebrow text-primary-800">Sales context sent to agent</div>
+                    <div class="text-sm text-slate-700">
+                        <span class="font-medium">Business:</span>
+                        {{ lead?.customer?.business_name || lead?.customer?.name || 'Not provided' }}
                     </div>
-                    <button @click="$emit('close')" class="p-2 -m-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                    <div v-if="lead?.customer?.business_name" class="text-sm text-slate-700">
+                        <span class="font-medium">Contact:</span>
+                        {{ lead?.customer?.name || 'N/A' }}
+                    </div>
+                    <div class="text-sm text-slate-700">
+                        <span class="font-medium">Lead:</span>
+                        #{{ lead?.id }} - {{ formatStage(lead?.stage) || 'No stage' }}
+                    </div>
+                    <div>
+                        <div class="mb-1 text-xs font-medium text-primary-800">What to sell</div>
+                        <div v-if="leadProducts.length" class="flex flex-wrap gap-1.5">
+                            <span
+                                v-for="product in leadProducts"
+                                :key="product"
+                                class="rounded border border-primary-200 bg-primary-50 px-2 py-1 text-xs font-medium text-primary-800"
+                            >
+                                {{ product }}
+                            </span>
+                        </div>
+                        <div v-else class="text-xs text-warning-800">
+                            No product is attached to this lead yet. Add products before scheduling if possible.
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label" for="logactivitymodal-assign-to-who-will-attend">Assign to (who will attend) <span class="form-required" aria-hidden="true">*</span></label>
+                    <select id="logactivitymodal-assign-to-who-will-attend"
+                        v-model="form.assigned_user_id"
+                        required
+                        class="form-select"
+                    >
+                        <option value="">Select team member...</option>
+                        <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }} ({{ u.role?.name || '—' }})</option>
+                    </select>
+                    <p class="mt-1 text-xs text-primary-800">The assigned person will receive an email with the appointment time and notes.</p>
+                </div>
+                <div class="form-grid-2">
+                    <div>
+                        <label class="form-label" for="logactivitymodal-appointment-date">Appointment Date <span class="form-required" aria-hidden="true">*</span></label>
+                        <input id="logactivitymodal-appointment-date"
+                            v-model="form.appointment_date"
+                            type="date"
+                            :required="form.activity_type === 'appointment'"
+                            class="form-input"
+                        />
+                    </div>
+                    <div>
+                        <label class="form-label" for="logactivitymodal-appointment-time">Appointment Time <span class="form-required" aria-hidden="true">*</span></label>
+                        <input id="logactivitymodal-appointment-time"
+                            v-model="form.appointment_time"
+                            type="time"
+                            :required="form.activity_type === 'appointment'"
+                            class="form-input"
+                        />
+                    </div>
+                </div>
+                <p class="flex items-start gap-2 text-xs text-primary-800">
+                    <InformationCircleIcon class="icon-sm mt-px shrink-0" aria-hidden="true" />
+                    <span>Confirmation emails will be sent to the customer and admin notification email.</span>
+                </p>
+            </div>
+
+            <!-- Activity Date & Time (for non-appointments) -->
+            <div v-if="form.activity_type !== 'appointment'" class="form-grid-2">
+                <div>
+                    <label class="form-label" for="logactivitymodal-activity-date-time">Activity Date &amp; Time <span class="form-required" aria-hidden="true">*</span></label>
+                    <input id="logactivitymodal-activity-date-time"
+                        v-model="form.activity_at"
+                        type="datetime-local"
+                        required
+                        class="form-input"
+                    />
+                </div>
+                <div>
+                    <label class="form-label" for="logactivitymodal-duration-minutes">Duration (minutes)</label>
+                    <input id="logactivitymodal-duration-minutes"
+                        v-model.number="form.duration"
+                        type="number"
+                        min="1"
+                        placeholder="e.g., 15"
+                        class="form-input"
+                    />
                 </div>
             </div>
 
-            <form @submit.prevent="handleSubmit" class="p-4 sm:p-6 space-y-5 flex-1 overflow-y-auto">
-                <!-- Activity Type -->
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-3">Activity Type *</label>
-                    <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                        <label
-                            v-for="type in activityTypes"
-                            :key="type.value"
-                            class="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 p-3 border-2 rounded-xl cursor-pointer transition-all min-h-[56px] touch-manipulation"
-                            :class="form.activity_type === type.value ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'"
-                        >
-                            <input
-                                type="radio"
-                                v-model="form.activity_type"
-                                :value="type.value"
-                                class="sr-only"
-                            />
-                            <span class="text-xl sm:text-2xl">{{ type.icon }}</span>
-                            <span class="text-xs sm:text-sm font-medium text-slate-700 text-center">{{ type.label }}</span>
-                        </label>
-                    </div>
-                </div>
+            <!-- Notes -->
+            <div>
+                <label class="form-label" for="logactivitymodal-notes-summary">Notes/Summary <span class="form-required" aria-hidden="true">*</span></label>
+                <textarea id="logactivitymodal-notes-summary"
+                    v-model="form.notes"
+                    rows="3"
+                    required
+                    class="form-textarea resize-none"
+                    :placeholder="form.activity_type === 'appointment' ? 'Add appointment brief: customer need, pain point, what to sell, and any instructions for the agent.' : 'What was discussed? What was the outcome?'"
+                />
+            </div>
 
-                <!-- Appointment: Assign to (first step) -->
-                <div v-if="form.activity_type === 'appointment'" class="p-4 sm:p-5 bg-blue-50/80 rounded-xl border border-blue-200 space-y-4">
-                    <h3 class="font-semibold text-blue-900 flex flex-col sm:flex-row sm:items-center gap-1">
-                        <span>📅 Appointment Details</span>
-                        <span class="text-xs font-normal text-blue-700">(Email sent to customer, admin & assignee)</span>
-                    </h3>
-                    <div class="rounded-lg bg-white border border-blue-100 p-3 space-y-2">
-                        <div class="text-xs font-semibold text-blue-900 uppercase tracking-wide">Sales context sent to agent</div>
-                        <div class="text-sm text-slate-700">
-                            <span class="font-medium">Business:</span>
-                            {{ lead?.customer?.business_name || lead?.customer?.name || 'Not provided' }}
-                        </div>
-                        <div v-if="lead?.customer?.business_name" class="text-sm text-slate-700">
-                            <span class="font-medium">Contact:</span>
-                            {{ lead?.customer?.name || 'N/A' }}
-                        </div>
-                        <div class="text-sm text-slate-700">
-                            <span class="font-medium">Lead:</span>
-                            #{{ lead?.id }} - {{ formatStage(lead?.stage) || 'No stage' }}
-                        </div>
-                        <div>
-                            <div class="text-xs font-medium text-blue-800 mb-1">What to sell</div>
-                            <div v-if="leadProducts.length" class="flex flex-wrap gap-1.5">
-                                <span
-                                    v-for="product in leadProducts"
-                                    :key="product"
-                                    class="px-2 py-1 rounded bg-blue-50 text-blue-800 border border-blue-100 text-xs font-medium"
-                                >
-                                    {{ product }}
-                                </span>
-                            </div>
-                            <div v-else class="text-xs text-amber-700">
-                                No product is attached to this lead yet. Add products before scheduling if possible.
-                            </div>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Assign to (who will attend) *</label>
-                        <select
-                            v-model="form.assigned_user_id"
-                            required
-                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="">Select team member...</option>
-                            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }} ({{ u.role?.name || '—' }})</option>
-                        </select>
-                        <p class="text-xs text-blue-700 mt-1">The assigned person will receive an email with the appointment time and notes.</p>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Appointment Date *</label>
-                            <input
-                                v-model="form.appointment_date"
-                                type="date"
-                                :required="form.activity_type === 'appointment'"
-                                class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Appointment Time *</label>
-                            <input
-                                v-model="form.appointment_time"
-                                type="time"
-                                :required="form.activity_type === 'appointment'"
-                                class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
-                    </div>
-                    <p class="text-xs text-blue-700">
-                        ℹ️ Confirmation emails will be sent to the customer and admin notification email.
-                    </p>
-                </div>
-
-                <!-- Activity Date & Time (for non-appointments) -->
-                <div v-if="form.activity_type !== 'appointment'" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Activity Date & Time *</label>
+            <!-- Outcome -->
+            <fieldset class="form-fieldset">
+                <legend class="form-legend">Outcome</legend>
+                <div class="flex flex-wrap gap-2">
+                    <label
+                        v-for="outcome in outcomes"
+                        :key="outcome.value"
+                        class="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-card border-2 px-3 py-2.5 transition-all touch-manipulation"
+                        :class="form.outcome === outcome.value ? outcome.activeClass : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'"
+                    >
                         <input
-                            v-model="form.activity_at"
-                            type="datetime-local"
-                            required
-                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            type="radio"
+                            v-model="form.outcome"
+                            :value="outcome.value"
+                            class="sr-only"
                         />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Duration (minutes)</label>
-                        <input
-                            v-model.number="form.duration"
-                            type="number"
-                            min="1"
-                            placeholder="e.g., 15"
-                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                    </div>
+                        <span class="text-sm font-medium">{{ outcome.label }}</span>
+                    </label>
+                </div>
+            </fieldset>
+
+            <!-- Schedule Next Follow-up -->
+            <div class="border-t border-slate-200 pt-4">
+                <div class="mb-3 flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        v-model="form.schedule_followup"
+                        id="schedule_followup_modal"
+                        class="form-checkbox h-4 w-4"
+                    />
+                    <label for="schedule_followup_modal" class="text-sm font-medium text-slate-700">
+                        Schedule next follow-up
+                    </label>
                 </div>
 
-                <!-- Notes -->
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Notes/Summary *</label>
-                    <textarea
-                        v-model="form.notes"
-                        rows="3"
-                        required
-                        class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                        :placeholder="form.activity_type === 'appointment' ? 'Add appointment brief: customer need, pain point, what to sell, and any instructions for the agent.' : 'What was discussed? What was the outcome?'"
+                <div v-if="form.schedule_followup" class="rounded-card border border-warning-200 bg-warning-50 p-4">
+                    <label class="form-label" for="logactivitymodal-next-follow-up-date">Next Follow-up Date <span class="form-required" aria-hidden="true">*</span></label>
+                    <input id="logactivitymodal-next-follow-up-date"
+                        v-model="form.next_follow_up_at"
+                        type="datetime-local"
+                        :required="form.schedule_followup"
+                        class="form-input"
                     />
                 </div>
 
-                <!-- Outcome -->
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Outcome</label>
-                    <div class="flex flex-wrap gap-2">
-                        <label
-                            v-for="outcome in outcomes"
-                            :key="outcome.value"
-                            class="flex items-center gap-2 px-3 py-2.5 border-2 rounded-xl cursor-pointer transition-all min-h-[44px] touch-manipulation"
-                            :class="form.outcome === outcome.value ? outcome.activeClass : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'"
-                        >
-                            <input
-                                type="radio"
-                                v-model="form.outcome"
-                                :value="outcome.value"
-                                class="sr-only"
-                            />
-                            <span class="text-sm font-medium">{{ outcome.label }}</span>
-                        </label>
-                    </div>
+                <!-- Quick Schedule Buttons -->
+                <div v-if="form.schedule_followup" class="mt-3 flex flex-wrap gap-2">
+                    <BaseButton variant="outline" @click="setQuickFollowUp(1)">Tomorrow</BaseButton>
+                    <BaseButton variant="outline" @click="setQuickFollowUp(2)">In 2 days</BaseButton>
+                    <BaseButton variant="outline" @click="setQuickFollowUp(3)">In 3 days</BaseButton>
+                    <BaseButton variant="outline" @click="setQuickFollowUp(7)">In 1 week</BaseButton>
                 </div>
+            </div>
 
-                <!-- Schedule Next Follow-up -->
-                <div class="border-t border-slate-200 pt-4">
-                    <div class="flex items-center gap-2 mb-3">
-                        <input
-                            type="checkbox"
-                            v-model="form.schedule_followup"
-                            id="schedule_followup_modal"
-                            class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-                        />
-                        <label for="schedule_followup_modal" class="text-sm font-medium text-slate-700">
-                            Schedule next follow-up
-                        </label>
-                    </div>
+            <!-- Error Message -->
+            <p v-if="error" class="callout callout-danger" role="alert">
+                {{ error }}
+            </p>
+        </form>
 
-                    <div v-if="form.schedule_followup" class="p-4 bg-amber-50 rounded-xl border border-amber-200">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Next Follow-up Date *</label>
-                        <input
-                            v-model="form.next_follow_up_at"
-                            type="datetime-local"
-                            :required="form.schedule_followup"
-                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                        />
-                    </div>
-
-                    <!-- Quick Schedule Buttons -->
-                    <div v-if="form.schedule_followup" class="flex flex-wrap gap-2 mt-3">
-                        <button
-                            type="button"
-                            @click="setQuickFollowUp(1)"
-                            class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 touch-manipulation"
-                        >
-                            Tomorrow
-                        </button>
-                        <button
-                            type="button"
-                            @click="setQuickFollowUp(2)"
-                            class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 touch-manipulation"
-                        >
-                            In 2 days
-                        </button>
-                        <button
-                            type="button"
-                            @click="setQuickFollowUp(3)"
-                            class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 touch-manipulation"
-                        >
-                            In 3 days
-                        </button>
-                        <button
-                            type="button"
-                            @click="setQuickFollowUp(7)"
-                            class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 touch-manipulation"
-                        >
-                            In 1 week
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Error Message -->
-                <div v-if="error" class="text-sm text-red-600 bg-red-50 p-4 rounded-xl border border-red-200">
-                    {{ error }}
-                </div>
-
-                <!-- Buttons -->
-                <div class="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-slate-200">
-                    <button
-                        type="button"
-                        @click="$emit('close')"
-                        class="w-full sm:w-auto px-4 py-2.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        :disabled="loading"
-                        class="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 font-medium"
-                    >
-                        <svg v-if="loading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        {{ loading ? 'Saving...' : 'Log Activity' }}
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="$emit('close')">Cancel</BaseButton>
+            <BaseButton
+                variant="primary"
+                type="submit"
+                form="log-activity-form"
+                block-mobile
+                :loading="loading"
+            >
+                {{ loading ? 'Saving...' : 'Log Activity' }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
 import { computed, ref, onMounted, watch } from 'vue';
 import axios from 'axios';
+import { CalendarDaysIcon, InformationCircleIcon } from '@heroicons/vue/24/outline';
 import { useToastStore } from '@/stores/toast';
+import { BaseButton, BaseModal } from '@/components/base';
 
 const toast = useToastStore();
 const users = ref([]);
@@ -299,11 +256,15 @@ const activityTypes = [
 ];
 
 const outcomes = [
-    { value: 'positive', label: 'Positive', activeClass: 'border-green-500 bg-green-50 text-green-700' },
-    { value: 'neutral', label: 'Neutral', activeClass: 'border-blue-500 bg-blue-50 text-blue-700' },
-    { value: 'negative', label: 'Negative', activeClass: 'border-red-500 bg-red-50 text-red-700' },
+    { value: 'positive', label: 'Positive', activeClass: 'border-success-500 bg-success-50 text-success-700' },
+    { value: 'neutral', label: 'Neutral', activeClass: 'border-primary-500 bg-primary-50 text-primary-700' },
+    { value: 'negative', label: 'Negative', activeClass: 'border-danger-500 bg-danger-50 text-danger-700' },
     { value: 'no_answer', label: 'No Answer', activeClass: 'border-slate-500 bg-slate-100 text-slate-700' },
 ];
+
+const headerDescription = computed(
+    () => `${props.lead?.customer?.name || 'Customer'} — Lead #${props.lead?.id}`,
+);
 
 const leadProducts = computed(() => {
     const names = (props.lead?.items || [])
@@ -380,7 +341,7 @@ const handleSubmit = async () => {
 
     try {
         console.log('Logging activity for lead:', props.lead.id);
-        
+
         // Build meta object based on activity type
         const meta = {
             activity_at: form.value.activity_at,
@@ -420,7 +381,7 @@ const handleSubmit = async () => {
     } catch (err) {
         console.error('Error logging activity:', err);
         console.error('Response:', err.response);
-        
+
         if (err.response?.status === 404) {
             error.value = 'Lead not found. It may have been deleted.';
         } else if (err.response?.status === 422) {
@@ -441,4 +402,3 @@ const handleSubmit = async () => {
     }
 };
 </script>
-

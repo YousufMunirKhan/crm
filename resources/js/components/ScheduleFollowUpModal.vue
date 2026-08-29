@@ -1,46 +1,61 @@
 <template>
-    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div class="p-4 border-b border-slate-200 flex justify-between items-center">
-                <h2 class="text-lg font-semibold text-slate-900">Schedule Follow-up</h2>
-                <button type="button" @click="$emit('close')" class="p-2 text-slate-400 hover:text-slate-600 rounded-lg">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+    <BaseModal
+        :model-value="true"
+        title="Schedule Follow-up"
+        size="sm"
+        :close-on-backdrop="false"
+        @close="$emit('close')"
+    >
+        <form id="schedule-follow-up-form" class="space-y-4" @submit.prevent="handleSubmit">
+            <p v-if="lead" class="text-sm text-slate-600">{{ lead.customer?.name }} — Lead #{{ lead.id }}</p>
+
+            <div>
+                <label class="form-label" for="schedulefollowupmodal-date-time">
+                    Date &amp; time <span class="form-required" aria-hidden="true">*</span>
+                </label>
+                <input
+                    id="schedulefollowupmodal-date-time"
+                    v-model="form.next_follow_up_at"
+                    type="datetime-local"
+                    required
+                    class="form-input"
+                />
             </div>
-            <form @submit.prevent="handleSubmit" class="p-4 space-y-4">
-                <p v-if="lead" class="text-sm text-slate-600">{{ lead.customer?.name }} — Lead #{{ lead.id }}</p>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Date & time *</label>
-                    <input
-                        v-model="form.next_follow_up_at"
-                        type="datetime-local"
-                        required
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Note (optional)</label>
-                    <textarea
-                        v-model="form.comment"
-                        rows="2"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="e.g. Call back about quote"
-                    />
-                </div>
-                <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-                <div class="flex gap-2 justify-end pt-2">
-                    <button type="button" @click="$emit('close')" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
-                    <button type="submit" :disabled="loading" class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50">Schedule</button>
-                </div>
-            </form>
-        </div>
-    </div>
+
+            <div>
+                <label class="form-label" for="schedulefollowupmodal-note-optional">Note (optional)</label>
+                <textarea
+                    id="schedulefollowupmodal-note-optional"
+                    v-model="form.comment"
+                    rows="2"
+                    class="form-textarea"
+                    placeholder="e.g. Call back about quote"
+                />
+            </div>
+
+            <p v-if="error" class="callout callout-danger" role="alert">{{ error }}</p>
+        </form>
+
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="$emit('close')">Cancel</BaseButton>
+            <BaseButton
+                variant="primary"
+                type="submit"
+                form="schedule-follow-up-form"
+                block-mobile
+                :loading="loading"
+            >
+                Schedule
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
+import { BaseButton, BaseModal } from '@/components/base';
 
 const props = defineProps({ lead: { type: Object, default: null } });
 const emit = defineEmits(['saved', 'close']);

@@ -1,139 +1,134 @@
 <template>
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div class="p-6 border-b border-slate-200">
-                <h2 class="text-xl font-semibold text-slate-900">
-                    {{ customer ? 'Edit Customer' : 'Create New Customer' }}
-                </h2>
+    <BaseModal
+        :model-value="true"
+        :title="customer ? 'Edit Customer' : 'Create New Customer'"
+        size="md"
+        :close-on-backdrop="false"
+        @close="$emit('close')"
+    >
+        <form id="customer-form" class="space-y-4" @submit.prevent="handleSubmit">
+            <div class="form-grid-2">
+                <div>
+                    <label class="form-label" for="customerform-name">Name <span class="form-required" aria-hidden="true">*</span></label>
+                    <input id="customerform-name"
+                        v-model="form.name"
+                        type="text"
+                        required
+                        class="form-input"
+                    />
+                </div>
+
+                <div>
+                    <label class="form-label" for="customerform-phone">Phone <span class="form-required" aria-hidden="true">*</span></label>
+                    <input id="customerform-phone"
+                        v-model="form.phone"
+                        type="text"
+                        required
+                        class="form-input"
+                    />
+                </div>
+
+                <div>
+                    <label class="form-label" for="customerform-email">Email</label>
+                    <input id="customerform-email"
+                        v-model="form.email"
+                        type="email"
+                        class="form-input"
+                    />
+                </div>
+
+                <div>
+                    <label class="form-label" for="customerform-city">City</label>
+                    <input id="customerform-city"
+                        v-model="form.city"
+                        type="text"
+                        class="form-input"
+                    />
+                </div>
+
+                <div>
+                    <label class="form-label" for="customerform-postcode">Postcode</label>
+                    <input id="customerform-postcode"
+                        v-model="form.postcode"
+                        type="text"
+                        class="form-input"
+                    />
+                </div>
+
+                <div>
+                    <label class="form-label" for="customerform-vat-number">VAT Number</label>
+                    <input id="customerform-vat-number"
+                        v-model="form.vat_number"
+                        type="text"
+                        class="form-input"
+                    />
+                </div>
             </div>
 
-            <form @submit.prevent="handleSubmit" class="p-6 space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Name *</label>
-                        <input
-                            v-model="form.name"
-                            type="text"
-                            required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
+            <div>
+                <label class="form-label" for="customerform-address">Address</label>
+                <textarea id="customerform-address"
+                    v-model="form.address"
+                    rows="2"
+                    class="form-textarea"
+                />
+            </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Phone *</label>
-                        <input
-                            v-model="form.phone"
-                            type="text"
-                            required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
+            <div>
+                <label class="form-label" for="customerform-notes">Notes</label>
+                <textarea id="customerform-notes"
+                    v-model="form.notes"
+                    rows="3"
+                    class="form-textarea"
+                />
+            </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                        <input
-                            v-model="form.email"
-                            type="email"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">City</label>
-                        <input
-                            v-model="form.city"
-                            type="text"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Postcode</label>
-                        <input
-                            v-model="form.postcode"
-                            type="text"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">VAT Number</label>
-                        <input
-                            v-model="form.vat_number"
-                            type="text"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-                </div>
-
+            <div class="form-grid-2">
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Address</label>
-                    <textarea
-                        v-model="form.address"
-                        rows="2"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    <label class="form-label" for="customerform-latitude">Latitude</label>
+                    <input id="customerform-latitude"
+                        v-model="form.latitude"
+                        type="number"
+                        step="any"
+                        class="form-input"
                     />
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-                    <textarea
-                        v-model="form.notes"
-                        rows="3"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    <label class="form-label" for="customerform-longitude">Longitude</label>
+                    <input id="customerform-longitude"
+                        v-model="form.longitude"
+                        type="number"
+                        step="any"
+                        class="form-input"
                     />
                 </div>
+            </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Latitude</label>
-                        <input
-                            v-model="form.latitude"
-                            type="number"
-                            step="any"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
+            <p v-if="error" class="callout callout-danger" role="alert">
+                {{ error }}
+            </p>
+        </form>
 
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Longitude</label>
-                        <input
-                            v-model="form.longitude"
-                            type="number"
-                            step="any"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-                </div>
-
-                <div v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded">
-                    {{ error }}
-                </div>
-
-                <div class="flex justify-end gap-3 pt-4 border-t border-slate-200">
-                    <button
-                        type="button"
-                        @click="$emit('close')"
-                        class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        :disabled="loading"
-                        class="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
-                    >
-                        {{ loading ? 'Saving...' : (customer ? 'Update' : 'Create') }}
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="$emit('close')">Cancel</BaseButton>
+            <BaseButton
+                variant="primary"
+                type="submit"
+                form="customer-form"
+                block-mobile
+                :loading="loading"
+            >
+                {{ loading ? 'Saving...' : (customer ? 'Update' : 'Create') }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import { BaseButton, BaseModal } from '@/components/base';
 
 const props = defineProps({
     customer: {
@@ -187,7 +182,7 @@ const handleSubmit = async () => {
         } else {
             await axios.post('/api/customers', payload);
         }
-        
+
         // Reset form
         form.value = {
             name: '',
@@ -201,7 +196,7 @@ const handleSubmit = async () => {
             latitude: null,
             longitude: null,
         };
-        
+
         emit('saved');
         emit('close');
     } catch (err) {

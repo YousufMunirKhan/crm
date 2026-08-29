@@ -5,29 +5,26 @@
         :badge="salaryReportsBadge"
     >
         <template #actions>
-            <button
-                type="button"
-                :disabled="loading"
-                class="listing-btn-primary w-full sm:w-auto disabled:opacity-50"
-                @click="exportReport"
-            >
+            <BaseButton variant="outline" block-mobile :disabled="loading" @click="exportReport">
+                <template #icon><ArrowDownTrayIcon class="icon" aria-hidden="true" /></template>
                 Export CSV
-            </button>
+            </BaseButton>
         </template>
 
         <template #filters>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                 <div>
-                    <label class="listing-label">From month</label>
-                    <input v-model="filters.from_month" type="month" class="listing-input" />
+                    <label class="form-label" for="salaryreportsview-from-month">From month</label>
+                    <input id="salaryreportsview-from-month" v-model="filters.from_month" type="month" class="form-input" />
                 </div>
                 <div>
-                    <label class="listing-label">To month</label>
-                    <input v-model="filters.to_month" type="month" class="listing-input" />
+                    <label class="form-label" for="salaryreportsview-to-month">To month</label>
+                    <input id="salaryreportsview-to-month" v-model="filters.to_month" type="month" class="form-input" />
                 </div>
                 <div>
-                    <label class="listing-label">Employee</label>
-                    <select v-model="filters.user_id" class="listing-input">
+                    <label class="form-label" for="salaryreportsview-employee">Employee</label>
+                    <!-- Native select: user_id is a number and goes straight into the request params. -->
+                    <select id="salaryreportsview-employee" v-model="filters.user_id" class="form-select">
                         <option value="">All employees</option>
                         <option v-for="user in users" :key="user.id" :value="user.id">
                             {{ user.name }} ({{ user.role?.name || 'N/A' }})
@@ -35,8 +32,8 @@
                     </select>
                 </div>
                 <div>
-                    <label class="listing-label">Currency</label>
-                    <select v-model="filters.currency" class="listing-input">
+                    <label class="form-label" for="salaryreportsview-currency">Currency</label>
+                    <select id="salaryreportsview-currency" v-model="filters.currency" class="form-select">
                         <option value="">All currencies</option>
                         <option value="GBP">GBP (£)</option>
                         <option value="PKR">PKR (Rs)</option>
@@ -44,62 +41,59 @@
                 </div>
             </div>
             <div class="mt-4 flex flex-wrap gap-2">
-                <button type="button" :disabled="loading" class="listing-btn-primary disabled:opacity-50" @click="loadReport">
+                <BaseButton variant="primary" :loading="loading" @click="loadReport">
+                    <template #icon><ChartBarIcon class="icon" aria-hidden="true" /></template>
                     {{ loading ? 'Loading…' : 'Generate report' }}
-                </button>
-                <button type="button" class="listing-btn-outline" @click="resetFilters">Reset</button>
+                </BaseButton>
+                <BaseButton variant="outline" @click="resetFilters">
+                    <template #icon><ArrowPathIcon class="icon" aria-hidden="true" /></template>
+                    Reset
+                </BaseButton>
             </div>
         </template>
 
-        <div v-if="loading" class="px-5 py-14 flex justify-center">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+        <div v-if="loading" class="px-5 py-14 flex justify-center text-slate-500" aria-busy="true">
+            <span class="spinner" role="status" aria-label="Loading" />
         </div>
 
         <div v-if="report && !loading" class="grid grid-cols-1 md:grid-cols-4 gap-4 px-3 sm:px-5">
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <div class="text-sm text-slate-600 mb-1">Total Salaries</div>
-                <div class="text-2xl font-bold text-slate-900">{{ report.summary.total_salaries }}</div>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <div class="text-sm text-slate-600 mb-1">Total Employees</div>
-                <div class="text-2xl font-bold text-slate-900">{{ report.summary.total_employees }}</div>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <div class="text-sm text-slate-600 mb-1">Total GBP</div>
-                <div class="text-2xl font-bold text-green-600">£{{ formatNumber(report.summary.total_gbp) }}</div>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <div class="text-sm text-slate-600 mb-1">Total PKR</div>
-                <div class="text-2xl font-bold text-blue-600">Rs{{ formatNumber(report.summary.total_pkr) }}</div>
-            </div>
+            <StatCard label="Total salaries" :value="report.summary.total_salaries" tone="neutral">
+                <template #icon><DocumentTextIcon class="icon" aria-hidden="true" /></template>
+            </StatCard>
+            <StatCard label="Total employees" :value="report.summary.total_employees" tone="primary">
+                <template #icon><UsersIcon class="icon" aria-hidden="true" /></template>
+            </StatCard>
+            <StatCard label="Total GBP" :value="`£${formatNumber(report.summary.total_gbp)}`" tone="success">
+                <template #icon><CurrencyPoundIcon class="icon" aria-hidden="true" /></template>
+            </StatCard>
+            <StatCard label="Total PKR" :value="`Rs${formatNumber(report.summary.total_pkr)}`" tone="primary">
+                <template #icon><BanknotesIcon class="icon" aria-hidden="true" /></template>
+            </StatCard>
         </div>
 
-        <div v-if="report && !loading" class="mx-3 sm:mx-5 mb-4 rounded-xl border border-slate-200 bg-slate-50/30 p-5 sm:p-6">
-            <h2 class="text-lg font-semibold text-slate-900 mb-4">Monthly Breakdown</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead>
-                        <tr class="border-b border-slate-200">
-                            <th class="text-left py-3 px-4 text-sm font-semibold text-slate-700">Month</th>
-                            <th class="text-right py-3 px-4 text-sm font-semibold text-slate-700">Count</th>
-                            <th class="text-right py-3 px-4 text-sm font-semibold text-slate-700">Total GBP</th>
-                            <th class="text-right py-3 px-4 text-sm font-semibold text-slate-700">Total PKR</th>
+        <div v-if="report && !loading" class="mx-3 sm:mx-5 mb-4 card card-body">
+            <h2 class="card-title mb-4">Monthly breakdown</h2>
+            <div class="table-wrap">
+                <table class="table">
+                    <caption class="sr-only">Salary totals for each month in the selected range</caption>
+                    <thead class="table-thead">
+                        <tr>
+                            <th scope="col" class="table-th">Month</th>
+                            <th scope="col" class="table-th-num">Count</th>
+                            <th scope="col" class="table-th-num">Total GBP</th>
+                            <th scope="col" class="table-th-num">Total PKR</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr
-                            v-for="(data, month) in report.monthly"
-                            :key="month"
-                            class="border-b border-slate-100 hover:bg-slate-50"
-                        >
-                            <td class="py-3 px-4 text-sm text-slate-900">
+                        <tr v-for="(data, month) in report.monthly" :key="month" class="table-row">
+                            <td class="table-td-strong">
                                 {{ formatMonth(month) }}
                             </td>
-                            <td class="py-3 px-4 text-sm text-slate-600 text-right">{{ data.count }}</td>
-                            <td class="py-3 px-4 text-sm text-green-600 text-right font-semibold">
+                            <td class="table-td-num">{{ data.count }}</td>
+                            <td class="table-td-num text-success-700 font-semibold">
                                 £{{ formatNumber(data.total_gbp) }}
                             </td>
-                            <td class="py-3 px-4 text-sm text-blue-600 text-right font-semibold">
+                            <td class="table-td-num text-primary-700 font-semibold">
                                 Rs{{ formatNumber(data.total_pkr) }}
                             </td>
                         </tr>
@@ -109,34 +103,31 @@
         </div>
 
         <!-- By Employee -->
-        <div v-if="report && !loading" class="bg-white rounded-xl shadow-sm p-6">
-            <h2 class="text-lg font-semibold text-slate-900 mb-4">By Employee</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead>
-                        <tr class="border-b border-slate-200">
-                            <th class="text-left py-3 px-4 text-sm font-semibold text-slate-700">Employee Name</th>
-                            <th class="text-left py-3 px-4 text-sm font-semibold text-slate-700">Designation</th>
-                            <th class="text-right py-3 px-4 text-sm font-semibold text-slate-700">Total Salaries</th>
-                            <th class="text-right py-3 px-4 text-sm font-semibold text-slate-700">Total GBP</th>
-                            <th class="text-right py-3 px-4 text-sm font-semibold text-slate-700">Total PKR</th>
+        <div v-if="report && !loading" class="mx-3 sm:mx-5 mb-4 card card-body">
+            <h2 class="card-title mb-4">By employee</h2>
+            <div class="table-wrap">
+                <table class="table">
+                    <caption class="sr-only">Salary totals for each employee in the selected range</caption>
+                    <thead class="table-thead">
+                        <tr>
+                            <th scope="col" class="table-th">Employee name</th>
+                            <th scope="col" class="table-th">Designation</th>
+                            <th scope="col" class="table-th-num">Total salaries</th>
+                            <th scope="col" class="table-th-num">Total GBP</th>
+                            <th scope="col" class="table-th-num">Total PKR</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr
-                            v-for="employee in report.by_employee"
-                            :key="employee.user_id"
-                            class="border-b border-slate-100 hover:bg-slate-50"
-                        >
-                            <td class="py-3 px-4 text-sm text-slate-900 font-medium">
+                        <tr v-for="employee in report.by_employee" :key="employee.user_id" class="table-row">
+                            <td class="table-td-strong">
                                 {{ employee.user_name }}
                             </td>
-                            <td class="py-3 px-4 text-sm text-slate-600">{{ employee.user_role }}</td>
-                            <td class="py-3 px-4 text-sm text-slate-600 text-right">{{ employee.total_salaries }}</td>
-                            <td class="py-3 px-4 text-sm text-green-600 text-right font-semibold">
+                            <td class="table-td">{{ employee.user_role }}</td>
+                            <td class="table-td-num">{{ employee.total_salaries }}</td>
+                            <td class="table-td-num text-success-700 font-semibold">
                                 £{{ formatNumber(employee.total_gbp) }}
                             </td>
-                            <td class="py-3 px-4 text-sm text-blue-600 text-right font-semibold">
+                            <td class="table-td-num text-primary-700 font-semibold">
                                 Rs{{ formatNumber(employee.total_pkr) }}
                             </td>
                         </tr>
@@ -145,46 +136,44 @@
             </div>
         </div>
 
-        <div v-if="report && !loading" class="mx-3 sm:mx-5 mb-4 rounded-xl border border-slate-200 bg-slate-50/30 p-5 sm:p-6">
-            <h2 class="text-lg font-semibold text-slate-900 mb-4">Detailed Salary List</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead>
-                        <tr class="border-b border-slate-200">
-                            <th class="text-left py-3 px-4 text-sm font-semibold text-slate-700">Payslip #</th>
-                            <th class="text-left py-3 px-4 text-sm font-semibold text-slate-700">Employee</th>
-                            <th class="text-left py-3 px-4 text-sm font-semibold text-slate-700">Designation</th>
-                            <th class="text-left py-3 px-4 text-sm font-semibold text-slate-700">Month</th>
-                            <th class="text-right py-3 px-4 text-sm font-semibold text-slate-700">Base Salary</th>
-                            <th class="text-right py-3 px-4 text-sm font-semibold text-slate-700">Allowances</th>
-                            <th class="text-right py-3 px-4 text-sm font-semibold text-slate-700">Net Salary</th>
-                            <th class="text-center py-3 px-4 text-sm font-semibold text-slate-700">Currency</th>
+        <div v-if="report && !loading" class="mx-3 sm:mx-5 mb-4 card card-body">
+            <h2 class="card-title mb-4">Detailed salary list</h2>
+            <div class="table-wrap">
+                <table class="table">
+                    <caption class="sr-only">Every payslip matching the current filters</caption>
+                    <thead class="table-thead">
+                        <tr>
+                            <th scope="col" class="table-th">Payslip #</th>
+                            <th scope="col" class="table-th">Employee</th>
+                            <th scope="col" class="table-th">Designation</th>
+                            <th scope="col" class="table-th">Month</th>
+                            <th scope="col" class="table-th-num">Base salary</th>
+                            <th scope="col" class="table-th-num">Allowances</th>
+                            <th scope="col" class="table-th-num">Net salary</th>
+                            <th scope="col" class="table-th text-center">Currency</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr
-                            v-for="salary in report.salaries"
-                            :key="salary.id"
-                            class="border-b border-slate-100 hover:bg-slate-50"
-                        >
-                            <td class="py-3 px-4 text-sm text-slate-600">
+                        <tr v-for="salary in report.salaries" :key="salary.id" class="table-row">
+                            <td class="table-td">
                                 PS-{{ String(salary.id).padStart(4, '0') }}
                             </td>
-                            <td class="py-3 px-4 text-sm text-slate-900 font-medium">{{ salary.user_name }}</td>
-                            <td class="py-3 px-4 text-sm text-slate-600">{{ salary.user_role }}</td>
-                            <td class="py-3 px-4 text-sm text-slate-600">{{ formatMonth(salary.month) }}</td>
-                            <td class="py-3 px-4 text-sm text-slate-600 text-right">
+                            <td class="table-td-strong">{{ salary.user_name }}</td>
+                            <td class="table-td">{{ salary.user_role }}</td>
+                            <td class="table-td">{{ formatMonth(salary.month) }}</td>
+                            <td class="table-td-num">
                                 {{ getCurrencySymbol(salary.currency) }}{{ formatNumber(salary.base_salary) }}
                             </td>
-                            <td class="py-3 px-4 text-sm text-slate-600 text-right">
+                            <td class="table-td-num">
                                 {{ getCurrencySymbol(salary.currency) }}{{ formatNumber(salary.allowances || 0) }}
                             </td>
-                            <td class="py-3 px-4 text-sm font-semibold text-right"
-                                :class="salary.currency === 'GBP' ? 'text-green-600' : 'text-blue-600'"
+                            <td
+                                class="table-td-num font-semibold"
+                                :class="salary.currency === 'GBP' ? 'text-success-700' : 'text-primary-700'"
                             >
                                 {{ getCurrencySymbol(salary.currency) }}{{ formatNumber(salary.net_salary) }}
                             </td>
-                            <td class="py-3 px-4 text-sm text-slate-600 text-center">{{ salary.currency }}</td>
+                            <td class="table-td text-center">{{ salary.currency }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -196,8 +185,18 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
+import {
+    ArrowDownTrayIcon,
+    ArrowPathIcon,
+    BanknotesIcon,
+    ChartBarIcon,
+    CurrencyPoundIcon,
+    DocumentTextIcon,
+    UsersIcon,
+} from '@heroicons/vue/24/outline';
 import { useToastStore } from '@/stores/toast';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseButton, StatCard } from '@/components/base';
 
 const toast = useToastStore();
 const loading = ref(false);

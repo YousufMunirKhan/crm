@@ -8,47 +8,51 @@
                 </p>
             </div>
             <div class="flex gap-3">
-                <button
-                    @click="syncTemplates"
-                    :disabled="syncing"
-                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm"
-                >
-                    {{ syncing ? 'Syncing...' : '🔄 Sync from Meta' }}
-                </button>
-                <button
-                    @click="showCreateModal = true"
-                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm"
-                >
-                    + Create Template
-                </button>
+                <BaseButton variant="outline" :loading="syncing" @click="syncTemplates">
+                    <template #icon><ArrowPathIcon class="icon" aria-hidden="true" /></template>
+                    {{ syncing ? 'Syncing...' : 'Sync from Meta' }}
+                </BaseButton>
+                <BaseButton variant="primary" @click="showCreateModal = true">
+                    <template #icon><PlusIcon class="icon" aria-hidden="true" /></template>
+                    Create Template
+                </BaseButton>
             </div>
         </div>
 
         <!-- Filters -->
-        <div class="bg-white rounded-xl shadow-sm p-4 flex gap-4">
-            <select
-                v-model="filters.status"
-                class="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-                <option value="">All Status</option>
-                <option value="PENDING">Pending</option>
-                <option value="APPROVED">Approved</option>
-                <option value="REJECTED">Rejected</option>
-            </select>
-            <select
-                v-model="filters.category"
-                class="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-                <option value="">All Categories</option>
-                <option value="TRANSACTIONAL">Transactional</option>
-                <option value="MARKETING">Marketing</option>
-            </select>
+        <div class="bg-white rounded-xl shadow-sm p-4 flex flex-wrap gap-4">
+            <div class="min-w-[12rem]">
+                <label class="form-label" for="whatsapptemplatesview-filter-status">Status</label>
+                <select
+                    id="whatsapptemplatesview-filter-status"
+                    v-model="filters.status"
+                    class="form-select"
+                >
+                    <option value="">All Status</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="APPROVED">Approved</option>
+                    <option value="REJECTED">Rejected</option>
+                </select>
+            </div>
+            <div class="min-w-[12rem]">
+                <label class="form-label" for="whatsapptemplatesview-filter-category">Category</label>
+                <select
+                    id="whatsapptemplatesview-filter-category"
+                    v-model="filters.category"
+                    class="form-select"
+                >
+                    <option value="">All Categories</option>
+                    <option value="TRANSACTIONAL">Transactional</option>
+                    <option value="MARKETING">Marketing</option>
+                </select>
+            </div>
         </div>
 
         <!-- Templates Table -->
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden overflow-x-auto">
-            <div v-if="loading" class="flex justify-center py-12">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden overflow-x-auto" :aria-busy="loading ? 'true' : 'false'">
+            <div v-if="loading" class="flex justify-center py-12" role="status" aria-live="polite">
+                <span class="spinner w-8 h-8 text-slate-600" aria-hidden="true" />
+                <span class="sr-only">Loading templates…</span>
             </div>
             <div v-else-if="templates.length === 0" class="p-12 text-center text-slate-500">
                 No templates found. Create your first template to get started.
@@ -75,17 +79,10 @@
                         <td class="px-6 py-4 text-sm text-slate-600">{{ template.category }}</td>
                         <td class="px-6 py-4 text-sm text-slate-600">{{ template.language }}</td>
                         <td class="px-6 py-4">
-                            <span
-                                class="px-2 py-1 text-xs font-medium rounded-full"
-                                :class="{
-                                    'bg-yellow-100 text-yellow-800': template.status === 'PENDING',
-                                    'bg-green-100 text-green-800': template.status === 'APPROVED',
-                                    'bg-red-100 text-red-800': template.status === 'REJECTED',
-                                }"
-                            >
+                            <BaseBadge :tone="templateTone(template.status)">
                                 {{ formatApiEnumLabel(template.status) }}
-                            </span>
-                            <div v-if="template.rejection_reason" class="text-xs text-red-600 mt-1">
+                            </BaseBadge>
+                            <div v-if="template.rejection_reason" class="text-xs text-danger-700 mt-1">
                                 {{ template.rejection_reason }}
                             </div>
                         </td>
@@ -94,19 +91,19 @@
                         </td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex justify-end gap-2">
-                                <button
+                                <BaseButton
                                     v-if="template.status === 'REJECTED'"
+                                    size="sm"
+                                    variant="soft"
                                     @click="resubmitTemplate(template.id)"
-                                    class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
                                 >
+                                    <template #icon><ArrowPathIcon class="icon-sm" aria-hidden="true" /></template>
                                     Resubmit
-                                </button>
-                                <button
-                                    @click="viewTemplate(template)"
-                                    class="px-3 py-1 text-xs bg-slate-600 text-white rounded hover:bg-slate-700"
-                                >
+                                </BaseButton>
+                                <BaseButton size="sm" variant="outline" @click="viewTemplate(template)">
+                                    <template #icon><EyeIcon class="icon-sm" aria-hidden="true" /></template>
                                     View
-                                </button>
+                                </BaseButton>
                             </div>
                         </td>
                     </tr>
@@ -115,173 +112,163 @@
         </div>
 
         <!-- Create Template Modal -->
-        <div v-if="showCreateModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                <div class="p-6 border-b border-slate-200">
-                    <h2 class="text-xl font-bold text-slate-900">Create WhatsApp Template</h2>
-                </div>
-                <div class="p-6 space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Template Name *</label>
-                        <input
-                            v-model="newTemplate.name"
-                            type="text"
-                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="hello_world"
-                        >
-                        <p class="text-xs text-slate-500 mt-1">Lowercase, underscores only. Must be unique.</p>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Category *</label>
-                            <select
-                                v-model="newTemplate.category"
-                                class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="TRANSACTIONAL">Transactional</option>
-                                <option value="MARKETING">Marketing</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Language</label>
-                            <input
-                                v-model="newTemplate.language"
-                                type="text"
-                                class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="en_US"
-                            >
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Body Text *</label>
-                        <textarea
-                            v-model="newTemplate.bodyText"
-                            rows="4"
-                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Hello {{1}}, welcome to our service!"
-                        ></textarea>
-                        <p class="text-xs text-slate-500 mt-1" v-pre>
-                            Use {{1}}, {{2}} for variables — the CRM adds sample examples for Meta automatically. Named fields (e.g. {{name}}) are better created in Meta Business Suite, then sync here.
-                        </p>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Footer (optional)</label>
-                        <input
-                            v-model="newTemplate.footerText"
-                            type="text"
-                            maxlength="60"
-                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Reply STOP to opt out"
-                        >
-                        <p class="text-xs text-slate-500 mt-1">Max 60 characters — no variables in footer.</p>
-                    </div>
-                </div>
-                <div class="p-6 border-t border-slate-200 flex justify-end gap-3">
-                    <button
-                        @click="showCreateModal = false"
-                        class="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50"
+        <BaseModal
+            v-model="showCreateModal"
+            title="Create WhatsApp Template"
+            size="md"
+            :close-on-backdrop="false"
+        >
+            <form id="whatsapp-create-template-form" class="space-y-4" novalidate @submit.prevent="createTemplate">
+                <div>
+                    <label class="form-label" for="whatsapptemplatesview-template-name">Template Name <span class="form-required">*</span></label>
+                    <input id="whatsapptemplatesview-template-name"
+                        v-model="newTemplate.name"
+                        type="text"
+                        class="form-input"
+                        placeholder="hello_world"
                     >
-                        Cancel
-                    </button>
-                    <button
-                        @click="createTemplate"
-                        :disabled="creating"
-                        class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
-                    >
-                        {{ creating ? 'Creating...' : 'Create Template' }}
-                    </button>
+                    <p class="form-hint">Lowercase, underscores only. Must be unique.</p>
                 </div>
-            </div>
-        </div>
+                <div class="form-grid-2">
+                    <div>
+                        <label class="form-label" for="whatsapptemplatesview-category">Category <span class="form-required">*</span></label>
+                        <select id="whatsapptemplatesview-category"
+                            v-model="newTemplate.category"
+                            class="form-select"
+                        >
+                            <option value="TRANSACTIONAL">Transactional</option>
+                            <option value="MARKETING">Marketing</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" for="whatsapptemplatesview-language">Language</label>
+                        <input id="whatsapptemplatesview-language"
+                            v-model="newTemplate.language"
+                            type="text"
+                            class="form-input"
+                            placeholder="en_US"
+                        >
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label" for="whatsapptemplatesview-body-text">Body Text <span class="form-required">*</span></label>
+                    <textarea id="whatsapptemplatesview-body-text"
+                        v-model="newTemplate.bodyText"
+                        rows="4"
+                        class="form-textarea"
+                        placeholder="Hello {{1}}, welcome to our service!"
+                    ></textarea>
+                    <p class="form-hint" v-pre>
+                        Use {{1}}, {{2}} for variables — the CRM adds sample examples for Meta automatically. Named fields (e.g. {{name}}) are better created in Meta Business Suite, then sync here.
+                    </p>
+                </div>
+                <div>
+                    <label class="form-label" for="whatsapptemplatesview-footer-optional">Footer (optional)</label>
+                    <input id="whatsapptemplatesview-footer-optional"
+                        v-model="newTemplate.footerText"
+                        type="text"
+                        maxlength="60"
+                        class="form-input"
+                        placeholder="Reply STOP to opt out"
+                    >
+                    <p class="form-hint">Max 60 characters — no variables in footer.</p>
+                </div>
+            </form>
+
+            <template #actions>
+                <BaseButton variant="outline" block-mobile @click="showCreateModal = false">Cancel</BaseButton>
+                <BaseButton
+                    variant="soft"
+                    type="submit"
+                    form="whatsapp-create-template-form"
+                    block-mobile
+                    :loading="creating"
+                >{{ creating ? 'Creating...' : 'Create Template' }}</BaseButton>
+            </template>
+        </BaseModal>
 
         <!-- View / Preview modal -->
-        <div v-if="viewingTemplate" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div class="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[92vh] overflow-y-auto">
-                <div class="p-6 border-b border-slate-200 flex justify-between items-start gap-4">
+        <BaseModal
+            :model-value="!!viewingTemplate"
+            :title="viewingTemplate?.name || ''"
+            :description="viewDescription"
+            size="lg"
+            @close="closeViewModal"
+        >
+            <div v-if="viewingTemplate" class="space-y-4">
+                <p class="text-sm text-slate-600">
+                    Below is what this CRM builds for Meta’s <code class="text-xs bg-slate-100 px-1 rounded">/messages</code> call.
+                    Adjust sample variables and recipient, then refresh preview.
+                </p>
+                <div class="form-grid-2">
                     <div>
-                        <h2 class="text-xl font-bold text-slate-900">{{ viewingTemplate.name }}</h2>
-                        <p class="text-sm text-slate-500 mt-1">
-                            {{ formatApiEnumLabel(viewingTemplate.status) }} · {{ viewingTemplate.language }} · {{ formatApiEnumLabel(viewingTemplate.category) }}
-                        </p>
+                        <label class="form-label" for="whatsapptemplatesview-sample-to-number-e-164-optional">Sample “to” number (E.164, optional)</label>
+                        <input id="whatsapptemplatesview-sample-to-number-e-164-optional"
+                            v-model="previewSampleTo"
+                            type="text"
+                            class="form-input"
+                            placeholder="447700900123"
+                            @change="runPreview"
+                        >
                     </div>
-                    <button type="button" class="text-slate-500 hover:text-slate-800 text-2xl leading-none" @click="closeViewModal" aria-label="Close">×</button>
+                    <div>
+                        <p class="form-label">Parameter format (from sync)</p>
+                        <div class="text-sm text-slate-800 py-2">{{ viewingTemplate.parameter_format || '—' }}</div>
+                    </div>
                 </div>
-                <div class="p-6 space-y-4">
-                    <p class="text-sm text-slate-600">
-                        Below is what this CRM builds for Meta’s <code class="text-xs bg-slate-100 px-1 rounded">/messages</code> call.
-                        Adjust sample variables and recipient, then refresh preview.
-                    </p>
-                    <div class="grid sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Sample “to” number (E.164, optional)</label>
-                            <input
-                                v-model="previewSampleTo"
-                                type="text"
-                                class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
-                                placeholder="447700900123"
-                                @change="runPreview"
-                            >
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Parameter format (from sync)</label>
-                            <div class="text-sm text-slate-800 py-2">{{ viewingTemplate.parameter_format || '—' }}</div>
-                        </div>
+                <div>
+                    <label class="form-label" for="whatsapptemplatesview-preview-params">
+                        <span v-pre>template_params</span> (JSON: <span v-pre>["val1","val2"]</span> for positional, or <span v-pre>{"name":"x"}</span> for named)
+                    </label>
+                    <textarea
+                        id="whatsapptemplatesview-preview-params"
+                        v-model="previewParamsJson"
+                        rows="3"
+                        class="form-textarea font-mono"
+                        placeholder='["Alice","Tuesday"] or {"customer_name":"Alice"}'
+                        @keydown.ctrl.enter="runPreview"
+                    ></textarea>
+                </div>
+                <BaseButton variant="soft" :loading="previewLoading" @click="runPreview">
+                    <template #icon><ArrowPathIcon class="icon" aria-hidden="true" /></template>
+                    {{ previewLoading ? 'Loading…' : 'Refresh preview' }}
+                </BaseButton>
+                <div v-if="previewError" class="callout callout-danger" role="alert">{{ previewError }}</div>
+                <div v-if="previewResult" class="space-y-4 border-t border-slate-200 pt-4">
+                    <p class="text-xs text-slate-500">{{ previewResult.sample_to_note }}</p>
+                    <div v-if="previewResult.header_preview" class="rounded-card bg-slate-50 border border-slate-200 p-3">
+                        <div class="text-eyebrow text-slate-500 uppercase mb-1">Header preview</div>
+                        <div class="text-sm text-slate-900 whitespace-pre-wrap">{{ previewResult.header_preview }}</div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">
-                            <span v-pre>template_params</span> (JSON: <span v-pre>["val1","val2"]</span> for positional, or <span v-pre>{"name":"x"}</span> for named)
-                        </label>
-                        <textarea
-                            v-model="previewParamsJson"
-                            rows="3"
-                            class="w-full px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg"
-                            placeholder='["Alice","Tuesday"] or {"customer_name":"Alice"}'
-                            @keydown.ctrl.enter="runPreview"
-                        ></textarea>
+                    <div class="rounded-card bg-success-50 border border-success-200 p-3">
+                        <div class="text-eyebrow text-success-800 uppercase mb-1">Body preview (as filled by CRM)</div>
+                        <div class="text-sm text-slate-900 whitespace-pre-wrap">{{ previewResult.body_preview || '(no body text)' }}</div>
                     </div>
-                    <button
-                        type="button"
-                        class="px-4 py-2 bg-slate-900 text-white text-sm rounded-lg hover:bg-slate-800 disabled:opacity-50"
-                        :disabled="previewLoading"
-                        @click="runPreview"
-                    >
-                        {{ previewLoading ? 'Loading…' : 'Refresh preview' }}
-                    </button>
-                    <div v-if="previewError" class="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{{ previewError }}</div>
-                    <div v-if="previewResult" class="space-y-4 border-t border-slate-200 pt-4">
-                        <p class="text-xs text-slate-500">{{ previewResult.sample_to_note }}</p>
-                        <div v-if="previewResult.header_preview" class="rounded-lg bg-slate-50 border border-slate-200 p-3">
-                            <div class="text-xs font-semibold text-slate-500 uppercase mb-1">Header preview</div>
-                            <div class="text-sm text-slate-900 whitespace-pre-wrap">{{ previewResult.header_preview }}</div>
-                        </div>
-                        <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-3">
-                            <div class="text-xs font-semibold text-emerald-800 uppercase mb-1">Body preview (as filled by CRM)</div>
-                            <div class="text-sm text-slate-900 whitespace-pre-wrap">{{ previewResult.body_preview || '(no body text)' }}</div>
-                        </div>
-                        <div v-if="previewResult.url_button_dynamic_note" class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded p-2">
-                            {{ previewResult.url_button_dynamic_note }}
-                        </div>
-                        <details open class="text-sm">
-                            <summary class="cursor-pointer font-medium text-slate-700">graph_payload (exact JSON)</summary>
-                            <pre class="mt-2 p-3 bg-slate-900 text-emerald-100 text-xs rounded-lg overflow-x-auto whitespace-pre-wrap break-all">{{ JSON.stringify(previewResult.graph_payload, null, 2) }}</pre>
-                        </details>
+                    <div v-if="previewResult.url_button_dynamic_note" class="callout callout-warning">
+                        {{ previewResult.url_button_dynamic_note }}
                     </div>
-                    <div v-if="viewingTemplate.components_json?.length" class="border-t border-slate-200 pt-4">
-                        <details class="text-sm">
-                            <summary class="cursor-pointer font-medium text-slate-700">Stored components (from CRM / Meta sync)</summary>
-                            <pre class="mt-2 p-3 bg-slate-50 text-xs rounded-lg overflow-x-auto whitespace-pre-wrap break-all">{{ JSON.stringify(viewingTemplate.components_json, null, 2) }}</pre>
-                        </details>
-                    </div>
+                    <details open class="text-sm">
+                        <summary class="cursor-pointer font-medium text-slate-700">graph_payload (exact JSON)</summary>
+                        <pre class="mt-2 p-3 bg-slate-900 text-success-100 text-xs rounded-card overflow-x-auto whitespace-pre-wrap break-all">{{ JSON.stringify(previewResult.graph_payload, null, 2) }}</pre>
+                    </details>
+                </div>
+                <div v-if="viewingTemplate.components_json?.length" class="border-t border-slate-200 pt-4">
+                    <details class="text-sm">
+                        <summary class="cursor-pointer font-medium text-slate-700">Stored components (from CRM / Meta sync)</summary>
+                        <pre class="mt-2 p-3 bg-slate-50 text-xs rounded-card overflow-x-auto whitespace-pre-wrap break-all">{{ JSON.stringify(viewingTemplate.components_json, null, 2) }}</pre>
+                    </details>
                 </div>
             </div>
-        </div>
+        </BaseModal>
     </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
+import { ArrowPathIcon, EyeIcon, PlusIcon } from '@heroicons/vue/24/outline';
 import { useToastStore } from '@/stores/toast';
+import { BaseBadge, BaseButton, BaseModal } from '@/components/base';
 import { formatApiEnumLabel } from '@/utils/displayFormat';
 import { formatDateUsDisplay } from '@/utils/dateFormatUi';
 
@@ -313,6 +300,19 @@ const previewResult = ref(null);
 const previewLoading = ref(false);
 const previewError = ref(null);
 
+const viewDescription = computed(() => {
+    if (!viewingTemplate.value) return '';
+    const t = viewingTemplate.value;
+    return `${formatApiEnumLabel(t.status)} · ${t.language} · ${formatApiEnumLabel(t.category)}`;
+});
+
+function templateTone(status) {
+    if (status === 'APPROVED') return 'success';
+    if (status === 'REJECTED') return 'danger';
+    if (status === 'PENDING') return 'warning';
+    return 'neutral';
+}
+
 function slugTemplateName(raw) {
     return raw
         .trim()
@@ -328,7 +328,7 @@ const loadTemplates = async () => {
         const params = new URLSearchParams();
         if (filters.status) params.append('status', filters.status);
         if (filters.category) params.append('category', filters.category);
-        
+
         const response = await axios.get(`/api/whatsapp/templates?${params.toString()}`);
         templates.value = response.data.data || response.data;
     } catch (error) {
@@ -492,4 +492,3 @@ onMounted(() => {
     loadTemplates();
 });
 </script>
-

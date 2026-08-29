@@ -7,187 +7,210 @@
         <template #filters>
             <div class="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
                 <div>
-                    <label class="listing-label">Month</label>
+                    <label class="form-label" for="reporttargetachievementview-month">Month</label>
                     <div class="flex items-center gap-2">
-                        <button type="button" class="listing-btn-outline px-3 py-2" title="Previous month" @click="shiftMonth(-1)">‹</button>
-                        <select v-model="selectedMonth" class="listing-input flex-1 min-w-[10rem]" @change="loadData">
+                        <BaseButton
+                            variant="outline"
+                            size="icon"
+                            type="button"
+                            label="Previous month"
+                            title="Previous month"
+                            @click="shiftMonth(-1)"
+                        >
+                            <template #icon>
+                                <ChevronLeftIcon class="icon" aria-hidden="true" />
+                            </template>
+                        </BaseButton>
+                        <select id="reporttargetachievementview-month" v-model="selectedMonth" class="form-select flex-1 min-w-[10rem]" @change="loadData">
                             <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
                         </select>
-                        <button
+                        <BaseButton
+                            variant="outline"
+                            size="icon"
                             type="button"
-                            class="listing-btn-outline px-3 py-2"
+                            label="Next month"
                             title="Next month"
                             :disabled="selectedMonth === monthOptions[0]?.value"
                             @click="shiftMonth(1)"
                         >
-                            ›
-                        </button>
+                            <template #icon>
+                                <ChevronRightIcon class="icon" aria-hidden="true" />
+                            </template>
+                        </BaseButton>
                     </div>
                 </div>
             </div>
         </template>
 
-        <div class="mx-3 sm:mx-5 mb-4 rounded-2xl border border-slate-200 bg-slate-50/40 p-4 sm:p-5">
+        <div class="px-3 sm:px-5 pt-4 pb-4 space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div
-                    class="w-16 h-16 rounded-full grid place-items-center shrink-0"
-                    :style="ringStyle(overallPercent)"
-                    aria-label="Overall progress"
-                >
-                    <div class="w-12 h-12 bg-white rounded-full grid place-items-center text-lg font-bold text-slate-900">
+                <div class="w-16 h-16 rounded-full grid place-items-center shrink-0" :style="ringStyle(overallPercent)" aria-hidden="true">
+                    <div class="w-12 h-12 bg-white rounded-full grid place-items-center text-lg font-bold text-slate-900 tabular-nums">
                         {{ overallPercent }}%
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-x-6 gap-y-2 flex-1">
-                    <div>
-                        <div class="text-sm text-slate-500">Total target</div>
-                        <div class="text-lg font-semibold text-slate-900">{{ totalTarget }}</div>
-                    </div>
-                    <div>
-                        <div class="text-sm text-slate-500">Total achieved</div>
-                        <div class="text-lg font-semibold text-slate-900">{{ totalAchieved }}</div>
-                    </div>
-                    <div class="col-span-2">
-                        <div class="text-sm text-slate-500">Overall</div>
-                        <div class="text-sm font-semibold text-slate-900">{{ overallPercent }}%</div>
-                    </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1 min-w-0">
+                    <StatCard label="Total target" :value="totalTarget" caption="Appointments targeted this month" />
+                    <StatCard label="Total achieved" :value="totalAchieved" caption="Appointments recorded this month" tone="success" />
+                    <StatCard label="Overall" :value="`${overallPercent}%`" caption="Achieved against target" tone="primary" />
                 </div>
             </div>
-            <div class="mt-4">
-                <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                        class="h-2.5 rounded-full bg-gradient-to-r from-blue-600 via-emerald-500 to-emerald-500"
-                        :style="{ width: `${overallPercent}%` }"
-                    />
-                </div>
+            <div
+                class="h-2.5 bg-slate-100 rounded-full overflow-hidden"
+                role="progressbar"
+                aria-label="Overall appointment progress"
+                :aria-valuenow="overallPercent"
+                aria-valuemin="0"
+                aria-valuemax="100"
+            >
+                <div
+                    class="h-2.5 rounded-full bg-gradient-to-r from-primary-600 via-success-500 to-success-500"
+                    :style="{ width: `${overallPercent}%` }"
+                />
             </div>
         </div>
 
-        <div v-if="loading" class="px-5 py-14 flex justify-center">
-            <svg class="animate-spin h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
+        <div v-if="loading" class="px-3 sm:px-5 py-8 space-y-3" aria-busy="true">
+            <p class="sr-only">Loading target achievement…</p>
+            <div class="skeleton-text w-1/3"></div>
+            <div class="skeleton-text w-2/3"></div>
+            <div class="skeleton-text w-1/2"></div>
+            <div class="skeleton-text w-3/4"></div>
         </div>
 
-        <div v-else-if="data.length === 0" class="px-5 py-12 text-center text-slate-500 text-sm">
-            No employees with targets for this month. Set targets in
-            <router-link to="/employees/goals" class="text-blue-600 hover:underline">Set targets</router-link>.
-        </div>
+        <EmptyState
+            v-else-if="data.length === 0"
+            heading="No employees with targets"
+            description="No employees with targets for this month. Set targets to start tracking achievement."
+        >
+            <template #icon>
+                <ViewfinderCircleIcon class="icon" aria-hidden="true" />
+            </template>
+            <template #action>
+                <BaseButton variant="primary" to="/employees/goals">Set targets</BaseButton>
+            </template>
+        </EmptyState>
 
         <div v-else class="space-y-6 px-3 pb-4 sm:px-5">
             <!-- Appointments board -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div class="px-4 sm:px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <div>
-                        <h2 class="text-base font-semibold text-slate-900">Appointments</h2>
-                        <p class="text-xs text-slate-500 mt-0.5">Ranked by appointment achievement.</p>
-                    </div>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full min-w-[720px]">
-                        <thead class="bg-slate-50">
+            <BaseCard title="Appointments" subtitle="Ranked by appointment achievement." :padded="false">
+                <div class="table-wrap">
+                    <table class="table min-w-[720px]">
+                        <caption class="sr-only">Employees ranked by appointment achievement, with achieved and target appointments and progress</caption>
+                        <thead class="table-thead">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700">Rank</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700">Employee</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700">Appointments</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700">Progress</th>
+                                <th scope="col" class="table-th">Rank</th>
+                                <th scope="col" class="table-th">Employee</th>
+                                <th scope="col" class="table-th">Appointments</th>
+                                <th scope="col" class="table-th">Progress</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <tr v-for="(row, idx) in appointmentsRows" :key="row.employee_id" class="hover:bg-slate-50">
-                                <td class="px-4 py-3">
-                                    <span :class="rankClass(idx + 1)" class="inline-flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold">
+                        <tbody>
+                            <tr v-for="(row, idx) in appointmentsRows" :key="row.employee_id" class="table-row">
+                                <td class="table-td">
+                                    <span :class="rankClass(idx + 1)" class="inline-flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold tabular-nums">
                                         {{ idx + 1 }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="table-td">
                                     <div class="flex items-center gap-3">
-                                        <div class="w-9 h-9 rounded-full bg-slate-200 text-slate-600 grid place-items-center text-xs font-bold">
+                                        <div class="w-9 h-9 rounded-full bg-slate-200 text-slate-700 grid place-items-center text-xs font-bold" aria-hidden="true">
                                             {{ initials(row.employee_name) }}
                                         </div>
                                         <div class="min-w-0">
                                             <div class="text-sm font-semibold text-slate-900 truncate">{{ row.employee_name }}</div>
                                             <div v-if="idx === 0" class="inline-flex items-center gap-2 mt-1">
-                                                <span class="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">Top Performer</span>
+                                                <BaseBadge tone="warning">Top Performer</BaseBadge>
                                             </div>
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-sm text-slate-700 font-medium">
+                                <td class="table-td font-medium tabular-nums">
                                     {{ row.achieved_appointments }} / {{ row.target_appointments || 0 }}
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="table-td">
                                     <div class="flex items-center gap-3">
-                                        <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                            <div class="h-2 rounded-full bg-gradient-to-r from-blue-600 to-emerald-500" :style="{ width: `${clampPct(row.appointment_progress)}%` }" />
+                                        <div
+                                            class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"
+                                            role="progressbar"
+                                            :aria-label="`${row.employee_name} appointment progress`"
+                                            :aria-valuenow="clampPct(row.appointment_progress)"
+                                            aria-valuemin="0"
+                                            aria-valuemax="100"
+                                        >
+                                            <div class="h-2 rounded-full bg-gradient-to-r from-primary-600 to-success-500" :style="{ width: `${clampPct(row.appointment_progress)}%` }" />
                                         </div>
-                                        <div class="text-sm font-semibold text-slate-700 w-14 text-right">{{ clampPct(row.appointment_progress) }}%</div>
+                                        <div class="text-sm font-semibold text-slate-700 w-14 text-right tabular-nums">{{ clampPct(row.appointment_progress) }}%</div>
                                     </div>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- Sales + Revenue board -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div class="px-4 sm:px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <div>
-                        <h2 class="text-base font-semibold text-slate-900">Sales & Revenue</h2>
-                        <p class="text-xs text-slate-500 mt-0.5">Ranked by overall achievement.</p>
-                    </div>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full min-w-[860px]">
-                        <thead class="bg-slate-50">
+            <BaseCard title="Sales &amp; Revenue" subtitle="Ranked by overall achievement." :padded="false">
+                <div class="table-wrap">
+                    <table class="table min-w-[860px]">
+                        <caption class="sr-only">Employees ranked by overall achievement, with sales, revenue and overall progress</caption>
+                        <thead class="table-thead">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700">Rank</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700">Employee</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700">Sales</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700">Revenue</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700">Overall</th>
+                                <th scope="col" class="table-th">Rank</th>
+                                <th scope="col" class="table-th">Employee</th>
+                                <th scope="col" class="table-th">Sales</th>
+                                <th scope="col" class="table-th">Revenue</th>
+                                <th scope="col" class="table-th-num">Overall</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <tr v-for="row in data" :key="row.employee_id" class="hover:bg-slate-50">
-                                <td class="px-4 py-3">
-                                    <span :class="rankClass(row.rank)" class="inline-flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold">
+                        <tbody>
+                            <tr v-for="row in data" :key="row.employee_id" class="table-row">
+                                <td class="table-td">
+                                    <span :class="rankClass(row.rank)" class="inline-flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold tabular-nums">
                                         {{ row.rank }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 text-sm font-semibold text-slate-900">{{ row.employee_name }}</td>
-                                <td class="px-4 py-3">
-                                    <div class="text-sm font-medium text-slate-700">{{ row.achieved_sales }} / {{ row.target_sales || 0 }}</div>
+                                <td class="table-td-strong">{{ row.employee_name }}</td>
+                                <td class="table-td">
+                                    <div class="text-sm font-medium text-slate-700 tabular-nums">{{ row.achieved_sales }} / {{ row.target_sales || 0 }}</div>
                                     <div class="flex items-center gap-2 mt-2">
-                                        <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                            <div class="h-2 rounded-full bg-gradient-to-r from-blue-600 to-amber-400" :style="{ width: `${clampPct(row.sales_progress)}%` }" />
+                                        <div
+                                            class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"
+                                            role="progressbar"
+                                            :aria-label="`${row.employee_name} sales progress`"
+                                            :aria-valuenow="clampPct(row.sales_progress)"
+                                            aria-valuemin="0"
+                                            aria-valuemax="100"
+                                        >
+                                            <div class="h-2 rounded-full bg-gradient-to-r from-primary-600 to-warning-400" :style="{ width: `${clampPct(row.sales_progress)}%` }" />
                                         </div>
-                                        <div class="text-xs font-semibold text-slate-600 w-12 text-right">{{ clampPct(row.sales_progress) }}%</div>
+                                        <div class="text-xs font-semibold text-slate-600 w-12 text-right tabular-nums">{{ clampPct(row.sales_progress) }}%</div>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3">
-                                    <div class="text-sm font-medium text-slate-700">£{{ formatNumber(row.achieved_revenue) }} / £{{ formatNumber(row.target_revenue) }}</div>
+                                <td class="table-td">
+                                    <div class="text-sm font-medium text-slate-700 tabular-nums">£{{ formatNumber(row.achieved_revenue) }} / £{{ formatNumber(row.target_revenue) }}</div>
                                     <div class="flex items-center gap-2 mt-2">
-                                        <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                            <div class="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600" :style="{ width: `${clampPct(row.revenue_progress)}%` }" />
+                                        <div
+                                            class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"
+                                            role="progressbar"
+                                            :aria-label="`${row.employee_name} revenue progress`"
+                                            :aria-valuenow="clampPct(row.revenue_progress)"
+                                            aria-valuemin="0"
+                                            aria-valuemax="100"
+                                        >
+                                            <div class="h-2 rounded-full bg-gradient-to-r from-success-500 to-success-600" :style="{ width: `${clampPct(row.revenue_progress)}%` }" />
                                         </div>
-                                        <div class="text-xs font-semibold text-slate-600 w-12 text-right">{{ clampPct(row.revenue_progress) }}%</div>
+                                        <div class="text-xs font-semibold text-slate-600 w-12 text-right tabular-nums">{{ clampPct(row.revenue_progress) }}%</div>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3">
-                                    <div class="flex items-center justify-end gap-2">
-                                        <div class="text-sm font-bold" :class="overallClass(row.overall_progress)">{{ clampPct(row.overall_progress) }}%</div>
-                                    </div>
+                                <td class="table-td-num">
+                                    <span class="text-sm font-bold" :class="overallClass(row.overall_progress)">{{ clampPct(row.overall_progress) }}%</span>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </BaseCard>
         </div>
     </ListingPageShell>
 </template>
@@ -196,6 +219,8 @@
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseBadge, BaseButton, BaseCard, EmptyState, StatCard } from '@/components/base';
+import { ChevronLeftIcon, ChevronRightIcon, ViewfinderCircleIcon } from '@heroicons/vue/24/outline';
 
 const formatMonth = (date) => {
     const d = date instanceof Date ? date : new Date(date);
@@ -256,23 +281,23 @@ function initials(name) {
 }
 
 function rankClass(rank) {
-    if (rank === 1) return 'bg-amber-100 text-amber-800';
+    if (rank === 1) return 'bg-warning-100 text-warning-800';
     if (rank === 2) return 'bg-slate-200 text-slate-700';
-    if (rank === 3) return 'bg-amber-100/70 text-amber-700';
-    return 'bg-slate-100 text-slate-600';
+    if (rank === 3) return 'bg-warning-100/70 text-warning-800';
+    return 'bg-slate-100 text-slate-700';
 }
 
 function overallClass(pct) {
     const p = Number(pct ?? 0);
-    if (p >= 100) return 'text-emerald-600';
-    if (p >= 50) return 'text-amber-600';
+    if (p >= 100) return 'text-success-700';
+    if (p >= 50) return 'text-warning-800';
     return 'text-slate-700';
 }
 
 function ringStyle(pct) {
     const p = clampPct(pct);
     return {
-        background: `conic-gradient(#2563eb ${p * 3.6}deg, #e2e8f0 0deg)`,
+        background: `conic-gradient(var(--color-primary-600) ${p * 3.6}deg, var(--color-slate-200) 0deg)`,
     };
 }
 

@@ -20,12 +20,10 @@
                     <button
                         v-else
                         type="button"
-                        class="text-slate-400 hover:text-slate-600 p-1"
+                        class="text-slate-500 hover:text-slate-600 p-1"
                         @click="$emit('close')"
                     >
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <XMarkIcon class="w-6 h-6" aria-hidden="true" />
                     </button>
                 </div>
             </div>
@@ -37,19 +35,19 @@
                     <!-- Template Info -->
                     <div class="p-4 border-b border-slate-200 space-y-3">
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Template Name *</label>
-                            <input
+                            <label class="block text-sm font-medium text-slate-700 mb-1" for="templatebuilder-template-name">Template Name *</label>
+                            <input id="templatebuilder-template-name"
                                 v-model="form.name"
                                 type="text"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                 placeholder="Welcome Email"
                             />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Category *</label>
-                            <select
+                            <label class="block text-sm font-medium text-slate-700 mb-1" for="templatebuilder-category">Category *</label>
+                            <select id="templatebuilder-category"
                                 v-model="form.category"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                             >
                                 <option value="welcome">Welcome Email</option>
                                 <option value="epos">Epos Description</option>
@@ -64,29 +62,29 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Email Subject *</label>
-                            <input
+                            <label class="block text-sm font-medium text-slate-700 mb-1" for="templatebuilder-email-subject">Email Subject *</label>
+                            <input id="templatebuilder-email-subject"
                                 v-model="form.subject"
                                 type="text"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                 placeholder="Welcome to {{company_name}}"
                             />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                            <textarea
+                            <label class="block text-sm font-medium text-slate-700 mb-1" for="templatebuilder-description">Description</label>
+                            <textarea id="templatebuilder-description"
                                 v-model="form.description"
                                 rows="2"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                 placeholder="Template description..."
                             />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Preview Line</label>
-                            <input
+                            <label class="block text-sm font-medium text-slate-700 mb-1" for="templatebuilder-preview-line">Preview Line</label>
+                            <input id="templatebuilder-preview-line"
                                 v-model="form.content.preview_line"
                                 type="text"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                 placeholder="e.g. View this offer in your inbox"
                             />
                             <p class="text-xs text-slate-500 mt-1">Text shown next to subject in inbox (Gmail, Outlook, etc.)</p>
@@ -128,10 +126,10 @@
                             <p class="text-xs text-slate-500 mb-3">Change font, size & color. Preview updates below.</p>
                             <div class="space-y-3">
                                 <div>
-                                    <label class="block text-xs font-medium text-slate-600 mb-1">Font</label>
-                                    <select
+                                    <label class="block text-xs font-medium text-slate-600 mb-1" for="templatebuilder-font">Font</label>
+                                    <select id="templatebuilder-font"
                                         v-model="styleTarget.font_family"
-                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                     >
                                         <option value="">Default (Arial)</option>
                                         <option value="Arial, sans-serif">Arial</option>
@@ -144,10 +142,10 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-slate-600 mb-1">Size</label>
-                                    <select
+                                    <label class="block text-xs font-medium text-slate-600 mb-1" for="templatebuilder-size">Size</label>
+                                    <select id="templatebuilder-size"
                                         v-model="styleTarget.font_size"
-                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                     >
                                         <option value="">Default</option>
                                         <option value="12px">12px</option>
@@ -171,7 +169,7 @@
                                         <input
                                             v-model="styleTarget.font_color"
                                             type="text"
-                                            class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                             placeholder="#333333"
                                         />
                                     </div>
@@ -203,14 +201,14 @@
                         <div class="flex flex-wrap gap-2 items-center">
                             <button
                                 @click="previewMode = 'desktop'"
-                                :class="previewMode === 'desktop' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700'"
+                                :class="previewMode === 'desktop' ? 'bg-primary-600 text-white' : 'bg-white text-slate-700'"
                                 class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 transition-colors"
                             >
                                 🖥️ Desktop
                             </button>
                             <button
                                 @click="previewMode = 'mobile'"
-                                :class="previewMode === 'mobile' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700'"
+                                :class="previewMode === 'mobile' ? 'bg-primary-600 text-white' : 'bg-white text-slate-700'"
                                 class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 transition-colors"
                             >
                                 📱 Mobile
@@ -218,7 +216,7 @@
                             <button
                                 v-if="hasRawHtmlSection"
                                 type="button"
-                                class="px-3 py-1.5 text-sm rounded-lg border border-violet-300 bg-violet-50 text-violet-900 font-medium hover:bg-violet-100 transition-colors"
+                                class="px-3 py-1.5 text-sm rounded-lg border border-primary-300 bg-primary-50 text-primary-900 font-medium hover:bg-primary-100 transition-colors"
                                 @click="openVisualBuilderModal"
                             >
                                 🎨 Edit with visual builder
@@ -242,7 +240,7 @@
                             <span class="text-xs font-medium text-slate-300">Live preview — same render as sent email (sample data)</span>
                             <button
                                 type="button"
-                                class="text-xs text-blue-400 hover:text-blue-300 shrink-0"
+                                class="text-xs text-primary-400 hover:text-primary-300 shrink-0"
                                 @click="runLivePreview"
                             >
                                 Refresh
@@ -265,7 +263,7 @@
                             <div v-else-if="livePreviewLoading" class="p-8 text-center text-sm text-slate-500 bg-white">
                                 Loading preview…
                             </div>
-                            <div v-else-if="livePreviewError" class="p-4 text-sm text-red-600 bg-white">
+                            <div v-else-if="livePreviewError" class="p-4 text-sm text-danger-600 bg-white">
                                 {{ livePreviewError }}
                             </div>
                             <div v-else class="p-4 text-xs text-slate-500 bg-white">
@@ -287,7 +285,7 @@
                             ]"
                         >
                             <!-- Template Sections -->
-                            <div v-if="form.content.sections.length === 0" class="p-12 text-center text-slate-400">
+                            <div v-if="form.content.sections.length === 0" class="p-12 text-center text-slate-500">
                                 <div class="text-4xl mb-4">📧</div>
                                 <p>Click "Add Section" to start building your template</p>
                             </div>
@@ -296,7 +294,7 @@
                                 v-for="(section, index) in form.content.sections"
                                 :key="index"
                                 class="relative group border-b border-slate-200"
-                                :class="{ 'border-blue-500 border-2': selectedSectionIndex === index }"
+                                :class="{ 'border-primary-500 border-2': selectedSectionIndex === index }"
                             >
                                 <!-- Section Controls -->
                                 <div class="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -325,7 +323,7 @@
                                     </button>
                                     <button
                                         @click="removeSection(index)"
-                                        class="p-1 bg-white border border-red-300 text-red-600 rounded text-xs hover:bg-red-50"
+                                        class="p-1 bg-white border border-danger-300 text-danger-600 rounded text-xs hover:bg-danger-50"
                                         title="Remove"
                                     >
                                         🗑️
@@ -348,13 +346,13 @@
                                             @click="editSectionImage(index, 'logo')"
                                             class="h-12 mx-auto mb-4 bg-slate-100 border-2 border-dashed border-slate-300 rounded flex items-center justify-center cursor-pointer hover:bg-slate-200"
                                         >
-                                            <span class="text-slate-400 text-sm">Click to add logo</span>
+                                            <span class="text-slate-500 text-sm">Click to add logo</span>
                                         </div>
                                         <input
                                             v-model="section.content.text"
                                             type="text"
                                             :style="getSectionPreviewStyle(section)"
-                                            class="text-2xl font-bold text-center w-full border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2"
+                                            class="text-2xl font-bold text-center w-full border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded px-2"
                                             placeholder="Header Text"
                                         />
                                     </div>
@@ -365,7 +363,7 @@
                                             v-model="section.content.blocks[0].text"
                                             rows="4"
                                             :style="getSectionPreviewStyle(section)"
-                                            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white resize-none overflow-hidden"
+                                            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 bg-white resize-none overflow-hidden"
                                             placeholder="Write your paragraph here – you can use {{variables}} and press Enter for new lines"
                                             @input="autoResizeTextArea($event)"
                                             @focus="autoResizeTextArea($event)"
@@ -388,10 +386,10 @@
                                                 @click="editSectionImage(index, 'image_url')"
                                                 class="h-48 bg-slate-100 border-2 border-dashed border-slate-300 rounded flex items-center justify-center cursor-pointer hover:bg-slate-200"
                                             >
-                                                <span class="text-slate-400">Click to add image</span>
+                                                <span class="text-slate-500">Click to add image</span>
                                             </div>
                                             <!-- Clickable indicator -->
-                                            <div v-if="section.content.link_url && section.content.link_url !== '#'" class="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                                            <div v-if="section.content.link_url && section.content.link_url !== '#'" class="absolute top-2 right-2 bg-primary-600 text-white text-xs px-2 py-1 rounded">
                                                 🔗 Link
                                             </div>
                                         </div>
@@ -399,7 +397,7 @@
                                             <input
                                                 v-model="section.content.alt"
                                                 type="text"
-                                                class="w-full text-sm text-center border border-slate-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                class="w-full text-sm text-center border border-slate-300 rounded-lg px-2 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                                 placeholder="Image alt text"
                                             />
                                             <!-- Link URL - shows when section is selected -->
@@ -408,7 +406,7 @@
                                                     v-model="section.content.link_url"
                                                     type="url"
                                                     @click.stop
-                                                    class="w-full text-sm border border-slate-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    class="w-full text-sm border border-slate-300 rounded-lg px-2 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                                     placeholder="Image link URL (optional) - https://example.com or # for no link"
                                                 />
                                                 <p class="text-xs text-slate-500 mt-1">
@@ -430,7 +428,7 @@
                                                     v-model="section.content.text"
                                                     type="text"
                                                     :style="{ minWidth: '200px', ...getSectionPreviewStyle(section) }"
-                                                    class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium border-2 border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    class="px-6 py-3 bg-primary-600 text-white rounded-lg font-medium border-2 border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-primary-500"
                                                     placeholder="Button Text"
                                                 />
                                             </div>
@@ -440,7 +438,7 @@
                                                     v-model="section.content.url"
                                                     type="url"
                                                     @click.stop
-                                                    class="w-full max-w-md mx-auto px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                                    class="w-full max-w-md mx-auto px-3 py-2 border border-slate-300 rounded-lg text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 bg-white"
                                                     placeholder="https://switch-and-save.uk/ or # for no link"
                                                 />
                                                 <p class="text-xs text-slate-500 mt-1">
@@ -461,7 +459,7 @@
                                                 v-model="section.content.left_text"
                                                 type="text"
                                                 :style="getSectionPreviewStyle(section)"
-                                                class="w-full border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-2 bg-transparent"
+                                                class="w-full border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded p-2 bg-transparent"
                                                 placeholder="Left column text"
                                             />
                                         </div>
@@ -470,7 +468,7 @@
                                                 v-model="section.content.right_text"
                                                 type="text"
                                                 :style="getSectionPreviewStyle(section)"
-                                                class="w-full border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-2 bg-transparent"
+                                                class="w-full border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded p-2 bg-transparent"
                                                 placeholder="Right column text"
                                             />
                                         </div>
@@ -482,7 +480,7 @@
                                             v-model="section.content.text"
                                             type="text"
                                             :style="getSectionPreviewStyle(section)"
-                                            class="w-full text-sm text-center border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 mb-2 bg-transparent"
+                                            class="w-full text-sm text-center border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded px-2 mb-2 bg-transparent"
                                             placeholder="Footer text"
                                         />
                                         <div class="text-xs text-slate-500">
@@ -496,7 +494,7 @@
                                             <p class="text-xs text-slate-600 font-medium">Custom HTML</p>
                                             <button
                                                 type="button"
-                                                class="text-xs font-medium px-3 py-1.5 rounded-lg border border-violet-300 bg-violet-50 text-violet-900 hover:bg-violet-100"
+                                                class="text-xs font-medium px-3 py-1.5 rounded-lg border border-primary-300 bg-primary-50 text-primary-900 hover:bg-primary-100"
                                                 @click.stop="selectedSectionIndex = index; openVisualBuilderModal()"
                                             >
                                                 🎨 Open visual builder
@@ -505,7 +503,7 @@
                                         <textarea
                                             v-model="section.content.html"
                                             rows="14"
-                                            class="w-full font-mono text-xs border border-slate-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white resize-y min-h-[200px]"
+                                            class="w-full font-mono text-xs border border-slate-300 rounded-lg px-2 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 bg-white resize-y min-h-[200px]"
                                             placeholder="HTML body fragment (merge tags like {{first_name}}). Use “Edit with visual builder” at the top for drag-and-drop."
                                             @click.stop="selectedSectionIndex = index"
                                         />
@@ -532,7 +530,7 @@
                 <button
                     @click="showTestSendModal = true"
                     :disabled="!form.subject || !form.content.sections.length"
-                    class="px-4 py-2 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="px-4 py-2 border border-primary-300 text-primary-600 rounded-lg hover:bg-primary-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Send test email to verify variables and layout"
                 >
                     Test send
@@ -547,39 +545,44 @@
             </div>
         </div>
 
-        <!-- Test Send Modal -->
-        <div v-if="showTestSendModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]" @click.self="showTestSendModal = false">
-            <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
-                <h3 class="text-lg font-semibold text-slate-900 mb-2">Test send template</h3>
-                <p class="text-sm text-slate-600 mb-4">Sends the current template to your email with sample data so you can verify variables and layout.</p>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Send to email *</label>
-                    <input
-                        v-model="testSendEmail"
-                        type="email"
-                        class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        placeholder="your@email.com"
-                    />
-                </div>
-                <div class="flex justify-end gap-3">
-                    <button @click="showTestSendModal = false" class="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700">
-                        Cancel
-                    </button>
-                    <button
-                        @click="doTestSend"
-                        :disabled="!testSendEmail || sendingTest"
-                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {{ sendingTest ? 'Sending...' : 'Send test' }}
-                    </button>
-                </div>
-            </div>
-        </div>
+        <!-- Test send -->
+        <BaseModal
+            v-model="showTestSendModal"
+            title="Test send template"
+            description="Sends the current template to your email with sample data so you can verify variables and layout."
+            size="sm"
+            :close-on-backdrop="false"
+        >
+            <form id="test-send-form" novalidate @submit.prevent="doTestSend">
+                <label class="form-label" for="templatebuilder-send-to-email">Send to email *</label>
+                <input
+                    id="templatebuilder-send-to-email"
+                    v-model="testSendEmail"
+                    type="email"
+                    class="form-input"
+                    placeholder="your@email.com"
+                />
+            </form>
+
+            <template #actions>
+                <BaseButton variant="outline" block-mobile @click="showTestSendModal = false">Cancel</BaseButton>
+                <BaseButton
+                    variant="primary"
+                    type="submit"
+                    form="test-send-form"
+                    block-mobile
+                    :disabled="!testSendEmail"
+                    :loading="sendingTest"
+                >
+                    Send test
+                </BaseButton>
+            </template>
+        </BaseModal>
 
         <!-- Visual email builder: true full viewport (above app chrome) -->
         <div
             v-if="showVisualBuilderModal"
-            class="fixed inset-0 z-[200] flex flex-col bg-white"
+            class="fixed inset-0 z-toast flex flex-col bg-white"
             role="dialog"
             aria-modal="true"
             aria-labelledby="visual-builder-title"
@@ -655,15 +658,13 @@
                             aria-label="Close visual builder"
                             @click="cancelVisualBuilderModal"
                         >
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                            <XMarkIcon class="icon" aria-hidden="true" />
                         </button>
                     </div>
                 </div>
                 <div v-if="pasteHtmlOpen" class="px-3 py-2 border-b border-slate-100 bg-slate-50 shrink-0 space-y-2">
-                    <label class="block text-xs font-medium text-slate-600">Paste full HTML or body fragment — replaces the canvas</label>
-                    <textarea
+                    <label class="block text-xs font-medium text-slate-600" for="templatebuilder-paste-full-html-or-body-fragment-replace">Paste full HTML or body fragment — replaces the canvas</label>
+                    <textarea id="templatebuilder-paste-full-html-or-body-fragment-replace"
                         v-model="pasteHtmlBuffer"
                         rows="5"
                         class="w-full font-mono text-xs border border-slate-300 rounded-lg px-2 py-2"
@@ -671,7 +672,7 @@
                     />
                     <button
                         type="button"
-                        class="px-3 py-1.5 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-700"
+                        class="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                         @click="applyPasteHtml"
                     >
                         Replace canvas from paste
@@ -696,25 +697,25 @@
                 </p>
         </div>
 
-        <!-- Image Upload Modal -->
-        <div v-if="showImageUpload" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-            <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-                <h3 class="text-lg font-semibold mb-4">Upload Image</h3>
-                <input
-                    ref="imageInput"
-                    type="file"
-                    accept="image/*"
-                    @change="handleImageUpload"
-                    class="mb-4"
-                />
-                <div class="flex justify-end gap-3">
-                    <button @click="showImageUpload = false" class="px-4 py-2 border rounded-lg">Cancel</button>
-                    <button @click="uploadImage" :disabled="uploadingImage" class="px-4 py-2 bg-blue-600 text-white rounded-lg">
-                        {{ uploadingImage ? 'Uploading...' : 'Upload' }}
-                    </button>
-                </div>
-            </div>
-        </div>
+        <!-- Image upload -->
+        <BaseModal v-model="showImageUpload" title="Upload Image" size="sm" :close-on-backdrop="false">
+            <label class="form-label" for="templatebuilder-image-file">Image file</label>
+            <input
+                id="templatebuilder-image-file"
+                ref="imageInput"
+                type="file"
+                accept="image/*"
+                class="form-input h-auto py-2"
+                @change="handleImageUpload"
+            />
+
+            <template #actions>
+                <BaseButton variant="outline" block-mobile @click="showImageUpload = false">Cancel</BaseButton>
+                <BaseButton variant="primary" block-mobile :loading="uploadingImage" @click="uploadImage">
+                    Upload
+                </BaseButton>
+            </template>
+        </BaseModal>
     </div>
 </template>
 
@@ -723,6 +724,8 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick, defin
 import axios from 'axios';
 import { RouterLink, useRouter } from 'vue-router';
 import { useToastStore } from '@/stores/toast';
+import { XMarkIcon } from '@heroicons/vue/24/outline';
+import { BaseButton, BaseModal } from '@/components/base';
 
 const EmailVisualEditor = defineAsyncComponent({
     loader: () => import('./EmailVisualEditor.vue'),
@@ -759,14 +762,14 @@ const router = useRouter();
 
 const builderOuterClass = computed(() =>
     props.layout === 'modal'
-        ? 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+        ? 'modal-backdrop flex items-center justify-center p-4'
         : 'w-full flex flex-col flex-1 min-h-[calc(100dvh-9rem)]'
 );
 
 const builderInnerClass = computed(() =>
     props.layout === 'modal'
-        ? 'bg-white rounded-xl shadow-xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col'
-        : 'flex flex-col flex-1 min-h-0 w-full border border-slate-200 rounded-xl bg-white shadow-sm overflow-hidden'
+        ? 'bg-white rounded-panel shadow-overlay w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col'
+        : 'flex flex-col flex-1 min-h-0 w-full border border-slate-200 rounded-panel bg-white shadow-card overflow-hidden'
 );
 
 /** GrapesJS height inside full-screen visual builder */

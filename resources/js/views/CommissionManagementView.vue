@@ -1,46 +1,48 @@
 <template>
     <ListingPageShell title="Commission Workspace" :subtitle="subtitle" :badge="badgeText">
         <template #actions>
-            <router-link to="/commission/report" class="listing-btn-outline w-full sm:w-auto text-center">
+            <BaseButton to="/commission/report" variant="outline" block-mobile>
+                <template #icon><ChartBarIcon class="icon" aria-hidden="true" /></template>
                 Reports
-            </router-link>
+            </BaseButton>
         </template>
 
         <template #filters>
             <div class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">From</label>
-                        <input v-model="filters.from" type="date" class="listing-input" />
+                        <label class="listing-label" for="commissionmanagementview-from">From</label>
+                        <input id="commissionmanagementview-from" v-model="filters.from" type="date" class="listing-input" />
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">To</label>
-                        <input v-model="filters.to" type="date" class="listing-input" />
+                        <label class="listing-label" for="commissionmanagementview-to">To</label>
+                        <input id="commissionmanagementview-to" v-model="filters.to" type="date" class="listing-input" />
                     </div>
                     <div>
                         <div class="mb-1">
                             <HelpLabel label="Status" tooltip="Use Needs allocation to find won sales that still need commission. Allocated shows sales already saved." />
                         </div>
-                        <select v-model="filters.processed" class="listing-input">
+                        <select v-model="filters.processed" class="listing-input" aria-label="Commission allocation status filter">
                             <option value="all">All sales</option>
                             <option value="no">Needs allocation</option>
                             <option value="yes">Allocated</option>
                         </select>
                     </div>
-                    <button type="button" class="listing-btn-primary w-full" :disabled="loading" @click="loadSales">
+                    <BaseButton variant="soft" class="w-full" :loading="loading" @click="loadSales">
+                        <template #icon><FunnelIcon class="icon" aria-hidden="true" /></template>
                         {{ loading ? 'Loading...' : 'Apply' }}
-                    </button>
-                    <button type="button" class="listing-btn-outline w-full" @click="applyDatePreset('thisMonth')">
+                    </BaseButton>
+                    <BaseButton variant="outline" class="w-full" @click="applyDatePreset('thisMonth')">
                         This month
-                    </button>
+                    </BaseButton>
                 </div>
-                <div class="flex flex-wrap gap-2">
-                    <button type="button" class="px-3 py-2 text-xs sm:text-sm rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50" @click="applyDatePreset('twoMonths')">
+                <div class="flex flex-wrap gap-2 items-center">
+                    <BaseButton size="sm" variant="ghost" @click="applyDatePreset('twoMonths')">
                         Last 2 months
-                    </button>
-                    <button type="button" class="px-3 py-2 text-xs sm:text-sm rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50" @click="applyDatePreset('lastMonth')">
+                    </BaseButton>
+                    <BaseButton size="sm" variant="ghost" @click="applyDatePreset('lastMonth')">
                         Last month
-                    </button>
+                    </BaseButton>
                     <span class="inline-flex items-center text-xs text-slate-500">
                         Based on won product close date.
                     </span>
@@ -50,14 +52,14 @@
 
         <div class="p-4 sm:p-6 space-y-6">
             <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-                <div v-for="card in overviewCards" :key="card.label" class="rounded-lg border border-slate-200 bg-white p-4">
+                <div v-for="card in overviewCards" :key="card.label" class="rounded-card border border-slate-200 bg-white p-4">
                     <HelpLabel :label="card.label" :tooltip="card.tooltip" />
                     <p class="mt-2 text-2xl font-bold text-slate-950">{{ card.value }}</p>
                     <p class="mt-1 text-xs text-slate-500">{{ card.detail }}</p>
                 </div>
             </section>
 
-            <section class="rounded-lg border border-violet-200 bg-violet-50/70 p-4">
+            <section class="callout callout-info">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                         <h2 class="font-semibold text-slate-950">How to add commission</h2>
@@ -66,15 +68,15 @@
                         </p>
                     </div>
                     <div class="grid grid-cols-1 gap-2 text-sm text-slate-700 sm:grid-cols-3 lg:w-[34rem]">
-                        <div class="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-violet-100">
+                        <div class="rounded-control bg-white/80 px-3 py-2 ring-1 ring-primary-100">
                             <span class="font-semibold text-slate-900">1. Open sale</span>
                             <span class="block text-xs text-slate-500">Use Needs allocation.</span>
                         </div>
-                        <div class="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-violet-100">
+                        <div class="rounded-control bg-white/80 px-3 py-2 ring-1 ring-primary-100">
                             <span class="font-semibold text-slate-900">2. Add split rows</span>
                             <span class="block text-xs text-slate-500">One row per person.</span>
                         </div>
-                        <div class="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-violet-100">
+                        <div class="rounded-control bg-white/80 px-3 py-2 ring-1 ring-primary-100">
                             <span class="font-semibold text-slate-900">3. Save once</span>
                             <span class="block text-xs text-slate-500">Existing allocation is replaced.</span>
                         </div>
@@ -84,19 +86,20 @@
 
             <section class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_22rem] gap-5">
                 <div class="space-y-4 min-w-0">
-                    <div class="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                    <div class="rounded-card border border-slate-200 bg-white overflow-hidden">
                         <div class="px-4 py-3 border-b border-slate-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                             <div>
                                 <HelpLabel label="Sales Queue" tooltip="This list shows won product sales from the selected period. Pending sales need commission; allocated sales already have commission rows." text-class="font-semibold text-slate-900" />
                                 <p class="text-sm text-slate-500">Allocate commission once for each won product sale.</p>
                             </div>
-                            <div class="grid grid-cols-3 gap-2 text-xs sm:flex sm:flex-wrap">
+                            <div class="tab-list">
                                 <button
                                     v-for="tab in statusTabs"
                                     :key="tab.value"
                                     type="button"
-                                    class="rounded-lg px-3 py-2 font-medium transition-colors"
-                                    :class="filters.processed === tab.value ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+                                    class="tab"
+                                    :class="filters.processed === tab.value ? 'tab-active' : 'bg-slate-100 text-slate-700'"
+                                    :aria-pressed="filters.processed === tab.value ? 'true' : 'false'"
                                     @click="setStatus(tab.value)"
                                 >
                                     {{ tab.label }}
@@ -104,7 +107,7 @@
                             </div>
                         </div>
 
-                        <div v-if="loading" class="p-6 text-sm text-slate-500">Loading commission sales...</div>
+                        <div v-if="loading" class="p-6 text-sm text-slate-500" role="status" aria-live="polite">Loading commission sales...</div>
                         <div v-else-if="!sales.length" class="p-6 text-sm text-slate-500">No won sales found for this filter.</div>
 
                         <div v-else>
@@ -112,12 +115,12 @@
                                 <table class="min-w-full text-sm">
                                     <thead class="bg-slate-50 text-slate-600">
                                         <tr>
-                                            <th class="px-4 py-3 text-left">Customer</th>
-                                            <th class="px-4 py-3 text-left">Product</th>
-                                            <th class="px-4 py-3 text-left whitespace-nowrap">Sale date</th>
-                                            <th class="px-4 py-3 text-left">Lead owner</th>
-                                            <th class="px-4 py-3 text-left">Commission</th>
-                                            <th class="px-4 py-3 text-right">Action</th>
+                                            <th scope="col" class="px-4 py-3 text-left">Customer</th>
+                                            <th scope="col" class="px-4 py-3 text-left">Product</th>
+                                            <th scope="col" class="px-4 py-3 text-left whitespace-nowrap">Sale date</th>
+                                            <th scope="col" class="px-4 py-3 text-left">Lead owner</th>
+                                            <th scope="col" class="px-4 py-3 text-left">Commission</th>
+                                            <th scope="col" class="px-4 py-3 text-right">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-slate-100">
@@ -130,19 +133,19 @@
                                             <td class="px-4 py-3 whitespace-nowrap text-slate-600">{{ formatSaleDate(row.closed_at) }}</td>
                                             <td class="px-4 py-3">{{ row.lead_assigned_to_name || '-' }}</td>
                                             <td class="px-4 py-3">
-                                                <span :class="statusPillClass(row)">
+                                                <BaseBadge :tone="row.commission_processed ? 'success' : 'warning'">
                                                     {{ row.commission_processed ? allocationLabel(row) : 'Needs allocation' }}
-                                                </span>
+                                                </BaseBadge>
                                             </td>
                                             <td class="px-4 py-3 text-right">
-                                                <button
-                                                    type="button"
-                                                    class="listing-btn-primary !py-1.5 !text-xs"
+                                                <BaseButton
+                                                    size="sm"
+                                                    variant="soft"
                                                     title="Open this won sale and enter the commission user, amount, currency, and role."
                                                     @click="openAllocation(row)"
                                                 >
                                                     {{ row.commission_processed ? 'Review' : 'Allocate' }}
-                                                </button>
+                                                </BaseButton>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -156,9 +159,9 @@
                                             <p class="font-semibold text-slate-900 break-words">{{ row.customer_name || '-' }}</p>
                                             <p class="text-sm text-slate-600 break-words">{{ row.product_name || '-' }}</p>
                                         </div>
-                                        <span :class="statusPillClass(row)">
+                                        <BaseBadge :tone="row.commission_processed ? 'success' : 'warning'">
                                             {{ row.commission_processed ? 'Allocated' : 'Pending' }}
-                                        </span>
+                                        </BaseBadge>
                                     </div>
                                     <div class="grid grid-cols-2 gap-2 text-sm">
                                         <div>
@@ -170,14 +173,14 @@
                                             <p class="font-medium text-slate-800">{{ row.lead_assigned_to_name || '-' }}</p>
                                         </div>
                                     </div>
-                                    <button
-                                        type="button"
-                                        class="listing-btn-primary w-full"
+                                    <BaseButton
+                                        variant="soft"
+                                        class="w-full"
                                         title="Open this won sale and enter the commission details."
                                         @click="openAllocation(row)"
                                     >
                                         {{ row.commission_processed ? 'Review allocation' : 'Allocate commission' }}
-                                    </button>
+                                    </BaseButton>
                                 </article>
                             </div>
                         </div>
@@ -185,17 +188,17 @@
                 </div>
 
                 <aside class="space-y-4">
-                    <section class="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                    <section class="rounded-card border border-slate-200 bg-white overflow-hidden">
                         <div class="px-4 py-3 border-b border-slate-100">
                             <HelpLabel label="Commission Users" tooltip="Only users marked Eligible can be selected inside the allocation modal." text-class="font-semibold text-slate-900" />
                             <p class="text-sm text-slate-500">Only eligible users can receive commission.</p>
                         </div>
                         <div class="p-4 grid grid-cols-2 gap-3">
-                            <div class="rounded-lg bg-slate-50 p-3">
+                            <div class="rounded-control bg-slate-50 p-3">
                                 <p class="text-xs text-slate-500">Eligible</p>
                                 <p class="text-xl font-bold text-slate-950">{{ eligibleUsers.length }}</p>
                             </div>
-                            <div class="rounded-lg bg-slate-50 p-3">
+                            <div class="rounded-control bg-slate-50 p-3">
                                 <p class="text-xs text-slate-500">Disabled</p>
                                 <p class="text-xl font-bold text-slate-950">{{ users.length - eligibleUsers.length }}</p>
                             </div>
@@ -210,7 +213,7 @@
                                     <input
                                         :checked="!!u.commission_eligible"
                                         type="checkbox"
-                                        class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                        class="form-checkbox"
                                         @change="toggleEligibility(u, $event)"
                                     />
                                     Eligible
@@ -219,7 +222,7 @@
                         </div>
                     </section>
 
-                    <section class="rounded-lg border border-slate-200 bg-white p-4">
+                    <section class="rounded-card border border-slate-200 bg-white p-4">
                         <HelpLabel label="Allocation Rules" tooltip="These rules stop accidental duplicate commission entries while keeping the same live database structure." text-class="font-semibold text-slate-900" />
                         <div class="mt-3 space-y-3 text-sm text-slate-600">
                             <p>Saving an allocation replaces the existing allocation for that sale, so the same sale is not added twice.</p>
@@ -231,132 +234,156 @@
         </div>
     </ListingPageShell>
 
-    <div v-if="showAllocationModal" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-3 sm:p-4">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[92vh] flex flex-col">
-            <div class="px-4 sm:px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                    <h3 class="text-lg font-semibold text-slate-900">Allocate Commission</h3>
-                    <p class="text-sm text-slate-600 mt-1 break-words">
-                        {{ activeSale?.customer_name || '-' }} - {{ activeSale?.product_name || '-' }}
-                    </p>
+    <BaseModal
+        v-model="showAllocationModal"
+        title="Allocate Commission"
+        :description="allocationDescription"
+        size="lg"
+        :close-on-backdrop="false"
+        :dismissible="!savingAllocation"
+        @close="closeAllocation"
+    >
+        <div class="space-y-4">
+            <section class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="rounded-control bg-slate-50 p-3">
+                    <p class="text-xs text-slate-500">Sale date</p>
+                    <p class="font-semibold text-slate-900">{{ formatSaleDate(activeSale?.closed_at) }}</p>
                 </div>
-                <button type="button" class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50" @click="closeAllocation">
-                    Close
-                </button>
-            </div>
+                <div class="rounded-control bg-slate-50 p-3">
+                    <p class="text-xs text-slate-500">Lead owner</p>
+                    <p class="font-semibold text-slate-900">{{ activeSale?.lead_assigned_to_name || '-' }}</p>
+                </div>
+                <div class="rounded-control bg-slate-50 p-3">
+                    <p class="text-xs text-slate-500">Sale value</p>
+                    <p class="font-semibold text-slate-900">{{ formatAmountNumber(activeSale?.total_price) }}</p>
+                </div>
+            </section>
 
-            <div class="p-4 sm:p-6 space-y-4 overflow-y-auto">
-                <section class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div class="rounded-lg bg-slate-50 p-3">
-                        <p class="text-xs text-slate-500">Sale date</p>
-                        <p class="font-semibold text-slate-900">{{ formatSaleDate(activeSale?.closed_at) }}</p>
+            <section class="rounded-card border border-slate-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-slate-100 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <HelpLabel label="Split Rows" tooltip="Use one row for a single owner, or multiple rows when commission is split between people." text-class="font-semibold text-slate-900" />
+                        <p class="text-sm text-slate-500">Add each person who should receive commission for this sale.</p>
                     </div>
-                    <div class="rounded-lg bg-slate-50 p-3">
-                        <p class="text-xs text-slate-500">Lead owner</p>
-                        <p class="font-semibold text-slate-900">{{ activeSale?.lead_assigned_to_name || '-' }}</p>
-                    </div>
-                    <div class="rounded-lg bg-slate-50 p-3">
-                        <p class="text-xs text-slate-500">Sale value</p>
-                        <p class="font-semibold text-slate-900">{{ formatAmountNumber(activeSale?.total_price) }}</p>
-                    </div>
-                </section>
+                    <BaseButton
+                        variant="outline"
+                        block-mobile
+                        title="Add another person to split commission for this same sale."
+                        @click="addSplitRow"
+                    >
+                        <template #icon><PlusIcon class="icon" aria-hidden="true" /></template>
+                        Add row
+                    </BaseButton>
+                </div>
 
-                <section class="rounded-lg border border-slate-200 overflow-hidden">
-                    <div class="px-4 py-3 border-b border-slate-100 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div class="divide-y divide-slate-100">
+                    <div v-for="(entry, idx) in allocationRows" :key="entry.local_id" class="p-4 space-y-3">
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                            <div class="md:col-span-3">
+                                <HelpLabel label="User" tooltip="Select the employee who should receive this commission row." />
+                                <select
+                                    v-model="entry.credited_user_id"
+                                    class="listing-input mt-1"
+                                    :aria-label="`User for split row ${idx + 1}`"
+                                >
+                                    <option value="">Select user...</option>
+                                    <option v-for="u in eligibleUsers" :key="u.id" :value="u.id">{{ u.name }}</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <HelpLabel label="Amount" tooltip="Enter the commission amount only, not the full sale value." />
+                                <input
+                                    v-model.number="entry.commission_amount"
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    class="listing-input mt-1"
+                                    :aria-label="`Commission amount for split row ${idx + 1}`"
+                                />
+                            </div>
+                            <div class="md:col-span-2">
+                                <HelpLabel label="Currency" tooltip="Choose the currency for this commission amount. GBP and PKR are tracked separately in reports." />
+                                <select
+                                    v-model="entry.commission_currency"
+                                    class="listing-input mt-1"
+                                    :aria-label="`Currency for split row ${idx + 1}`"
+                                >
+                                    <option value="GBP">GBP</option>
+                                    <option value="PKR">PKR</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-3">
+                                <HelpLabel label="Role" tooltip="Single Owner means one person gets commission. Closer and Appointment Creator are useful for split commission." />
+                                <select
+                                    v-model="entry.commission_role"
+                                    class="listing-input mt-1"
+                                    :aria-label="`Role for split row ${idx + 1}`"
+                                >
+                                    <option value="single_owner">Single Owner</option>
+                                    <option value="appointment_creator">Appointment Creator</option>
+                                    <option value="closer">Closer</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2 flex items-end">
+                                <BaseButton
+                                    variant="ghost"
+                                    class="w-full text-danger-700 hover:bg-danger-50 hover:text-danger-800"
+                                    :disabled="allocationRows.length === 1"
+                                    :label="`Remove split row ${idx + 1}`"
+                                    @click="removeSplitRow(idx)"
+                                >
+                                    <template #icon><TrashIcon class="icon" aria-hidden="true" /></template>
+                                    Remove
+                                </BaseButton>
+                            </div>
+                        </div>
                         <div>
-                            <HelpLabel label="Split Rows" tooltip="Use one row for a single owner, or multiple rows when commission is split between people." text-class="font-semibold text-slate-900" />
-                            <p class="text-sm text-slate-500">Add each person who should receive commission for this sale.</p>
-                        </div>
-                        <button
-                            type="button"
-                            class="listing-btn-outline w-full sm:w-auto"
-                            title="Add another person to split commission for this same sale."
-                            @click="addSplitRow"
-                        >
-                            Add row
-                        </button>
-                    </div>
-
-                    <div class="divide-y divide-slate-100">
-                        <div v-for="(entry, idx) in allocationRows" :key="entry.local_id" class="p-4 space-y-3">
-                            <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-                                <div class="md:col-span-3">
-                                    <HelpLabel label="User" tooltip="Select the employee who should receive this commission row." />
-                                    <select v-model="entry.credited_user_id" class="listing-input mt-1">
-                                        <option value="">Select user...</option>
-                                        <option v-for="u in eligibleUsers" :key="u.id" :value="u.id">{{ u.name }}</option>
-                                    </select>
-                                </div>
-                                <div class="md:col-span-2">
-                                    <HelpLabel label="Amount" tooltip="Enter the commission amount only, not the full sale value." />
-                                    <input v-model.number="entry.commission_amount" type="number" step="0.01" min="0.01" class="listing-input mt-1" />
-                                </div>
-                                <div class="md:col-span-2">
-                                    <HelpLabel label="Currency" tooltip="Choose the currency for this commission amount. GBP and PKR are tracked separately in reports." />
-                                    <select v-model="entry.commission_currency" class="listing-input mt-1">
-                                        <option value="GBP">GBP</option>
-                                        <option value="PKR">PKR</option>
-                                    </select>
-                                </div>
-                                <div class="md:col-span-3">
-                                    <HelpLabel label="Role" tooltip="Single Owner means one person gets commission. Closer and Appointment Creator are useful for split commission." />
-                                    <select v-model="entry.commission_role" class="listing-input mt-1">
-                                        <option value="single_owner">Single Owner</option>
-                                        <option value="appointment_creator">Appointment Creator</option>
-                                        <option value="closer">Closer</option>
-                                    </select>
-                                </div>
-                                <div class="md:col-span-2 flex items-end">
-                                    <button
-                                        type="button"
-                                        class="w-full rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-                                        :disabled="allocationRows.length === 1"
-                                        @click="removeSplitRow(idx)"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            </div>
-                            <div>
-                                <HelpLabel label="Notes" tooltip="Optional internal note explaining why this person received commission." />
-                                <input v-model="entry.notes" type="text" class="listing-input mt-1" placeholder="Optional note for this commission row" />
-                            </div>
+                            <HelpLabel label="Notes" tooltip="Optional internal note explaining why this person received commission." />
+                            <input
+                                v-model="entry.notes"
+                                type="text"
+                                class="listing-input mt-1"
+                                placeholder="Optional note for this commission row"
+                                :aria-label="`Notes for split row ${idx + 1}`"
+                            />
                         </div>
                     </div>
-                </section>
+                </div>
+            </section>
 
-                <section class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div class="rounded-lg bg-slate-50 p-4">
-                        <p class="text-xs uppercase tracking-wide text-slate-500">GBP total</p>
-                        <p class="mt-1 text-xl font-bold text-slate-950">{{ formatMoney('GBP', allocationTotals.GBP) }}</p>
-                    </div>
-                    <div class="rounded-lg bg-slate-50 p-4">
-                        <p class="text-xs uppercase tracking-wide text-slate-500">PKR total</p>
-                        <p class="mt-1 text-xl font-bold text-slate-950">{{ formatMoney('PKR', allocationTotals.PKR) }}</p>
-                    </div>
-                </section>
-            </div>
-
-            <div class="px-4 sm:px-6 py-4 border-t border-slate-200 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-                <button type="button" class="listing-btn-outline w-full sm:w-auto" @click="closeAllocation">Cancel</button>
-                <button
-                    type="button"
-                    class="listing-btn-primary w-full sm:w-auto"
-                    title="Save this commission allocation. Existing allocation for this sale will be replaced."
-                    :disabled="savingAllocation"
-                    @click="saveAllocation"
-                >
-                    {{ savingAllocation ? 'Saving...' : 'Save allocation' }}
-                </button>
-            </div>
+            <section class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="rounded-control bg-slate-50 p-4">
+                    <p class="text-eyebrow uppercase text-slate-500">GBP total</p>
+                    <p class="mt-1 text-xl font-bold text-slate-950">{{ formatMoney('GBP', allocationTotals.GBP) }}</p>
+                </div>
+                <div class="rounded-control bg-slate-50 p-4">
+                    <p class="text-eyebrow uppercase text-slate-500">PKR total</p>
+                    <p class="mt-1 text-xl font-bold text-slate-950">{{ formatMoney('PKR', allocationTotals.PKR) }}</p>
+                </div>
+            </section>
         </div>
-    </div>
+
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="closeAllocation">Cancel</BaseButton>
+            <BaseButton
+                variant="primary"
+                block-mobile
+                title="Save this commission allocation. Existing allocation for this sale will be replaced."
+                :loading="savingAllocation"
+                @click="saveAllocation"
+            >
+                {{ savingAllocation ? 'Saving...' : 'Save allocation' }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
 import { computed, defineComponent, h, reactive, ref } from 'vue';
 import axios from 'axios';
+import { ChartBarIcon, FunnelIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseBadge, BaseButton, BaseModal } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 
 const toast = useToastStore();
@@ -386,6 +413,10 @@ const eligibleUsers = computed(() => users.value.filter((u) => !!u.commission_el
 const pendingCount = computed(() => sales.value.filter((row) => !row.commission_processed).length);
 const allocatedCount = computed(() => sales.value.filter((row) => row.commission_processed).length);
 const badgeText = computed(() => `${sales.value.length} sales`);
+
+const allocationDescription = computed(
+    () => `${activeSale.value?.customer_name || '-'} - ${activeSale.value?.product_name || '-'}`,
+);
 
 const allocatedTotals = computed(() => {
     const totals = { GBP: 0, PKR: 0 };
@@ -502,13 +533,6 @@ function formatMoney(currency, amount) {
 
 function saleKey(row) {
     return `${row.lead_id}-${row.lead_item_id || 'lead'}`;
-}
-
-function statusPillClass(row) {
-    return [
-        'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap',
-        row.commission_processed ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200',
-    ];
 }
 
 function allocationLabel(row) {
@@ -681,12 +705,12 @@ const HelpLabel = defineComponent({
             h('span', { class: 'group relative inline-flex shrink-0' }, [
                 h('button', {
                     type: 'button',
-                    class: 'grid h-4 w-4 place-items-center rounded-full border border-slate-300 bg-white text-[10px] font-bold leading-none text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-200',
+                    class: 'grid h-4 w-4 place-items-center rounded-full border border-slate-300 bg-white text-[10px] font-bold leading-none text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
                     'aria-label': `${props.label}: ${props.tooltip}`,
                 }, '?'),
                 h('span', {
                     class: [
-                        'pointer-events-none absolute bottom-full z-40 mb-2 hidden w-60 rounded-md bg-slate-900 px-3 py-2 text-left text-[11px] font-medium leading-4 text-white shadow-lg group-hover:block group-focus-within:block',
+                        'pointer-events-none absolute bottom-full z-dropdown mb-2 hidden w-60 rounded-md bg-slate-900 px-3 py-2 text-left text-[11px] font-medium leading-4 text-white shadow-dropdown group-hover:block group-focus-within:block',
                         props.align === 'right' ? 'right-0' : 'left-0',
                     ],
                 }, props.tooltip),

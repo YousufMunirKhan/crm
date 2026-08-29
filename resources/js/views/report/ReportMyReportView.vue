@@ -6,142 +6,171 @@
     >
         <template #filters>
             <div>
-                <label class="listing-label">Month</label>
-                <select v-model="selectedMonth" class="listing-input w-full sm:w-56" @change="loadReport">
+                <label class="form-label" for="reportmyreportview-month">Month</label>
+                <select id="reportmyreportview-month" v-model="selectedMonth" class="form-select w-full sm:w-56" @change="loadReport">
                     <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
                 </select>
             </div>
         </template>
 
-        <div v-if="loading" class="px-5 py-14 flex justify-center text-slate-500 text-sm">
-            <svg class="animate-spin h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
+        <div v-if="loading" class="px-4 sm:px-5 py-8 space-y-3" aria-busy="true">
+            <p class="sr-only">Loading your report…</p>
+            <div class="skeleton-text w-1/3"></div>
+            <div class="skeleton-text w-2/3"></div>
+            <div class="skeleton-text w-1/2"></div>
+            <div class="skeleton-text w-3/4"></div>
         </div>
 
         <div v-else-if="self" class="px-4 sm:px-5 pb-5 space-y-4">
             <!-- Ranking badge -->
             <div
                 v-if="self.rank"
-                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-warning-50 to-warning-100 border border-warning-200"
             >
-                <span class="text-2xl font-bold text-amber-700">#{{ self.rank }}</span>
-                <span class="text-sm text-amber-800">
+                <span class="text-2xl font-bold text-warning-800 tabular-nums">#{{ self.rank }}</span>
+                <span class="text-sm text-warning-800">
                     out of {{ totalEmployeesWithTargets }} employee{{ totalEmployeesWithTargets !== 1 ? 's' : '' }} with targets
                 </span>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-                <div v-for="card in activityCards" :key="card.label" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-                    <div class="text-sm font-medium text-slate-500 mb-1">{{ card.label }}</div>
-                    <div class="text-2xl font-bold text-slate-900">{{ card.value }}</div>
-                    <div class="mt-1 text-xs text-slate-500">{{ card.help }}</div>
-                </div>
+                <StatCard
+                    v-for="card in activityCards"
+                    :key="card.label"
+                    :label="card.label"
+                    :value="card.value"
+                    :caption="card.help"
+                />
             </div>
 
             <!-- Target vs Achievement cards -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-                    <div class="text-sm font-medium text-slate-500 mb-1">Appointments</div>
+                <BaseCard>
+                    <div class="stat-label">Appointments</div>
                     <div class="flex items-baseline gap-2">
-                        <span class="text-2xl font-bold text-slate-900">{{ self.achieved_appointments }}</span>
-                        <span class="text-slate-500">/ {{ self.target_appointments }}</span>
+                        <span class="text-2xl font-bold text-slate-900 tabular-nums">{{ self.achieved_appointments }}</span>
+                        <span class="text-slate-500 tabular-nums">/ {{ self.target_appointments }}</span>
                     </div>
                     <div class="mt-2">
                         <div class="flex justify-between text-xs text-slate-500 mb-1">
                             <span>Progress</span>
-                            <span>{{ self.appointment_progress }}%</span>
+                            <span class="tabular-nums">{{ self.appointment_progress }}%</span>
                         </div>
-                        <div class="w-full bg-slate-200 rounded-full h-2">
+                        <div
+                            class="w-full bg-slate-200 rounded-full h-2"
+                            role="progressbar"
+                            aria-label="Appointment target progress"
+                            :aria-valuenow="Math.min(self.appointment_progress || 0, 100)"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                        >
                             <div
-                                class="h-2 rounded-full bg-emerald-500 transition-all"
+                                class="h-2 rounded-full bg-success-600 transition-all"
                                 :style="{ width: `${Math.min(self.appointment_progress || 0, 100)}%` }"
                             ></div>
                         </div>
                     </div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-                    <div class="text-sm font-medium text-slate-500 mb-1">Sales (Products Won)</div>
+                </BaseCard>
+                <BaseCard>
+                    <div class="stat-label">Sales (Products Won)</div>
                     <div class="flex items-baseline gap-2">
-                        <span class="text-2xl font-bold text-slate-900">{{ self.achieved_sales }}</span>
-                        <span class="text-slate-500">/ {{ self.target_sales }}</span>
+                        <span class="text-2xl font-bold text-slate-900 tabular-nums">{{ self.achieved_sales }}</span>
+                        <span class="text-slate-500 tabular-nums">/ {{ self.target_sales }}</span>
                     </div>
                     <div class="mt-2">
                         <div class="flex justify-between text-xs text-slate-500 mb-1">
                             <span>Progress</span>
-                            <span>{{ self.sales_progress }}%</span>
+                            <span class="tabular-nums">{{ self.sales_progress }}%</span>
                         </div>
-                        <div class="w-full bg-slate-200 rounded-full h-2">
+                        <div
+                            class="w-full bg-slate-200 rounded-full h-2"
+                            role="progressbar"
+                            aria-label="Sales target progress"
+                            :aria-valuenow="Math.min(self.sales_progress || 0, 100)"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                        >
                             <div
-                                class="h-2 rounded-full bg-blue-500 transition-all"
+                                class="h-2 rounded-full bg-primary-600 transition-all"
                                 :style="{ width: `${Math.min(self.sales_progress || 0, 100)}%` }"
                             ></div>
                         </div>
                     </div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-                    <div class="text-sm font-medium text-slate-500 mb-1">Revenue</div>
+                </BaseCard>
+                <BaseCard>
+                    <div class="stat-label">Revenue</div>
                     <div class="flex items-baseline gap-2">
-                        <span class="text-2xl font-bold text-slate-900">£{{ formatNumber(self.achieved_revenue || 0) }}</span>
-                        <span class="text-slate-500">/ £{{ formatNumber(self.target_revenue || 0) }}</span>
+                        <span class="text-2xl font-bold text-slate-900 tabular-nums">£{{ formatNumber(self.achieved_revenue || 0) }}</span>
+                        <span class="text-slate-500 tabular-nums">/ £{{ formatNumber(self.target_revenue || 0) }}</span>
                     </div>
                     <div class="mt-2">
                         <div class="flex justify-between text-xs text-slate-500 mb-1">
                             <span>Progress</span>
-                            <span>{{ self.revenue_progress }}%</span>
+                            <span class="tabular-nums">{{ self.revenue_progress }}%</span>
                         </div>
-                        <div class="w-full bg-slate-200 rounded-full h-2">
+                        <div
+                            class="w-full bg-slate-200 rounded-full h-2"
+                            role="progressbar"
+                            aria-label="Revenue target progress"
+                            :aria-valuenow="Math.min(self.revenue_progress || 0, 100)"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                        >
                             <div
-                                class="h-2 rounded-full bg-indigo-500 transition-all"
+                                class="h-2 rounded-full bg-primary-500 transition-all"
                                 :style="{ width: `${Math.min(self.revenue_progress || 0, 100)}%` }"
                             ></div>
                         </div>
                     </div>
-                </div>
+                </BaseCard>
             </div>
 
-            <div
+            <BaseCard
                 v-if="self.sales_target_lines?.length"
-                class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+                title="Sales targets by product & category"
+                subtitle="Won line items in the month — category rows include every product in that category."
+                :padded="false"
             >
-                <div class="px-5 py-3 border-b border-slate-100">
-                    <h2 class="text-sm font-semibold text-slate-900">Sales targets by product & category</h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Won line items in the month — category rows include every product in that category.</p>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-slate-50 text-left text-xs font-medium text-slate-600">
+                <div class="table-wrap">
+                    <table class="table">
+                        <caption class="sr-only">Sales targets by product and category, with achieved and target quantities</caption>
+                        <thead class="table-thead">
                             <tr>
-                                <th class="px-4 py-2">Target</th>
-                                <th class="px-4 py-2">Achieved</th>
-                                <th class="px-4 py-2">Target qty</th>
-                                <th class="px-4 py-2">Progress</th>
+                                <th scope="col" class="table-th">Target</th>
+                                <th scope="col" class="table-th-num">Achieved</th>
+                                <th scope="col" class="table-th-num">Target qty</th>
+                                <th scope="col" class="table-th-num">Progress</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <tr v-for="(ln, idx) in self.sales_target_lines" :key="idx">
-                                <td class="px-4 py-2 text-slate-900">{{ ln.label }}</td>
-                                <td class="px-4 py-2 font-medium">{{ ln.achieved_quantity }}</td>
-                                <td class="px-4 py-2 text-slate-600">{{ ln.target_quantity }}</td>
-                                <td class="px-4 py-2">
-                                    <span class="text-slate-600">{{ lineProgress(ln) }}%</span>
-                                </td>
+                        <tbody>
+                            <tr v-for="(ln, idx) in self.sales_target_lines" :key="idx" class="table-row">
+                                <td class="table-td-strong">{{ ln.label }}</td>
+                                <td class="table-td-num font-medium">{{ ln.achieved_quantity }}</td>
+                                <td class="table-td-num">{{ ln.target_quantity }}</td>
+                                <td class="table-td-num">{{ lineProgress(ln) }}%</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </BaseCard>
 
-            <div v-if="!self.rank && (self.target_appointments || self.target_sales || self.target_revenue)" class="text-sm text-slate-500">
+            <p v-if="!self.rank && (self.target_appointments || self.target_sales || self.target_revenue)" class="callout callout-info">
                 No ranking yet — you may not be in the Sales/CallAgent role or targets were set recently.
-            </div>
-            <div v-if="!self.target_appointments && !self.target_sales && !self.target_revenue" class="text-sm text-slate-500 bg-slate-50 rounded-lg p-4">
+            </p>
+            <p v-if="!self.target_appointments && !self.target_sales && !self.target_revenue" class="callout callout-warning">
                 No targets set for this month. Ask your admin to use Set targets (Employees).
-            </div>
+            </p>
         </div>
 
-        <div v-else class="px-5 py-12 text-center text-slate-500 text-sm">Unable to load your report.</div>
+        <EmptyState
+            v-else
+            heading="Unable to load your report"
+            description="We could not fetch your targets for this month. Pick another month or try again shortly."
+        >
+            <template #icon>
+                <ChartBarIcon class="icon" aria-hidden="true" />
+            </template>
+        </EmptyState>
     </ListingPageShell>
 </template>
 
@@ -149,6 +178,8 @@
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseCard, EmptyState, StatCard } from '@/components/base';
+import { ChartBarIcon } from '@heroicons/vue/24/outline';
 
 const formatMonth = (date) => {
     const d = date instanceof Date ? date : new Date(date);

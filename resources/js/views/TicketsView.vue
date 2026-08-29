@@ -5,19 +5,17 @@
         :badge="ticketsBadge"
     >
         <template #actions>
-            <router-link
-                to="/tickets/create"
-                class="listing-btn-accent w-full sm:w-auto touch-manipulation text-center"
-            >
-                + Create Ticket
-            </router-link>
+            <BaseButton variant="primary" to="/tickets/create" block-mobile>
+                <template #icon><PlusIcon class="icon" aria-hidden="true" /></template>
+                Create Ticket
+            </BaseButton>
         </template>
 
         <template #filters>
             <div class="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
                 <div class="w-full sm:w-56">
-                    <label class="listing-label">Status</label>
-                    <select v-model="statusFilter" class="listing-input" @change="onStatusFilterChange">
+                    <label class="form-label" for="ticketsview-status">Status</label>
+                    <select id="ticketsview-status" v-model="statusFilter" class="form-select" @change="onStatusFilterChange">
                         <option value="">All status</option>
                         <option value="open">Open</option>
                         <option value="in_progress">Working</option>
@@ -25,70 +23,68 @@
                     </select>
                 </div>
                 <div class="w-full sm:w-44">
-                    <label class="listing-label">From</label>
-                    <input v-model="dateFrom" type="date" class="listing-input" />
+                    <label class="form-label" for="ticketsview-from">From</label>
+                    <input id="ticketsview-from" v-model="dateFrom" type="date" class="form-input" />
                 </div>
                 <div class="w-full sm:w-44">
-                    <label class="listing-label">To</label>
-                    <input v-model="dateTo" type="date" class="listing-input" />
+                    <label class="form-label" for="ticketsview-to">To</label>
+                    <input id="ticketsview-to" v-model="dateTo" type="date" class="form-input" />
                 </div>
-                <button type="button" class="listing-btn-primary" @click="loadTickets">
+                <BaseButton variant="soft" @click="loadTickets">
+                    <template #icon><FunnelIcon class="icon" aria-hidden="true" /></template>
                     Filter
-                </button>
+                </BaseButton>
             </div>
         </template>
 
-        <div class="hidden md:block overflow-x-auto">
-            <table class="w-full min-w-[1040px]">
-                <thead class="listing-thead">
+        <div v-if="tickets.length" class="hidden md:block table-wrap">
+            <table class="table min-w-[1040px]">
+                <caption class="sr-only">Support tickets matching the current filters</caption>
+                <thead class="table-thead">
                     <tr>
-                        <th class="listing-th">Ticket #</th>
-                        <th class="listing-th">Subject</th>
-                        <th class="listing-th">Customer</th>
-                        <th v-if="isStaffAdmin" class="listing-th">Created</th>
-                        <th class="listing-th">Priority</th>
-                        <th class="listing-th">Status</th>
-                        <th v-if="isStaffAdmin" class="listing-th">Resolved</th>
-                        <th v-if="isStaffAdmin" class="listing-th text-center">Comments</th>
-                        <th v-if="isStaffAdmin" class="listing-th text-center">Files</th>
-                        <th class="listing-th">Assigned</th>
-                        <th class="listing-th">Actions</th>
+                        <th scope="col" class="table-th">Ticket #</th>
+                        <th scope="col" class="table-th">Subject</th>
+                        <th scope="col" class="table-th">Customer</th>
+                        <th v-if="isStaffAdmin" scope="col" class="table-th">Created</th>
+                        <th scope="col" class="table-th">Priority</th>
+                        <th scope="col" class="table-th">Status</th>
+                        <th v-if="isStaffAdmin" scope="col" class="table-th">Resolved</th>
+                        <th v-if="isStaffAdmin" scope="col" class="table-th text-center">Comments</th>
+                        <th v-if="isStaffAdmin" scope="col" class="table-th text-center">Files</th>
+                        <th scope="col" class="table-th">Assigned</th>
+                        <th scope="col" class="table-th">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="ticket in tickets" :key="ticket.id" class="listing-row">
-                        <td class="listing-td-strong">
-                            <router-link :to="`/tickets/${ticket.id}`" class="listing-link-edit">
+                    <tr v-for="ticket in tickets" :key="ticket.id" class="table-row">
+                        <td class="table-td-strong">
+                            <router-link :to="`/tickets/${ticket.id}`" class="link">
                                 {{ ticket.ticket_number }}
                             </router-link>
                         </td>
-                        <td class="listing-td">
-                            <router-link :to="`/tickets/${ticket.id}`" class="text-slate-800 hover:text-blue-600 font-medium">
+                        <td class="table-td">
+                            <router-link :to="`/tickets/${ticket.id}`" class="text-slate-800 hover:text-primary-700 font-medium">
                                 {{ ticket.subject }}
                             </router-link>
                         </td>
-                        <td class="listing-td">{{ ticket.customer?.name || '—' }}</td>
-                        <td v-if="isStaffAdmin" class="listing-td whitespace-nowrap text-slate-600">{{ formatDateTime(ticket.created_at) }}</td>
-                        <td class="listing-td">
-                            <span class="inline-flex rounded-md px-2 py-0.5 text-xs font-medium" :class="getPriorityClass(ticket.priority)">
-                                {{ ticket.priority }}
-                            </span>
+                        <td class="table-td">{{ ticket.customer?.name || '—' }}</td>
+                        <td v-if="isStaffAdmin" class="table-td whitespace-nowrap text-slate-600">{{ formatDateTime(ticket.created_at) }}</td>
+                        <td class="table-td">
+                            <BaseBadge :tone="getPriorityTone(ticket.priority)">{{ ticket.priority }}</BaseBadge>
                         </td>
-                        <td class="listing-td">
-                            <span class="inline-flex rounded-md px-2 py-0.5 text-xs font-medium" :class="getStatusClass(ticket.status)">
-                                {{ getStatusLabel(ticket.status) }}
-                            </span>
+                        <td class="table-td">
+                            <BaseBadge :tone="getStatusTone(ticket.status)">{{ getStatusLabel(ticket.status) }}</BaseBadge>
                         </td>
-                        <td v-if="isStaffAdmin" class="listing-td whitespace-nowrap text-slate-600">
+                        <td v-if="isStaffAdmin" class="table-td whitespace-nowrap text-slate-600">
                             {{ ticket.resolved_at ? formatDateTime(ticket.resolved_at) : '—' }}
                         </td>
-                        <td v-if="isStaffAdmin" class="listing-td text-center text-slate-600">{{ ticket.messages_count ?? '—' }}</td>
-                        <td v-if="isStaffAdmin" class="listing-td text-center text-slate-600">{{ ticket.attachments_count ?? '—' }}</td>
-                        <td class="listing-td">{{ formatAssignees(ticket) }}</td>
-                        <td class="listing-td">
+                        <td v-if="isStaffAdmin" class="table-td text-center text-slate-600">{{ ticket.messages_count ?? '—' }}</td>
+                        <td v-if="isStaffAdmin" class="table-td text-center text-slate-600">{{ ticket.attachments_count ?? '—' }}</td>
+                        <td class="table-td">{{ formatAssignees(ticket) }}</td>
+                        <td class="table-td">
                             <div class="flex flex-wrap gap-x-3 gap-y-1">
-                                <router-link :to="`/tickets/${ticket.id}`" class="listing-link-edit">View</router-link>
-                                <router-link :to="`/tickets/${ticket.id}/edit`" class="listing-link-edit">Edit</router-link>
+                                <router-link :to="`/tickets/${ticket.id}`" class="link text-sm">View</router-link>
+                                <router-link :to="`/tickets/${ticket.id}/edit`" class="link text-sm">Edit</router-link>
                             </div>
                         </td>
                     </tr>
@@ -96,19 +92,17 @@
             </table>
         </div>
 
-        <div class="md:hidden space-y-3 px-3 pb-3">
+        <div v-if="tickets.length" class="md:hidden space-y-3 px-3 pb-3">
             <div
                 v-for="ticket in tickets"
                 :key="`mobile-${ticket.id}`"
-                class="rounded-xl border border-slate-200 bg-slate-50/40 p-4 space-y-2"
+                class="table-card"
             >
                 <div class="flex items-start justify-between gap-2">
-                    <router-link :to="`/tickets/${ticket.id}`" class="text-sm font-semibold text-blue-600 hover:text-blue-800">
+                    <router-link :to="`/tickets/${ticket.id}`" class="link text-sm font-semibold">
                         #{{ ticket.ticket_number }}
                     </router-link>
-                    <span class="inline-flex rounded-md px-2 py-0.5 text-xs font-medium" :class="getStatusClass(ticket.status)">
-                        {{ getStatusLabel(ticket.status) }}
-                    </span>
+                    <BaseBadge :tone="getStatusTone(ticket.status)">{{ getStatusLabel(ticket.status) }}</BaseBadge>
                 </div>
                 <div class="text-sm font-medium text-slate-900">
                     {{ ticket.subject }}
@@ -116,21 +110,27 @@
                 <div class="text-sm text-slate-600">
                     Customer: {{ ticket.customer?.name || '—' }}
                 </div>
-                <div class="text-sm text-slate-600">
-                    Priority:
-                    <span class="inline-flex rounded-md px-2 py-0.5 text-xs font-medium ml-1" :class="getPriorityClass(ticket.priority)">
-                        {{ ticket.priority }}
-                    </span>
+                <div class="text-sm text-slate-600 flex items-center gap-1.5">
+                    <span>Priority:</span>
+                    <BaseBadge :tone="getPriorityTone(ticket.priority)">{{ ticket.priority }}</BaseBadge>
                 </div>
                 <div class="text-sm text-slate-600">
                     Assigned: {{ formatAssignees(ticket) }}
                 </div>
                 <div class="flex flex-wrap gap-3 pt-1">
-                    <router-link :to="`/tickets/${ticket.id}`" class="listing-link-edit">View</router-link>
-                    <router-link :to="`/tickets/${ticket.id}/edit`" class="listing-link-edit">Edit</router-link>
+                    <router-link :to="`/tickets/${ticket.id}`" class="link text-sm">View</router-link>
+                    <router-link :to="`/tickets/${ticket.id}/edit`" class="link text-sm">Edit</router-link>
                 </div>
             </div>
         </div>
+
+        <EmptyState
+            v-if="!tickets.length"
+            heading="No tickets to show"
+            description="Nothing matches the current filters. Clear the status or date range, or create a new ticket."
+        >
+            <template #icon><TicketIcon class="icon" aria-hidden="true" /></template>
+        </EmptyState>
 
         <template #pagination>
             <Pagination
@@ -148,8 +148,10 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import axios from 'axios';
+import { FunnelIcon, PlusIcon, TicketIcon } from '@heroicons/vue/24/outline';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseBadge, BaseButton, EmptyState } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
 import { formatTicketStatus } from '@/utils/displayFormat';
@@ -212,25 +214,27 @@ function syncFiltersFromRoute() {
     assignedToFilter.value = q.assigned_to != null && q.assigned_to !== '' ? String(q.assigned_to) : '';
 }
 
-const getPriorityClass = (priority) => {
-    const classes = {
-        urgent: 'bg-red-100 text-red-800',
-        high: 'bg-orange-100 text-orange-800',
-        medium: 'bg-yellow-100 text-yellow-800',
-        low: 'bg-blue-100 text-blue-800',
+/** Ticket priority -> BaseBadge tone (same colour intent as the old class map). */
+const getPriorityTone = (priority) => {
+    const tones = {
+        urgent: 'danger',
+        high: 'warning',
+        medium: 'warning',
+        low: 'primary',
     };
-    return classes[priority] || 'bg-slate-100 text-slate-800';
+    return tones[priority] || 'neutral';
 };
 
-const getStatusClass = (status) => {
-    const classes = {
-        open: 'bg-yellow-100 text-yellow-800',
-        in_progress: 'bg-blue-100 text-blue-800',
-        on_hold: 'bg-amber-100 text-amber-800',
-        resolved: 'bg-green-100 text-green-800',
-        closed: 'bg-slate-100 text-slate-800',
+/** Ticket status -> BaseBadge tone (same colour intent as the old class map). */
+const getStatusTone = (status) => {
+    const tones = {
+        open: 'warning',
+        in_progress: 'primary',
+        on_hold: 'warning',
+        resolved: 'success',
+        closed: 'neutral',
     };
-    return classes[status] || 'bg-slate-100 text-slate-800';
+    return tones[status] || 'neutral';
 };
 
 const formatAssignees = (ticket) => {

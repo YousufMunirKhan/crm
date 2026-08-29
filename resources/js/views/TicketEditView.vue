@@ -1,39 +1,69 @@
 <template>
     <div class="min-h-screen bg-slate-50 w-full min-w-0 overflow-x-hidden">
         <div class="max-w-3xl mx-auto px-3 sm:px-6 py-6 lg:py-8 w-full min-w-0">
-            <div v-if="loadError" class="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800 text-sm mb-6">
-                {{ loadError }}
-                <router-link to="/tickets" class="block mt-2 font-medium text-red-900 underline">Back to tickets</router-link>
+            <div v-if="loadError" class="callout callout-danger mb-6" role="alert">
+                <p>{{ loadError }}</p>
+                <div class="mt-3">
+                    <BaseButton to="/tickets" variant="ghost" size="sm">
+                        <template #icon>
+                            <ArrowLeftIcon class="icon" aria-hidden="true" />
+                        </template>
+                        Back to tickets
+                    </BaseButton>
+                </div>
             </div>
 
             <template v-else>
                 <div class="mb-6">
-                    <router-link
-                        :to="`/tickets/${ticketId}`"
-                        class="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 text-sm mb-4"
-                    >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
+                    <BaseButton :to="`/tickets/${ticketId}`" variant="ghost" size="sm" class="mb-4">
+                        <template #icon>
+                            <ArrowLeftIcon class="icon" aria-hidden="true" />
+                        </template>
                         Back to ticket
-                    </router-link>
+                    </BaseButton>
                     <h1 class="text-2xl font-bold text-slate-900">Edit ticket</h1>
                     <p v-if="ticketNumber" class="text-slate-600 mt-1 text-sm font-mono">{{ ticketNumber }}</p>
                     <p class="text-slate-500 mt-1 text-sm">Changes save to the same record. Add comments from the ticket detail page.</p>
                 </div>
 
-                <div v-if="pageLoading" class="text-center py-12 text-slate-500 text-sm">Loading…</div>
+                <div v-if="pageLoading" class="form-card p-6 space-y-3" aria-busy="true">
+                    <span class="sr-only">Loading ticket…</span>
+                    <div class="skeleton-text w-1/3"></div>
+                    <div class="skeleton-text w-full"></div>
+                    <div class="skeleton-text w-5/6"></div>
+                    <div class="skeleton-text w-2/3"></div>
+                    <div class="skeleton-text w-1/2"></div>
+                </div>
 
-                <form v-else class="form-card !overflow-visible" @submit.prevent="handleSubmit">
+                <form v-else id="ticket-edit-form" novalidate class="form-card !overflow-visible" @submit.prevent="handleSubmit">
                     <div class="form-section-head-mint">
                         <h2 class="form-section-title-mint text-xl">Update ticket</h2>
                         <p class="form-section-desc-mint">Assignees and creator receive email when someone posts a comment on the ticket detail page.</p>
                     </div>
 
                     <div class="form-body space-y-4">
+                        <!-- Validation summary: focused on a failed submit -->
+                        <div
+                            v-if="error || errorFields.length"
+                            ref="errorSummaryRef"
+                            class="callout callout-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-600/40"
+                            role="alert"
+                            tabindex="-1"
+                        >
+                            <p class="font-semibold">
+                                {{ errorFields.length ? 'Please fix the following before saving:' : 'This ticket could not be saved' }}
+                            </p>
+                            <ul v-if="errorFields.length" class="mt-1.5 list-disc pl-5 space-y-0.5">
+                                <li v-for="failed in errorFields" :key="failed.field">
+                                    <span class="font-medium">{{ failed.label }}</span> — {{ failed.message }}
+                                </li>
+                            </ul>
+                            <p v-else class="mt-1">{{ error }}</p>
+                        </div>
+
                         <div>
-                            <label class="form-label">Customer</label>
-                            <select v-model="form.customer_id" class="form-input">
+                            <label class="form-label" for="ticketeditview-customer">Customer</label>
+                            <select id="ticketeditview-customer" v-model="form.customer_id" class="form-select">
                                 <option value="">No customer</option>
                                 <option v-for="c in customers" :key="c.id" :value="c.id">
                                     {{ c.name }} — {{ c.phone }}
@@ -42,68 +72,114 @@
                         </div>
 
                         <div>
-                            <label class="form-label">Subject *</label>
-                            <input v-model="form.subject" type="text" required class="form-input" />
+                            <label class="form-label" for="ticketeditview-subject">
+                                Subject<span class="form-required" aria-hidden="true">*</span>
+                            </label>
+                            <input
+                                id="ticketeditview-subject"
+                                v-model="form.subject"
+                                type="text"
+                                required
+                                class="form-input"
+                                :aria-invalid="fieldErrors.subject ? 'true' : undefined"
+                                :aria-describedby="fieldErrors.subject ? 'ticketeditview-subject-error' : undefined"
+                            />
+                            <p v-if="fieldErrors.subject" id="ticketeditview-subject-error" class="form-error">
+                                {{ fieldErrors.subject }}
+                            </p>
                         </div>
 
                         <div>
-                            <label class="form-label">Description</label>
+                            <label class="form-label" for="ticketeditview-description">Description</label>
                             <textarea
+                                id="ticketeditview-description"
                                 ref="descriptionTextareaRef"
                                 v-model="form.description"
                                 rows="8"
                                 class="form-textarea-ticket-description"
                             />
-                            <p class="text-xs text-slate-500 mt-1">Drag the corner to resize. The field expands as you type or paste.</p>
+                            <p class="form-hint">Drag the corner to resize. The field expands as you type or paste.</p>
                         </div>
 
                         <div>
-                            <label class="form-label">Reference link</label>
-                            <input v-model="form.reference_url" type="url" class="form-input" placeholder="https://..." />
+                            <label class="form-label" for="ticketeditview-reference-link">Reference link</label>
+                            <input id="ticketeditview-reference-link" v-model="form.reference_url" type="url" class="form-input" placeholder="https://..." />
                         </div>
 
                         <div>
-                            <label class="form-label">Attachments</label>
+                            <label class="form-label" for="ticketeditview-attachments">Attachments</label>
                             <p v-if="existingAttachments.length" class="text-xs text-slate-600 mb-2">
                                 <span class="font-medium">Current:</span>
                                 <span v-for="(att, i) in existingAttachments" :key="att.id" class="inline-flex items-center gap-1 ml-1">
-                                    <a :href="att.url" target="_blank" rel="noopener" class="text-violet-600 hover:underline">{{ att.original_name }}</a>
-                                    <button type="button" class="text-red-600 text-xs" @click="removeAttachment(att)">Remove</button>
-                                    <span v-if="i < existingAttachments.length - 1">·</span>
+                                    <a :href="att.url" target="_blank" rel="noopener" class="link">{{ att.original_name }}</a>
+                                    <BaseButton
+                                        variant="ghost"
+                                        size="sm"
+                                        :label="`Remove ${att.original_name}`"
+                                        @click="requestRemoveAttachment(att)"
+                                    >
+                                        <template #icon>
+                                            <TrashIcon class="icon-sm" aria-hidden="true" />
+                                        </template>
+                                        Remove
+                                    </BaseButton>
+                                    <span v-if="i < existingAttachments.length - 1" aria-hidden="true">·</span>
                                 </span>
                             </p>
                             <input
+                                id="ticketeditview-attachments"
                                 ref="attachmentInputRef"
                                 type="file"
                                 multiple
                                 accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                                class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100"
+                                class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded-control"
                                 @change="onFiles"
                             />
                             <ul v-if="pendingFiles.length" class="mt-2 text-xs text-slate-600 space-y-1">
-                                <li v-for="(f, i) in pendingFiles" :key="i" class="flex justify-between gap-2">
+                                <li v-for="(f, i) in pendingFiles" :key="i" class="flex items-center justify-between gap-2">
                                     <span class="truncate">{{ f.name }}</span>
-                                    <button type="button" class="text-red-600 shrink-0" @click="pendingFiles.splice(i, 1)">Remove</button>
+                                    <BaseButton
+                                        variant="ghost"
+                                        size="sm"
+                                        class="shrink-0"
+                                        :label="`Remove ${f.name}`"
+                                        @click="pendingFiles.splice(i, 1)"
+                                    >
+                                        <template #icon>
+                                            <TrashIcon class="icon-sm" aria-hidden="true" />
+                                        </template>
+                                        Remove
+                                    </BaseButton>
                                 </li>
                             </ul>
                         </div>
 
                         <div>
-                            <label class="form-label">Expected resolution (hours)</label>
+                            <label class="form-label" for="ticketeditview-estimated-resolve-hours">Expected resolution (hours)</label>
                             <input
+                                id="ticketeditview-estimated-resolve-hours"
                                 v-model.number="form.estimated_resolve_hours"
                                 type="number"
                                 min="1"
                                 max="8760"
                                 class="form-input"
                                 placeholder="Empty = use priority SLA"
+                                :aria-invalid="fieldErrors.estimated_resolve_hours ? 'true' : undefined"
+                                :aria-describedby="fieldErrors.estimated_resolve_hours ? 'ticketeditview-estimated-resolve-hours-error' : undefined"
                             />
+                            <p
+                                v-if="fieldErrors.estimated_resolve_hours"
+                                id="ticketeditview-estimated-resolve-hours-error"
+                                class="form-error"
+                            >
+                                {{ fieldErrors.estimated_resolve_hours }}
+                            </p>
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label class="form-label">Priority</label>
-                                <select v-model="form.priority" class="form-input">
+                                <label class="form-label" for="ticketeditview-priority">Priority</label>
+                                <select id="ticketeditview-priority" v-model="form.priority" class="form-select">
                                     <option value="low">Low</option>
                                     <option value="medium">Medium</option>
                                     <option value="high">High</option>
@@ -111,8 +187,8 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="form-label">Status</label>
-                                <select v-model="form.status" class="form-input">
+                                <label class="form-label" for="ticketeditview-status">Status</label>
+                                <select id="ticketeditview-status" v-model="form.status" class="form-select">
                                     <option value="open">Open</option>
                                     <option value="in_progress">Working</option>
                                     <option value="on_hold">On hold</option>
@@ -122,62 +198,79 @@
                             </div>
                         </div>
 
-                        <div>
-                            <span class="form-label">Assign to (one or more)</span>
-                            <div class="rounded-xl border border-slate-200 bg-white p-3 max-h-48 overflow-y-auto space-y-2">
+                        <fieldset class="form-fieldset">
+                            <legend class="form-legend">Assign to (one or more)</legend>
+                            <div class="rounded-card border border-slate-200 bg-white p-3 max-h-48 overflow-y-auto space-y-2">
                                 <label
                                     v-for="u in users"
                                     :key="u.id"
-                                    class="flex items-center gap-2 text-sm text-slate-800 cursor-pointer"
+                                    class="form-choice text-slate-800"
                                 >
                                     <input v-model="form.assigned_user_ids" type="checkbox" :value="Number(u.id)" class="form-checkbox" />
                                     {{ u.name }}
                                 </label>
-                                <p v-if="!users.length" class="text-sm text-slate-400">No users loaded.</p>
+                                <p v-if="!users.length" class="text-sm text-slate-500">No users loaded.</p>
                             </div>
                             <div
                                 v-if="editCommentRecipientRows.length > 0"
-                                class="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800"
+                                class="mt-3 callout callout-info text-xs"
                             >
-                                <div class="font-semibold text-slate-900 mb-1">After save, comment emails will go to:</div>
+                                <div class="font-semibold mb-1">After save, comment emails will go to:</div>
                                 <ul class="space-y-1 list-none">
                                     <li v-for="row in editCommentRecipientRows" :key="row.email" class="break-all">
                                         <span class="font-medium">{{ row.name }}</span>
-                                        <span class="text-slate-600"> — {{ row.email }}</span>
+                                        <span> — {{ row.email }}</span>
                                     </li>
                                 </ul>
-                                <p class="mt-2 text-slate-600">The person who posts a comment does not receive email for their own comment.</p>
+                                <p class="mt-2">The person who posts a comment does not receive email for their own comment.</p>
                             </div>
                             <div
                                 v-else-if="(form.assigned_user_ids || []).length > 0 || ticketCreator"
-                                class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950"
+                                class="mt-3 callout callout-warning text-xs"
                             >
                                 No valid recipient emails found for the current assignees or creator. Check user profiles or Settings → admin notification email.
                             </div>
-                        </div>
-
-                        <div v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-100">
-                            {{ error }}
-                        </div>
+                        </fieldset>
                     </div>
 
                     <div class="form-actions">
-                        <router-link :to="`/tickets/${ticketId}`" class="form-btn-cancel text-center">Cancel</router-link>
-                        <button type="submit" :disabled="saving" class="form-btn-submit">
+                        <BaseButton :to="`/tickets/${ticketId}`" variant="outline" block-mobile>Cancel</BaseButton>
+                        <BaseButton
+                            type="submit"
+                            variant="primary"
+                            size="lg"
+                            block-mobile
+                            :loading="saving"
+                            form="ticket-edit-form"
+                        >
                             {{ saving ? 'Saving…' : 'Save changes' }}
-                        </button>
+                        </BaseButton>
                     </div>
                 </form>
             </template>
         </div>
+
+        <ConfirmDialog
+            v-model="confirmRemoveOpen"
+            title="Remove this file?"
+            :message="attachmentToRemove ? `“${attachmentToRemove.original_name}” will be deleted from this ticket.` : 'Remove this file?'"
+            confirm-label="Remove file"
+            cancel-label="Keep file"
+            tone="danger"
+            :loading="removingAttachment"
+            @confirm="confirmRemoveAttachment"
+            @cancel="cancelRemoveAttachment"
+        />
     </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useAutosizeTextarea } from '@/composables/useAutosizeTextarea';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
+import { ArrowLeftIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import { BaseButton, ConfirmDialog } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 
 const route = useRoute();
@@ -195,6 +288,11 @@ const users = ref([]);
 const existingAttachments = ref([]);
 const pendingFiles = ref([]);
 const attachmentInputRef = ref(null);
+const errorSummaryRef = ref(null);
+const fieldErrors = ref({});
+const confirmRemoveOpen = ref(false);
+const attachmentToRemove = ref(null);
+const removingAttachment = ref(false);
 /** Ticket creator (for comment recipient preview). */
 const ticketCreator = ref(null);
 
@@ -210,6 +308,19 @@ const form = ref({
 });
 
 const { textareaRef: descriptionTextareaRef } = useAutosizeTextarea(() => form.value.description);
+
+const FIELD_LABELS = {
+    subject: 'Subject',
+    estimated_resolve_hours: 'Expected resolution (hours)',
+};
+
+const errorFields = computed(() =>
+    Object.keys(fieldErrors.value).map((field) => ({
+        field,
+        label: FIELD_LABELS[field] || field,
+        message: fieldErrors.value[field],
+    })),
+);
 
 const editCommentRecipientRows = computed(() => {
     const seen = new Set();
@@ -277,20 +388,64 @@ function onFiles(e) {
     e.target.value = '';
 }
 
-async function removeAttachment(att) {
-    if (!window.confirm('Remove this file?')) return;
+function requestRemoveAttachment(att) {
+    attachmentToRemove.value = att;
+    confirmRemoveOpen.value = true;
+}
+
+function cancelRemoveAttachment() {
+    if (removingAttachment.value) return;
+    confirmRemoveOpen.value = false;
+    attachmentToRemove.value = null;
+}
+
+async function confirmRemoveAttachment() {
+    const att = attachmentToRemove.value;
+    if (!att) return;
+    removingAttachment.value = true;
     try {
         await axios.delete(`/api/tickets/${ticketId.value}/attachments/${att.id}`);
         existingAttachments.value = existingAttachments.value.filter((a) => a.id !== att.id);
         toast.success('Attachment removed');
     } catch (err) {
         toast.error(err.response?.data?.message || 'Could not remove file');
+    } finally {
+        removingAttachment.value = false;
+        confirmRemoveOpen.value = false;
+        attachmentToRemove.value = null;
     }
 }
 
+/** Client-side checks only — the payload itself is unchanged. */
+function validate() {
+    const errs = {};
+    if (!String(form.value.subject ?? '').trim()) {
+        errs.subject = 'Enter a subject so the ticket can be identified.';
+    }
+    const hours = form.value.estimated_resolve_hours;
+    if (hours !== null && hours !== undefined && hours !== '') {
+        const n = Number(hours);
+        if (!Number.isFinite(n) || n < 1 || n > 8760) {
+            errs.estimated_resolve_hours = 'Enter a whole number of hours between 1 and 8760, or leave it empty.';
+        }
+    }
+    fieldErrors.value = errs;
+    return Object.keys(errs).length === 0;
+}
+
+async function focusErrorSummary() {
+    await nextTick();
+    errorSummaryRef.value?.focus();
+}
+
 async function handleSubmit() {
-    saving.value = true;
     error.value = null;
+    if (!validate()) {
+        await focusErrorSummary();
+        return;
+    }
+
+    saving.value = true;
     try {
         const payload = {
             subject: form.value.subject,
@@ -322,6 +477,7 @@ async function handleSubmit() {
         router.push(`/tickets/${ticketId.value}`);
     } catch (err) {
         error.value = err.response?.data?.message || 'Failed to save ticket';
+        await focusErrorSummary();
     } finally {
         saving.value = false;
     }

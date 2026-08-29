@@ -6,8 +6,8 @@
     >
         <template #filters>
             <div>
-                <label class="listing-label">Month</label>
-                <input v-model="selectedMonth" type="month" class="listing-input w-full sm:w-48" @change="loadData" />
+                <label class="listing-label" for="employeegoalsview-month">Month</label>
+                <input id="employeegoalsview-month" v-model="selectedMonth" type="month" class="listing-input w-full sm:w-48" @change="loadData" />
             </div>
         </template>
 
@@ -17,7 +17,7 @@
                     <tr>
                         <th class="listing-th">Employee</th>
                         <th class="listing-th">Appointments (target / achieved)</th>
-                        <th class="listing-th">Sales (target / achieved) <span class="font-normal text-slate-400">· by product/category</span></th>
+                        <th class="listing-th">Sales (target / achieved) <span class="font-normal text-slate-500">· by product/category</span></th>
                         <th class="listing-th">Revenue (target / won)</th>
                         <th class="listing-th">Progress</th>
                         <th class="listing-th">Actions</th>
@@ -51,18 +51,25 @@
                                     <span>{{ row.appointment_progress }}%</span>
                                     <span>Appointments</span>
                                 </div>
-                                <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                                <div
+                                    class="w-full bg-slate-200 rounded-full h-2 overflow-hidden"
+                                    role="progressbar"
+                                    :aria-valuenow="row.appointment_progress"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    :aria-label="`Appointment progress for ${row.user?.name || 'employee'}`"
+                                >
                                     <div
-                                        class="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
+                                        class="h-2 rounded-full bg-gradient-to-r from-success-500 to-success-600"
                                         :style="{ width: `${row.appointment_progress}%` }"
                                     ></div>
                                 </div>
                             </div>
                         </td>
                         <td class="listing-td">
-                            <button type="button" class="listing-btn-primary text-xs py-1.5 px-3" @click="openEdit(row)">
+                            <BaseButton variant="soft" size="sm" @click="openEdit(row)">
                                 Set targets
-                            </button>
+                            </BaseButton>
                         </td>
                     </tr>
                 </tbody>
@@ -70,167 +77,157 @@
         </div>
     </ListingPageShell>
 
-        <!-- Set targets modal -->
-        <div
-            v-if="editing"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        >
-            <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-4">
-                <div class="flex justify-between items-center">
-                    <h2 class="text-lg font-semibold text-slate-900">
-                        Set targets – {{ editing.user?.name || 'Employee' }}
-                    </h2>
-                    <button
-                        class="text-slate-400 hover:text-slate-600"
-                        @click="closeEdit"
-                    >
-                        ✕
-                    </button>
+    <!-- Set targets modal -->
+    <BaseModal
+        v-model="showEditModal"
+        :title="`Set targets – ${editing?.user?.name || 'Employee'}`"
+        size="md"
+        :dismissible="!saving"
+        :close-on-backdrop="false"
+    >
+        <form id="employee-goals-form" class="space-y-4" novalidate @submit.prevent="saveGoals">
+            <div>
+                <label class="form-label" for="employeegoalsview-month-2">Month</label>
+                <input id="employeegoalsview-month-2"
+                    v-model="editForm.month"
+                    type="month"
+                    class="form-input"
+                    disabled
+                />
+            </div>
+            <div class="form-grid-2">
+                <div>
+                    <label class="form-label" for="employeegoalsview-target-appointments">Target appointments</label>
+                    <input id="employeegoalsview-target-appointments"
+                        v-model.number="editForm.target_appointments"
+                        type="number"
+                        min="0"
+                        class="form-input"
+                    />
                 </div>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Month</label>
-                        <input
-                            v-model="editForm.month"
-                            type="month"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                            disabled
-                        />
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Target appointments</label>
-                            <input
-                                v-model.number="editForm.target_appointments"
-                                type="number"
-                                min="0"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                            />
-                        </div>
-                        <div v-if="!editForm.lines.length">
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Target sales (total won items)</label>
-                            <input
-                                v-model.number="editForm.target_sales"
-                                type="number"
-                                min="0"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Target revenue (£)</label>
-                        <input
-                            v-model.number="editForm.target_revenue"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-                    <div class="border border-slate-200 rounded-lg p-4 space-y-3 bg-slate-50/80">
-                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <div>
-                                <div class="text-sm font-medium text-slate-800">Sales by product or category</div>
-                                <p class="text-xs text-slate-500 mt-0.5">
-                                    Add one row per product or per category. For a category, all products that share that category (in Products admin) are included — any of them, when sold (won line item), counts toward the same category target.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 shrink-0"
-                                @click="addTargetLine"
-                            >
-                                + Add line
-                            </button>
-                        </div>
-                        <p v-if="editForm.lines.length" class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-1.5">
-                            Product/category lines replace the simple “target sales” total. Remove all lines to use the total again.
-                        </p>
-                        <div v-if="!editForm.lines.length" class="text-xs text-slate-500">No lines — the total above applies.</div>
-                        <p v-else-if="!categories.length && products.length" class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-1.5">
-                            No categories found on active products. Set a category on products in Admin → Products so category targets appear here.
-                        </p>
-                        <div
-                            v-for="(line, idx) in editForm.lines"
-                            :key="idx"
-                            class="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-3 border-b border-slate-200 pb-4 last:border-0 last:pb-0"
-                        >
-                            <div class="w-full sm:w-[8.5rem] shrink-0">
-                                <label class="block text-xs font-medium text-slate-600 mb-1">Type</label>
-                                <select
-                                    v-model="line.line_type"
-                                    class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white"
-                                    @change="onLineTypeChange(line)"
-                                >
-                                    <option value="product">Product</option>
-                                    <option value="category">Category</option>
-                                </select>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <label class="block text-xs font-medium text-slate-600 mb-1">
-                                    {{ line.line_type === 'category' ? 'Category' : 'Product' }}
-                                </label>
-                                <select
-                                    v-if="line.line_type === 'product'"
-                                    v-model.number="line.product_id"
-                                    class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white min-h-[42px]"
-                                >
-                                    <option :value="0">Select product…</option>
-                                    <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }}</option>
-                                </select>
-                                <select
-                                    v-else
-                                    v-model="line.category_name"
-                                    class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white min-h-[42px]"
-                                >
-                                    <option value="">Select category…</option>
-                                    <option
-                                        v-if="line.category_name && !categories.includes(line.category_name)"
-                                        :value="line.category_name"
-                                    >
-                                        {{ line.category_name }} (saved)
-                                    </option>
-                                    <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
-                                </select>
-                            </div>
-                            <div class="w-full sm:w-36 shrink-0">
-                                <label class="block text-xs font-medium text-slate-600 mb-1">Target (won items)</label>
-                                <input
-                                    v-model.number="line.target_quantity"
-                                    type="number"
-                                    min="0"
-                                    class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm min-h-[42px]"
-                                />
-                            </div>
-                            <div class="flex sm:flex-col sm:justify-end sm:pb-0.5 shrink-0">
-                                <button
-                                    type="button"
-                                    class="text-sm font-medium text-red-600 hover:text-red-700 py-2.5 sm:px-1 text-left sm:text-right"
-                                    @click="removeTargetLine(idx)"
-                                >
-                                    Remove
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="flex justify-end gap-3 pt-2">
-                    <button
-                        class="px-4 py-2 rounded-lg border border-slate-300 text-sm text-slate-700 hover:bg-slate-50"
-                        @click="closeEdit"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        class="px-4 py-2 rounded-lg bg-slate-900 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
-                        :disabled="saving"
-                        @click="saveGoals"
-                    >
-                        {{ saving ? 'Saving...' : 'Save targets' }}
-                    </button>
+                <div v-if="!editForm.lines.length">
+                    <label class="form-label" for="employeegoalsview-target-sales-total-won-items">Target sales (total won items)</label>
+                    <input id="employeegoalsview-target-sales-total-won-items"
+                        v-model.number="editForm.target_sales"
+                        type="number"
+                        min="0"
+                        class="form-input"
+                    />
                 </div>
             </div>
-        </div>
+            <div>
+                <label class="form-label" for="employeegoalsview-target-revenue">Target revenue (£)</label>
+                <input id="employeegoalsview-target-revenue"
+                    v-model.number="editForm.target_revenue"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="form-input"
+                />
+            </div>
+            <div class="border border-slate-200 rounded-card p-4 space-y-3 bg-slate-50/80">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                        <div class="text-sm font-medium text-slate-800">Sales by product or category</div>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Add one row per product or per category. For a category, all products that share that category (in Products admin) are included — any of them, when sold (won line item), counts toward the same category target.
+                        </p>
+                    </div>
+                    <BaseButton variant="outline" size="sm" class="shrink-0" @click="addTargetLine">
+                        <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                        Add line
+                    </BaseButton>
+                </div>
+                <p v-if="editForm.lines.length" class="callout callout-warning text-xs flex items-start gap-2">
+                    <ExclamationTriangleIcon class="icon-sm shrink-0" aria-hidden="true" />
+                    <span>Product/category lines replace the simple “target sales” total. Remove all lines to use the total again.</span>
+                </p>
+                <div v-if="!editForm.lines.length" class="text-xs text-slate-500">No lines — the total above applies.</div>
+                <p v-else-if="!categories.length && products.length" class="callout callout-warning text-xs flex items-start gap-2">
+                    <ExclamationTriangleIcon class="icon-sm shrink-0" aria-hidden="true" />
+                    <span>No categories found on active products. Set a category on products in Admin → Products so category targets appear here.</span>
+                </p>
+                <div
+                    v-for="(line, idx) in editForm.lines"
+                    :key="idx"
+                    class="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-3 border-b border-slate-200 pb-4 last:border-0 last:pb-0"
+                >
+                    <div class="w-full sm:w-[8.5rem] shrink-0">
+                        <label class="form-label" :for="`employeegoalsview-line-${idx}-type`">Type</label>
+                        <select
+                            :id="`employeegoalsview-line-${idx}-type`"
+                            v-model="line.line_type"
+                            class="form-select"
+                            @change="onLineTypeChange(line)"
+                        >
+                            <option value="product">Product</option>
+                            <option value="category">Category</option>
+                        </select>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <label class="form-label" :for="`employeegoalsview-line-${idx}-target`">
+                            {{ line.line_type === 'category' ? 'Category' : 'Product' }}
+                        </label>
+                        <select
+                            v-if="line.line_type === 'product'"
+                            :id="`employeegoalsview-line-${idx}-target`"
+                            v-model.number="line.product_id"
+                            class="form-select"
+                        >
+                            <option :value="0">Select product…</option>
+                            <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }}</option>
+                        </select>
+                        <select
+                            v-else
+                            :id="`employeegoalsview-line-${idx}-target`"
+                            v-model="line.category_name"
+                            class="form-select"
+                        >
+                            <option value="">Select category…</option>
+                            <option
+                                v-if="line.category_name && !categories.includes(line.category_name)"
+                                :value="line.category_name"
+                            >
+                                {{ line.category_name }} (saved)
+                            </option>
+                            <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
+                        </select>
+                    </div>
+                    <div class="w-full sm:w-36 shrink-0">
+                        <label class="form-label" :for="`employeegoalsview-line-${idx}-quantity`">Target (won items)</label>
+                        <input
+                            :id="`employeegoalsview-line-${idx}-quantity`"
+                            v-model.number="line.target_quantity"
+                            type="number"
+                            min="0"
+                            class="form-input"
+                        />
+                    </div>
+                    <div class="flex sm:flex-col sm:justify-end shrink-0">
+                        <BaseButton
+                            variant="ghost"
+                            size="sm"
+                            class="text-danger-700 hover:bg-danger-50 hover:text-danger-800"
+                            :label="`Remove line ${idx + 1}`"
+                            @click="removeTargetLine(idx)"
+                        >
+                            <template #icon><TrashIcon class="icon-sm" aria-hidden="true" /></template>
+                            Remove
+                        </BaseButton>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <template #actions>
+            <BaseButton variant="outline" block-mobile :disabled="saving" @click="closeEdit">
+                Cancel
+            </BaseButton>
+            <BaseButton variant="primary" type="submit" form="employee-goals-form" block-mobile :loading="saving">
+                {{ saving ? 'Saving...' : 'Save targets' }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
@@ -239,6 +236,8 @@ import axios from 'axios';
 import { useRoute } from 'vue-router';
 import { useToastStore } from '@/stores/toast';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseButton, BaseModal } from '@/components/base';
+import { ExclamationTriangleIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline';
 
 const route = useRoute();
 const toast = useToastStore();
@@ -256,6 +255,17 @@ const editForm = ref({
     target_sales: 0,
     target_revenue: 0,
     lines: [],
+});
+
+/**
+ * `editing` holds the row object, so BaseModal's boolean v-model is derived
+ * from it; setting it false routes through closeEdit() to clear the row.
+ */
+const showEditModal = computed({
+    get: () => editing.value !== null,
+    set: (value) => {
+        if (!value) closeEdit();
+    },
 });
 
 const selectedEmployeeId = computed(() => {

@@ -5,26 +5,27 @@
         :badge="listBadge"
     >
         <template #actions>
-            <router-link to="/employees" class="listing-btn-accent w-full sm:w-auto text-center touch-manipulation">
-                + Add employee
-            </router-link>
+            <BaseButton variant="primary" to="/employees" block-mobile>
+                <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                Add employee
+            </BaseButton>
         </template>
 
         <template #filters>
             <div class="listing-filters-row">
                 <div class="flex-1 min-w-0">
-                    <label class="listing-label">Search</label>
-                    <input
+                    <label class="listing-label" for="employeelistview-search">Search</label>
+                    <input id="employeelistview-search"
                         v-model="searchQuery"
                         type="text"
                         placeholder="Search employees…"
-                        class="listing-input"
+                        class="form-input"
                         @input="debouncedSearch"
                     />
                 </div>
                 <div class="w-full sm:w-48">
-                    <label class="listing-label">Role</label>
-                    <select v-model="roleFilter" class="listing-input" @change="loadEmployees">
+                    <label class="listing-label" for="employeelistview-role">Role</label>
+                    <select id="employeelistview-role" v-model="roleFilter" class="form-select" @change="loadEmployees">
                         <option value="">All roles</option>
                         <option value="Admin">Admin</option>
                         <option value="Manager">Manager</option>
@@ -36,47 +37,57 @@
             </div>
         </template>
 
-        <div v-if="loading" class="px-5 py-14 text-center text-slate-500 text-sm">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-2 border-slate-200 border-t-blue-600"></div>
-            <p class="mt-2">Loading employees…</p>
+        <div
+            v-if="loading"
+            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 px-3 py-6 sm:px-5"
+            aria-busy="true"
+        >
+            <div v-for="n in 6" :key="`sk-${n}`" class="table-card">
+                <span class="skeleton-text block w-2/3" />
+                <span class="skeleton-text block w-1/2" />
+                <span class="skeleton-text block w-full" />
+            </div>
         </div>
 
-        <div v-else-if="employees.length === 0" class="px-5 py-12 text-center text-slate-500 text-sm">
-            <p class="text-lg text-slate-700 mb-4">No employees found</p>
-            <router-link to="/employees" class="listing-btn-accent inline-flex touch-manipulation">Add your first employee</router-link>
-        </div>
+        <EmptyState
+            v-else-if="employees.length === 0"
+            heading="No employees found"
+            description="Adjust the search or role filter, or add your first employee."
+        >
+            <template #icon><UsersIcon class="icon" aria-hidden="true" /></template>
+            <template #action>
+                <BaseButton variant="primary" to="/employees">Add your first employee</BaseButton>
+            </template>
+        </EmptyState>
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 px-3 pb-1 sm:px-5">
             <div
                 v-for="employee in employees"
                 :key="employee.id"
-                class="rounded-xl border border-slate-200 bg-slate-50/40 p-5 hover:border-slate-300 transition cursor-pointer shadow-sm"
+                class="rounded-card border border-slate-200 bg-slate-50/40 p-5 hover:border-slate-300 transition cursor-pointer shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                role="button"
+                tabindex="0"
                 @click="viewEmployee(employee.id)"
+                @keydown.enter.prevent="viewEmployee(employee.id)"
+                @keydown.space.prevent="viewEmployee(employee.id)"
             >
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4 min-w-0">
                     <div class="flex-1 min-w-0">
                         <h3 class="text-lg font-semibold text-slate-900 break-words">{{ employee.name }}</h3>
                         <p class="text-sm text-slate-500 mt-1">{{ employee.role?.name || 'No role' }}</p>
                     </div>
-                    <span
-                        class="px-2 py-1 text-xs font-medium rounded-full shrink-0 self-start"
-                        :class="getRoleBadgeClass(employee.role?.name)"
-                    >
+                    <BaseBadge :tone="getRoleTone(employee.role?.name)" class="shrink-0 self-start">
                         {{ employee.role?.name || 'N/A' }}
-                    </span>
+                    </BaseBadge>
                 </div>
 
                 <div class="space-y-2 text-sm">
                     <div class="flex items-center text-slate-600">
-                        <svg class="w-4 h-4 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
+                        <EnvelopeIcon class="icon-sm mr-2" aria-hidden="true" />
                         <span class="truncate">{{ employee.email || 'No email' }}</span>
                     </div>
                     <div v-if="employee.phone" class="flex items-center text-slate-600">
-                        <svg class="w-4 h-4 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                        </svg>
+                        <PhoneIcon class="icon-sm mr-2" aria-hidden="true" />
                         <span>{{ employee.phone }}</span>
                     </div>
                 </div>
@@ -111,8 +122,10 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
+import { EnvelopeIcon, PhoneIcon, PlusIcon, UsersIcon } from '@heroicons/vue/24/outline';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseBadge, BaseButton, EmptyState } from '@/components/base';
 
 const router = useRouter();
 
@@ -129,15 +142,15 @@ const listBadge = computed(() => {
     return `${t} ${t === 1 ? 'employee' : 'employees'}`;
 });
 
-const getRoleBadgeClass = (roleName) => {
-    const classes = {
-        Admin: 'bg-purple-100 text-purple-700',
-        Manager: 'bg-blue-100 text-blue-700',
-        Sales: 'bg-green-100 text-green-700',
-        CallAgent: 'bg-yellow-100 text-yellow-700',
-        'System Admin': 'bg-red-100 text-red-700',
+const getRoleTone = (roleName) => {
+    const tones = {
+        Admin: 'primary',
+        Manager: 'primary',
+        Sales: 'success',
+        CallAgent: 'warning',
+        'System Admin': 'danger',
     };
-    return classes[roleName] || 'bg-slate-100 text-slate-700';
+    return tones[roleName] || 'neutral';
 };
 
 const debouncedSearch = () => {

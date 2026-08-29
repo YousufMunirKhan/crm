@@ -1,417 +1,547 @@
 <template>
-    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-5">
-        <div class="flex flex-col gap-4">
-            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                <div class="min-w-0">
-                    <h1 class="text-2xl font-bold text-slate-900">Business Reports</h1>
-                    <p class="mt-1 text-sm text-slate-500">
-                        {{ selectedEmployee ? `Focused on ${selectedEmployee.name}` : 'All employee performance and sales movement' }}
-                    </p>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1.2fr_auto_auto] gap-2 w-full lg:w-auto">
-                    <input v-model="filters.from" type="date" class="report-input" />
-                    <input v-model="filters.to" type="date" class="report-input" />
-                    <select v-model="filters.employee_id" class="report-input">
-                        <option value="">All Employees</option>
-                        <option v-for="emp in employees" :key="emp.id" :value="String(emp.id)">
-                            {{ emp.name }}
-                        </option>
-                    </select>
-                    <button type="button" class="report-btn-primary" :disabled="loading" @click="loadReports">
-                        {{ loading ? 'Loading...' : 'Apply' }}
-                    </button>
-                    <button type="button" class="report-btn-outline" :disabled="teamRows.length === 0" @click="exportTeamCsv">
-                        Export CSV
-                    </button>
-                </div>
-            </div>
-
-            <div class="flex flex-wrap gap-2">
-                <button
-                    v-for="range in quickRanges"
-                    :key="range.key"
-                    type="button"
-                    class="px-3 py-1.5 rounded border text-xs font-medium"
-                    :class="activeQuickRange === range.key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'"
-                    @click="setQuickRange(range.key)"
+    <TabGroup as="div" class="w-full min-w-0" :selected-index="activeSectionIndex" @change="onSectionChange">
+        <ListingPageShell
+            title="Business Reports"
+            :subtitle="selectedEmployee ? `Focused on ${selectedEmployee.name}` : 'All employee performance and sales movement'"
+            :badge="periodLabel"
+        >
+            <template #actions>
+                <BaseButton variant="primary" :loading="loading" block-mobile @click="loadReports">
+                    Apply
+                </BaseButton>
+                <BaseButton
+                    variant="outline"
+                    :disabled="teamRows.length === 0"
+                    block-mobile
+                    @click="exportTeamCsv"
                 >
-                    {{ range.label }}
-                </button>
-            </div>
-        </div>
+                    <template #icon><ArrowDownTrayIcon class="icon" aria-hidden="true" /></template>
+                    Export CSV
+                </BaseButton>
+            </template>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3">
-            <div v-for="card in summaryCards" :key="card.label" class="bg-white border border-slate-200 rounded-lg p-4 min-w-0">
-                <div class="text-xs font-semibold text-slate-500 uppercase">{{ card.label }}</div>
-                <div class="mt-2 text-2xl font-bold text-slate-900 tabular-nums break-words">{{ card.value }}</div>
-                <div class="mt-1 text-xs text-slate-500">{{ card.help }}</div>
-            </div>
-        </div>
-
-        <div class="bg-white border border-slate-200 rounded-lg p-3">
-            <div class="flex flex-wrap gap-2">
-                <button
-                    v-for="section in sections"
-                    :key="section.key"
-                    type="button"
-                    class="px-3 py-2 rounded text-sm font-medium"
-                    :class="activeSection === section.key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
-                    @click="activeSection = section.key"
-                >
-                    {{ section.label }}
-                </button>
-            </div>
-        </div>
-
-        <section v-if="activeSection === 'overview'" class="space-y-4">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div class="lg:col-span-2 bg-white border border-slate-200 rounded-lg p-4 sm:p-5">
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-                        <div>
-                            <h2 class="text-lg font-semibold text-slate-900">Where the business stands</h2>
-                            <p class="text-sm text-slate-500">Sales are counted when product lines are won in the selected period.</p>
+            <template #filters>
+                <div class="space-y-3">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        <div class="min-w-0">
+                            <label class="form-label" for="reportsview-from">From</label>
+                            <input id="reportsview-from" v-model="filters.from" type="date" class="form-input" />
                         </div>
-                        <div class="text-xs font-medium text-slate-500">{{ periodLabel }}</div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div v-for="item in operatingCards" :key="item.label" class="rounded border border-slate-200 bg-slate-50 p-3">
-                            <div class="text-xs text-slate-500">{{ item.label }}</div>
-                            <div class="mt-1 text-lg font-bold text-slate-900">{{ item.value }}</div>
-                            <div class="mt-1 text-xs text-slate-500">{{ item.help }}</div>
+                        <div class="min-w-0">
+                            <label class="form-label" for="reportsview-to">To</label>
+                            <input id="reportsview-to" v-model="filters.to" type="date" class="form-input" />
                         </div>
-                    </div>
-                </div>
-
-                <div class="bg-white border border-slate-200 rounded-lg p-4 sm:p-5">
-                    <h2 class="text-lg font-semibold text-slate-900 mb-4">Communication</h2>
-                    <div class="space-y-3 text-sm">
-                        <div class="flex justify-between gap-3">
-                            <span class="text-slate-600">Sent</span>
-                            <span class="font-semibold text-slate-900">{{ commData.sent || 0 }}</span>
-                        </div>
-                        <div class="flex justify-between gap-3">
-                            <span class="text-slate-600">Received</span>
-                            <span class="font-semibold text-slate-900">{{ commData.received || 0 }}</span>
-                        </div>
-                        <div v-for="[channel, count] in communicationChannels" :key="channel" class="flex justify-between gap-3">
-                            <span class="text-slate-600 capitalize">{{ channel }}</span>
-                            <span class="font-semibold text-slate-900">{{ count }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white border border-slate-200 rounded-lg p-4 sm:p-5">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-                    <div>
-                        <h2 class="text-lg font-semibold text-slate-900">Sales workflow</h2>
-                        <p class="text-sm text-slate-500">Follow the customer journey from contact to final outcome.</p>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2">
-                    <div v-for="stage in stageRows" :key="stage.key" class="rounded border border-slate-200 p-3">
-                        <div class="text-xs font-medium text-slate-500">{{ stage.label }}</div>
-                        <div class="mt-2 text-xl font-bold text-slate-900">{{ stage.count }}</div>
-                        <div class="mt-1 h-2 bg-slate-100 rounded overflow-hidden">
-                            <div class="h-2 bg-blue-600 rounded" :style="{ width: `${stage.percent}%` }"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section v-else-if="activeSection === 'team'" class="bg-white border border-slate-200 rounded-lg overflow-hidden">
-            <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                    <h2 class="text-lg font-semibold text-slate-900">Team Performance</h2>
-                    <p class="text-sm text-slate-500">Compare users using the same date range and sales basis.</p>
-                </div>
-                <button type="button" class="report-btn-outline" :disabled="teamRows.length === 0" @click="filters.employee_id = ''; loadReports()">
-                    Show All
-                </button>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[1040px]">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th class="report-th">Employee</th>
-                            <th class="report-th text-right">Appointments</th>
-                            <th class="report-th text-right">New Leads</th>
-                            <th class="report-th text-right">Open Pipeline</th>
-                            <th class="report-th text-right">Won Products</th>
-                            <th class="report-th text-right">Won Leads</th>
-                            <th class="report-th text-right">Conversion</th>
-                            <th class="report-th text-right">Sales Revenue</th>
-                            <th class="report-th text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <tr v-for="row in teamRows" :key="row.employee_id" class="hover:bg-slate-50">
-                            <td class="report-td font-semibold text-slate-900">{{ row.employee_name }}</td>
-                            <td class="report-td text-right">{{ row.appointments }}</td>
-                            <td class="report-td text-right">{{ row.leads }}</td>
-                            <td class="report-td text-right">{{ row.open_pipeline }}</td>
-                            <td class="report-td text-right text-green-700 font-semibold">{{ row.won_products }}</td>
-                            <td class="report-td text-right">{{ row.won_leads }}</td>
-                            <td class="report-td text-right">{{ row.conversion_rate }}%</td>
-                            <td class="report-td text-right font-semibold text-slate-900">GBP {{ formatNumber(row.revenue) }}</td>
-                            <td class="report-td text-right">
-                                <button type="button" class="text-sm font-medium text-blue-700 hover:underline" @click="selectEmployee(row.employee_id, 'employee')">
-                                    View
-                                </button>
-                            </td>
-                        </tr>
-                        <tr v-if="teamRows.length === 0">
-                            <td class="px-4 py-8 text-center text-sm text-slate-500" colspan="9">No team data for this period.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <section v-else-if="activeSection === 'employee'" class="space-y-4">
-            <div v-if="!filters.employee_id" class="bg-white border border-slate-200 rounded-lg p-8 text-center">
-                <h2 class="text-lg font-semibold text-slate-900">Choose an employee</h2>
-                <p class="mt-1 text-sm text-slate-500">Select one user above or use View from the team table.</p>
-            </div>
-
-            <template v-else>
-                <div class="bg-white border border-slate-200 rounded-lg p-4 sm:p-5">
-                    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-                        <div>
-                            <h2 class="text-lg font-semibold text-slate-900">{{ selectedEmployee?.name || 'Employee' }} Report</h2>
-                            <p class="text-sm text-slate-500">Month target view plus product sales detail.</p>
-                        </div>
-                        <div class="w-full sm:w-56">
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Target month</label>
-                            <select v-model="selectedMonth" class="report-input w-full" @change="loadEmployeeReports">
-                                <option v-for="month in monthOptions" :key="month.value" :value="month.value">{{ month.label }}</option>
+                        <div class="min-w-0">
+                            <label class="form-label" for="reportsview-employee">Employee</label>
+                            <select id="reportsview-employee" v-model="filters.employee_id" class="form-select">
+                                <option value="">All Employees</option>
+                                <option v-for="emp in employees" :key="emp.id" :value="String(emp.id)">
+                                    {{ emp.name }}
+                                </option>
                             </select>
                         </div>
                     </div>
+
+                    <div class="flex flex-wrap gap-2" role="group" aria-label="Quick date ranges">
+                        <button
+                            v-for="range in quickRanges"
+                            :key="range.key"
+                            type="button"
+                            :class="['tab', activeQuickRange === range.key ? 'tab-active' : '']"
+                            :aria-pressed="activeQuickRange === range.key ? 'true' : 'false'"
+                            @click="setQuickRange(range.key)"
+                        >
+                            {{ range.label }}
+                        </button>
+                    </div>
                 </div>
+            </template>
 
-                <div v-if="employeeLoading" class="bg-white border border-slate-200 rounded-lg p-10 text-center text-sm text-slate-500">
-                    Loading employee report...
-                </div>
+            <template #toolbar>
+                <TabList class="tab-list" aria-label="Report sections">
+                    <Tab v-for="section in sections" :key="section.key" v-slot="{ selected }" as="template">
+                        <button type="button" :class="['tab', selected ? 'tab-active' : '']">
+                            {{ section.label }}
+                        </button>
+                    </Tab>
+                </TabList>
+            </template>
 
-                <template v-else>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
-                        <div v-for="card in employeeActivityCards" :key="card.label" class="bg-white border border-slate-200 rounded-lg p-4">
-                            <div class="text-sm text-slate-500">{{ card.label }}</div>
-                            <div class="mt-1 text-xl font-bold text-slate-900">{{ card.value }}</div>
-                            <div class="mt-1 text-xs text-slate-500">{{ card.help }}</div>
-                        </div>
+            <TabPanels class="px-4 py-4 sm:px-6 sm:py-6">
+                <!-- Overview -->
+                <TabPanel class="space-y-4 focus-visible:outline-none">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        <StatCard
+                            v-for="card in summaryCards"
+                            :key="card.label"
+                            :label="card.label"
+                            :value="card.value"
+                            :caption="card.help"
+                        />
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div v-for="card in employeeTargetCards" :key="card.label" class="bg-white border border-slate-200 rounded-lg p-4">
-                            <div class="text-sm text-slate-500">{{ card.label }}</div>
-                            <div class="mt-1 text-xl font-bold text-slate-900">{{ card.value }}</div>
-                            <div class="mt-3 h-2 bg-slate-100 rounded overflow-hidden">
-                                <div class="h-2 bg-emerald-600 rounded" :style="{ width: `${card.progress}%` }"></div>
+                    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                        <BaseCard
+                            class="lg:col-span-2"
+                            title="Where the business stands"
+                            subtitle="Sales are counted when product lines are won in the selected period."
+                        >
+                            <template #actions>
+                                <span class="text-xs font-medium text-slate-500">{{ periodLabel }}</span>
+                            </template>
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <StatCard
+                                    v-for="item in operatingCards"
+                                    :key="item.label"
+                                    :label="item.label"
+                                    :value="item.value"
+                                    :caption="item.help"
+                                />
                             </div>
-                            <div class="mt-1 text-xs text-slate-500">{{ card.progress }}% achieved</div>
-                        </div>
+                        </BaseCard>
+
+                        <BaseCard title="Communication">
+                            <dl class="space-y-3 text-sm">
+                                <div class="flex justify-between gap-3">
+                                    <dt class="text-slate-600">Sent</dt>
+                                    <dd class="font-semibold text-slate-900 tabular-nums">{{ commData.sent || 0 }}</dd>
+                                </div>
+                                <div class="flex justify-between gap-3">
+                                    <dt class="text-slate-600">Received</dt>
+                                    <dd class="font-semibold text-slate-900 tabular-nums">{{ commData.received || 0 }}</dd>
+                                </div>
+                                <div
+                                    v-for="[channel, count] in communicationChannels"
+                                    :key="channel"
+                                    class="flex justify-between gap-3"
+                                >
+                                    <dt class="capitalize text-slate-600">{{ channel }}</dt>
+                                    <dd class="font-semibold text-slate-900 tabular-nums">{{ count }}</dd>
+                                </div>
+                            </dl>
+                        </BaseCard>
                     </div>
 
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <div class="bg-white border border-slate-200 rounded-lg p-4 sm:p-5">
-                            <h3 class="text-base font-semibold text-slate-900 mb-3">Last Week</h3>
-                            <div class="text-sm text-slate-500">{{ employeeOverview.last_week?.label || '-' }}</div>
-                            <div class="mt-3 grid grid-cols-2 gap-3">
-                                <div>
-                                    <div class="text-xs text-slate-500">Won products</div>
-                                    <div class="text-xl font-bold text-slate-900">{{ employeeOverview.last_week?.won_line_items || 0 }}</div>
-                                </div>
-                                <div>
-                                    <div class="text-xs text-slate-500">Revenue</div>
-                                    <div class="text-xl font-bold text-slate-900">GBP {{ formatNumber(employeeOverview.last_week?.total_revenue || 0) }}</div>
+                    <BaseCard
+                        title="Sales workflow"
+                        subtitle="Follow the customer journey from contact to final outcome."
+                    >
+                        <div class="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
+                            <div
+                                v-for="stage in stageRows"
+                                :key="stage.key"
+                                class="rounded-control border border-slate-200 p-3"
+                            >
+                                <div class="text-eyebrow uppercase text-slate-500">{{ stage.label }}</div>
+                                <div class="mt-2 text-xl font-bold tabular-nums text-slate-900">{{ stage.count }}</div>
+                                <div class="mt-2 h-2 overflow-hidden rounded bg-slate-100" aria-hidden="true">
+                                    <div class="h-2 rounded bg-primary-600" :style="{ width: `${stage.percent}%` }"></div>
                                 </div>
                             </div>
                         </div>
+                    </BaseCard>
+                </TabPanel>
 
-                        <div class="bg-white border border-slate-200 rounded-lg p-4 sm:p-5">
-                            <h3 class="text-base font-semibold text-slate-900 mb-3">Selected Month</h3>
-                            <div class="text-sm text-slate-500">
-                                {{ employeeOverview.selected_month?.period?.from || '-' }} to {{ employeeOverview.selected_month?.period?.to || '-' }}
-                            </div>
-                            <div class="mt-3 grid grid-cols-2 gap-3">
-                                <div>
-                                    <div class="text-xs text-slate-500">Won products</div>
-                                    <div class="text-xl font-bold text-slate-900">{{ employeeOverview.selected_month?.won_line_items || 0 }}</div>
-                                </div>
-                                <div>
-                                    <div class="text-xs text-slate-500">Revenue</div>
-                                    <div class="text-xl font-bold text-slate-900">GBP {{ formatNumber(employeeOverview.selected_month?.total_revenue || 0) }}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <!-- Team -->
+                <TabPanel class="focus-visible:outline-none">
+                    <BaseCard
+                        :padded="false"
+                        title="Team Performance"
+                        subtitle="Compare users using the same date range and sales basis."
+                    >
+                        <template #actions>
+                            <BaseButton
+                                variant="outline"
+                                size="sm"
+                                :disabled="teamRows.length === 0"
+                                @click="filters.employee_id = ''; loadReports()"
+                            >
+                                Show All
+                            </BaseButton>
+                        </template>
 
-                    <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                        <div class="p-4 sm:p-5 border-b border-slate-100">
-                            <h3 class="text-base font-semibold text-slate-900">Products Won In Current Filter</h3>
-                            <p class="text-sm text-slate-500">{{ productReport.period?.from || filters.from }} to {{ productReport.period?.to || filters.to }}</p>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full min-w-[760px]">
-                                <thead class="bg-slate-50">
+                        <div v-if="teamRows.length" class="table-wrap">
+                            <table class="table min-w-[1040px]">
+                                <caption class="sr-only">
+                                    Team performance for {{ periodLabel }}: appointments, new leads, open pipeline,
+                                    won products, won leads, conversion rate and sales revenue per employee.
+                                </caption>
+                                <thead class="table-thead">
                                     <tr>
-                                        <th class="report-th">Product</th>
-                                        <th class="report-th">Customer</th>
-                                        <th class="report-th text-right">Qty</th>
-                                        <th class="report-th text-right">Unit Price</th>
-                                        <th class="report-th text-right">Total</th>
+                                        <th scope="col" class="table-th">Employee</th>
+                                        <th scope="col" class="table-th-num">Appointments</th>
+                                        <th scope="col" class="table-th-num">New Leads</th>
+                                        <th scope="col" class="table-th-num">Open Pipeline</th>
+                                        <th scope="col" class="table-th-num">Won Products</th>
+                                        <th scope="col" class="table-th-num">Won Leads</th>
+                                        <th scope="col" class="table-th-num">Conversion</th>
+                                        <th scope="col" class="table-th-num">Sales Revenue</th>
+                                        <th scope="col" class="table-th-num">Action</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-100">
-                                    <tr v-for="(item, index) in productReport.products || []" :key="index">
-                                        <td class="report-td font-semibold text-slate-900">{{ item.product_name }}</td>
-                                        <td class="report-td">{{ item.customer_name }}</td>
-                                        <td class="report-td text-right">{{ item.quantity }}</td>
-                                        <td class="report-td text-right">GBP {{ formatNumber(item.unit_price) }}</td>
-                                        <td class="report-td text-right font-semibold">GBP {{ formatNumber(item.total_price) }}</td>
-                                    </tr>
-                                    <tr v-if="!(productReport.products || []).length">
-                                        <td class="px-4 py-8 text-center text-sm text-slate-500" colspan="5">No won products for this employee in the selected range.</td>
+                                <tbody>
+                                    <tr v-for="row in teamRows" :key="row.employee_id" class="table-row">
+                                        <td class="table-td-strong">{{ row.employee_name }}</td>
+                                        <td class="table-td-num">{{ row.appointments }}</td>
+                                        <td class="table-td-num">{{ row.leads }}</td>
+                                        <td class="table-td-num">{{ row.open_pipeline }}</td>
+                                        <td class="table-td-num font-semibold text-success-700">{{ row.won_products }}</td>
+                                        <td class="table-td-num">{{ row.won_leads }}</td>
+                                        <td class="table-td-num">{{ row.conversion_rate }}%</td>
+                                        <td class="table-td-num font-semibold text-slate-900">
+                                            GBP {{ formatNumber(row.revenue) }}
+                                        </td>
+                                        <td class="table-td-actions">
+                                            <BaseButton
+                                                variant="ghost"
+                                                size="sm"
+                                                @click="selectEmployee(row.employee_id, 'employee')"
+                                            >
+                                                View
+                                            </BaseButton>
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-                </template>
-            </template>
-        </section>
+                        <EmptyState v-else heading="No team data for this period.">
+                            <template #icon><UsersIcon class="icon" aria-hidden="true" /></template>
+                        </EmptyState>
+                    </BaseCard>
+                </TabPanel>
 
-        <section v-else-if="activeSection === 'pipeline'" class="bg-white border border-slate-200 rounded-lg overflow-hidden">
-            <div class="p-4 sm:p-5 border-b border-slate-100">
-                <h2 class="text-lg font-semibold text-slate-900">Pipeline Report</h2>
-                <p class="text-sm text-slate-500">Counts are lead opportunities created in the selected period; appointments are booked activities.</p>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[1120px]">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th class="report-th">Employee</th>
-                            <th class="report-th text-right">Follow-up</th>
-                            <th class="report-th text-right">Lead</th>
-                            <th class="report-th text-right">Hot Lead</th>
-                            <th class="report-th text-right">Appointment</th>
-                            <th class="report-th text-right">Quotation</th>
-                            <th class="report-th text-right">Won</th>
-                            <th class="report-th text-right">Lost</th>
-                            <th class="report-th text-right">Products W/L/P</th>
-                            <th class="report-th text-right">Pipeline Value</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <tr v-for="row in allEmployeesPipeline" :key="row.employee_id">
-                            <td class="report-td font-semibold text-slate-900">{{ row.employee_name }}</td>
-                            <td class="report-td text-right">{{ row.follow_up || 0 }}</td>
-                            <td class="report-td text-right">{{ row.lead || 0 }}</td>
-                            <td class="report-td text-right">{{ row.hot_lead || 0 }}</td>
-                            <td class="report-td text-right">{{ row.appointments || 0 }}</td>
-                            <td class="report-td text-right">{{ row.quotation || 0 }}</td>
-                            <td class="report-td text-right text-green-700 font-semibold">{{ row.won || 0 }}</td>
-                            <td class="report-td text-right text-red-600">{{ row.lost || 0 }}</td>
-                            <td class="report-td text-right">
-                                {{ row.products?.won || 0 }} / {{ row.products?.lost || 0 }} / {{ row.products?.pending || 0 }}
-                            </td>
-                            <td class="report-td text-right font-semibold">GBP {{ formatNumber(row.total_value || 0) }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
+                <!-- Employee -->
+                <TabPanel class="space-y-4 focus-visible:outline-none">
+                    <BaseCard v-if="!filters.employee_id" :padded="false">
+                        <EmptyState
+                            heading="Choose an employee"
+                            description="Select one user above or use View from the team table."
+                        >
+                            <template #icon><UserIcon class="icon" aria-hidden="true" /></template>
+                        </EmptyState>
+                    </BaseCard>
 
-        <section v-else-if="activeSection === 'revenue'" class="space-y-4">
-            <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                <div class="p-4 sm:p-5 border-b border-slate-100">
-                    <h2 class="text-lg font-semibold text-slate-900">Product And Revenue Report</h2>
-                    <p class="text-sm text-slate-500">Sales revenue is won product lines. Billed revenue is invoice total.</p>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full min-w-[860px]">
-                        <thead class="bg-slate-50">
-                            <tr>
-                                <th class="report-th">Employee</th>
-                                <th class="report-th text-right">Sales Revenue</th>
-                                <th class="report-th text-right">Billed Revenue</th>
-                                <th class="report-th text-right">Total Revenue</th>
-                                <th class="report-th text-right">Won Products</th>
-                                <th class="report-th text-right">Lost Products</th>
-                                <th class="report-th text-right">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <tr v-for="row in revenueByEmployee" :key="row.employee_id">
-                                <td class="report-td font-semibold text-slate-900">{{ row.employee_name }}</td>
-                                <td class="report-td text-right">GBP {{ formatNumber(row.lead_revenue || 0) }}</td>
-                                <td class="report-td text-right">GBP {{ formatNumber(row.invoice_revenue || 0) }}</td>
-                                <td class="report-td text-right font-semibold">GBP {{ formatNumber(row.revenue || 0) }}</td>
-                                <td class="report-td text-right text-green-700 font-semibold">{{ row.products?.won || 0 }}</td>
-                                <td class="report-td text-right text-red-600">{{ row.products?.lost || 0 }}</td>
-                                <td class="report-td text-right">
-                                    <button type="button" class="text-sm font-medium text-blue-700 hover:underline" @click="selectEmployee(row.employee_id, 'employee')">
-                                        Products
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
+                    <template v-else>
+                        <BaseCard
+                            :title="`${selectedEmployee?.name || 'Employee'} Report`"
+                            subtitle="Month target view plus product sales detail."
+                        >
+                            <div class="w-full sm:w-56">
+                                <label class="form-label" for="reportsview-target-month">Target month</label>
+                                <select
+                                    id="reportsview-target-month"
+                                    v-model="selectedMonth"
+                                    class="form-select"
+                                    @change="loadEmployeeReports"
+                                >
+                                    <option v-for="month in monthOptions" :key="month.value" :value="month.value">
+                                        {{ month.label }}
+                                    </option>
+                                </select>
+                            </div>
+                        </BaseCard>
 
-        <section v-else-if="activeSection === 'daily'" class="space-y-4">
-            <div class="bg-white border border-slate-200 rounded-lg p-4 sm:p-5">
-                <h2 class="text-lg font-semibold text-slate-900">Today And Field Activity</h2>
-                <p class="text-sm text-slate-500">Follow-ups are always for today. Activity locations use the selected date range.</p>
-            </div>
+                        <div v-if="employeeLoading" class="card card-body space-y-3" aria-busy="true">
+                            <p class="sr-only" role="status">Loading employee report...</p>
+                            <span class="skeleton-text block w-1/3"></span>
+                            <span class="skeleton-text block w-full"></span>
+                            <span class="skeleton-text block w-5/6"></span>
+                        </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div class="bg-white border border-slate-200 rounded-lg p-4 sm:p-5">
-                    <h3 class="text-base font-semibold text-slate-900 mb-4">Today's Follow-ups</h3>
-                    <div v-if="todaysFollowUps.length === 0" class="text-sm text-slate-500 py-8 text-center">No follow-ups scheduled for today.</div>
-                    <div v-else class="space-y-4">
-                        <div v-for="group in todaysFollowUps" :key="group.agent_id" class="border border-slate-200 rounded p-3">
-                            <div class="font-semibold text-slate-900">{{ group.agent_name }} ({{ group.count }})</div>
-                            <div class="mt-3 space-y-2">
-                                <div v-for="followUp in group.follow_ups" :key="followUp.id" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm border-l-2 border-blue-200 pl-3 py-2">
-                                    <div class="min-w-0">
-                                        <div class="font-medium text-slate-900 truncate">{{ followUp.customer?.name || 'Unknown customer' }}</div>
-                                        <div class="text-slate-500 truncate">{{ productNames(followUp) || 'No product selected' }}</div>
+                        <template v-else>
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                <StatCard
+                                    v-for="card in employeeActivityCards"
+                                    :key="card.label"
+                                    :label="card.label"
+                                    :value="card.value"
+                                    :caption="card.help"
+                                />
+                            </div>
+
+                            <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                <div v-for="card in employeeTargetCards" :key="card.label" class="stat-card">
+                                    <p class="stat-label">{{ card.label }}</p>
+                                    <p class="stat-value">{{ card.value }}</p>
+                                    <div class="mt-3 h-2 overflow-hidden rounded bg-slate-100" aria-hidden="true">
+                                        <div class="h-2 rounded bg-success-600" :style="{ width: `${card.progress}%` }"></div>
                                     </div>
-                                    <div class="flex gap-2 shrink-0">
-                                        <button type="button" class="px-2 py-1 rounded bg-green-600 text-white text-xs" @click="openActivityModal(followUp)">Log</button>
-                                        <router-link v-if="followUp.customer_id" :to="`/customers/${followUp.customer_id}`" class="px-2 py-1 rounded bg-blue-600 text-white text-xs">View</router-link>
-                                    </div>
+                                    <p class="stat-caption">{{ card.progress }}% achieved</p>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="bg-white border border-slate-200 rounded-lg p-4 sm:p-5">
-                    <h3 class="text-base font-semibold text-slate-900 mb-4">Recent Visits And Meetings</h3>
-                    <div v-if="teamLocationStatus.length === 0" class="text-sm text-slate-500 py-8 text-center">No recent visits or meetings.</div>
-                    <div v-else class="space-y-4">
-                        <div v-for="agent in teamLocationStatus" :key="agent.agent_id" class="border border-slate-200 rounded p-3">
-                            <div class="font-semibold text-slate-900">{{ agent.agent_name }} ({{ agent.activity_count }})</div>
-                            <div class="mt-2 space-y-1">
-                                <div v-for="customer in agent.customers" :key="customer.id" class="text-sm text-slate-600">
-                                    {{ customer.name }} - {{ customer.phone || 'No phone' }}
-                                    <span v-if="customer.address" class="text-xs text-slate-500">({{ customer.address }})</span>
+                            <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                                <BaseCard title="Last Week" :subtitle="employeeOverview.last_week?.label || '-'">
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <StatCard
+                                            label="Won products"
+                                            :value="employeeOverview.last_week?.won_line_items || 0"
+                                        />
+                                        <StatCard
+                                            label="Revenue"
+                                            :value="`GBP ${formatNumber(employeeOverview.last_week?.total_revenue || 0)}`"
+                                        />
+                                    </div>
+                                </BaseCard>
+
+                                <BaseCard
+                                    title="Selected Month"
+                                    :subtitle="`${employeeOverview.selected_month?.period?.from || '-'} to ${employeeOverview.selected_month?.period?.to || '-'}`"
+                                >
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <StatCard
+                                            label="Won products"
+                                            :value="employeeOverview.selected_month?.won_line_items || 0"
+                                        />
+                                        <StatCard
+                                            label="Revenue"
+                                            :value="`GBP ${formatNumber(employeeOverview.selected_month?.total_revenue || 0)}`"
+                                        />
+                                    </div>
+                                </BaseCard>
+                            </div>
+
+                            <BaseCard
+                                :padded="false"
+                                title="Products Won In Current Filter"
+                                :subtitle="`${productReport.period?.from || filters.from} to ${productReport.period?.to || filters.to}`"
+                            >
+                                <div v-if="(productReport.products || []).length" class="table-wrap">
+                                    <table class="table min-w-[760px]">
+                                        <caption class="sr-only">
+                                            Products won by {{ selectedEmployee?.name || 'the selected employee' }}:
+                                            product, customer, quantity, unit price and total.
+                                        </caption>
+                                        <thead class="table-thead">
+                                            <tr>
+                                                <th scope="col" class="table-th">Product</th>
+                                                <th scope="col" class="table-th">Customer</th>
+                                                <th scope="col" class="table-th-num">Qty</th>
+                                                <th scope="col" class="table-th-num">Unit Price</th>
+                                                <th scope="col" class="table-th-num">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr
+                                                v-for="(item, index) in productReport.products || []"
+                                                :key="index"
+                                                class="table-row"
+                                            >
+                                                <td class="table-td-strong">{{ item.product_name }}</td>
+                                                <td class="table-td">{{ item.customer_name }}</td>
+                                                <td class="table-td-num">{{ item.quantity }}</td>
+                                                <td class="table-td-num">GBP {{ formatNumber(item.unit_price) }}</td>
+                                                <td class="table-td-num font-semibold">
+                                                    GBP {{ formatNumber(item.total_price) }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <EmptyState
+                                    v-else
+                                    heading="No won products for this employee in the selected range."
+                                >
+                                    <template #icon><CubeIcon class="icon" aria-hidden="true" /></template>
+                                </EmptyState>
+                            </BaseCard>
+                        </template>
+                    </template>
+                </TabPanel>
+
+                <!-- Pipeline -->
+                <TabPanel class="focus-visible:outline-none">
+                    <BaseCard
+                        :padded="false"
+                        title="Pipeline Report"
+                        subtitle="Counts are lead opportunities created in the selected period; appointments are booked activities."
+                    >
+                        <div v-if="allEmployeesPipeline.length" class="table-wrap">
+                            <table class="table min-w-[1120px]">
+                                <caption class="sr-only">
+                                    Pipeline stage counts and value per employee for {{ periodLabel }}.
+                                </caption>
+                                <thead class="table-thead">
+                                    <tr>
+                                        <th scope="col" class="table-th">Employee</th>
+                                        <th scope="col" class="table-th-num">Follow-up</th>
+                                        <th scope="col" class="table-th-num">Lead</th>
+                                        <th scope="col" class="table-th-num">Hot Lead</th>
+                                        <th scope="col" class="table-th-num">Appointment</th>
+                                        <th scope="col" class="table-th-num">Quotation</th>
+                                        <th scope="col" class="table-th-num">Won</th>
+                                        <th scope="col" class="table-th-num">Lost</th>
+                                        <th scope="col" class="table-th-num">Products W/L/P</th>
+                                        <th scope="col" class="table-th-num">Pipeline Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="row in allEmployeesPipeline" :key="row.employee_id" class="table-row">
+                                        <td class="table-td-strong">{{ row.employee_name }}</td>
+                                        <td class="table-td-num">{{ row.follow_up || 0 }}</td>
+                                        <td class="table-td-num">{{ row.lead || 0 }}</td>
+                                        <td class="table-td-num">{{ row.hot_lead || 0 }}</td>
+                                        <td class="table-td-num">{{ row.appointments || 0 }}</td>
+                                        <td class="table-td-num">{{ row.quotation || 0 }}</td>
+                                        <td class="table-td-num font-semibold text-success-700">{{ row.won || 0 }}</td>
+                                        <td class="table-td-num text-danger-700">{{ row.lost || 0 }}</td>
+                                        <td class="table-td-num">
+                                            {{ row.products?.won || 0 }} / {{ row.products?.lost || 0 }} /
+                                            {{ row.products?.pending || 0 }}
+                                        </td>
+                                        <td class="table-td-num font-semibold">
+                                            GBP {{ formatNumber(row.total_value || 0) }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <EmptyState v-else heading="No pipeline data for this period.">
+                            <template #icon><ChartBarIcon class="icon" aria-hidden="true" /></template>
+                        </EmptyState>
+                    </BaseCard>
+                </TabPanel>
+
+                <!-- Products & Revenue -->
+                <TabPanel class="focus-visible:outline-none">
+                    <BaseCard
+                        :padded="false"
+                        title="Product And Revenue Report"
+                        subtitle="Sales revenue is won product lines. Billed revenue is invoice total."
+                    >
+                        <div v-if="revenueByEmployee.length" class="table-wrap">
+                            <table class="table min-w-[860px]">
+                                <caption class="sr-only">
+                                    Sales, billed and total revenue plus won and lost product counts per employee
+                                    for {{ periodLabel }}.
+                                </caption>
+                                <thead class="table-thead">
+                                    <tr>
+                                        <th scope="col" class="table-th">Employee</th>
+                                        <th scope="col" class="table-th-num">Sales Revenue</th>
+                                        <th scope="col" class="table-th-num">Billed Revenue</th>
+                                        <th scope="col" class="table-th-num">Total Revenue</th>
+                                        <th scope="col" class="table-th-num">Won Products</th>
+                                        <th scope="col" class="table-th-num">Lost Products</th>
+                                        <th scope="col" class="table-th-num">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="row in revenueByEmployee" :key="row.employee_id" class="table-row">
+                                        <td class="table-td-strong">{{ row.employee_name }}</td>
+                                        <td class="table-td-num">GBP {{ formatNumber(row.lead_revenue || 0) }}</td>
+                                        <td class="table-td-num">GBP {{ formatNumber(row.invoice_revenue || 0) }}</td>
+                                        <td class="table-td-num font-semibold">GBP {{ formatNumber(row.revenue || 0) }}</td>
+                                        <td class="table-td-num font-semibold text-success-700">
+                                            {{ row.products?.won || 0 }}
+                                        </td>
+                                        <td class="table-td-num text-danger-700">{{ row.products?.lost || 0 }}</td>
+                                        <td class="table-td-actions">
+                                            <BaseButton
+                                                variant="ghost"
+                                                size="sm"
+                                                @click="selectEmployee(row.employee_id, 'employee')"
+                                            >
+                                                Products
+                                            </BaseButton>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <EmptyState v-else heading="No revenue data for this period.">
+                            <template #icon><BanknotesIcon class="icon" aria-hidden="true" /></template>
+                        </EmptyState>
+                    </BaseCard>
+                </TabPanel>
+
+                <!-- Today -->
+                <TabPanel class="space-y-4 focus-visible:outline-none">
+                    <BaseCard
+                        title="Today And Field Activity"
+                        subtitle="Follow-ups are always for today. Activity locations use the selected date range."
+                        :padded="false"
+                    />
+
+                    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        <BaseCard title="Today's Follow-ups" :padded="todaysFollowUps.length > 0">
+                            <EmptyState v-if="todaysFollowUps.length === 0" heading="No follow-ups scheduled for today.">
+                                <template #icon><CalendarDaysIcon class="icon" aria-hidden="true" /></template>
+                            </EmptyState>
+                            <div v-else class="space-y-4">
+                                <div
+                                    v-for="group in todaysFollowUps"
+                                    :key="group.agent_id"
+                                    class="rounded-control border border-slate-200 p-3"
+                                >
+                                    <h3 class="font-semibold text-slate-900">
+                                        {{ group.agent_name }} ({{ group.count }})
+                                    </h3>
+                                    <ul class="mt-3 space-y-2">
+                                        <li
+                                            v-for="followUp in group.follow_ups"
+                                            :key="followUp.id"
+                                            class="flex flex-col gap-2 border-l-2 border-primary-200 py-2 pl-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                                        >
+                                            <div class="min-w-0">
+                                                <div class="truncate font-medium text-slate-900">
+                                                    {{ followUp.customer?.name || 'Unknown customer' }}
+                                                </div>
+                                                <div class="truncate text-slate-500">
+                                                    {{ productNames(followUp) || 'No product selected' }}
+                                                </div>
+                                            </div>
+                                            <div class="flex shrink-0 gap-2">
+                                                <BaseButton variant="soft" size="sm" @click="openActivityModal(followUp)">
+                                                    Log
+                                                </BaseButton>
+                                                <BaseButton
+                                                    v-if="followUp.customer_id"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    :to="`/customers/${followUp.customer_id}`"
+                                                >
+                                                    View
+                                                </BaseButton>
+                                            </div>
+                                        </li>
+                                    </ul>
                                 </div>
                             </div>
-                        </div>
+                        </BaseCard>
+
+                        <BaseCard title="Recent Visits And Meetings" :padded="teamLocationStatus.length > 0">
+                            <EmptyState v-if="teamLocationStatus.length === 0" heading="No recent visits or meetings.">
+                                <template #icon><MapPinIcon class="icon" aria-hidden="true" /></template>
+                            </EmptyState>
+                            <div v-else class="space-y-4">
+                                <div
+                                    v-for="agent in teamLocationStatus"
+                                    :key="agent.agent_id"
+                                    class="rounded-control border border-slate-200 p-3"
+                                >
+                                    <h3 class="font-semibold text-slate-900">
+                                        {{ agent.agent_name }} ({{ agent.activity_count }})
+                                    </h3>
+                                    <ul class="mt-2 space-y-1">
+                                        <li
+                                            v-for="customer in agent.customers"
+                                            :key="customer.id"
+                                            class="text-sm text-slate-600"
+                                        >
+                                            {{ customer.name }} - {{ customer.phone || 'No phone' }}
+                                            <span v-if="customer.address" class="text-xs text-slate-500">
+                                                ({{ customer.address }})
+                                            </span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </BaseCard>
                     </div>
-                </div>
-            </div>
-        </section>
+                </TabPanel>
+            </TabPanels>
+        </ListingPageShell>
 
         <LogActivityModal
             v-if="showActivityModal && activityLead"
@@ -419,13 +549,26 @@
             @close="closeActivityModal"
             @saved="handleActivitySaved"
         />
-    </div>
+    </TabGroup>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import axios from 'axios';
+import { TabGroup, TabList, Tab, TabPanels, TabPanel } from '@headlessui/vue';
+import {
+    ArrowDownTrayIcon,
+    BanknotesIcon,
+    CalendarDaysIcon,
+    ChartBarIcon,
+    CubeIcon,
+    MapPinIcon,
+    UserIcon,
+    UsersIcon,
+} from '@heroicons/vue/24/outline';
 import LogActivityModal from '@/components/LogActivityModal.vue';
+import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseButton, BaseCard, EmptyState, StatCard } from '@/components/base';
 
 const dateToInput = (date) => {
     const y = date.getFullYear();
@@ -471,6 +614,16 @@ const sections = [
     { key: 'revenue', label: 'Products & Revenue' },
     { key: 'daily', label: 'Today' },
 ];
+
+/** Bridges the string-keyed `activeSection` to the headless tab index. */
+const activeSectionIndex = computed(() => {
+    const index = sections.findIndex((section) => section.key === activeSection.value);
+    return index === -1 ? 0 : index;
+});
+
+const onSectionChange = (index) => {
+    activeSection.value = sections[index]?.key || 'overview';
+};
 
 const quickRanges = [
     { key: 'today', label: 'Today' },
@@ -812,68 +965,3 @@ onMounted(async () => {
     await loadReports();
 });
 </script>
-
-<style scoped>
-.report-input {
-    width: 100%;
-    min-width: 0;
-    border: 1px solid #cbd5e1;
-    border-radius: 0.5rem;
-    background: #ffffff;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-}
-
-.report-btn-primary {
-    border-radius: 0.5rem;
-    background: #0f172a;
-    color: #ffffff;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    line-height: 1.25rem;
-}
-
-.report-btn-outline {
-    border: 1px solid #cbd5e1;
-    border-radius: 0.5rem;
-    background: #ffffff;
-    color: #334155;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    line-height: 1.25rem;
-}
-
-.report-th {
-    padding: 0.75rem 1rem;
-    text-align: left;
-    font-size: 0.75rem;
-    font-weight: 600;
-    line-height: 1rem;
-    color: #475569;
-    text-transform: uppercase;
-}
-
-.report-td {
-    padding: 0.75rem 1rem;
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    color: #475569;
-}
-
-.report-btn-primary:hover {
-    background: #1e293b;
-}
-
-.report-btn-outline:hover {
-    background: #f8fafc;
-}
-
-.report-btn-primary:disabled,
-.report-btn-outline:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-</style>

@@ -7,8 +7,8 @@
         <template #filters>
             <div class="flex flex-col lg:flex-row lg:flex-wrap gap-3 lg:items-end">
                 <div class="w-full lg:w-auto lg:min-w-[12rem]">
-                    <label class="listing-label">Employee</label>
-                    <select v-model="selectedEmployeeId" class="listing-input" @change="loadData">
+                    <label class="form-label" for="reportproductsbyemployeeview-employee">Employee</label>
+                    <select id="reportproductsbyemployeeview-employee" v-model="selectedEmployeeId" class="form-select" @change="loadData">
                         <option value="">Select employee</option>
                         <option v-for="emp in employees" :key="emp.id" :value="emp.id">
                             {{ emp.name }}
@@ -16,68 +16,92 @@
                     </select>
                 </div>
                 <div class="w-full sm:w-48">
-                    <label class="listing-label">Month</label>
-                    <select v-model="selectedMonth" class="listing-input" @change="loadData">
+                    <label class="form-label" for="reportproductsbyemployeeview-month">Month</label>
+                    <select id="reportproductsbyemployeeview-month" v-model="selectedMonth" class="form-select" @change="loadData">
                         <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
                     </select>
                 </div>
-                <button type="button" class="listing-btn-primary" :disabled="loading" @click="loadData">
+                <BaseButton
+                    variant="primary"
+                    type="button"
+                    :disabled="loading"
+                    :loading="loading"
+                    block-mobile
+                    @click="loadData"
+                >
+                    <template #icon>
+                        <ArrowPathIcon class="icon" aria-hidden="true" />
+                    </template>
                     {{ loading ? 'Loading…' : 'Refresh' }}
-                </button>
+                </BaseButton>
             </div>
         </template>
 
-        <div v-if="!selectedEmployeeId" class="mx-3 sm:mx-5 mb-4 rounded-xl border border-slate-200 bg-slate-50/50 p-8 text-center text-slate-500 text-sm">
-            Select an employee from the dropdown to view products they sold this month.
-        </div>
+        <EmptyState
+            v-if="!selectedEmployeeId"
+            heading="No employee selected"
+            description="Select an employee from the dropdown to view products they sold this month."
+        >
+            <template #icon>
+                <UsersIcon class="icon" aria-hidden="true" />
+            </template>
+        </EmptyState>
 
         <template v-else>
-            <div v-if="loading" class="flex justify-center py-12">
-                <svg class="animate-spin h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+            <div v-if="loading" class="px-3 sm:px-5 py-8 space-y-3" aria-busy="true">
+                <p class="sr-only">Loading products sold…</p>
+                <div class="skeleton-text w-1/3"></div>
+                <div class="skeleton-text w-2/3"></div>
+                <div class="skeleton-text w-1/2"></div>
+                <div class="skeleton-text w-3/4"></div>
             </div>
 
             <template v-else>
-                <div v-if="report.employee_name" class="mb-4 text-sm text-slate-600">
+                <div v-if="report.employee_name" class="px-3 sm:px-5 py-4 text-sm text-slate-600">
                     <strong>{{ report.employee_name }}</strong> — {{ report.period?.from }} to {{ report.period?.to }}
-                    <span v-if="report.total_revenue !== undefined" class="ml-2 font-semibold text-slate-900">
+                    <span v-if="report.total_revenue !== undefined" class="ml-2 font-semibold text-slate-900 tabular-nums">
                         Total: £{{ formatNumber(report.total_revenue) }}
                     </span>
                 </div>
 
-                <div v-if="report.products?.length === 0" class="px-5 py-12 text-center text-slate-500 text-sm">
-                    No products sold by this employee in the selected period.
-                </div>
+                <EmptyState
+                    v-if="report.products?.length === 0"
+                    heading="No products sold"
+                    description="No products sold by this employee in the selected period."
+                >
+                    <template #icon>
+                        <CubeIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
 
-                <div v-else class="overflow-x-auto min-w-0">
-                    <table class="w-full min-w-[600px]">
-                        <thead class="listing-thead">
+                <div v-else class="table-wrap min-w-0">
+                    <table class="table min-w-[600px]">
+                        <caption class="sr-only">Products sold by the selected employee, with quantity, unit price and total</caption>
+                        <thead class="table-thead">
                             <tr>
-                                <th class="listing-th">Product</th>
-                                <th class="listing-th">Customer</th>
-                                <th class="listing-th text-right">Qty</th>
-                                <th class="listing-th text-right">Unit price</th>
-                                <th class="listing-th text-right">Total</th>
+                                <th scope="col" class="table-th">Product</th>
+                                <th scope="col" class="table-th">Customer</th>
+                                <th scope="col" class="table-th-num">Qty</th>
+                                <th scope="col" class="table-th-num">Unit price</th>
+                                <th scope="col" class="table-th-num">Total</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(p, i) in report.products" :key="i" class="listing-row">
-                                <td class="listing-td-strong">{{ p.product_name }}</td>
-                                <td class="listing-td">
+                            <tr v-for="(p, i) in report.products" :key="i" class="table-row">
+                                <td class="table-td-strong">{{ p.product_name }}</td>
+                                <td class="table-td">
                                     <router-link
                                         v-if="p.customer_id"
                                         :to="`/customers/${p.customer_id}`"
-                                        class="listing-link-edit"
+                                        class="link"
                                     >
                                         {{ p.customer_name }}
                                     </router-link>
                                     <span v-else class="text-slate-600">{{ p.customer_name }}</span>
                                 </td>
-                                <td class="listing-td text-right">{{ p.quantity }}</td>
-                                <td class="listing-td text-right">£{{ formatNumber(p.unit_price) }}</td>
-                                <td class="listing-td text-right font-semibold text-slate-900">£{{ formatNumber(p.total_price) }}</td>
+                                <td class="table-td-num">{{ p.quantity }}</td>
+                                <td class="table-td-num">£{{ formatNumber(p.unit_price) }}</td>
+                                <td class="table-td-num font-semibold text-slate-900">£{{ formatNumber(p.total_price) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -91,6 +115,8 @@
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseButton, EmptyState } from '@/components/base';
+import { ArrowPathIcon, CubeIcon, UsersIcon } from '@heroicons/vue/24/outline';
 
 const selectedEmployeeId = ref('');
 

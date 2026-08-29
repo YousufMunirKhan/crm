@@ -1,169 +1,137 @@
 <template>
     <div class="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
         <div>
-            <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Email Management</h1>
+            <h1 class="text-page-title text-slate-900">Email Management</h1>
             <p class="text-sm text-slate-600 mt-1">Filter contacts, export list, choose template and send bulk emails. SMTP settings from Settings → Email/SMTP.</p>
             <!-- SMTP status from Settings -->
             <div
                 v-if="smtpStatus"
-                class="mt-4 p-4 rounded-xl flex flex-wrap items-center gap-3"
-                :class="smtpStatus.configured ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'"
+                class="callout mt-4 flex flex-wrap items-center gap-3"
+                :class="smtpStatus.configured ? 'callout-success' : 'callout-warning'"
+                role="status"
+                aria-live="polite"
             >
-                <span v-if="smtpStatus.configured" class="text-green-600 text-lg">✓</span>
-                <span v-else class="text-amber-600 text-lg">⚠</span>
-                <span class="text-sm" :class="smtpStatus.configured ? 'text-green-800' : 'text-amber-800'">
-                    {{ smtpStatus.message }}
-                </span>
-                <router-link
-                    to="/settings"
-                    class="text-sm font-medium underline"
-                    :class="smtpStatus.configured ? 'text-green-700 hover:text-green-900' : 'text-amber-700 hover:text-amber-900'"
-                >
-                    Open Settings
-                </router-link>
+                <CheckCircleIcon v-if="smtpStatus.configured" class="icon" aria-hidden="true" />
+                <ExclamationTriangleIcon v-else class="icon" aria-hidden="true" />
+                <span class="text-sm">{{ smtpStatus.message }}</span>
+                <router-link to="/settings" class="link">Open Settings</router-link>
             </div>
         </div>
 
         <!-- Tabs: Send Email | Report -->
-        <div class="flex gap-2 border-b border-slate-200 overflow-x-auto pb-px scrollbar-thin -mx-1 px-1 sm:mx-0 sm:px-0 flex-nowrap">
+        <div class="tab-list border-b border-slate-200" role="tablist" aria-label="Email management sections">
             <button
+                v-for="tab in tabOptions"
+                :key="tab.value"
                 type="button"
-                @click="activeTab = 'send'"
-                :class="[
-                    'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0',
-                    activeTab === 'send'
-                        ? 'bg-white border border-b-0 border-slate-200 text-slate-900'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                ]"
+                role="tab"
+                :class="['tab', activeTab === tab.value ? 'tab-active' : '']"
+                :aria-selected="activeTab === tab.value"
+                @click="selectTab(tab.value)"
             >
-                Send Email
-            </button>
-            <button
-                type="button"
-                @click="activeTab = 'report'; loadReport()"
-                :class="[
-                    'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0',
-                    activeTab === 'report'
-                        ? 'bg-white border border-b-0 border-slate-200 text-slate-900'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                ]"
-            >
-                Report
-            </button>
-            <button
-                type="button"
-                @click="activeTab = 'upload'; loadSavedLists()"
-                :class="[
-                    'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0',
-                    activeTab === 'upload'
-                        ? 'bg-white border border-b-0 border-slate-200 text-slate-900'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                ]"
-            >
-                Upload list
-            </button>
-            <button
-                type="button"
-                @click="activeTab = 'sendByDate'"
-                :class="[
-                    'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0',
-                    activeTab === 'sendByDate'
-                        ? 'bg-white border border-b-0 border-slate-200 text-slate-900'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                ]"
-            >
-                Send by Date
+                {{ tab.label }}
             </button>
         </div>
 
         <!-- Tab: Send Email -->
         <template v-if="activeTab === 'send'">
             <!-- Step 1: Audience -->
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-4">1. Audience</h2>
-                <div class="flex flex-wrap gap-4">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" v-model="audience" value="prospect" class="rounded-full text-slate-900 focus:ring-slate-500" />
-                        <span class="text-sm font-medium text-slate-700">Prospects only</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" v-model="audience" value="customer" class="rounded-full text-slate-900 focus:ring-slate-500" />
-                        <span class="text-sm font-medium text-slate-700">Customers only</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" v-model="audience" value="both" class="rounded-full text-slate-900 focus:ring-slate-500" />
-                        <span class="text-sm font-medium text-slate-700">Both (Prospects & Customers)</span>
-                    </label>
-                </div>
-            </div>
+            <BaseCard title="1. Audience">
+                <fieldset class="form-fieldset">
+                    <legend class="sr-only">Audience</legend>
+                    <div class="flex flex-wrap gap-4">
+                        <label class="form-choice">
+                            <input v-model="audience" type="radio" value="prospect" class="form-radio" />
+                            <span class="text-sm font-medium text-slate-700">Prospects only</span>
+                        </label>
+                        <label class="form-choice">
+                            <input v-model="audience" type="radio" value="customer" class="form-radio" />
+                            <span class="text-sm font-medium text-slate-700">Customers only</span>
+                        </label>
+                        <label class="form-choice">
+                            <input v-model="audience" type="radio" value="both" class="form-radio" />
+                            <span class="text-sm font-medium text-slate-700">Both (Prospects &amp; Customers)</span>
+                        </label>
+                    </div>
+                </fieldset>
+            </BaseCard>
 
             <!-- Step 2: Product filters -->
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-2">2. Product filters</h2>
-                <p class="text-sm text-slate-500 mb-4">Add rules to narrow who receives the email. Leave empty or set "All" to include everyone in the selected audience.</p>
+            <BaseCard
+                title="2. Product filters"
+                subtitle='Add rules to narrow who receives the email. Leave empty or set "All" to include everyone in the selected audience.'
+            >
                 <div class="space-y-3">
                     <div
                         v-for="(filter, index) in productFilters"
                         :key="index"
-                        class="flex flex-wrap items-center gap-3"
+                        class="flex flex-wrap items-end gap-3"
                     >
-                        <select
-                            v-model="filter.product_id"
-                            class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
-                        >
-                            <option :value="null">Select product</option>
-                            <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }}</option>
-                        </select>
-                        <select
-                            v-model="filter.rule"
-                            class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="all">All (no filter)</option>
-                            <option value="has">Has product</option>
-                            <option value="does_not_have">Does not have product</option>
-                        </select>
-                        <button
+                        <div class="min-w-[180px]">
+                            <label class="form-label" :for="`email-filter-product-${index}`">Product</label>
+                            <select
+                                :id="`email-filter-product-${index}`"
+                                v-model="filter.product_id"
+                                class="form-select"
+                            >
+                                <option :value="null">Select product</option>
+                                <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }}</option>
+                            </select>
+                        </div>
+                        <div class="min-w-[180px]">
+                            <label class="form-label" :for="`email-filter-rule-${index}`">Rule</label>
+                            <select
+                                :id="`email-filter-rule-${index}`"
+                                v-model="filter.rule"
+                                class="form-select"
+                            >
+                                <option value="all">All (no filter)</option>
+                                <option value="has">Has product</option>
+                                <option value="does_not_have">Does not have product</option>
+                            </select>
+                        </div>
+                        <BaseButton
                             v-if="productFilters.length > 1"
-                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            class="text-danger-700 hover:bg-danger-50 hover:text-danger-800"
                             @click="removeFilter(index)"
-                            class="text-red-600 hover:text-red-800 text-sm"
                         >
+                            <template #icon>
+                                <TrashIcon class="icon-sm" aria-hidden="true" />
+                            </template>
                             Remove
-                        </button>
+                        </BaseButton>
                     </div>
-                    <button
-                        type="button"
-                        @click="addFilter"
-                        class="text-sm text-blue-600 hover:text-blue-800"
-                    >
-                        + Add product rule
-                    </button>
+                    <BaseButton variant="outline" size="sm" @click="addFilter">
+                        <template #icon>
+                            <PlusIcon class="icon-sm" aria-hidden="true" />
+                        </template>
+                        Add product rule
+                    </BaseButton>
                 </div>
                 <div class="mt-4 flex flex-wrap gap-3 items-end">
                     <div class="min-w-[200px] flex-1 max-w-md">
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Search by customer name (optional)</label>
-                        <input
+                        <label class="form-label" for="emailmanagementview-search-by-customer-name-optional">Search by customer name (optional)</label>
+                        <input id="emailmanagementview-search-by-customer-name-optional"
                             v-model="searchQuery"
                             type="search"
                             placeholder="e.g. Smith"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="form-input"
                             @keydown.enter.prevent="applyFilters"
                         />
                     </div>
-                    <button
-                        type="button"
-                        @click="applyFilters"
-                        :disabled="loadingContacts"
-                        class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium"
-                    >
+                    <BaseButton variant="soft" :loading="loadingContacts" @click="applyFilters">
+                        <template #icon>
+                            <FunnelIcon class="icon" aria-hidden="true" />
+                        </template>
                         {{ loadingContacts ? 'Loading...' : 'Apply filters' }}
-                    </button>
+                    </BaseButton>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- Result: Contact list (paginated) & export -->
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-4">3. Recipients</h2>
+            <BaseCard title="3. Recipients">
                 <div v-if="totalContacts === 0 && !hasApplied" class="text-slate-500 text-sm">
                     Click "Apply filters" to see who will receive the email.
                 </div>
@@ -171,87 +139,96 @@
                     No contacts match the current filters (or none have an email).
                 </div>
                 <div v-else>
-                    <p class="text-sm text-slate-700 mb-3">
+                    <p class="text-sm text-slate-700 mb-3" role="status" aria-live="polite">
                         <strong>{{ totalContacts }}</strong> match filters;
-                        <strong class="text-blue-700">{{ sendableTotal }}</strong> selected to receive (uncheck rows to exclude).
+                        <strong class="text-primary-700">{{ sendableTotal }}</strong> selected to receive (uncheck rows to exclude).
                         <span v-if="totalContacts > contacts.length" class="text-slate-500">(showing page {{ contactsPage }} of {{ contactsLastPage }})</span>
                     </p>
-                    <div class="flex flex-wrap gap-2 mb-3 text-sm">
-                        <button type="button" class="text-blue-600 hover:text-blue-800" @click="selectAllRecipientsOnPage">Select all on this page</button>
-                        <span class="text-slate-300">|</span>
-                        <button type="button" class="text-blue-600 hover:text-blue-800" @click="deselectAllRecipientsOnPage">Uncheck all on this page</button>
-                        <span class="text-slate-300">|</span>
-                        <button type="button" class="text-slate-600 hover:text-slate-900" @click="clearRecipientExclusions">Include everyone again</button>
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <BaseButton variant="ghost" size="sm" @click="selectAllRecipientsOnPage">Select all on this page</BaseButton>
+                        <BaseButton variant="ghost" size="sm" @click="deselectAllRecipientsOnPage">Uncheck all on this page</BaseButton>
+                        <BaseButton variant="ghost" size="sm" @click="clearRecipientExclusions">Include everyone again</BaseButton>
                     </div>
                     <div class="flex flex-wrap gap-3 mb-4 items-center">
-                        <button
-                            type="button"
-                            @click="exportCsv"
-                            :disabled="exporting"
-                            class="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm disabled:opacity-50"
-                        >
+                        <BaseButton variant="outline" size="sm" :loading="exporting" @click="exportCsv">
+                            <template #icon>
+                                <ArrowDownTrayIcon class="icon-sm" aria-hidden="true" />
+                            </template>
                             {{ exporting ? 'Exporting...' : 'Export CSV' }}
-                        </button>
+                        </BaseButton>
                         <div v-if="contactsLastPage > 1" class="flex items-center gap-2 text-sm">
-                            <button
-                                type="button"
-                                @click="goToContactsPage(contactsPage - 1)"
+                            <BaseButton
+                                variant="outline"
+                                size="sm"
                                 :disabled="contactsPage <= 1"
-                                class="px-2 py-1 border border-slate-300 rounded disabled:opacity-50"
+                                @click="goToContactsPage(contactsPage - 1)"
                             >
+                                <template #icon>
+                                    <ChevronLeftIcon class="icon-sm" aria-hidden="true" />
+                                </template>
                                 Previous
-                            </button>
+                            </BaseButton>
                             <span class="text-slate-600">Page {{ contactsPage }} of {{ contactsLastPage }}</span>
-                            <button
-                                type="button"
-                                @click="goToContactsPage(contactsPage + 1)"
+                            <BaseButton
+                                variant="outline"
+                                size="sm"
                                 :disabled="contactsPage >= contactsLastPage"
-                                class="px-2 py-1 border border-slate-300 rounded disabled:opacity-50"
+                                @click="goToContactsPage(contactsPage + 1)"
                             >
+                                <template #icon>
+                                    <ChevronRightIcon class="icon-sm" aria-hidden="true" />
+                                </template>
                                 Next
-                            </button>
+                            </BaseButton>
                         </div>
                     </div>
-                    <div class="border border-slate-200 rounded-lg overflow-hidden max-h-64 overflow-y-auto overflow-x-auto">
-                        <table class="w-full text-sm min-w-[320px]">
-                            <thead class="bg-slate-50 sticky top-0">
+                    <div
+                        class="table-wrap border border-slate-200 rounded-card max-h-64 overflow-y-auto"
+                        :aria-busy="loadingContacts ? 'true' : 'false'"
+                    >
+                        <table class="table min-w-[320px]">
+                            <caption class="sr-only">Contacts matching the current filters</caption>
+                            <thead class="table-thead table-thead-sticky">
                                 <tr>
-                                    <th class="w-10 px-2 py-2 font-medium text-slate-700 text-center" title="Include in send">✓</th>
-                                    <th class="text-left px-3 sm:px-4 py-2 font-medium text-slate-700">Name</th>
-                                    <th class="text-left px-3 sm:px-4 py-2 font-medium text-slate-700">Email</th>
-                                    <th class="text-left px-3 sm:px-4 py-2 font-medium text-slate-700">Type</th>
+                                    <th scope="col" class="table-th w-10 text-center">
+                                        <span class="sr-only">Include in send</span>
+                                        <CheckIcon class="icon-sm inline-block" aria-hidden="true" />
+                                    </th>
+                                    <th scope="col" class="table-th">Name</th>
+                                    <th scope="col" class="table-th">Email</th>
+                                    <th scope="col" class="table-th">Type</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="c in contacts" :key="c.id" class="border-t border-slate-100 hover:bg-slate-50">
-                                    <td class="px-2 py-2 text-center">
+                                <tr v-for="c in contacts" :key="c.id" class="table-row">
+                                    <td class="table-td text-center">
                                         <input
                                             type="checkbox"
-                                            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                            class="form-checkbox"
                                             :checked="recipientIncluded(c.id)"
+                                            :aria-label="`Include ${c.name || c.email} in this send`"
                                             @change="toggleRecipient(c.id, $event.target.checked)"
                                         />
                                     </td>
-                                    <td class="px-3 sm:px-4 py-2">{{ c.name }}</td>
-                                    <td class="px-3 sm:px-4 py-2">{{ c.email }}</td>
-                                    <td class="px-3 sm:px-4 py-2 capitalize">{{ c.type }}</td>
+                                    <td class="table-td-strong">{{ c.name }}</td>
+                                    <td class="table-td">{{ c.email }}</td>
+                                    <td class="table-td capitalize">{{ c.type }}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- Step 4: Template & preview -->
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-4">4. Template & preview</h2>
+            <BaseCard title="4. Template &amp; preview">
                 <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Choose template</label>
-                        <select
+                    <div class="max-w-md">
+                        <label class="form-label" for="emailmanagementview-choose-template">Choose template</label>
+                        <select id="emailmanagementview-choose-template"
                             v-model="selectedTemplateId"
+                            class="form-select"
                             @change="loadPreview"
-                            class="w-full max-w-md px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             <option :value="null">Select a template</option>
                             <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
@@ -260,7 +237,7 @@
                     <div v-if="totalContacts > 0" class="text-sm text-slate-600">
                         This email will go to <strong>{{ sendableTotal }}</strong> recipient(s) ({{ totalContacts }} match filters<span v-if="excludedRecipientIds.length">; {{ excludedRecipientIds.length }} excluded</span>).
                     </div>
-                    <div v-if="preview.subject || preview.content" class="border border-slate-200 rounded-lg overflow-hidden">
+                    <div v-if="preview.subject || preview.content" class="border border-slate-200 rounded-card overflow-hidden">
                         <div class="px-4 py-2 bg-slate-50 border-b border-slate-200 text-sm font-medium text-slate-700">
                             Preview: {{ preview.template_name || 'Template' }}
                         </div>
@@ -269,7 +246,7 @@
                             <p class="text-xs text-slate-500 mb-2">Visual preview (full HTML document loads in frame — same as recipients see).</p>
                             <iframe
                                 v-if="preview.content"
-                                class="w-full min-h-[520px] border border-slate-200 rounded-lg bg-white"
+                                class="w-full min-h-[520px] border border-slate-200 rounded-card bg-white"
                                 title="Email preview"
                                 sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                                 :srcdoc="preview.content"
@@ -279,507 +256,636 @@
                     <div v-else-if="selectedTemplateId && !loadingPreview" class="text-sm text-slate-500">
                         Select a template to see preview.
                     </div>
-                    <div v-else-if="loadingPreview" class="text-sm text-slate-500">
+                    <div v-else-if="loadingPreview" class="text-sm text-slate-500" role="status" aria-live="polite">
                         Loading preview...
                     </div>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- Step 5: Send -->
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-4">5. Send</h2>
-                <button
-                    type="button"
+            <BaseCard title="5. Send">
+                <BaseButton
+                    variant="primary"
+                    size="lg"
+                    block-mobile
+                    :loading="sending"
+                    :disabled="sendableTotal === 0 || !selectedTemplateId"
                     @click="sendBulk"
-                    :disabled="sending || sendableTotal === 0 || !selectedTemplateId"
-                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
                 >
+                    <template #icon>
+                        <PaperAirplaneIcon class="icon" aria-hidden="true" />
+                    </template>
                     {{ sending ? 'Sending...' : `Send email to ${sendableTotal} recipient(s)` }}
-                </button>
-                <p v-if="sendResult" class="mt-3 text-sm" :class="sendResult.failed ? 'text-amber-600' : 'text-green-600'">
+                </BaseButton>
+                <p
+                    v-if="sendResult"
+                    class="callout mt-3"
+                    :class="sendResult.failed ? 'callout-warning' : 'callout-success'"
+                    :role="sendResult.failed ? 'alert' : 'status'"
+                    aria-live="polite"
+                >
                     {{ sendResult.message }}
                 </p>
-            </div>
+            </BaseCard>
         </template>
 
         <!-- Tab: Send by Date -->
         <template v-if="activeTab === 'sendByDate'">
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200 space-y-6">
-                <h2 class="text-lg font-semibold text-slate-900">Send by Date</h2>
-                <p class="text-sm text-slate-600">Filter customers and prospects by creation date, choose a template, and send email.</p>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">From date</label>
-                        <input v-model="dateFilterFrom" type="date" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">To date</label>
-                        <input v-model="dateFilterTo" type="date" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Audience</label>
-                        <select v-model="dateFilterAudience" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="prospect">Prospects only</option>
-                            <option value="customer">Customers only</option>
-                            <option value="both">Both</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Search name (optional)</label>
-                        <input
-                            v-model="dateSearchQuery"
-                            type="search"
-                            placeholder="e.g. Smith"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            @keydown.enter.prevent="applyDateFilter"
-                        />
-                    </div>
-                    <div class="flex items-end">
-                        <button
-                            type="button"
-                            @click="applyDateFilter"
-                            :disabled="loadingDateContacts"
-                            class="w-full px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium"
-                        >
-                            {{ loadingDateContacts ? 'Loading...' : 'Apply' }}
-                        </button>
-                    </div>
-                </div>
-                <p class="text-xs text-slate-500">Leave dates empty for all. Filter by when the customer/prospect was created.</p>
-
-                <div v-if="hasDateApplied" class="space-y-4">
-                    <div class="flex flex-wrap items-center gap-4">
-                        <p class="text-sm text-slate-700">
-                            <strong>{{ dateTotalContacts }}</strong> match;
-                            <strong class="text-blue-700">{{ dateSendableTotal }}</strong> selected to send.
-                        </p>
+            <BaseCard
+                title="Send by Date"
+                subtitle="Filter customers and prospects by creation date, choose a template, and send email."
+            >
+                <div class="space-y-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Choose template</label>
-                            <select
-                                v-model="dateSelectedTemplateId"
-                                @change="loadDatePreview"
-                                class="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[200px] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option :value="null">Select template</option>
-                                <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
+                            <label class="form-label" for="emailmanagementview-from-date">From date</label>
+                            <input id="emailmanagementview-from-date" v-model="dateFilterFrom" type="date" class="form-input" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="emailmanagementview-to-date">To date</label>
+                            <input id="emailmanagementview-to-date" v-model="dateFilterTo" type="date" class="form-input" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="emailmanagementview-audience">Audience</label>
+                            <select id="emailmanagementview-audience" v-model="dateFilterAudience" class="form-select">
+                                <option value="prospect">Prospects only</option>
+                                <option value="customer">Customers only</option>
+                                <option value="both">Both</option>
                             </select>
                         </div>
-                        <button
-                            type="button"
-                            @click="sendByDate"
-                            :disabled="sendingByDate || dateSendableTotal === 0 || !dateSelectedTemplateId"
-                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
-                        >
-                            {{ sendingByDate ? 'Sending...' : `Send to ${dateSendableTotal} recipient(s)` }}
-                        </button>
-                    </div>
-                    <div class="flex flex-wrap gap-2 text-sm">
-                        <button type="button" class="text-blue-600 hover:text-blue-800" @click="selectAllDateRecipientsOnPage">Select all on this page</button>
-                        <span class="text-slate-300">|</span>
-                        <button type="button" class="text-blue-600 hover:text-blue-800" @click="deselectAllDateRecipientsOnPage">Uncheck all on this page</button>
-                        <span class="text-slate-300">|</span>
-                        <button type="button" class="text-slate-600 hover:text-slate-900" @click="clearDateRecipientExclusions">Include everyone again</button>
-                    </div>
-
-                    <div v-if="datePreview.subject || datePreview.content" class="border border-slate-200 rounded-lg overflow-hidden">
-                        <div class="px-4 py-2 bg-slate-50 border-b border-slate-200 text-sm font-medium text-slate-700">
-                            Preview: {{ datePreview.template_name || 'Template' }}
-                        </div>
-                        <div class="p-4">
-                            <p class="text-sm text-slate-600 mb-2"><strong>Subject:</strong> {{ datePreview.subject }}</p>
-                            <iframe
-                                v-if="datePreview.content"
-                                class="w-full min-h-[480px] border border-slate-200 rounded-lg bg-white"
-                                title="Email preview"
-                                sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-                                :srcdoc="datePreview.content"
+                        <div>
+                            <label class="form-label" for="emailmanagementview-search-name-optional">Search name (optional)</label>
+                            <input id="emailmanagementview-search-name-optional"
+                                v-model="dateSearchQuery"
+                                type="search"
+                                placeholder="e.g. Smith"
+                                class="form-input"
+                                @keydown.enter.prevent="applyDateFilter"
                             />
                         </div>
+                        <div class="flex items-end">
+                            <BaseButton
+                                variant="soft"
+                                class="w-full"
+                                :loading="loadingDateContacts"
+                                @click="applyDateFilter"
+                            >
+                                <template #icon>
+                                    <FunnelIcon class="icon" aria-hidden="true" />
+                                </template>
+                                {{ loadingDateContacts ? 'Loading...' : 'Apply' }}
+                            </BaseButton>
+                        </div>
                     </div>
+                    <p class="text-xs text-slate-500">Leave dates empty for all. Filter by when the customer/prospect was created.</p>
 
-                    <div class="border border-slate-200 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
-                        <table class="w-full text-sm min-w-[320px]">
-                            <thead class="bg-slate-50 sticky top-0">
-                                <tr>
-                                    <th class="w-10 px-2 py-2 font-medium text-slate-700 text-center">✓</th>
-                                    <th class="text-left px-3 py-2 font-medium text-slate-700">Name</th>
-                                    <th class="text-left px-3 py-2 font-medium text-slate-700">Email</th>
-                                    <th class="text-left px-3 py-2 font-medium text-slate-700">Type</th>
-                                    <th class="text-left px-3 py-2 font-medium text-slate-700">Template</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="c in dateContacts" :key="c.id" class="border-t border-slate-100">
-                                    <td class="px-2 py-2 text-center">
-                                        <input
-                                            type="checkbox"
-                                            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                            :checked="dateRecipientIncluded(c.id)"
-                                            @change="toggleDateRecipient(c.id, $event.target.checked)"
-                                        />
-                                    </td>
-                                    <td class="px-3 py-2">{{ c.name }}</td>
-                                    <td class="px-3 py-2">{{ c.email }}</td>
-                                    <td class="px-3 py-2 capitalize">{{ c.type }}</td>
-                                    <td class="px-3 py-2 text-slate-600">{{ dateSelectedTemplateName }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <div v-if="hasDateApplied" class="space-y-4">
+                        <div class="flex flex-wrap items-end gap-4">
+                            <p class="text-sm text-slate-700" role="status" aria-live="polite">
+                                <strong>{{ dateTotalContacts }}</strong> match;
+                                <strong class="text-primary-700">{{ dateSendableTotal }}</strong> selected to send.
+                            </p>
+                            <div class="min-w-[200px]">
+                                <label class="form-label" for="emailmanagementview-choose-template-2">Choose template</label>
+                                <select id="emailmanagementview-choose-template-2"
+                                    v-model="dateSelectedTemplateId"
+                                    class="form-select"
+                                    @change="loadDatePreview"
+                                >
+                                    <option :value="null">Select template</option>
+                                    <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
+                                </select>
+                            </div>
+                            <BaseButton
+                                variant="soft"
+                                :loading="sendingByDate"
+                                :disabled="dateSendableTotal === 0 || !dateSelectedTemplateId"
+                                @click="sendByDate"
+                            >
+                                <template #icon>
+                                    <PaperAirplaneIcon class="icon" aria-hidden="true" />
+                                </template>
+                                {{ sendingByDate ? 'Sending...' : `Send to ${dateSendableTotal} recipient(s)` }}
+                            </BaseButton>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <BaseButton variant="ghost" size="sm" @click="selectAllDateRecipientsOnPage">Select all on this page</BaseButton>
+                            <BaseButton variant="ghost" size="sm" @click="deselectAllDateRecipientsOnPage">Uncheck all on this page</BaseButton>
+                            <BaseButton variant="ghost" size="sm" @click="clearDateRecipientExclusions">Include everyone again</BaseButton>
+                        </div>
 
-                    <p v-if="dateSendResult" class="text-sm" :class="dateSendResult.failed ? 'text-amber-600' : 'text-green-600'">{{ dateSendResult.message }}</p>
-                    <div v-if="dateSendResult?.failed_list?.length" class="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                        <p class="text-sm font-medium text-amber-800 mb-2">Failed recipients ({{ dateSendResult.failed_list.length }})</p>
-                        <div class="max-h-40 overflow-y-auto text-xs space-y-1">
-                            <div v-for="(f, i) in dateSendResult.failed_list" :key="i" class="py-1 border-b border-amber-100 last:border-0">
-                                <span class="font-medium">{{ f.name || f.email }}</span> {{ f.email }} — <span class="text-red-600" :title="f.error">{{ f.error }}</span>
+                        <div v-if="datePreview.subject || datePreview.content" class="border border-slate-200 rounded-card overflow-hidden">
+                            <div class="px-4 py-2 bg-slate-50 border-b border-slate-200 text-sm font-medium text-slate-700">
+                                Preview: {{ datePreview.template_name || 'Template' }}
+                            </div>
+                            <div class="p-4">
+                                <p class="text-sm text-slate-600 mb-2"><strong>Subject:</strong> {{ datePreview.subject }}</p>
+                                <iframe
+                                    v-if="datePreview.content"
+                                    class="w-full min-h-[480px] border border-slate-200 rounded-card bg-white"
+                                    title="Email preview"
+                                    sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                                    :srcdoc="datePreview.content"
+                                />
+                            </div>
+                        </div>
+
+                        <div
+                            class="table-wrap border border-slate-200 rounded-card max-h-64 overflow-y-auto"
+                            :aria-busy="loadingDateContacts ? 'true' : 'false'"
+                        >
+                            <table class="table min-w-[320px]">
+                                <caption class="sr-only">Recipients matching the selected date range</caption>
+                                <thead class="table-thead table-thead-sticky">
+                                    <tr>
+                                        <th scope="col" class="table-th w-10 text-center">
+                                            <span class="sr-only">Include in send</span>
+                                            <CheckIcon class="icon-sm inline-block" aria-hidden="true" />
+                                        </th>
+                                        <th scope="col" class="table-th">Name</th>
+                                        <th scope="col" class="table-th">Email</th>
+                                        <th scope="col" class="table-th">Type</th>
+                                        <th scope="col" class="table-th">Template</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="c in dateContacts" :key="c.id" class="table-row">
+                                        <td class="table-td text-center">
+                                            <input
+                                                type="checkbox"
+                                                class="form-checkbox"
+                                                :checked="dateRecipientIncluded(c.id)"
+                                                :aria-label="`Include ${c.name || c.email} in this send`"
+                                                @change="toggleDateRecipient(c.id, $event.target.checked)"
+                                            />
+                                        </td>
+                                        <td class="table-td-strong">{{ c.name }}</td>
+                                        <td class="table-td">{{ c.email }}</td>
+                                        <td class="table-td capitalize">{{ c.type }}</td>
+                                        <td class="table-td">{{ dateSelectedTemplateName }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <p
+                            v-if="dateSendResult"
+                            class="callout"
+                            :class="dateSendResult.failed ? 'callout-warning' : 'callout-success'"
+                            :role="dateSendResult.failed ? 'alert' : 'status'"
+                            aria-live="polite"
+                        >
+                            {{ dateSendResult.message }}
+                        </p>
+                        <div v-if="dateSendResult?.failed_list?.length" class="callout callout-warning">
+                            <p class="text-sm font-medium mb-2">Failed recipients ({{ dateSendResult.failed_list.length }})</p>
+                            <div class="max-h-40 overflow-y-auto text-xs space-y-1">
+                                <div v-for="(f, i) in dateSendResult.failed_list" :key="i" class="py-1 border-b border-warning-200 last:border-0">
+                                    <span class="font-medium">{{ f.name || f.email }}</span> {{ f.email }} — <span class="text-danger-800" :title="f.error">{{ f.error }}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
+                    <div v-else class="text-slate-500 text-sm py-4">Click Apply to see recipients matching the date range.</div>
                 </div>
-                <div v-else class="text-slate-500 text-sm py-4">Click Apply to see recipients matching the date range.</div>
-            </div>
+            </BaseCard>
         </template>
 
         <!-- Tab: Report -->
         <template v-if="activeTab === 'report'">
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-4">Sent email report</h2>
-                <p class="text-sm text-slate-600 mb-4">
-                    Filter by date range. Opens use a small tracking image when the inbox loads images (not 100% accurate). Bounces are classified from the mail server error when possible; do not resend to bounced addresses.
-                </p>
-                <div class="flex flex-wrap gap-2 mb-4 border-b border-slate-200 pb-3">
+            <BaseCard
+                title="Sent email report"
+                subtitle="Filter by date range. Opens use a small tracking image when the inbox loads images (not 100% accurate). Bounces are classified from the mail server error when possible; do not resend to bounced addresses."
+            >
+                <div class="tab-list border-b border-slate-200 pb-3 mb-4">
                     <button
                         v-for="opt in reportScopeOptions"
                         :key="opt.value"
                         type="button"
+                        :class="['tab', reportScope === opt.value ? 'tab-active' : 'bg-slate-100']"
+                        :aria-pressed="reportScope === opt.value"
                         @click="setReportScope(opt.value)"
-                        :class="[
-                            'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
-                            reportScope === opt.value
-                                ? 'bg-slate-900 text-white'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        ]"
                     >
                         {{ opt.label }}
                     </button>
                 </div>
                 <div class="flex flex-wrap gap-3 mb-4 items-end">
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">From</label>
-                        <input v-model="reportDateFrom" type="date" class="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                        <label class="form-label" for="emailmanagementview-from">From</label>
+                        <input id="emailmanagementview-from" v-model="reportDateFrom" type="date" class="form-input" />
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">To</label>
-                        <input v-model="reportDateTo" type="date" class="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                        <label class="form-label" for="emailmanagementview-to">To</label>
+                        <input id="emailmanagementview-to" v-model="reportDateTo" type="date" class="form-input" />
                     </div>
-                    <button
-                        type="button"
-                        @click="loadReport"
-                        :disabled="loadingReport"
-                        class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 text-sm disabled:opacity-50"
-                    >
+                    <BaseButton variant="soft" :loading="loadingReport" @click="loadReport">
+                        <template #icon>
+                            <FunnelIcon class="icon" aria-hidden="true" />
+                        </template>
                         {{ loadingReport ? 'Loading...' : 'Apply' }}
-                    </button>
-                    <button
+                    </BaseButton>
+                    <BaseButton
                         v-if="reportScope === 'opened'"
-                        type="button"
+                        variant="outline"
+                        :loading="exportingOpenedReport"
+                        :disabled="reportSummary && (reportSummary.total_opened ?? 0) === 0"
                         @click="exportOpenedEmailsCsv"
-                        :disabled="exportingOpenedReport || (reportSummary && (reportSummary.total_opened ?? 0) === 0)"
-                        class="px-4 py-2 border border-teal-600 text-teal-800 rounded-lg hover:bg-teal-50 text-sm font-medium disabled:opacity-50"
                     >
+                        <template #icon>
+                            <ArrowDownTrayIcon class="icon" aria-hidden="true" />
+                        </template>
                         {{ exportingOpenedReport ? 'Exporting…' : 'Export CSV' }}
-                    </button>
+                    </BaseButton>
                 </div>
-                <div
-                    v-if="reportScope === 'opened'"
-                    class="mb-4 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-xs text-teal-900"
-                >
+                <div v-if="reportScope === 'opened'" class="callout callout-info mb-4 text-xs">
                     Lists delivered emails where the tracking pixel loaded at least once (same date filter as above). Export downloads every matching row, not only this page.
                 </div>
                 <div
                     v-if="reportSummary && reportScope === 'retry_queue' && (reportSummary.total_failed_retryable ?? 0) > 0"
-                    class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3"
+                    class="callout callout-warning mb-4 flex flex-wrap items-center gap-3"
                 >
-                    <button
-                        type="button"
-                        @click="queueAllRetries"
-                        :disabled="queueingRetryAll"
-                        class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium disabled:opacity-50"
-                    >
+                    <BaseButton variant="soft" :loading="queueingRetryAll" @click="queueAllRetries">
+                        <template #icon>
+                            <ArrowPathIcon class="icon" aria-hidden="true" />
+                        </template>
                         {{ queueingRetryAll ? 'Queuing…' : `Queue all retries (${reportSummary.total_failed_retryable})` }}
-                    </button>
-                    <p class="text-xs text-amber-900 max-w-xl">
+                    </BaseButton>
+                    <p class="text-xs max-w-xl">
                         Queues every failed send in this filter (not only this page), up to
                         {{ reportRetryChunkSize }} per background job, staggered so SMTP is not hammered. Use
-                        <code class="rounded bg-amber-100 px-1">php artisan queue:work</code>
-                        when <code class="rounded bg-amber-100 px-1">QUEUE_CONNECTION</code> is not <code class="rounded bg-amber-100 px-1">sync</code>.
+                        <code class="kbd">php artisan queue:work</code>
+                        when <code class="kbd">QUEUE_CONNECTION</code> is not <code class="kbd">sync</code>.
                     </p>
                 </div>
                 <div v-if="reportSummary" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-                    <div class="bg-slate-50 rounded-lg p-4">
-                        <div class="text-xs text-slate-500 uppercase">Delivered</div>
-                        <div class="text-xl font-semibold text-green-600">{{ reportSummary.total_sent }}</div>
-                    </div>
-                    <div class="bg-slate-50 rounded-lg p-4">
-                        <div class="text-xs text-slate-500 uppercase">Opened</div>
-                        <div class="text-xl font-semibold text-teal-600">{{ reportSummary.total_opened ?? 0 }}</div>
-                    </div>
-                    <div class="bg-slate-50 rounded-lg p-4">
-                        <div class="text-xs text-slate-500 uppercase">Retry queue</div>
-                        <div class="text-xl font-semibold text-amber-600">{{ reportSummary.total_failed_retryable ?? 0 }}</div>
-                    </div>
-                    <div class="bg-slate-50 rounded-lg p-4">
-                        <div class="text-xs text-slate-500 uppercase">Bounced</div>
-                        <div class="text-xl font-semibold text-orange-700">{{ reportSummary.total_bounced ?? 0 }}</div>
-                    </div>
-                    <div class="bg-slate-50 rounded-lg p-4">
-                        <div class="text-xs text-slate-500 uppercase">Skipped (data)</div>
-                        <div class="text-xl font-semibold text-slate-600">{{ reportSummary.total_failed_validation ?? 0 }}</div>
-                    </div>
-                    <div class="bg-slate-50 rounded-lg p-4">
-                        <div class="text-xs text-slate-500 uppercase">All issues</div>
-                        <div class="text-xl font-semibold text-red-600">{{ reportSummary.total_failed ?? 0 }}</div>
-                    </div>
+                    <StatCard label="Delivered" :value="reportSummary.total_sent ?? 0" tone="success">
+                        <template #icon><CheckCircleIcon class="icon" aria-hidden="true" /></template>
+                    </StatCard>
+                    <StatCard label="Opened" :value="reportSummary.total_opened ?? 0" tone="primary">
+                        <template #icon><EnvelopeIcon class="icon" aria-hidden="true" /></template>
+                    </StatCard>
+                    <StatCard label="Retry queue" :value="reportSummary.total_failed_retryable ?? 0" tone="warning">
+                        <template #icon><ArrowPathIcon class="icon" aria-hidden="true" /></template>
+                    </StatCard>
+                    <StatCard label="Bounced" :value="reportSummary.total_bounced ?? 0" tone="warning">
+                        <template #icon><ExclamationTriangleIcon class="icon" aria-hidden="true" /></template>
+                    </StatCard>
+                    <StatCard label="Skipped (data)" :value="reportSummary.total_failed_validation ?? 0">
+                        <template #icon><InformationCircleIcon class="icon" aria-hidden="true" /></template>
+                    </StatCard>
+                    <StatCard label="All issues" :value="reportSummary.total_failed ?? 0" tone="danger">
+                        <template #icon><XCircleIcon class="icon" aria-hidden="true" /></template>
+                    </StatCard>
                 </div>
-                <div v-if="loadingReport" class="text-sm text-slate-500 py-4">Loading report...</div>
+                <div v-if="loadingReport" class="text-sm text-slate-500 py-4" role="status" aria-live="polite">Loading report...</div>
                 <div v-else-if="reportData.length === 0" class="text-sm text-slate-500 py-4">{{ reportEmptyMessage }}</div>
                 <div v-else>
-                    <div class="border border-slate-200 rounded-lg overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-slate-50">
+                    <div class="table-wrap border border-slate-200 rounded-card" :aria-busy="loadingReport ? 'true' : 'false'">
+                        <table class="table">
+                            <caption class="sr-only">Sent email activity</caption>
+                            <thead class="table-thead">
                                 <tr>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Recipient</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Email</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Template</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Status</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">{{ reportScope === 'opened' ? 'First opened' : 'Opened' }}</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Sent at</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Sent by</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700 w-28">Actions</th>
+                                    <th scope="col" class="table-th">Recipient</th>
+                                    <th scope="col" class="table-th">Email</th>
+                                    <th scope="col" class="table-th">Template</th>
+                                    <th scope="col" class="table-th">Status</th>
+                                    <th scope="col" class="table-th">{{ reportScope === 'opened' ? 'First opened' : 'Opened' }}</th>
+                                    <th scope="col" class="table-th">Sent at</th>
+                                    <th scope="col" class="table-th">Sent by</th>
+                                    <th scope="col" class="table-th w-28">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="row in reportData" :key="row.id" class="border-t border-slate-100 hover:bg-slate-50">
-                                    <td class="px-4 py-2">{{ row.recipient_name }}</td>
-                                    <td class="px-4 py-2">{{ row.recipient_email }}</td>
-                                    <td class="px-4 py-2">{{ row.template_name }}</td>
-                                    <td class="px-4 py-2">
-                                        <span
-                                            :class="
-                                                row.status === 'sent'
-                                                    ? 'text-green-600'
-                                                    : row.status === 'bounced'
-                                                      ? 'text-orange-700'
-                                                      : 'text-red-600'
-                                            "
-                                            >{{ formatCommLogStatus(row.status) }}</span
-                                        >
+                                <tr v-for="row in reportData" :key="row.id" class="table-row">
+                                    <td class="table-td-strong">{{ row.recipient_name }}</td>
+                                    <td class="table-td">{{ row.recipient_email }}</td>
+                                    <td class="table-td">{{ row.template_name }}</td>
+                                    <td class="table-td">
+                                        <BaseBadge :tone="reportStatusTone(row.status)">
+                                            {{ formatCommLogStatus(row.status) }}
+                                        </BaseBadge>
                                         <span v-if="row.error_message" class="block text-xs text-slate-500 truncate max-w-[220px]" :title="row.error_message">{{ row.error_message }}</span>
                                     </td>
-                                    <td class="px-4 py-2">
+                                    <td class="table-td">
                                         <template v-if="row.status === 'sent'">
-                                            <span v-if="row.seen" class="text-teal-700 font-medium" :title="row.opened_at ? 'First opened: ' + formatDate(row.opened_at) : ''">
+                                            <span v-if="row.seen" class="text-primary-700 font-medium" :title="row.opened_at ? 'First opened: ' + formatDate(row.opened_at) : ''">
                                                 {{ reportScope === 'opened' && row.opened_at ? formatDate(row.opened_at) : 'Opened' }}
                                             </span>
-                                            <span v-else class="text-slate-400">Not opened</span>
+                                            <span v-else class="text-slate-500">Not opened</span>
                                             <span v-if="row.open_count > 1" class="block text-xs text-slate-500">({{ row.open_count }} loads)</span>
                                         </template>
-                                        <span v-else class="text-slate-400">—</span>
+                                        <span v-else class="text-slate-500">—</span>
                                     </td>
-                                    <td class="px-4 py-2 text-slate-600">{{ formatDate(row.sent_at) }}</td>
-                                    <td class="px-4 py-2 text-slate-600">{{ row.sent_by_name || '—' }}</td>
-                                    <td class="px-4 py-2">
-                                        <button
+                                    <td class="table-td">{{ formatDate(row.sent_at) }}</td>
+                                    <td class="table-td">{{ row.sent_by_name || '—' }}</td>
+                                    <td class="table-td-actions">
+                                        <BaseButton
                                             v-if="row.can_resend"
-                                            type="button"
-                                            :disabled="resendingId === row.id"
+                                            variant="ghost"
+                                            size="sm"
+                                            :loading="resendingId === row.id"
                                             @click="resendSentEmail(row)"
-                                            class="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
                                         >
+                                            <template #icon>
+                                                <PaperAirplaneIcon class="icon-sm" aria-hidden="true" />
+                                            </template>
                                             {{ resendingId === row.id ? 'Sending…' : 'Resend' }}
-                                        </button>
-                                        <span v-else class="text-slate-300 text-xs">—</span>
+                                        </BaseButton>
+                                        <span v-else class="text-slate-500 text-xs">—</span>
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                     <div v-if="reportLastPage > 1" class="flex items-center gap-2 mt-4 text-sm">
-                        <button
-                            type="button"
-                            @click="goToReportPage(reportPage - 1)"
+                        <BaseButton
+                            variant="outline"
+                            size="sm"
                             :disabled="reportPage <= 1"
-                            class="px-2 py-1 border border-slate-300 rounded disabled:opacity-50"
+                            @click="goToReportPage(reportPage - 1)"
                         >
+                            <template #icon>
+                                <ChevronLeftIcon class="icon-sm" aria-hidden="true" />
+                            </template>
                             Previous
-                        </button>
+                        </BaseButton>
                         <span class="text-slate-600">Page {{ reportPage }} of {{ reportLastPage }}</span>
-                        <button
-                            type="button"
-                            @click="goToReportPage(reportPage + 1)"
+                        <BaseButton
+                            variant="outline"
+                            size="sm"
                             :disabled="reportPage >= reportLastPage"
-                            class="px-2 py-1 border border-slate-300 rounded disabled:opacity-50"
+                            @click="goToReportPage(reportPage + 1)"
                         >
+                            <template #icon>
+                                <ChevronRightIcon class="icon-sm" aria-hidden="true" />
+                            </template>
                             Next
-                        </button>
+                        </BaseButton>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
         </template>
 
         <!-- Tab: Upload list -->
         <template v-if="activeTab === 'upload'">
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-4">Upload email list</h2>
+            <BaseCard title="Upload email list">
                 <p class="text-sm text-slate-600 mb-4">Upload a CSV file with columns: <strong>email</strong> (required), <strong>name</strong> (optional). Choose which template will be sent to this list.</p>
                 <div class="flex flex-wrap gap-4 items-end">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">List name</label>
-                        <input
+                    <div class="w-64">
+                        <label class="form-label" for="emailmanagementview-list-name">List name</label>
+                        <input id="emailmanagementview-list-name"
                             v-model="uploadListName"
                             type="text"
                             placeholder="e.g. Campaign March 2025"
-                            class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="form-input"
                         />
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Template (which email will be sent)</label>
-                        <select
+                    <div class="min-w-[200px]">
+                        <label class="form-label" for="emailmanagementview-template-which-email-will-be-sent">Template (which email will be sent)</label>
+                        <select id="emailmanagementview-template-which-email-will-be-sent"
                             v-model="uploadTemplateId"
-                            class="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[200px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="form-select"
                         >
                             <option :value="null">Select template</option>
                             <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">CSV file</label>
+                        <label class="form-label" for="emailmanagementview-csv-file">CSV file</label>
                         <input
+                            id="emailmanagementview-csv-file"
                             type="file"
                             accept=".csv,.txt"
+                            class="block text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-control file:border-0 file:bg-slate-100 file:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded-control"
                             @change="onUploadFileChange"
-                            class="block text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700"
                         />
                     </div>
-                    <button
-                        type="button"
+                    <BaseButton
+                        variant="soft"
+                        :loading="uploading"
+                        :disabled="!uploadListName || !uploadFile"
                         @click="uploadList"
-                        :disabled="uploading || !uploadListName || !uploadFile"
-                        class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium"
                     >
+                        <template #icon>
+                            <ArrowUpTrayIcon class="icon" aria-hidden="true" />
+                        </template>
                         {{ uploading ? 'Uploading...' : 'Upload & save list' }}
-                    </button>
+                    </BaseButton>
                 </div>
-                <p v-if="uploadResult" class="mt-3 text-sm text-green-600">{{ uploadResult }}</p>
-            </div>
+                <p v-if="uploadResult" class="callout callout-success mt-3" role="status" aria-live="polite">{{ uploadResult }}</p>
+            </BaseCard>
 
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-4">Saved email lists</h2>
-                <div v-if="loadingLists" class="text-sm text-slate-500 py-4">Loading...</div>
-                <div v-else-if="savedLists.length === 0" class="text-sm text-slate-500 py-4">No uploaded lists yet. Upload a CSV above.</div>
+            <BaseCard title="Saved email lists">
+                <div v-if="loadingLists" class="text-sm text-slate-500 py-4" role="status" aria-live="polite">Loading...</div>
+                <EmptyState
+                    v-else-if="savedLists.length === 0"
+                    heading="No uploaded lists yet"
+                    description="Upload a CSV above to create your first list."
+                >
+                    <template #icon>
+                        <ListBulletIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
                 <div v-else>
-                    <div class="border border-slate-200 rounded-lg overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-slate-50">
+                    <div class="table-wrap border border-slate-200 rounded-card" :aria-busy="loadingLists ? 'true' : 'false'">
+                        <table class="table">
+                            <caption class="sr-only">Saved email lists</caption>
+                            <thead class="table-thead">
                                 <tr>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Name</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Template</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Date</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Total</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Sent</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Failed</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Actions</th>
+                                    <th scope="col" class="table-th">Name</th>
+                                    <th scope="col" class="table-th">Template</th>
+                                    <th scope="col" class="table-th">Date</th>
+                                    <th scope="col" class="table-th-num">Total</th>
+                                    <th scope="col" class="table-th-num">Sent</th>
+                                    <th scope="col" class="table-th-num">Failed</th>
+                                    <th scope="col" class="table-th">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="list in savedLists" :key="list.id" class="border-t border-slate-100 hover:bg-slate-50">
-                                    <td class="px-4 py-2 font-medium">{{ list.name }}</td>
-                                    <td class="px-4 py-2 text-slate-600">{{ list.template_name || '—' }}</td>
-                                    <td class="px-4 py-2 text-slate-600">{{ formatDate(list.created_at) }}</td>
-                                    <td class="px-4 py-2">{{ list.total }}</td>
-                                    <td class="px-4 py-2 text-green-600">{{ list.sent_count }}</td>
-                                    <td class="px-4 py-2 text-red-600">{{ list.failed_count }}</td>
-                                    <td class="px-4 py-2">
-                                        <button type="button" @click="viewListRecipients(list)" class="text-blue-600 hover:text-blue-800 mr-3">View</button>
-                                        <button type="button" @click="selectListForSend(list)" class="text-blue-600 hover:text-blue-800">Send</button>
+                                <tr v-for="list in savedLists" :key="list.id" class="table-row">
+                                    <td class="table-td-strong">{{ list.name }}</td>
+                                    <td class="table-td">{{ list.template_name || '—' }}</td>
+                                    <td class="table-td">{{ formatDate(list.created_at) }}</td>
+                                    <td class="table-td-num">{{ list.total }}</td>
+                                    <td class="table-td-num text-success-700 font-medium">{{ list.sent_count }}</td>
+                                    <td class="table-td-num text-danger-700 font-medium">{{ list.failed_count }}</td>
+                                    <td class="table-td-actions">
+                                        <BaseButton variant="ghost" size="sm" class="mr-1" @click="viewListRecipients(list)">
+                                            <template #icon>
+                                                <EyeIcon class="icon-sm" aria-hidden="true" />
+                                            </template>
+                                            View
+                                        </BaseButton>
+                                        <BaseButton variant="ghost" size="sm" @click="selectListForSend(list)">
+                                            <template #icon>
+                                                <PaperAirplaneIcon class="icon-sm" aria-hidden="true" />
+                                            </template>
+                                            Send
+                                        </BaseButton>
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                     <div v-if="listLastPage > 1" class="flex items-center gap-2 mt-4 text-sm">
-                        <button type="button" @click="goToListPage(listPage - 1)" :disabled="listPage <= 1" class="px-2 py-1 border border-slate-300 rounded disabled:opacity-50">Previous</button>
+                        <BaseButton variant="outline" size="sm" :disabled="listPage <= 1" @click="goToListPage(listPage - 1)">
+                            <template #icon>
+                                <ChevronLeftIcon class="icon-sm" aria-hidden="true" />
+                            </template>
+                            Previous
+                        </BaseButton>
                         <span class="text-slate-600">Page {{ listPage }} of {{ listLastPage }}</span>
-                        <button type="button" @click="goToListPage(listPage + 1)" :disabled="listPage >= listLastPage" class="px-2 py-1 border border-slate-300 rounded disabled:opacity-50">Next</button>
+                        <BaseButton variant="outline" size="sm" :disabled="listPage >= listLastPage" @click="goToListPage(listPage + 1)">
+                            <template #icon>
+                                <ChevronRightIcon class="icon-sm" aria-hidden="true" />
+                            </template>
+                            Next
+                        </BaseButton>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- View recipients modal -->
-            <div v-if="viewingList" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" @click.self="viewingList = null">
-                <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-                    <div class="p-4 border-b border-slate-200 flex justify-between items-center">
-                        <h3 class="font-semibold text-slate-900">{{ viewingList.name }} – Recipients</h3>
-                        <button type="button" @click="viewingList = null" class="text-slate-500 hover:text-slate-700">×</button>
+            <BaseModal
+                :model-value="!!viewingList"
+                :title="viewingList ? `${viewingList.name} – Recipients` : ''"
+                size="lg"
+                @close="viewingList = null"
+            >
+                <div v-if="loadingListRecipients" class="text-sm text-slate-500" role="status" aria-live="polite">Loading...</div>
+                <div v-else>
+                    <div class="table-wrap border border-slate-200 rounded-card max-h-[50vh] overflow-y-auto">
+                        <table class="table min-w-[280px]">
+                            <caption class="sr-only">Recipients in this list</caption>
+                            <thead class="table-thead table-thead-sticky">
+                                <tr>
+                                    <th scope="col" class="table-th">Email</th>
+                                    <th scope="col" class="table-th">Name</th>
+                                    <th scope="col" class="table-th">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="r in listRecipients" :key="r.id" class="table-row">
+                                    <td class="table-td">{{ r.email }}</td>
+                                    <td class="table-td">{{ r.name || '—' }}</td>
+                                    <td class="table-td">
+                                        <BaseBadge :tone="listRecipientTone(r.status)">{{ formatCommLogStatus(r.status) }}</BaseBadge>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="p-4 overflow-y-auto overflow-x-auto flex-1 min-h-0">
-                        <div v-if="loadingListRecipients" class="text-sm text-slate-500">Loading...</div>
-                        <div v-else class="overflow-x-auto">
-                            <table class="w-full text-sm min-w-[280px]">
-                                <thead class="bg-slate-50"><tr><th class="text-left px-2 py-1">Email</th><th class="text-left px-2 py-1">Name</th><th class="text-left px-2 py-1">Status</th></tr></thead>
-                                <tbody>
-                                    <tr v-for="r in listRecipients" :key="r.id" class="border-t border-slate-100">
-                                        <td class="px-2 py-1">{{ r.email }}</td>
-                                        <td class="px-2 py-1">{{ r.name || '—' }}</td>
-                                        <td class="px-2 py-1"><span :class="r.status === 'sent' ? 'text-green-600' : r.status === 'failed' ? 'text-red-600' : 'text-slate-500'">{{ formatCommLogStatus(r.status) }}</span></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            <div v-if="listRecipientsLastPage > 1" class="flex gap-2 mt-3 text-sm">
-                                <button type="button" @click="goToListRecipientsPage(listRecipientsPage - 1)" :disabled="listRecipientsPage <= 1" class="px-2 py-1 border rounded disabled:opacity-50">Previous</button>
-                                <span>Page {{ listRecipientsPage }} of {{ listRecipientsLastPage }}</span>
-                                <button type="button" @click="goToListRecipientsPage(listRecipientsPage + 1)" :disabled="listRecipientsPage >= listRecipientsLastPage" class="px-2 py-1 border rounded disabled:opacity-50">Next</button>
-                            </div>
-                        </div>
+                    <div v-if="listRecipientsLastPage > 1" class="flex items-center gap-2 mt-3 text-sm">
+                        <BaseButton
+                            variant="outline"
+                            size="sm"
+                            :disabled="listRecipientsPage <= 1"
+                            @click="goToListRecipientsPage(listRecipientsPage - 1)"
+                        >
+                            <template #icon>
+                                <ChevronLeftIcon class="icon-sm" aria-hidden="true" />
+                            </template>
+                            Previous
+                        </BaseButton>
+                        <span class="text-slate-600">Page {{ listRecipientsPage }} of {{ listRecipientsLastPage }}</span>
+                        <BaseButton
+                            variant="outline"
+                            size="sm"
+                            :disabled="listRecipientsPage >= listRecipientsLastPage"
+                            @click="goToListRecipientsPage(listRecipientsPage + 1)"
+                        >
+                            <template #icon>
+                                <ChevronRightIcon class="icon-sm" aria-hidden="true" />
+                            </template>
+                            Next
+                        </BaseButton>
                     </div>
                 </div>
-            </div>
+            </BaseModal>
 
             <!-- Send to list: template + send -->
-            <div v-if="selectedListForSend" class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-4">Send to list: {{ selectedListForSend.name }}</h2>
+            <BaseCard v-if="selectedListForSend" :title="`Send to list: ${selectedListForSend.name}`">
                 <p class="text-sm text-slate-600 mb-4">This will send the chosen template to <strong>{{ selectedListForSend.total }}</strong> recipient(s).</p>
                 <div class="flex flex-wrap gap-4 items-end">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Template</label>
-                        <select
+                    <div class="min-w-[200px]">
+                        <label class="form-label" for="emailmanagementview-template">Template</label>
+                        <select id="emailmanagementview-template"
                             v-model="sendToListTemplateId"
-                            class="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[200px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="form-select"
                         >
                             <option :value="null">Select template</option>
                             <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
                         </select>
                     </div>
-                    <button
-                        type="button"
+                    <BaseButton
+                        variant="soft"
+                        :loading="sendingToList"
+                        :disabled="!sendToListTemplateId"
                         @click="sendToList"
-                        :disabled="sendingToList || !sendToListTemplateId"
-                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
                     >
+                        <template #icon>
+                            <PaperAirplaneIcon class="icon" aria-hidden="true" />
+                        </template>
                         {{ sendingToList ? 'Sending...' : `Send to ${selectedListForSend.total} recipients` }}
-                    </button>
-                    <button type="button" @click="selectedListForSend = null" class="px-4 py-2 text-slate-600 hover:text-slate-800 text-sm">Cancel</button>
+                    </BaseButton>
+                    <BaseButton variant="ghost" @click="selectedListForSend = null">Cancel</BaseButton>
                 </div>
-                <p v-if="sendToListResult" class="mt-3 text-sm" :class="sendToListResult.failed ? 'text-amber-600' : 'text-green-600'">{{ sendToListResult.message }}</p>
-            </div>
+                <p
+                    v-if="sendToListResult"
+                    class="callout mt-3"
+                    :class="sendToListResult.failed ? 'callout-warning' : 'callout-success'"
+                    :role="sendToListResult.failed ? 'alert' : 'status'"
+                    aria-live="polite"
+                >
+                    {{ sendToListResult.message }}
+                </p>
+            </BaseCard>
         </template>
+
+        <!-- Bulk retry confirmation: replaces the old native browser confirm dialog -->
+        <ConfirmDialog
+            v-model="showQueueRetryConfirm"
+            title="Queue all retries"
+            :message="queueRetryConfirmMessage"
+            confirm-label="Queue retries"
+            tone="primary"
+            :loading="queueingRetryAll"
+            @confirm="confirmQueueAllRetries"
+        />
     </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
+import {
+    ArrowDownTrayIcon,
+    ArrowPathIcon,
+    ArrowUpTrayIcon,
+    CheckCircleIcon,
+    CheckIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    EnvelopeIcon,
+    ExclamationTriangleIcon,
+    EyeIcon,
+    FunnelIcon,
+    InformationCircleIcon,
+    ListBulletIcon,
+    PaperAirplaneIcon,
+    PlusIcon,
+    TrashIcon,
+    XCircleIcon,
+} from '@heroicons/vue/24/outline';
+import {
+    BaseBadge,
+    BaseButton,
+    BaseCard,
+    BaseModal,
+    ConfirmDialog,
+    EmptyState,
+    StatCard,
+} from '@/components/base';
 import { formatCommLogStatus } from '@/utils/displayFormat';
 import { formatDateTimeUsDisplay } from '@/utils/dateFormatUi';
 import { useToastStore } from '@/stores/toast';
@@ -787,6 +893,33 @@ import { useToastStore } from '@/stores/toast';
 const toast = useToastStore();
 
 const activeTab = ref('send');
+
+const tabOptions = [
+    { value: 'send', label: 'Send Email' },
+    { value: 'report', label: 'Report' },
+    { value: 'upload', label: 'Upload list' },
+    { value: 'sendByDate', label: 'Send by Date' },
+];
+
+/** Keeps each tab's original side effect (report loads the report, upload loads the lists). */
+function selectTab(value) {
+    activeTab.value = value;
+    if (value === 'report') loadReport();
+    if (value === 'upload') loadSavedLists();
+}
+
+/** Delivered / bounced / everything else — mirrors the previous colour mapping. */
+function reportStatusTone(status) {
+    if (status === 'sent') return 'success';
+    if (status === 'bounced') return 'warning';
+    return 'danger';
+}
+
+function listRecipientTone(status) {
+    if (status === 'sent') return 'success';
+    if (status === 'failed') return 'danger';
+    return 'neutral';
+}
 const audience = ref('both');
 const searchQuery = ref('');
 const excludedRecipientIds = ref([]);
@@ -820,6 +953,12 @@ const resendingId = ref(null);
 const queueingRetryAll = ref(false);
 const reportRetryChunkSize = ref(5);
 const exportingOpenedReport = ref(false);
+const showQueueRetryConfirm = ref(false);
+
+const queueRetryConfirmMessage = computed(
+    () =>
+        `Queue ${reportSummary.value?.total_failed_retryable ?? 0} resend(s) in the background (batches of ${reportRetryChunkSize.value})?`,
+);
 
 const reportScopeOptions = [
     { value: 'all', label: 'All activity' },
@@ -1126,9 +1265,16 @@ async function exportOpenedEmailsCsv() {
     }
 }
 
-async function queueAllRetries() {
+function queueAllRetries() {
     if (!reportSummary.value || (reportSummary.value.total_failed_retryable ?? 0) < 1) return;
-    if (!window.confirm(`Queue ${reportSummary.value.total_failed_retryable} resend(s) in the background (batches of ${reportRetryChunkSize.value})?`)) return;
+    showQueueRetryConfirm.value = true;
+}
+
+async function confirmQueueAllRetries() {
+    if (!reportSummary.value || (reportSummary.value.total_failed_retryable ?? 0) < 1) {
+        showQueueRetryConfirm.value = false;
+        return;
+    }
     queueingRetryAll.value = true;
     try {
         const payload = {};
@@ -1141,6 +1287,7 @@ async function queueAllRetries() {
         toast.error(e.response?.data?.message || e.message || 'Could not queue retries');
     } finally {
         queueingRetryAll.value = false;
+        showQueueRetryConfirm.value = false;
     }
 }
 

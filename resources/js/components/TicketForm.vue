@@ -1,233 +1,251 @@
 <template>
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div class="p-6 border-b border-slate-200">
-                <h2 class="text-xl font-semibold text-slate-900">
-                    {{ ticket ? 'Edit Ticket' : 'Create New Ticket' }}
-                </h2>
+    <BaseModal
+        :model-value="true"
+        :title="ticket ? 'Edit Ticket' : 'Create New Ticket'"
+        size="md"
+        :close-on-backdrop="false"
+        @close="$emit('close')"
+    >
+        <form id="ticket-form" class="space-y-4" @submit.prevent="handleSubmit">
+            <div>
+                <label class="form-label" for="ticketform-customer">Customer</label>
+                <select id="ticketform-customer"
+                    v-model="form.customer_id"
+                    class="form-select"
+                >
+                    <option value="">Select Customer (Optional)</option>
+                    <option v-for="customer in customers" :key="customer.id" :value="customer.id">
+                        {{ customer.name }} - {{ customer.phone }}
+                    </option>
+                </select>
+                <p class="form-hint">Or enter customer phone below</p>
             </div>
 
-            <form @submit.prevent="handleSubmit" class="p-6 space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Customer</label>
-                    <select
-                        v-model="form.customer_id"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                    >
-                        <option value="">Select Customer (Optional)</option>
-                        <option v-for="customer in customers" :key="customer.id" :value="customer.id">
-                            {{ customer.name }} - {{ customer.phone }}
-                        </option>
-                    </select>
-                    <p class="text-xs text-slate-500 mt-1">Or enter customer phone below</p>
-                </div>
+            <div v-if="!form.customer_id">
+                <label class="form-label" for="ticketform-customer-phone">Customer Phone</label>
+                <input id="ticketform-customer-phone"
+                    v-model="form.customer_phone"
+                    type="text"
+                    class="form-input"
+                />
+            </div>
 
-                <div v-if="!form.customer_id">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Customer Phone</label>
-                    <input
-                        v-model="form.customer_phone"
-                        type="text"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                    />
-                </div>
+            <div>
+                <label class="form-label" for="ticketform-subject">Subject <span class="form-required" aria-hidden="true">*</span></label>
+                <input id="ticketform-subject"
+                    v-model="form.subject"
+                    type="text"
+                    required
+                    class="form-input"
+                />
+            </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Subject *</label>
-                    <input
-                        v-model="form.subject"
-                        type="text"
-                        required
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                    />
-                </div>
+            <div>
+                <label class="form-label" for="ticketform-description">Description</label>
+                <textarea id="ticketform-description"
+                    ref="descriptionTextareaRef"
+                    v-model="form.description"
+                    rows="8"
+                    class="form-textarea-ticket-description"
+                />
+                <p class="form-hint">Drag the corner to resize. Expands as you type or paste.</p>
+            </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                    <textarea
-                        ref="descriptionTextareaRef"
-                        v-model="form.description"
-                        rows="8"
-                        class="w-full min-h-[13rem] max-h-[min(70vh,36rem)] px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 resize-y overflow-x-hidden"
-                    />
-                    <p class="text-xs text-slate-500 mt-1">Drag the corner to resize. Expands as you type or paste.</p>
-                </div>
+            <div class="callout callout-warning">
+                <p class="font-medium">Files &amp; long documents (internal)</p>
+                <p class="mt-1">
+                    For larger files or collaborative docs, it’s <strong>preferred</strong> that you upload to
+                    <strong>Google Drive</strong> or <strong>Google Sheets</strong>, then paste the shared link in
+                    <strong>Reference link</strong> below. You can still attach files here if needed.
+                </p>
+            </div>
 
-                <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-                    <p class="font-medium text-amber-900">Files &amp; long documents (internal)</p>
-                    <p class="mt-1 text-amber-900/90">
-                        For larger files or collaborative docs, it’s <strong>preferred</strong> that you upload to
-                        <strong>Google Drive</strong> or <strong>Google Sheets</strong>, then paste the shared link in
-                        <strong>Reference link</strong> below. You can still attach files here if needed.
-                    </p>
-                </div>
+            <div>
+                <label class="form-label" for="ticketform-reference-link-google-drive-sheet-url">Reference link (Google Drive / Sheet URL)</label>
+                <input id="ticketform-reference-link-google-drive-sheet-url"
+                    v-model="form.reference_url"
+                    type="url"
+                    class="form-input"
+                    placeholder="https://drive.google.com/... or https://docs.google.com/..."
+                />
+                <p class="form-hint">This URL is stored on the ticket and included in notification emails.</p>
+            </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Reference link (Google Drive / Sheet URL)</label>
-                    <input
-                        v-model="form.reference_url"
-                        type="url"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        placeholder="https://drive.google.com/... or https://docs.google.com/..."
-                    />
-                    <p class="text-xs text-slate-500 mt-1">This URL is stored on the ticket and included in notification emails.</p>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Attachments</label>
-                    <input
-                        ref="attachmentInputRef"
-                        type="file"
-                        multiple
-                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                        class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
-                        @change="onAttachmentFilesSelected"
-                    />
-                    <ul v-if="pendingAttachmentFiles.length" class="mt-2 text-xs text-slate-600 space-y-1">
-                        <li v-for="(f, i) in pendingAttachmentFiles" :key="i" class="flex justify-between gap-2">
-                            <span class="truncate">{{ f.name }}</span>
-                            <button type="button" class="text-red-600 shrink-0" @click="removePendingFile(i)">Remove</button>
+            <div>
+                <label class="form-label" for="ticketform-attachments">Attachments</label>
+                <input id="ticketform-attachments"
+                    ref="attachmentInputRef"
+                    type="file"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                    class="block w-full rounded-control text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-control file:border-0 file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                    @change="onAttachmentFilesSelected"
+                />
+                <ul v-if="pendingAttachmentFiles.length" class="mt-2 space-y-1 text-xs text-slate-600">
+                    <li v-for="(f, i) in pendingAttachmentFiles" :key="i" class="flex items-center justify-between gap-2">
+                        <span class="truncate">{{ f.name }}</span>
+                        <BaseButton
+                            variant="ghost"
+                            size="icon"
+                            class="shrink-0 text-danger-700"
+                            :label="`Remove ${f.name}`"
+                            @click="removePendingFile(i)"
+                        >
+                            <template #icon>
+                                <XMarkIcon class="icon-sm" aria-hidden="true" />
+                            </template>
+                        </BaseButton>
+                    </li>
+                </ul>
+                <div v-if="ticket && ticketAttachments.length" class="mt-3 border-t border-slate-200 pt-3">
+                    <p class="text-eyebrow text-slate-500 mb-2">Current files</p>
+                    <ul class="space-y-2">
+                        <li
+                            v-for="att in ticketAttachments"
+                            :key="att.id"
+                            class="flex items-center justify-between gap-2 text-sm"
+                        >
+                            <a :href="att.url" target="_blank" rel="noopener noreferrer" class="link truncate">{{ att.original_name }}</a>
+                            <BaseButton
+                                variant="ghost"
+                                size="icon"
+                                class="shrink-0 text-danger-700"
+                                :label="`Delete ${att.original_name}`"
+                                @click="deleteTicketAttachment(att)"
+                            >
+                                <template #icon>
+                                    <TrashIcon class="icon-sm" aria-hidden="true" />
+                                </template>
+                            </BaseButton>
                         </li>
                     </ul>
-                    <div v-if="ticket && ticketAttachments.length" class="mt-3 pt-3 border-t border-slate-200">
-                        <p class="text-xs font-medium text-slate-700 mb-2">Current files</p>
-                        <ul class="space-y-2">
-                            <li
-                                v-for="att in ticketAttachments"
-                                :key="att.id"
-                                class="flex items-center justify-between gap-2 text-sm"
-                            >
-                                <a :href="att.url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline truncate">{{ att.original_name }}</a>
-                                <button type="button" class="text-xs text-red-600 shrink-0" @click="deleteTicketAttachment(att)">Delete</button>
-                            </li>
-                        </ul>
-                    </div>
                 </div>
+            </div>
 
+            <div>
+                <label class="form-label" for="ticketform-estimated-resolve-hours">Expected resolution (hours)</label>
+                <input id="ticketform-estimated-resolve-hours"
+                    v-model.number="form.estimated_resolve_hours"
+                    type="number"
+                    min="1"
+                    max="8760"
+                    step="1"
+                    class="form-input"
+                    placeholder="e.g. 24 — leave empty to use priority-based SLA"
+                />
+                <p class="form-hint">If set, the due-by time is calculated from when the ticket is saved. Assigned users receive this in the assignment email.</p>
+            </div>
+
+            <div class="form-grid-2">
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Expected resolution (hours)</label>
-                    <input
-                        v-model.number="form.estimated_resolve_hours"
-                        type="number"
-                        min="1"
-                        max="8760"
-                        step="1"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        placeholder="e.g. 24 — leave empty to use priority-based SLA"
+                    <label class="form-label" for="ticketform-priority">Priority</label>
+                    <select id="ticketform-priority"
+                        v-model="form.priority"
+                        class="form-select"
+                    >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+
+                <div v-if="ticket">
+                    <label class="form-label" for="ticketform-status">Status</label>
+                    <select id="ticketform-status"
+                        v-model="form.status"
+                        class="form-select"
+                    >
+                        <option value="open">Open</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="on_hold">On Hold</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                </div>
+
+                <fieldset class="form-fieldset sm:col-span-2">
+                    <legend class="form-legend">Assign to (one or more)</legend>
+                    <div class="max-h-40 space-y-2 overflow-y-auto rounded-control border border-slate-200 bg-slate-50/50 p-2">
+                        <label
+                            v-for="user in users"
+                            :key="user.id"
+                            class="form-choice flex"
+                        >
+                            <input v-model="form.assigned_user_ids" type="checkbox" :value="user.id" class="form-checkbox" />
+                            {{ user.name }}
+                        </label>
+                    </div>
+                </fieldset>
+            </div>
+
+            <div v-if="ticket" class="mt-4 space-y-3 border-t border-slate-200 pt-4">
+                <h3 class="text-sm font-semibold text-slate-900">Comments</h3>
+                <div v-if="comments.length" class="max-h-48 space-y-2 overflow-y-auto">
+                    <div
+                        v-for="msg in comments"
+                        :key="msg.id"
+                        class="rounded-control border border-slate-200 bg-slate-50 p-2"
+                    >
+                        <div class="mb-1 flex items-baseline justify-between gap-2">
+                            <span class="text-xs font-medium text-slate-800">{{ msg.user?.name || 'Unknown' }}</span>
+                            <span class="text-[11px] text-slate-500">{{ formatDateTime(msg.created_at) }}</span>
+                        </div>
+                        <p class="text-xs text-slate-700 whitespace-pre-wrap">{{ msg.message }}</p>
+                    </div>
+                </div>
+                <p v-else class="text-xs text-slate-500">No comments yet.</p>
+                <div class="space-y-2">
+                    <label class="sr-only" for="ticketform-new-comment">Add a comment about this ticket</label>
+                    <textarea
+                        id="ticketform-new-comment"
+                        ref="commentTextareaRef"
+                        v-model="newComment"
+                        rows="4"
+                        class="form-textarea min-h-[7.5rem] max-h-[min(50vh,24rem)] overflow-x-hidden"
+                        placeholder="Add a comment about this ticket..."
                     />
-                    <p class="text-xs text-slate-500 mt-1">If set, the due-by time is calculated from when the ticket is saved. Assigned users receive this in the assignment email.</p>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Priority</label>
-                        <select
-                            v-model="form.priority"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    <div class="flex justify-end">
+                        <BaseButton
+                            variant="soft"
+                            :loading="commentLoading"
+                            :disabled="!newComment.trim()"
+                            @click="addComment"
                         >
-                            <option value="low">Low</option>
-                            <option value="medium">Medium</option>
-                            <option value="high">High</option>
-                            <option value="urgent">Urgent</option>
-                        </select>
+                            {{ commentLoading ? 'Adding...' : 'Add Comment' }}
+                        </BaseButton>
                     </div>
-
-                    <div v-if="ticket">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                        <select
-                            v-model="form.status"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        >
-                            <option value="open">Open</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="on_hold">On Hold</option>
-                            <option value="resolved">Resolved</option>
-                            <option value="closed">Closed</option>
-                        </select>
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Assign to (one or more)</label>
-                        <div class="max-h-40 overflow-y-auto rounded-lg border border-slate-200 p-2 space-y-2 bg-slate-50/50">
-                            <label
-                                v-for="user in users"
-                                :key="user.id"
-                                class="flex items-center gap-2 text-sm text-slate-800 cursor-pointer"
-                            >
-                                <input v-model="form.assigned_user_ids" type="checkbox" :value="user.id" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30" />
-                                {{ user.name }}
-                            </label>
-                        </div>
-                    </div>
+                    <p v-if="commentError" class="form-error" role="alert">{{ commentError }}</p>
                 </div>
+            </div>
 
-                <div v-if="ticket" class="mt-4 pt-4 border-t border-slate-200 space-y-3">
-                    <h3 class="text-sm font-semibold text-slate-900">Comments</h3>
-                    <div v-if="comments.length" class="space-y-2 max-h-48 overflow-y-auto">
-                        <div
-                            v-for="msg in comments"
-                            :key="msg.id"
-                            class="border border-slate-200 rounded-lg p-2 bg-slate-50"
-                        >
-                            <div class="flex items-baseline justify-between gap-2 mb-1">
-                                <span class="text-xs font-medium text-slate-800">{{ msg.user?.name || 'Unknown' }}</span>
-                                <span class="text-[11px] text-slate-500">{{ formatDateTime(msg.created_at) }}</span>
-                            </div>
-                            <p class="text-xs text-slate-700 whitespace-pre-wrap">{{ msg.message }}</p>
-                        </div>
-                    </div>
-                    <p v-else class="text-xs text-slate-500">No comments yet.</p>
-                    <div class="space-y-2">
-                        <textarea
-                            ref="commentTextareaRef"
-                            v-model="newComment"
-                            rows="4"
-                            class="w-full min-h-[7.5rem] max-h-[min(50vh,24rem)] px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 resize-y overflow-x-hidden"
-                            placeholder="Add a comment about this ticket..."
-                        />
-                        <div class="flex justify-end">
-                            <button
-                                type="button"
-                                :disabled="commentLoading || !newComment.trim()"
-                                @click="addComment"
-                                class="px-4 py-2 text-sm rounded-lg bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
-                            >
-                                {{ commentLoading ? 'Adding...' : 'Add Comment' }}
-                            </button>
-                        </div>
-                        <p v-if="commentError" class="text-xs text-red-600">{{ commentError }}</p>
-                    </div>
-                </div>
+            <p v-if="error" class="callout callout-danger" role="alert">
+                {{ error }}
+            </p>
+        </form>
 
-                <div v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded">
-                    {{ error }}
-                </div>
-
-                <div class="flex justify-end gap-3 pt-4 border-t border-slate-200">
-                    <button
-                        type="button"
-                        @click="$emit('close')"
-                        class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        :disabled="loading"
-                        class="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
-                    >
-                        {{ loading ? 'Saving...' : (ticket ? 'Update' : 'Create') }}
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="$emit('close')">Cancel</BaseButton>
+            <BaseButton
+                variant="primary"
+                type="submit"
+                form="ticket-form"
+                block-mobile
+                :loading="loading"
+            >
+                {{ loading ? 'Saving...' : (ticket ? 'Update' : 'Create') }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
 import { ref, onMounted, nextTick } from 'vue';
 import { useAutosizeTextarea } from '@/composables/useAutosizeTextarea';
 import axios from 'axios';
+import { TrashIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import { useToastStore } from '@/stores/toast';
+import { BaseButton, BaseModal } from '@/components/base';
 
 const toast = useToastStore();
 
@@ -427,4 +445,3 @@ const addComment = async () => {
     }
 };
 </script>
-

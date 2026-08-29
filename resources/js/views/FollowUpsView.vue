@@ -5,65 +5,77 @@
         :badge="followUpsBadge"
     >
         <template #actions>
-            <button type="button" class="listing-btn-outline w-full sm:w-auto" :disabled="!followUps.length" @click="exportCsv">
+            <BaseButton variant="outline" block-mobile :disabled="!followUps.length" @click="exportCsv">
+                <template #icon><ArrowDownTrayIcon class="icon" aria-hidden="true" /></template>
                 Export CSV
-            </button>
+            </BaseButton>
         </template>
 
         <template #filters>
             <div class="listing-filters-row">
                 <div>
-                    <label class="listing-label">From</label>
-                    <input v-model="fromDate" type="date" class="listing-input w-full sm:w-40" />
+                    <label class="form-label" for="followupsview-from">From</label>
+                    <input id="followupsview-from" v-model="fromDate" type="date" class="form-input w-full sm:w-40" />
                 </div>
                 <div>
-                    <label class="listing-label">To</label>
-                    <input v-model="toDate" type="date" class="listing-input w-full sm:w-40" />
+                    <label class="form-label" for="followupsview-to">To</label>
+                    <input id="followupsview-to" v-model="toDate" type="date" class="form-input w-full sm:w-40" />
                 </div>
-                <button type="button" class="listing-btn-outline" @click="setToday">Today</button>
-                <button type="button" class="listing-btn-outline" @click="setThisWeek">This week</button>
-                <button type="button" class="listing-btn-primary" @click="loadFollowUps">Filter</button>
+                <BaseButton variant="outline" @click="setToday">Today</BaseButton>
+                <BaseButton variant="outline" @click="setThisWeek">This week</BaseButton>
+                <BaseButton variant="primary" @click="loadFollowUps">
+                    <template #icon><FunnelIcon class="icon" aria-hidden="true" /></template>
+                    Filter
+                </BaseButton>
             </div>
         </template>
 
-        <div v-if="loading" class="px-5 py-14 text-center text-slate-500 text-sm">Loading…</div>
-
-        <div v-else-if="!followUps.length" class="px-5 py-12 text-center text-slate-500 text-sm">
-            No follow-ups for this period.
+        <div v-if="loading" class="px-5 py-14 text-center text-slate-500 text-sm" aria-busy="true">
+            <span class="spinner" role="status" aria-label="Loading" />
+            <span class="ml-2 align-middle">Loading…</span>
         </div>
+
+        <EmptyState
+            v-else-if="!followUps.length"
+            heading="No follow-ups for this period"
+            description="Try widening the date range, or pick “This week” to see what is coming up."
+        >
+            <template #icon><CalendarDaysIcon class="icon" aria-hidden="true" /></template>
+        </EmptyState>
 
         <!-- Desktop / tablet table -->
         <div v-else class="hidden sm:block overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[900px]">
-                    <thead class="listing-thead">
+            <div class="table-wrap">
+                <table class="table min-w-[900px]">
+                    <caption class="sr-only">Scheduled follow-ups for the selected date range</caption>
+                    <thead class="table-thead">
                         <tr>
-                            <th class="listing-th">Date</th>
-                            <th class="listing-th">Time</th>
-                            <th class="listing-th">Customer</th>
-                            <th class="listing-th">Products</th>
-                            <th class="listing-th">Stage</th>
-                            <th class="listing-th">Assignee</th>
-                            <th class="listing-th">Latest note</th>
+                            <th scope="col" class="table-th">Date</th>
+                            <th scope="col" class="table-th">Time</th>
+                            <th scope="col" class="table-th">Customer</th>
+                            <th scope="col" class="table-th">Products</th>
+                            <th scope="col" class="table-th">Stage</th>
+                            <th scope="col" class="table-th">Assignee</th>
+                            <th scope="col" class="table-th">Latest note</th>
                         </tr>
                     </thead>
                     <tbody>
                         <template v-for="fu in followUps" :key="fu.id">
                             <tr
-                                class="listing-row cursor-pointer"
+                                class="table-row cursor-pointer"
                                 @click="toggleExpanded(fu.id)"
                             >
-                                <td class="listing-td-strong">
+                                <td class="table-td-strong">
                                     {{ formatDate(fu.next_follow_up_date) }}
                                 </td>
-                                <td class="listing-td text-slate-600">
+                                <td class="table-td text-slate-600">
                                     {{ fu.next_follow_up_time || '—' }}
                                 </td>
-                                <td class="listing-td">
+                                <td class="table-td">
                                     <router-link
                                         v-if="fu.customer_id"
                                         :to="`/customers/${fu.customer_id}`"
-                                        class="text-slate-900 font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                        class="link font-medium"
                                     >
                                         {{ fu.customer?.name || '—' }}
                                     </router-link>
@@ -71,33 +83,29 @@
                                         {{ fu.customer?.name || '—' }}
                                     </span>
                                 </td>
-                                <td class="listing-td">
+                                <td class="table-td">
                                     {{ fu.products || '—' }}
                                 </td>
-                                <td class="listing-td">
-                                <span
-                                    class="inline-flex px-2 py-1 rounded-full font-medium whitespace-nowrap"
-                                    :class="stageClass(fu.stage)"
-                                >
-                                    {{ formatStage(fu.stage) }}
-                                </span>
+                                <td class="table-td">
+                                    <BaseBadge :tone="stageTone(fu.stage)">{{ formatStage(fu.stage) }}</BaseBadge>
                                 </td>
-                                <td class="listing-td">
+                                <td class="table-td">
                                     {{ fu.assignee?.name || '—' }}
                                 </td>
-                                <td class="listing-td max-w-xs">
+                                <td class="table-td max-w-xs">
                                     <div class="flex items-center gap-2">
                                         <span class="block truncate flex-1" :title="fu.latest_note || ''">
                                             {{ fu.latest_note || '—' }}
                                         </span>
-                                        <button
+                                        <BaseButton
                                             v-if="fu.latest_note"
-                                            type="button"
-                                            class="text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                                            variant="ghost"
+                                            size="sm"
+                                            class="whitespace-nowrap"
                                             @click.stop="toggleExpanded(fu.id)"
                                         >
                                             {{ expandedId === fu.id ? 'Hide note' : 'View note' }}
-                                        </button>
+                                        </BaseButton>
                                     </div>
                                 </td>
                             </tr>
@@ -123,31 +131,22 @@
 
         <!-- Mobile cards -->
         <div v-if="followUps.length" class="sm:hidden space-y-3 px-3 pb-3">
-            <div
-                v-for="fu in followUps"
-                :key="fu.id"
-                class="rounded-xl border border-slate-200 bg-slate-50/40 p-4 space-y-2"
-            >
+            <div v-for="fu in followUps" :key="fu.id" class="table-card">
                 <div class="flex justify-between items-start gap-2">
                     <div>
-                        <div class="text-xs text-slate-500 uppercase tracking-wide">Date & time</div>
+                        <div class="text-eyebrow text-slate-500 uppercase">Date &amp; time</div>
                         <div class="text-sm font-medium text-slate-900">
                             {{ formatDate(fu.next_follow_up_date) }} · {{ fu.next_follow_up_time || '—' }}
                         </div>
                     </div>
-                    <span
-                        class="inline-flex px-2 py-1 rounded-full text-[11px] font-medium"
-                        :class="stageClass(fu.stage)"
-                    >
-                        {{ formatStage(fu.stage) }}
-                    </span>
+                    <BaseBadge :tone="stageTone(fu.stage)">{{ formatStage(fu.stage) }}</BaseBadge>
                 </div>
                 <div>
-                    <div class="text-xs text-slate-500 uppercase tracking-wide">Customer</div>
+                    <div class="text-eyebrow text-slate-500 uppercase">Customer</div>
                     <router-link
                         v-if="fu.customer_id"
                         :to="`/customers/${fu.customer_id}`"
-                        class="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                        class="link text-sm font-medium"
                     >
                         {{ fu.customer?.name || '—' }}
                     </router-link>
@@ -156,19 +155,19 @@
                     </span>
                 </div>
                 <div v-if="fu.products">
-                    <div class="text-xs text-slate-500 uppercase tracking-wide">Products</div>
+                    <div class="text-eyebrow text-slate-500 uppercase">Products</div>
                     <div class="text-sm text-slate-700">
                         {{ fu.products }}
                     </div>
                 </div>
                 <div>
-                    <div class="text-xs text-slate-500 uppercase tracking-wide">Assignee</div>
+                    <div class="text-eyebrow text-slate-500 uppercase">Assignee</div>
                     <div class="text-sm text-slate-700">
                         {{ fu.assignee?.name || '—' }}
                     </div>
                 </div>
                 <div>
-                    <div class="text-xs text-slate-500 uppercase tracking-wide mb-1">Latest note</div>
+                    <div class="text-eyebrow text-slate-500 uppercase mb-1">Latest note</div>
                     <div class="text-sm text-slate-700 whitespace-pre-wrap">
                         {{ fu.latest_note || '—' }}
                     </div>
@@ -181,9 +180,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
+import { ArrowDownTrayIcon, CalendarDaysIcon, FunnelIcon } from '@heroicons/vue/24/outline';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
 import { formatLeadStage } from '@/utils/displayFormat';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseBadge, BaseButton, EmptyState } from '@/components/base';
 
 const loading = ref(true);
 const followUps = ref([]);
@@ -223,16 +224,17 @@ function formatDate(ymd) {
 
 const formatStage = formatLeadStage;
 
-function stageClass(stage) {
+/** Lead stage -> BaseBadge tone. Mirrors the previous colour intent exactly. */
+function stageTone(stage) {
     const map = {
-        follow_up: 'bg-blue-100 text-blue-800',
-        lead: 'bg-green-100 text-green-800',
-        hot_lead: 'bg-orange-100 text-orange-800',
-        quotation: 'bg-purple-100 text-purple-800',
-        won: 'bg-emerald-100 text-emerald-800',
-        lost: 'bg-red-100 text-red-800',
+        follow_up: 'primary',
+        lead: 'success',
+        hot_lead: 'warning',
+        quotation: 'primary',
+        won: 'success',
+        lost: 'danger',
     };
-    return map[stage] || 'bg-slate-100 text-slate-700';
+    return map[stage] || 'neutral';
 }
 
 async function loadFollowUps() {

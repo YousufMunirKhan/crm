@@ -1,416 +1,657 @@
 <template>
-    <div class="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
-        <div>
-            <h1 class="text-xl sm:text-2xl font-bold text-slate-900">WhatsApp Management</h1>
-            <p class="text-sm text-slate-600 mt-1">
-                Filter contacts like email campaigns, search by name, pick an <strong>approved</strong> Meta template, and send to everyone matching the filters. Single-chat WhatsApp from a customer record is unchanged.
-            </p>
+    <ListingPageShell
+        title="WhatsApp Management"
+        subtitle="Bulk WhatsApp template sends: filter contacts, pick an approved Meta template and send to everyone matching, newest matches first."
+        :badge="whatsappBadge"
+    >
+        <template #actions>
+            <BaseButton variant="primary" block-mobile :loading="exporting" @click="exportCsv">
+                <template #icon><ArrowDownTrayIcon class="icon-sm" aria-hidden="true" /></template>
+                {{ exporting ? 'Exporting...' : 'Export CSV' }}
+            </BaseButton>
+            <BaseButton variant="outline" block-mobile to="/whatsapp-templates">
+                <template #icon><DocumentTextIcon class="icon-sm" aria-hidden="true" /></template>
+                WhatsApp Templates
+            </BaseButton>
+            <BaseButton variant="outline" block-mobile to="/settings">
+                <template #icon><Cog6ToothIcon class="icon-sm" aria-hidden="true" /></template>
+                Settings
+            </BaseButton>
+        </template>
+
+        <template #filters>
+            <div class="space-y-4">
+                <div class="tab-list" role="tablist" aria-label="WhatsApp management sections">
+                    <button
+                        type="button"
+                        role="tab"
+                        :aria-selected="activeTab === 'send' ? 'true' : 'false'"
+                        :class="['tab', activeTab === 'send' ? 'tab-active' : '']"
+                        @click="activeTab = 'send'"
+                    >
+                        Send template
+                    </button>
+                    <button
+                        type="button"
+                        role="tab"
+                        :aria-selected="activeTab === 'report' ? 'true' : 'false'"
+                        :class="['tab', activeTab === 'report' ? 'tab-active' : '']"
+                        @click="activeTab = 'report'; loadReport()"
+                    >
+                        Report
+                    </button>
+                    <button
+                        type="button"
+                        role="tab"
+                        :aria-selected="activeTab === 'sendByDate' ? 'true' : 'false'"
+                        :class="['tab', activeTab === 'sendByDate' ? 'tab-active' : '']"
+                        @click="activeTab = 'sendByDate'"
+                    >
+                        Send by Date
+                    </button>
+                </div>
+
+                <!-- Send template filters -->
+                <div v-show="activeTab === 'send'" class="listing-filters-row">
+                    <fieldset class="form-fieldset w-full sm:w-auto">
+                        <legend class="form-legend">Audience</legend>
+                        <div class="flex flex-wrap gap-4">
+                            <label class="form-choice cursor-pointer">
+                                <input v-model="audience" type="radio" value="prospect" class="form-radio" />
+                                <span class="text-sm font-medium text-slate-700">Prospects only</span>
+                            </label>
+                            <label class="form-choice cursor-pointer">
+                                <input v-model="audience" type="radio" value="customer" class="form-radio" />
+                                <span class="text-sm font-medium text-slate-700">Customers only</span>
+                            </label>
+                            <label class="form-choice cursor-pointer">
+                                <input v-model="audience" type="radio" value="both" class="form-radio" />
+                                <span class="text-sm font-medium text-slate-700">Both</span>
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <div class="w-full">
+                        <p class="listing-label">Product filters</p>
+                        <p class="form-hint mb-2">
+                            Same rules as Email Management. Leave “All” to include everyone in the audience.
+                        </p>
+                        <div class="space-y-3">
+                            <div
+                                v-for="(filter, index) in productFilters"
+                                :key="index"
+                                class="flex flex-wrap items-center gap-3"
+                            >
+                                <div class="min-w-[180px]">
+                                    <label class="sr-only" :for="`whatsappmanagementview-product-${index}`">
+                                        Product for rule {{ index + 1 }}
+                                    </label>
+                                    <select
+                                        :id="`whatsappmanagementview-product-${index}`"
+                                        v-model="filter.product_id"
+                                        class="form-select"
+                                    >
+                                        <option :value="null">Select product</option>
+                                        <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }}</option>
+                                    </select>
+                                </div>
+                                <div class="min-w-[180px]">
+                                    <label class="sr-only" :for="`whatsappmanagementview-rule-${index}`">
+                                        Rule {{ index + 1 }}
+                                    </label>
+                                    <select
+                                        :id="`whatsappmanagementview-rule-${index}`"
+                                        v-model="filter.rule"
+                                        class="form-select"
+                                    >
+                                        <option value="all">All (no filter)</option>
+                                        <option value="has">Has product</option>
+                                        <option value="does_not_have">Does not have product</option>
+                                    </select>
+                                </div>
+                                <BaseButton
+                                    v-if="productFilters.length > 1"
+                                    variant="ghost"
+                                    class="text-danger-700 hover:text-danger-800"
+                                    @click="removeFilter(index)"
+                                >
+                                    <template #icon><TrashIcon class="icon-sm" aria-hidden="true" /></template>
+                                    Remove
+                                </BaseButton>
+                            </div>
+                            <BaseButton variant="outline" @click="addFilter">
+                                <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                                Add product rule
+                            </BaseButton>
+                        </div>
+                    </div>
+
+                    <div class="w-full sm:flex-1 sm:min-w-[12rem] sm:max-w-md">
+                        <label
+                            class="listing-label"
+                            for="whatsappmanagementview-search-by-customer-name-optional"
+                        >Search by customer name (optional)</label>
+                        <div class="relative">
+                            <MagnifyingGlassIcon
+                                class="icon absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
+                                aria-hidden="true"
+                            />
+                            <input
+                                id="whatsappmanagementview-search-by-customer-name-optional"
+                                v-model="searchQuery"
+                                type="search"
+                                placeholder="e.g. Smith"
+                                class="form-input-search"
+                                @keydown.enter.prevent="applyFilters"
+                            />
+                        </div>
+                    </div>
+                    <BaseButton
+                        variant="soft"
+                        block-mobile
+                        class="shrink-0"
+                        :loading="loadingContacts"
+                        @click="applyFilters"
+                    >
+                        <template #icon><FunnelIcon class="icon-sm" aria-hidden="true" /></template>
+                        {{ loadingContacts ? 'Loading...' : 'Apply filters' }}
+                    </BaseButton>
+                </div>
+
+                <!-- Send by date filters -->
+                <div v-show="activeTab === 'sendByDate'" class="listing-filters-row">
+                    <div class="w-full sm:w-auto sm:min-w-[10rem]">
+                        <label class="listing-label" for="whatsappmanagementview-from-date">From date</label>
+                        <input
+                            id="whatsappmanagementview-from-date"
+                            v-model="dateFilterFrom"
+                            type="date"
+                            class="form-input"
+                        />
+                    </div>
+                    <div class="w-full sm:w-auto sm:min-w-[10rem]">
+                        <label class="listing-label" for="whatsappmanagementview-to-date">To date</label>
+                        <input
+                            id="whatsappmanagementview-to-date"
+                            v-model="dateFilterTo"
+                            type="date"
+                            class="form-input"
+                        />
+                    </div>
+                    <div class="w-full sm:w-auto sm:min-w-[11rem]">
+                        <label class="listing-label" for="whatsappmanagementview-audience">Audience</label>
+                        <select
+                            id="whatsappmanagementview-audience"
+                            v-model="dateFilterAudience"
+                            class="form-select"
+                        >
+                            <option value="prospect">Prospects only</option>
+                            <option value="customer">Customers only</option>
+                            <option value="both">Both</option>
+                        </select>
+                    </div>
+                    <div class="w-full sm:flex-1 sm:min-w-[12rem] sm:max-w-sm">
+                        <label class="listing-label" for="whatsappmanagementview-search-name-optional">Search name (optional)</label>
+                        <div class="relative">
+                            <MagnifyingGlassIcon
+                                class="icon absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
+                                aria-hidden="true"
+                            />
+                            <input
+                                id="whatsappmanagementview-search-name-optional"
+                                v-model="dateSearchQuery"
+                                type="search"
+                                placeholder="e.g. Smith"
+                                class="form-input-search"
+                                @keydown.enter.prevent="applyDateFilter"
+                            />
+                        </div>
+                    </div>
+                    <BaseButton
+                        variant="soft"
+                        block-mobile
+                        class="shrink-0"
+                        :loading="loadingDateContacts"
+                        @click="applyDateFilter"
+                    >
+                        <template #icon><FunnelIcon class="icon-sm" aria-hidden="true" /></template>
+                        {{ loadingDateContacts ? 'Loading...' : 'Apply' }}
+                    </BaseButton>
+                    <p class="w-full form-hint">Leave dates empty for all records (still scoped by audience).</p>
+                </div>
+
+                <!-- Report filters -->
+                <div v-show="activeTab === 'report'" class="listing-filters-row">
+                    <div class="w-full sm:w-auto sm:min-w-[10rem]">
+                        <label class="listing-label" for="whatsappmanagementview-from">From</label>
+                        <input
+                            id="whatsappmanagementview-from"
+                            v-model="reportDateFrom"
+                            type="date"
+                            class="form-input"
+                        />
+                    </div>
+                    <div class="w-full sm:w-auto sm:min-w-[10rem]">
+                        <label class="listing-label" for="whatsappmanagementview-to">To</label>
+                        <input
+                            id="whatsappmanagementview-to"
+                            v-model="reportDateTo"
+                            type="date"
+                            class="form-input"
+                        />
+                    </div>
+                    <BaseButton
+                        variant="soft"
+                        block-mobile
+                        class="shrink-0"
+                        :loading="loadingReport"
+                        @click="loadReport"
+                    >
+                        <template #icon><FunnelIcon class="icon-sm" aria-hidden="true" /></template>
+                        {{ loadingReport ? 'Loading...' : 'Apply' }}
+                    </BaseButton>
+                </div>
+            </div>
+        </template>
+
+        <template #toolbar>
             <div
                 v-if="waStatus"
-                class="mt-4 p-4 rounded-xl flex flex-wrap items-center gap-3"
-                :class="waStatus.configured ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'"
+                class="callout flex flex-wrap items-center gap-3"
+                :class="waStatus.configured ? 'callout-success' : 'callout-warning'"
+                role="status"
             >
-                <span v-if="waStatus.configured" class="text-green-600 text-lg">✓</span>
-                <span v-else class="text-amber-600 text-lg">⚠</span>
-                <span class="text-sm" :class="waStatus.configured ? 'text-green-800' : 'text-amber-800'">
-                    {{ waStatus.message }}
-                </span>
-                <router-link
-                    to="/settings"
-                    class="text-sm font-medium underline"
-                    :class="waStatus.configured ? 'text-green-700 hover:text-green-900' : 'text-amber-700 hover:text-amber-900'"
-                >
-                    Open Settings
-                </router-link>
-                <router-link
-                    to="/whatsapp-templates"
-                    class="text-sm font-medium text-emerald-700 hover:text-emerald-900 underline"
-                >
-                    WhatsApp Templates
-                </router-link>
+                <CheckCircleIcon v-if="waStatus.configured" class="icon shrink-0" aria-hidden="true" />
+                <ExclamationTriangleIcon v-else class="icon shrink-0" aria-hidden="true" />
+                <span class="min-w-0">{{ waStatus.message }}</span>
             </div>
-        </div>
-
-        <div class="flex gap-2 border-b border-slate-200 overflow-x-auto pb-px scrollbar-thin -mx-1 px-1 sm:mx-0 sm:px-0 flex-nowrap">
-            <button
-                type="button"
-                @click="activeTab = 'send'"
-                :class="tabClass('send')"
-            >
-                Send template
-            </button>
-            <button
-                type="button"
-                @click="activeTab = 'report'; loadReport()"
-                :class="tabClass('report')"
-            >
-                Report
-            </button>
-            <button
-                type="button"
-                @click="activeTab = 'sendByDate'"
-                :class="tabClass('sendByDate')"
-            >
-                Send by Date
-            </button>
-        </div>
+            <p v-else class="text-sm text-slate-500">
+                Single-chat WhatsApp from a customer record is unchanged by anything on this screen.
+            </p>
+        </template>
 
         <!-- Send -->
         <template v-if="activeTab === 'send'">
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-4">1. Audience</h2>
-                <div class="flex flex-wrap gap-4">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input v-model="audience" type="radio" value="prospect" class="rounded-full text-slate-900 focus:ring-slate-500" />
-                        <span class="text-sm font-medium text-slate-700">Prospects only</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input v-model="audience" type="radio" value="customer" class="rounded-full text-slate-900 focus:ring-slate-500" />
-                        <span class="text-sm font-medium text-slate-700">Customers only</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input v-model="audience" type="radio" value="both" class="rounded-full text-slate-900 focus:ring-slate-500" />
-                        <span class="text-sm font-medium text-slate-700">Both</span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-2">2. Product filters</h2>
-                <p class="text-sm text-slate-500 mb-4">Same rules as Email Management. Leave “All” to include everyone in the audience.</p>
-                <div class="space-y-3">
-                    <div v-for="(filter, index) in productFilters" :key="index" class="flex flex-wrap items-center gap-3">
-                        <select v-model="filter.product_id" class="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[180px] focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option :value="null">Select product</option>
-                            <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }}</option>
-                        </select>
-                        <select v-model="filter.rule" class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="all">All (no filter)</option>
-                            <option value="has">Has product</option>
-                            <option value="does_not_have">Does not have product</option>
-                        </select>
-                        <button v-if="productFilters.length > 1" type="button" class="text-red-600 hover:text-red-800 text-sm" @click="removeFilter(index)">Remove</button>
-                    </div>
-                    <button type="button" class="text-sm text-emerald-600 hover:text-emerald-800" @click="addFilter">+ Add product rule</button>
-                </div>
-                <div class="mt-4 flex flex-wrap gap-3 items-end">
-                    <div class="min-w-[200px] flex-1 max-w-md">
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Search by customer name (optional)</label>
-                        <input
-                            v-model="searchQuery"
-                            type="search"
-                            placeholder="e.g. Smith"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                            @keydown.enter.prevent="applyFilters"
-                        />
-                    </div>
-                    <button
-                        type="button"
-                        :disabled="loadingContacts"
-                        class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium"
-                        @click="applyFilters"
-                    >
-                        {{ loadingContacts ? 'Loading...' : 'Apply filters' }}
-                    </button>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-4">3. Recipients</h2>
-                <p class="text-xs text-slate-500 mb-3">Only contacts with a WhatsApp number or phone are included. Sending uses the same filtered set (all pages), not only the table below.</p>
-                <div v-if="totalContacts === 0 && !hasApplied" class="text-slate-500 text-sm">Click “Apply filters” to load recipients.</div>
-                <div v-else-if="totalContacts === 0" class="text-slate-500 text-sm">No contacts match (or none have phone / WhatsApp).</div>
-                <div v-else>
-                    <p class="text-sm text-slate-700 mb-3">
-                        <strong>{{ totalContacts }}</strong> match;
-                        <strong class="text-emerald-700">{{ sendableTotal }}</strong> selected to receive.
-                        <span v-if="totalContacts > contacts.length" class="text-slate-500">(page {{ contactsPage }} of {{ contactsLastPage }})</span>
+            <div class="p-4 sm:p-6 space-y-5">
+                <section class="card p-5 sm:p-6 space-y-3">
+                    <h2 class="card-title">Recipients</h2>
+                    <p class="text-xs text-slate-500">
+                        Only contacts with a WhatsApp number or phone are included. Sending uses the same filtered set (all pages), not only the table below.
                     </p>
-                    <div class="flex flex-wrap gap-2 mb-3 text-sm">
-                        <button type="button" class="text-emerald-700 hover:text-emerald-900" @click="selectAllRecipientsOnPage">Select all on this page</button>
-                        <span class="text-slate-300">|</span>
-                        <button type="button" class="text-emerald-700 hover:text-emerald-900" @click="deselectAllRecipientsOnPage">Uncheck all on this page</button>
-                        <span class="text-slate-300">|</span>
-                        <button type="button" class="text-slate-600 hover:text-slate-900" @click="clearRecipientExclusions">Include everyone again</button>
+
+                    <div v-if="loadingContacts" class="space-y-3" aria-busy="true">
+                        <span v-for="n in 5" :key="n" class="skeleton-text block w-full" />
                     </div>
-                    <div class="flex flex-wrap gap-3 mb-4 items-center">
-                        <button
-                            type="button"
-                            :disabled="exporting"
-                            class="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm disabled:opacity-50"
-                            @click="exportCsv"
-                        >
-                            {{ exporting ? 'Exporting...' : 'Export CSV' }}
-                        </button>
-                        <div v-if="contactsLastPage > 1" class="flex items-center gap-2 text-sm">
-                            <button type="button" class="px-2 py-1 border border-slate-300 rounded disabled:opacity-50" :disabled="contactsPage <= 1" @click="goToContactsPage(contactsPage - 1)">Previous</button>
-                            <span class="text-slate-600">Page {{ contactsPage }} of {{ contactsLastPage }}</span>
-                            <button type="button" class="px-2 py-1 border border-slate-300 rounded disabled:opacity-50" :disabled="contactsPage >= contactsLastPage" @click="goToContactsPage(contactsPage + 1)">Next</button>
+
+                    <EmptyState
+                        v-else-if="totalContacts === 0 && !hasApplied"
+                        heading="No recipients loaded yet"
+                        description="Choose an audience and any product rules above, then select “Apply filters” to load the recipient list."
+                    >
+                        <template #icon><ChatBubbleLeftRightIcon class="icon" aria-hidden="true" /></template>
+                    </EmptyState>
+
+                    <EmptyState
+                        v-else-if="totalContacts === 0"
+                        heading="No contacts match"
+                        description="Nobody matches these filters, or none of the matches have a phone / WhatsApp number on record."
+                    >
+                        <template #icon><UsersIcon class="icon" aria-hidden="true" /></template>
+                    </EmptyState>
+
+                    <div v-else class="space-y-3">
+                        <p class="text-sm text-slate-700">
+                            <strong>{{ totalContacts }}</strong> match;
+                            <strong class="text-success-700">{{ sendableTotal }}</strong> selected to receive.
+                            <span v-if="totalContacts > contacts.length" class="text-slate-500">(page {{ contactsPage }} of {{ contactsLastPage }})</span>
+                        </p>
+                        <div class="flex flex-wrap gap-2">
+                            <BaseButton variant="ghost" @click="selectAllRecipientsOnPage">Select all on this page</BaseButton>
+                            <BaseButton variant="ghost" @click="deselectAllRecipientsOnPage">Uncheck all on this page</BaseButton>
+                            <BaseButton variant="ghost" @click="clearRecipientExclusions">Include everyone again</BaseButton>
+                        </div>
+                        <div class="table-wrap border border-slate-200 rounded-card max-h-64 overflow-y-auto">
+                            <table class="table" style="min-width: 320px">
+                                <caption class="sr-only">Recipients matching the current filters</caption>
+                                <thead class="table-thead table-thead-sticky">
+                                    <tr>
+                                        <th scope="col" class="table-th w-10 text-center">
+                                            <span class="sr-only">Include recipient</span>
+                                        </th>
+                                        <th scope="col" class="table-th">Name</th>
+                                        <th scope="col" class="table-th">WhatsApp / Phone</th>
+                                        <th scope="col" class="table-th">Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="c in contacts" :key="c.id" class="table-row">
+                                        <td class="table-td text-center">
+                                            <input
+                                                type="checkbox"
+                                                class="form-checkbox"
+                                                :aria-label="`Include ${c.name}`"
+                                                :checked="recipientIncluded(c.id)"
+                                                @change="toggleRecipient(c.id, $event.target.checked)"
+                                            />
+                                        </td>
+                                        <td class="table-td">{{ c.name }}</td>
+                                        <td class="table-td font-mono text-xs">{{ c.display_phone }}</td>
+                                        <td class="table-td capitalize">{{ c.type }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
-                    <div class="border border-slate-200 rounded-lg overflow-hidden max-h-64 overflow-y-auto overflow-x-auto">
-                        <table class="w-full text-sm min-w-[320px]">
-                            <thead class="bg-slate-50 sticky top-0">
-                                <tr>
-                                    <th class="w-10 px-2 py-2 font-medium text-slate-700 text-center">✓</th>
-                                    <th class="text-left px-3 sm:px-4 py-2 font-medium text-slate-700">Name</th>
-                                    <th class="text-left px-3 sm:px-4 py-2 font-medium text-slate-700">WhatsApp / Phone</th>
-                                    <th class="text-left px-3 sm:px-4 py-2 font-medium text-slate-700">Type</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="c in contacts" :key="c.id" class="border-t border-slate-100 hover:bg-slate-50">
-                                    <td class="px-2 py-2 text-center">
-                                        <input
-                                            type="checkbox"
-                                            class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                                            :checked="recipientIncluded(c.id)"
-                                            @change="toggleRecipient(c.id, $event.target.checked)"
-                                        />
-                                    </td>
-                                    <td class="px-3 sm:px-4 py-2">{{ c.name }}</td>
-                                    <td class="px-3 sm:px-4 py-2 font-mono text-xs">{{ c.display_phone }}</td>
-                                    <td class="px-3 sm:px-4 py-2 capitalize">{{ c.type }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+                </section>
 
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-4">4. Template & preview</h2>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Approved WhatsApp template</label>
+                <section class="card p-5 sm:p-6 space-y-4">
+                    <h2 class="card-title">Template &amp; preview</h2>
+                    <div class="max-w-md">
+                        <label
+                            class="form-label"
+                            for="whatsappmanagementview-approved-whatsapp-template"
+                        >Approved WhatsApp template</label>
                         <select
+                            id="whatsappmanagementview-approved-whatsapp-template"
                             v-model="selectedTemplateId"
-                            class="w-full max-w-md px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            class="form-select"
                             @change="loadPreview"
                         >
                             <option :value="null">Select template</option>
                             <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }} ({{ t.language }})</option>
                         </select>
                     </div>
-                    <div v-if="totalContacts > 0" class="text-sm text-slate-600">
+                    <p v-if="totalContacts > 0" class="text-sm text-slate-600">
                         Bulk send goes to <strong>{{ sendableTotal }}</strong> recipient(s) ({{ totalContacts }} match<span v-if="excludedRecipientIds.length">; {{ excludedRecipientIds.length }} excluded</span>). Variables are filled per customer (same as single send).
+                    </p>
+                    <div
+                        v-if="preview.body_preview || preview.header_preview"
+                        class="card bg-slate-50 p-4 text-sm space-y-2"
+                    >
+                        <p class="font-semibold text-slate-800">{{ preview.template_name || 'Preview' }}</p>
+                        <p v-if="preview.header_preview" class="text-slate-600">
+                            <span class="text-slate-500">Header:</span> {{ preview.header_preview }}
+                        </p>
+                        <p class="whitespace-pre-wrap text-slate-900">{{ preview.body_preview || '—' }}</p>
                     </div>
-                    <div v-if="preview.body_preview || preview.header_preview" class="border border-slate-200 rounded-lg p-4 bg-slate-50 text-sm space-y-2">
-                        <div class="font-medium text-slate-800">{{ preview.template_name || 'Preview' }}</div>
-                        <div v-if="preview.header_preview" class="text-slate-600"><span class="text-slate-400">Header:</span> {{ preview.header_preview }}</div>
-                        <div class="whitespace-pre-wrap text-slate-900">{{ preview.body_preview || '—' }}</div>
+                    <p v-else-if="selectedTemplateId && !loadingPreview" class="text-sm text-slate-500">Could not load preview.</p>
+                    <div v-if="loadingPreview" class="space-y-2" aria-busy="true">
+                        <span class="skeleton-text block w-1/3" />
+                        <span class="skeleton-text block w-full" />
                     </div>
-                    <div v-else-if="selectedTemplateId && !loadingPreview" class="text-sm text-slate-500">Could not load preview.</div>
-                    <div v-if="loadingPreview" class="text-sm text-slate-500">Loading preview…</div>
-                </div>
-            </div>
+                </section>
 
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-4">5. Send</h2>
-                <button
-                    type="button"
-                    :disabled="sending || sendableTotal === 0 || !selectedTemplateId"
-                    class="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium"
-                    @click="sendBulk"
-                >
-                    {{ sending ? 'Sending...' : `Send template to ${sendableTotal} recipient(s)` }}
-                </button>
-                <p v-if="sendResult" class="mt-3 text-sm" :class="sendResult.failed ? 'text-amber-600' : 'text-green-600'">{{ sendResult.message }}</p>
-                <div v-if="sendResult?.failed_list?.length" class="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg max-h-48 overflow-y-auto">
-                    <p class="text-sm font-medium text-amber-900 mb-2">Failures (showing up to {{ sendResult.failed_list.length }})</p>
-                    <ul class="text-xs space-y-1 text-amber-900">
-                        <li v-for="(f, i) in sendResult.failed_list" :key="i">{{ f.name }} — {{ f.error }}</li>
-                    </ul>
-                </div>
+                <section class="card p-5 sm:p-6 space-y-3">
+                    <h2 class="card-title">Send</h2>
+                    <BaseButton
+                        variant="success"
+                        size="lg"
+                        block-mobile
+                        :loading="sending"
+                        :disabled="sendableTotal === 0 || !selectedTemplateId"
+                        @click="sendBulk"
+                    >
+                        <template #icon><PaperAirplaneIcon class="icon-sm" aria-hidden="true" /></template>
+                        {{ sending ? 'Sending...' : `Send template to ${sendableTotal} recipient(s)` }}
+                    </BaseButton>
+                    <p
+                        v-if="sendResult"
+                        class="callout"
+                        :class="sendResult.failed ? 'callout-warning' : 'callout-success'"
+                        role="status"
+                        aria-live="polite"
+                    >{{ sendResult.message }}</p>
+                    <div v-if="sendResult?.failed_list?.length" class="callout callout-warning max-h-48 overflow-y-auto">
+                        <p class="font-semibold mb-2">Failures (showing up to {{ sendResult.failed_list.length }})</p>
+                        <ul class="text-xs space-y-1">
+                            <li v-for="(f, i) in sendResult.failed_list" :key="i">{{ f.name }} — {{ f.error }}</li>
+                        </ul>
+                    </div>
+                </section>
             </div>
         </template>
 
         <!-- Send by date -->
         <template v-if="activeTab === 'sendByDate'">
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200 space-y-6">
-                <h2 class="text-lg font-semibold text-slate-900">Send by Date</h2>
-                <p class="text-sm text-slate-600">Filter by customer/prospect creation date, then send an approved template to all matches with a phone/WhatsApp number.</p>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="p-4 sm:p-6">
+                <section class="card p-5 sm:p-6 space-y-5">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">From date</label>
-                        <input v-model="dateFilterFrom" type="date" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">To date</label>
-                        <input v-model="dateFilterTo" type="date" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Audience</label>
-                        <select v-model="dateFilterAudience" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="prospect">Prospects only</option>
-                            <option value="customer">Customers only</option>
-                            <option value="both">Both</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Search name (optional)</label>
-                        <input
-                            v-model="dateSearchQuery"
-                            type="search"
-                            placeholder="e.g. Smith"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                            @keydown.enter.prevent="applyDateFilter"
-                        />
-                    </div>
-                    <div class="flex items-end">
-                        <button
-                            type="button"
-                            :disabled="loadingDateContacts"
-                            class="w-full px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium"
-                            @click="applyDateFilter"
-                        >
-                            {{ loadingDateContacts ? 'Loading...' : 'Apply' }}
-                        </button>
-                    </div>
-                </div>
-                <p class="text-xs text-slate-500">Leave dates empty for all records (still scoped by audience).</p>
-
-                <div v-if="hasDateApplied" class="space-y-4">
-                    <div class="flex flex-wrap items-center gap-4">
-                        <p class="text-sm text-slate-700">
-                            <strong>{{ dateTotalContacts }}</strong> match;
-                            <strong class="text-emerald-700">{{ dateSendableTotal }}</strong> selected.
+                        <h2 class="card-title">Send by Date</h2>
+                        <p class="card-subtitle">
+                            Filter by customer/prospect creation date, then send an approved template to all matches with a phone/WhatsApp number.
                         </p>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Template</label>
-                            <select
-                                v-model="dateSelectedTemplateId"
-                                class="px-3 py-2 border border-slate-300 rounded-lg text-sm min-w-[200px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                @change="loadDatePreview"
+                    </div>
+
+                    <div v-if="loadingDateContacts" class="space-y-3" aria-busy="true">
+                        <span v-for="n in 5" :key="n" class="skeleton-text block w-full" />
+                    </div>
+
+                    <div v-else-if="hasDateApplied" class="space-y-4">
+                        <div class="flex flex-wrap items-end gap-4">
+                            <p class="text-sm text-slate-700">
+                                <strong>{{ dateTotalContacts }}</strong> match;
+                                <strong class="text-success-700">{{ dateSendableTotal }}</strong> selected.
+                            </p>
+                            <div class="min-w-[200px]">
+                                <label class="form-label" for="whatsappmanagementview-template">Template</label>
+                                <select
+                                    id="whatsappmanagementview-template"
+                                    v-model="dateSelectedTemplateId"
+                                    class="form-select"
+                                    @change="loadDatePreview"
+                                >
+                                    <option :value="null">Select template</option>
+                                    <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
+                                </select>
+                            </div>
+                            <BaseButton
+                                variant="success"
+                                block-mobile
+                                :loading="sendingByDate"
+                                :disabled="dateSendableTotal === 0 || !dateSelectedTemplateId"
+                                @click="sendByDate"
                             >
-                                <option :value="null">Select template</option>
-                                <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
-                            </select>
+                                <template #icon><PaperAirplaneIcon class="icon-sm" aria-hidden="true" /></template>
+                                {{ sendingByDate ? 'Sending...' : `Send to ${dateSendableTotal}` }}
+                            </BaseButton>
                         </div>
-                        <button
-                            type="button"
-                            :disabled="sendingByDate || dateSendableTotal === 0 || !dateSelectedTemplateId"
-                            class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium"
-                            @click="sendByDate"
-                        >
-                            {{ sendingByDate ? 'Sending...' : `Send to ${dateSendableTotal}` }}
-                        </button>
+
+                        <div class="flex flex-wrap gap-2">
+                            <BaseButton variant="ghost" @click="selectAllDateRecipientsOnPage">Select all on this page</BaseButton>
+                            <BaseButton variant="ghost" @click="deselectAllDateRecipientsOnPage">Uncheck all on this page</BaseButton>
+                            <BaseButton variant="ghost" @click="clearDateRecipientExclusions">Include everyone again</BaseButton>
+                        </div>
+
+                        <div class="table-wrap border border-slate-200 rounded-card max-h-56 overflow-y-auto">
+                            <table class="table" style="min-width: 280px">
+                                <caption class="sr-only">Recipients matching the selected date range</caption>
+                                <thead class="table-thead table-thead-sticky">
+                                    <tr>
+                                        <th scope="col" class="table-th w-10 text-center">
+                                            <span class="sr-only">Include recipient</span>
+                                        </th>
+                                        <th scope="col" class="table-th">Name</th>
+                                        <th scope="col" class="table-th">Phone</th>
+                                        <th scope="col" class="table-th">Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="c in dateContacts" :key="c.id" class="table-row">
+                                        <td class="table-td text-center">
+                                            <input
+                                                type="checkbox"
+                                                class="form-checkbox"
+                                                :aria-label="`Include ${c.name}`"
+                                                :checked="dateRecipientIncluded(c.id)"
+                                                @change="toggleDateRecipient(c.id, $event.target.checked)"
+                                            />
+                                        </td>
+                                        <td class="table-td">{{ c.name }}</td>
+                                        <td class="table-td font-mono text-xs">{{ c.display_phone }}</td>
+                                        <td class="table-td capitalize">{{ c.type }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <p
+                            v-if="datePreview.body_preview"
+                            class="card bg-slate-50 p-3 text-sm whitespace-pre-wrap"
+                        >{{ datePreview.body_preview }}</p>
+                        <p
+                            v-if="dateSendResult"
+                            class="callout"
+                            :class="dateSendResult.failed ? 'callout-warning' : 'callout-success'"
+                            role="status"
+                            aria-live="polite"
+                        >{{ dateSendResult.message }}</p>
                     </div>
-                    <div class="flex flex-wrap gap-2 text-sm">
-                        <button type="button" class="text-emerald-700 hover:text-emerald-900" @click="selectAllDateRecipientsOnPage">Select all on this page</button>
-                        <span class="text-slate-300">|</span>
-                        <button type="button" class="text-emerald-700 hover:text-emerald-900" @click="deselectAllDateRecipientsOnPage">Uncheck all on this page</button>
-                        <span class="text-slate-300">|</span>
-                        <button type="button" class="text-slate-600 hover:text-slate-900" @click="clearDateRecipientExclusions">Include everyone again</button>
-                    </div>
-                    <div class="border border-slate-200 rounded-lg overflow-hidden max-h-56 overflow-y-auto">
-                        <table class="w-full text-sm min-w-[280px]">
-                            <thead class="bg-slate-50 sticky top-0">
-                                <tr>
-                                    <th class="w-10 px-2 py-2 text-center">✓</th>
-                                    <th class="text-left px-3 py-2 font-medium text-slate-700">Name</th>
-                                    <th class="text-left px-3 py-2 font-medium text-slate-700">Phone</th>
-                                    <th class="text-left px-3 py-2 font-medium text-slate-700">Type</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="c in dateContacts" :key="c.id" class="border-t border-slate-100">
-                                    <td class="px-2 py-2 text-center">
-                                        <input
-                                            type="checkbox"
-                                            class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                                            :checked="dateRecipientIncluded(c.id)"
-                                            @change="toggleDateRecipient(c.id, $event.target.checked)"
-                                        />
-                                    </td>
-                                    <td class="px-3 py-2">{{ c.name }}</td>
-                                    <td class="px-3 py-2 font-mono text-xs">{{ c.display_phone }}</td>
-                                    <td class="px-3 py-2 capitalize">{{ c.type }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div v-if="datePreview.body_preview" class="border border-slate-200 rounded-lg p-3 text-sm bg-slate-50 whitespace-pre-wrap">{{ datePreview.body_preview }}</div>
-                    <p v-if="dateSendResult" class="text-sm" :class="dateSendResult.failed ? 'text-amber-600' : 'text-green-600'">{{ dateSendResult.message }}</p>
-                </div>
-                <div v-else class="text-slate-500 text-sm py-4">Click Apply to load recipients.</div>
+
+                    <EmptyState
+                        v-else
+                        heading="No recipients loaded yet"
+                        description="Pick a date range and audience above, then select “Apply” to load everyone who matches."
+                    >
+                        <template #icon><CalendarDaysIcon class="icon" aria-hidden="true" /></template>
+                    </EmptyState>
+                </section>
             </div>
         </template>
 
         <!-- Report -->
         <template v-if="activeTab === 'report'">
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <h2 class="text-lg font-semibold text-slate-900 mb-4">Sent WhatsApp (bulk) report</h2>
-                <p class="text-sm text-slate-600 mb-4">Logged sends from this screen (template messages). Filter by date.</p>
-                <div class="flex flex-wrap gap-3 mb-4 items-end">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">From</label>
-                        <input v-model="reportDateFrom" type="date" class="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">To</label>
-                        <input v-model="reportDateTo" type="date" class="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-                    </div>
-                    <button type="button" :disabled="loadingReport" class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 text-sm disabled:opacity-50" @click="loadReport">
-                        {{ loadingReport ? 'Loading...' : 'Apply' }}
-                    </button>
+            <div class="p-4 sm:p-6 space-y-5">
+                <div>
+                    <h2 class="card-title">Sent WhatsApp (bulk) report</h2>
+                    <p class="card-subtitle">Logged sends from this screen (template messages). Filter by date.</p>
                 </div>
-                <div v-if="reportSummary" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                    <div class="bg-slate-50 rounded-lg p-4">
-                        <div class="text-xs text-slate-500 uppercase">Total sent</div>
-                        <div class="text-xl font-semibold text-green-600">{{ reportSummary.total_sent }}</div>
-                    </div>
-                    <div class="bg-slate-50 rounded-lg p-4">
-                        <div class="text-xs text-slate-500 uppercase">Total failed</div>
-                        <div class="text-xl font-semibold text-red-600">{{ reportSummary.total_failed }}</div>
-                    </div>
+
+                <div v-if="reportSummary" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <StatCard
+                        label="Total sent"
+                        :value="reportSummary.total_sent"
+                        caption="Delivered to Meta in this period"
+                        tone="success"
+                    >
+                        <template #icon><PaperAirplaneIcon class="icon" aria-hidden="true" /></template>
+                    </StatCard>
+                    <StatCard
+                        label="Total failed"
+                        :value="reportSummary.total_failed"
+                        caption="Rejected or errored in this period"
+                        tone="danger"
+                    >
+                        <template #icon><ExclamationTriangleIcon class="icon" aria-hidden="true" /></template>
+                    </StatCard>
                 </div>
-                <div v-if="loadingReport" class="text-sm text-slate-500 py-4">Loading…</div>
-                <div v-else-if="reportData.length === 0" class="text-sm text-slate-500 py-4">No records in this period.</div>
-                <div v-else>
-                    <div class="border border-slate-200 rounded-lg overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-slate-50">
+
+                <div v-if="loadingReport" class="space-y-3" aria-busy="true">
+                    <span v-for="n in 6" :key="n" class="skeleton-text block w-full" />
+                </div>
+
+                <EmptyState
+                    v-else-if="reportData.length === 0"
+                    heading="No records in this period"
+                    description="Nothing was sent from this screen between those dates — widen the range or clear the filters above."
+                >
+                    <template #icon><DocumentTextIcon class="icon" aria-hidden="true" /></template>
+                </EmptyState>
+
+                <div v-else class="card overflow-hidden">
+                    <div class="table-wrap">
+                        <table class="table" style="min-width: 720px">
+                            <caption class="sr-only">Bulk WhatsApp messages sent in the selected period</caption>
+                            <thead class="table-thead">
                                 <tr>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Recipient</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Phone</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Template</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Status</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Sent at</th>
-                                    <th class="text-left px-4 py-2 font-medium text-slate-700">Sent by</th>
+                                    <th scope="col" class="table-th">Recipient</th>
+                                    <th scope="col" class="table-th">Phone</th>
+                                    <th scope="col" class="table-th">Template</th>
+                                    <th scope="col" class="table-th">Status</th>
+                                    <th scope="col" class="table-th">Sent at</th>
+                                    <th scope="col" class="table-th">Sent by</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="row in reportData" :key="row.id" class="border-t border-slate-100 hover:bg-slate-50">
-                                    <td class="px-4 py-2">{{ row.recipient_name }}</td>
-                                    <td class="px-4 py-2 font-mono text-xs">{{ row.recipient_phone }}</td>
-                                    <td class="px-4 py-2">{{ row.template_name }}</td>
-                                    <td class="px-4 py-2">
-                                        <span :class="row.status === 'sent' ? 'text-green-600' : 'text-red-600'">{{ formatCommLogStatus(row.status) }}</span>
-                                        <span v-if="row.error_message" class="block text-xs text-slate-500 truncate max-w-[220px]" :title="row.error_message">{{ row.error_message }}</span>
+                                <tr v-for="row in reportData" :key="row.id" class="table-row">
+                                    <td class="table-td">{{ row.recipient_name }}</td>
+                                    <td class="table-td font-mono text-xs">{{ row.recipient_phone }}</td>
+                                    <td class="table-td">{{ row.template_name }}</td>
+                                    <td class="table-td">
+                                        <BaseBadge :tone="row.status === 'sent' ? 'success' : 'danger'">
+                                            {{ formatCommLogStatus(row.status) }}
+                                        </BaseBadge>
+                                        <span
+                                            v-if="row.error_message"
+                                            class="block text-xs text-slate-500 truncate max-w-[220px]"
+                                            :title="row.error_message"
+                                        >{{ row.error_message }}</span>
                                     </td>
-                                    <td class="px-4 py-2 text-slate-600">{{ formatDate(row.sent_at) }}</td>
-                                    <td class="px-4 py-2 text-slate-600">{{ row.sent_by_name || '—' }}</td>
+                                    <td class="table-td">{{ formatDate(row.sent_at) }}</td>
+                                    <td class="table-td">{{ row.sent_by_name || '—' }}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                    <div v-if="reportLastPage > 1" class="flex items-center gap-2 mt-4 text-sm">
-                        <button type="button" class="px-2 py-1 border border-slate-300 rounded disabled:opacity-50" :disabled="reportPage <= 1" @click="goToReportPage(reportPage - 1)">Previous</button>
-                        <span class="text-slate-600">Page {{ reportPage }} of {{ reportLastPage }}</span>
-                        <button type="button" class="px-2 py-1 border border-slate-300 rounded disabled:opacity-50" :disabled="reportPage >= reportLastPage" @click="goToReportPage(reportPage + 1)">Next</button>
-                    </div>
                 </div>
             </div>
         </template>
-    </div>
+
+        <template #pagination>
+            <Pagination
+                v-if="activeTab === 'send' && hasApplied"
+                :pagination="contactsPagination"
+                embedded
+                result-label="recipients"
+                singular-label="recipient"
+                @page-change="goToContactsPage"
+            />
+            <div
+                v-else-if="activeTab === 'report' && reportLastPage > 1"
+                class="flex flex-wrap items-center gap-3 px-5 sm:px-6 py-3.5 bg-slate-50/40"
+            >
+                <BaseButton variant="outline" :disabled="reportPage <= 1" @click="goToReportPage(reportPage - 1)">
+                    <template #icon><ChevronLeftIcon class="icon-sm" aria-hidden="true" /></template>
+                    Previous
+                </BaseButton>
+                <span class="text-sm text-slate-600">Page {{ reportPage }} of {{ reportLastPage }}</span>
+                <BaseButton
+                    variant="outline"
+                    :disabled="reportPage >= reportLastPage"
+                    @click="goToReportPage(reportPage + 1)"
+                >
+                    <template #icon><ChevronRightIcon class="icon-sm" aria-hidden="true" /></template>
+                    Next
+                </BaseButton>
+            </div>
+        </template>
+    </ListingPageShell>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
+import {
+    ArrowDownTrayIcon,
+    CalendarDaysIcon,
+    ChatBubbleLeftRightIcon,
+    CheckCircleIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    Cog6ToothIcon,
+    DocumentTextIcon,
+    ExclamationTriangleIcon,
+    FunnelIcon,
+    MagnifyingGlassIcon,
+    PaperAirplaneIcon,
+    PlusIcon,
+    TrashIcon,
+    UsersIcon,
+} from '@heroicons/vue/24/outline';
 import { formatCommLogStatus } from '@/utils/displayFormat';
 import { formatDateTimeUsDisplay } from '@/utils/dateFormatUi';
+import Pagination from '@/components/Pagination.vue';
+import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseBadge, BaseButton, EmptyState, StatCard } from '@/components/base';
 
 const activeTab = ref('send');
 const audience = ref('both');
@@ -463,6 +704,18 @@ const sendableTotal = computed(() =>
 const dateSendableTotal = computed(() =>
     Math.max(0, dateTotalContacts.value - new Set(dateExcludedRecipientIds.value).size)
 );
+
+const whatsappBadge = computed(() =>
+    hasApplied.value && totalContacts.value ? `${totalContacts.value} Total` : null,
+);
+
+/** Shape the existing contact paging refs into what <Pagination> expects. */
+const contactsPagination = computed(() => ({
+    current_page: contactsPage.value,
+    last_page: contactsLastPage.value,
+    per_page: contactsPerPage.value,
+    total: totalContacts.value,
+}));
 
 function recipientIncluded(id) {
     return !excludedRecipientIds.value.includes(id);
@@ -524,15 +777,6 @@ function buildSendPayload() {
         ...buildPayload(),
         ...(ex.length ? { exclude_customer_ids: ex } : {}),
     };
-}
-
-function tabClass(id) {
-    return [
-        'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0',
-        activeTab.value === id
-            ? 'bg-white border border-b-0 border-slate-200 text-slate-900'
-            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
-    ];
 }
 
 function addFilter() {

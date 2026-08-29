@@ -3,7 +3,7 @@
         <!-- Welcome -->
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
             <div class="min-w-0">
-                <h1 class="text-xl font-semibold text-slate-900 tracking-tight sm:text-2xl md:text-3xl break-words">
+                <h1 class="text-page-title text-slate-900 sm:text-2xl md:text-3xl break-words">
                     Welcome back, {{ welcomeName }}
                 </h1>
                 <p class="text-xs text-slate-500 mt-1.5 sm:text-sm leading-relaxed">
@@ -12,67 +12,68 @@
             </div>
         </div>
 
-        <div
-            v-if="isSelfDashboardScope"
-            class="rounded-xl border border-sky-200 bg-sky-50/80 px-3 py-2.5 text-xs text-sky-900 leading-relaxed sm:px-4 sm:py-3 sm:text-sm"
-        >
+        <p v-if="isSelfDashboardScope" class="callout callout-info">
             You’re viewing <strong>your</strong> opportunities, customers, and activity. Admins and managers see the full organization on this screen.
-        </div>
+        </p>
 
         <!-- Date range (+ org user filter): compact on mobile, full row on desktop -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="card overflow-hidden">
             <button
                 type="button"
+                aria-controls="dashboard-filters-panel"
+                :aria-expanded="filtersOpen ? 'true' : 'false'"
+                class="md:hidden w-full min-h-12 flex items-center justify-between px-4 py-3 text-left text-slate-700 hover:bg-slate-50 transition-colors touch-manipulation active:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
                 @click="filtersOpen = !filtersOpen"
-                class="md:hidden w-full min-h-12 flex items-center justify-between px-4 py-3 text-left text-slate-700 hover:bg-slate-50 transition-colors touch-manipulation active:bg-slate-50"
             >
                 <span class="flex items-center gap-2">
-                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                    </svg>
+                    <FunnelIcon class="icon text-slate-500" aria-hidden="true" />
                     <span class="font-medium text-sm">Date range</span>
-                    <span v-if="activeFilterCount" class="px-2 py-0.5 bg-slate-900 text-white text-xs rounded-full">{{ activeFilterCount }}</span>
+                    <span v-if="activeFilterCount" class="badge-count">{{ activeFilterCount }}</span>
                 </span>
-                <span class="text-slate-400" :class="filtersOpen ? 'rotate-180' : ''">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                </span>
+                <ChevronDownIcon
+                    class="icon text-slate-500 transition-transform"
+                    :class="filtersOpen ? 'rotate-180' : ''"
+                    aria-hidden="true"
+                />
             </button>
-            <div :class="['md:block', filtersOpen ? 'block' : 'hidden']">
-                <div class="p-4 pt-0 md:pt-4 border-t md:border-t-0 border-slate-100">
-                    <p class="text-xs font-medium text-slate-500 mb-2">Quick range</p>
-                    <div class="flex flex-wrap gap-2 mb-4">
-                        <button type="button" :class="presetButtonClass('today')" @click="selectDatePreset('today')">Today</button>
-                        <button type="button" :class="presetButtonClass('2d')" @click="selectDatePreset('2d')">Last 2 days</button>
-                        <button type="button" :class="presetButtonClass('7d')" @click="selectDatePreset('7d')">Last 7 days</button>
-                        <button type="button" :class="presetButtonClass('last_week')" @click="selectDatePreset('last_week')">Last week</button>
-                        <button type="button" :class="presetButtonClass('week')" @click="selectDatePreset('week')">This week</button>
-                        <button type="button" :class="presetButtonClass('month')" @click="selectDatePreset('month')">This month</button>
-                        <button type="button" :class="presetButtonClass('30d')" @click="selectDatePreset('30d')">Last 30 days</button>
+            <div id="dashboard-filters-panel" :class="['md:block', filtersOpen ? 'block' : 'hidden']">
+                <div class="p-4 pt-0 md:pt-4 border-t md:border-t-0 border-slate-200">
+                    <p id="dashboard-quick-range-label" class="text-xs font-medium text-slate-500 mb-2">Quick range</p>
+                    <div class="flex flex-wrap gap-2 mb-4" role="group" aria-labelledby="dashboard-quick-range-label">
+                        <BaseButton
+                            v-for="preset in DATE_PRESETS"
+                            :key="preset.key"
+                            :variant="dateRangePreset === preset.key ? 'primary' : 'outline'"
+                            :aria-pressed="dateRangePreset === preset.key ? 'true' : 'false'"
+                            @click="selectDatePreset(preset.key)"
+                        >
+                            {{ preset.label }}
+                        </BaseButton>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 lg:gap-4 lg:items-end">
                         <div class="sm:col-span-1 lg:col-span-3">
-                            <label class="block text-xs font-medium text-slate-500 mb-1">From</label>
-                            <input
+                            <label class="form-label" for="dashboardview-from">From</label>
+                            <input id="dashboardview-from"
                                 v-model="filters.from"
                                 type="date"
-                                class="w-full min-h-11 px-3 py-2 border border-slate-300 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                class="form-input"
                                 @change="onDashboardDateManualChange"
                             />
                         </div>
                         <div class="sm:col-span-1 lg:col-span-3">
-                            <label class="block text-xs font-medium text-slate-500 mb-1">To</label>
-                            <input
+                            <label class="form-label" for="dashboardview-to">To</label>
+                            <input id="dashboardview-to"
                                 v-model="filters.to"
                                 type="date"
-                                class="w-full min-h-11 px-3 py-2 border border-slate-300 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                class="form-input"
                                 @change="onDashboardDateManualChange"
                             />
                         </div>
                         <div v-if="canUseOrgDashboardFilters" class="sm:col-span-1 lg:col-span-3">
-                            <label class="block text-xs font-medium text-slate-500 mb-1">User</label>
-                            <select
+                            <label class="form-label" for="dashboardview-user">User</label>
+                            <select id="dashboardview-user"
                                 v-model="filters.employee_id"
-                                class="w-full min-h-11 px-3 py-2 border border-slate-200 rounded-xl text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50"
+                                class="form-select"
                             >
                                 <option value="">All users</option>
                                 <option v-for="emp in employees" :key="emp.id" :value="emp.id">
@@ -81,34 +82,30 @@
                             </select>
                         </div>
                         <div class="flex flex-col sm:flex-row gap-2 sm:col-span-2" :class="canUseOrgDashboardFilters ? 'lg:col-span-3' : 'lg:col-span-6'">
-                            <button
+                            <BaseButton
+                                variant="primary"
+                                block-mobile
+                                class="flex-1 order-2 sm:order-1"
+                                :loading="loading"
                                 @click="loadDashboard"
-                                :disabled="loading"
-                                class="flex-1 min-h-11 px-4 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50 inline-flex items-center justify-center gap-2 order-2 sm:order-1 touch-manipulation"
                             >
-                                <svg v-if="loading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
                                 {{ loading ? 'Applying...' : 'Apply' }}
-                            </button>
-                            <button
+                            </BaseButton>
+                            <BaseButton
+                                variant="outline"
+                                block-mobile
+                                class="order-1 sm:order-2"
                                 @click="resetFilters"
-                                class="min-h-11 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 order-1 sm:order-2 touch-manipulation"
                             >
                                 Reset
-                            </button>
+                            </BaseButton>
                         </div>
                     </div>
-                    <div v-if="filters.from || filters.to || filters.employee_id" class="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
+                    <div v-if="filters.from || filters.to || filters.employee_id" class="mt-3 pt-3 border-t border-slate-200 flex flex-wrap items-center gap-2">
                         <span class="text-xs text-slate-500">Active:</span>
-                        <span v-if="filters.from" class="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs">
-                            From {{ formatFilterDate(filters.from) }}
-                        </span>
-                        <span v-if="filters.to" class="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs">
-                            To {{ formatFilterDate(filters.to) }}
-                        </span>
-                        <span v-if="filters.employee_id" class="inline-flex items-center px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs">
+                        <span v-if="filters.from" class="chip">From {{ formatFilterDate(filters.from) }}</span>
+                        <span v-if="filters.to" class="chip">To {{ formatFilterDate(filters.to) }}</span>
+                        <span v-if="filters.employee_id" class="chip">
                             {{ employees.find(e => e.id == filters.employee_id)?.name }}
                         </span>
                     </div>
@@ -118,122 +115,103 @@
 
         <!-- Main KPIs: total leads, won products, active, win rate -->
         <div class="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div
-                class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 cursor-pointer hover:shadow-md transition-shadow min-w-0"
-                @click="goToTotalLeadsListing"
+            <StatCard
+                label="Total leads"
+                :value="dashboardData.total_leads_all ?? 0"
+                :caption="`All stages · ${filterPeriodLabel}`"
+                tone="neutral"
+                :to="totalLeadsRoute"
             >
-                <div class="flex items-start justify-between gap-2 sm:gap-3">
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide sm:text-xs">Total leads</p>
-                        <p class="text-2xl font-semibold text-slate-900 tabular-nums mt-1 sm:text-3xl">{{ dashboardData.total_leads_all ?? 0 }}</p>
-                        <p class="text-xs text-slate-400 mt-2 line-clamp-2">All stages · {{ filterPeriodLabel }}</p>
-                    </div>
-                    <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 sm:w-11 sm:h-11">
-                        <svg class="w-5 h-5 text-slate-700 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    </div>
-                </div>
-            </div>
+                <template #icon>
+                    <DocumentTextIcon class="icon" aria-hidden="true" />
+                </template>
+            </StatCard>
 
-            <div
-                class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 cursor-pointer hover:shadow-md transition-shadow min-w-0"
-                @click="goToLeadsListing('won')"
+            <StatCard
+                label="Won products"
+                :value="dashboardData.won_product_units ?? 0"
+                :caption="wonProductsCaption"
+                tone="success"
+                :to="wonLeadsRoute"
             >
-                <div class="flex items-start justify-between gap-2 sm:gap-3">
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide sm:text-xs">Won products</p>
-                        <p class="text-2xl font-semibold text-slate-900 tabular-nums mt-1 sm:text-3xl">{{ dashboardData.won_product_units ?? 0 }}</p>
-                        <p class="text-xs text-slate-400 mt-2 line-clamp-2">
-                            Units on won line items
-                            <span v-if="(dashboardData.won_product_lines || 0) > 0" class="tabular-nums"> · {{ dashboardData.won_product_lines }} line(s)</span>
-                        </p>
-                    </div>
-                    <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0 sm:w-11 sm:h-11">
-                        <svg class="w-5 h-5 text-emerald-700 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </div>
-                </div>
-            </div>
+                <template #icon>
+                    <CheckCircleIcon class="icon" aria-hidden="true" />
+                </template>
+            </StatCard>
 
-            <div
-                class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 cursor-pointer hover:shadow-md transition-shadow min-w-0"
-                @click="router.push({ path: '/leads/pipeline' })"
+            <StatCard
+                label="Active opportunities"
+                :value="dashboardData.total_leads || 0"
+                :caption="`Open stages · ${filterPeriodLabel}`"
+                tone="primary"
+                to="/leads/pipeline"
             >
-                <div class="flex items-start justify-between gap-2 sm:gap-3">
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide sm:text-xs">Active opportunities</p>
-                        <p class="text-2xl font-semibold text-slate-900 tabular-nums mt-1 sm:text-3xl">{{ dashboardData.total_leads || 0 }}</p>
-                        <p class="text-xs text-slate-400 mt-2 line-clamp-2">Open stages · {{ filterPeriodLabel }}</p>
-                    </div>
-                    <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0 sm:w-11 sm:h-11">
-                        <svg class="w-5 h-5 text-indigo-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                    </div>
-                </div>
-            </div>
+                <template #icon>
+                    <UsersIcon class="icon" aria-hidden="true" />
+                </template>
+            </StatCard>
 
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 min-w-0">
-                <div class="flex items-start justify-between gap-2 sm:gap-3">
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide sm:text-xs">Win rate</p>
-                        <p class="text-2xl font-semibold text-slate-900 tabular-nums mt-1 sm:text-3xl">{{ dashboardData.conversion_rate || 0 }}%</p>
-                        <p class="text-xs text-slate-400 mt-2">Won / total</p>
-                    </div>
-                    <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 sm:w-11 sm:h-11">
-                        <svg class="w-5 h-5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                        </svg>
-                    </div>
-                </div>
-            </div>
+            <StatCard
+                label="Win rate"
+                :value="`${dashboardData.conversion_rate || 0}%`"
+                caption="Won / total"
+                tone="warning"
+            >
+                <template #icon>
+                    <ArrowTrendingUpIcon class="icon" aria-hidden="true" />
+                </template>
+            </StatCard>
         </div>
 
         <!-- Tickets by status (same date range and assignee as filters) -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <button
-                type="button"
-                class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 text-left cursor-pointer hover:shadow-md hover:border-amber-200/80 transition-all min-w-0 w-full touch-manipulation"
-                @click="goToTicketsListing('open')"
+            <StatCard
+                label="Open tickets"
+                :value="ticketStatusCounts.open"
+                :caption="filterPeriodLabel"
+                tone="warning"
+                :to="{ path: '/tickets', query: ticketsListingQuery('open') }"
             >
-                <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide sm:text-xs">Open tickets</p>
-                <p class="text-2xl font-semibold text-slate-900 tabular-nums mt-1 sm:text-3xl">{{ ticketStatusCounts.open }}</p>
-                <p class="text-xs text-slate-400 mt-2 line-clamp-2">{{ filterPeriodLabel }}</p>
-            </button>
-            <button
-                type="button"
-                class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 text-left cursor-pointer hover:shadow-md hover:border-blue-200/80 transition-all min-w-0 w-full touch-manipulation"
-                @click="goToTicketsListing('in_progress')"
+                <template #icon>
+                    <TicketIcon class="icon" aria-hidden="true" />
+                </template>
+            </StatCard>
+            <StatCard
+                label="Working"
+                :value="ticketStatusCounts.in_progress"
+                :caption="`In progress · ${filterPeriodLabel}`"
+                tone="primary"
+                :to="{ path: '/tickets', query: ticketsListingQuery('in_progress') }"
             >
-                <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide sm:text-xs">Working</p>
-                <p class="text-2xl font-semibold text-slate-900 tabular-nums mt-1 sm:text-3xl">{{ ticketStatusCounts.in_progress }}</p>
-                <p class="text-xs text-slate-400 mt-2 line-clamp-2">In progress · {{ filterPeriodLabel }}</p>
-            </button>
-            <button
-                type="button"
-                class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 text-left cursor-pointer hover:shadow-md hover:border-slate-300 transition-all min-w-0 w-full touch-manipulation"
-                @click="goToTicketsListing('closed')"
+                <template #icon>
+                    <ClockIcon class="icon" aria-hidden="true" />
+                </template>
+            </StatCard>
+            <StatCard
+                label="Closed"
+                :value="ticketStatusCounts.closed"
+                :caption="filterPeriodLabel"
+                tone="neutral"
+                :to="{ path: '/tickets', query: ticketsListingQuery('closed') }"
             >
-                <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide sm:text-xs">Closed</p>
-                <p class="text-2xl font-semibold text-slate-900 tabular-nums mt-1 sm:text-3xl">{{ ticketStatusCounts.closed }}</p>
-                <p class="text-xs text-slate-400 mt-2 line-clamp-2">{{ filterPeriodLabel }}</p>
-            </button>
+                <template #icon>
+                    <CheckIcon class="icon" aria-hidden="true" />
+                </template>
+            </StatCard>
         </div>
 
         <!-- Performer of the month + their targets (always shown; calendar month from reporting API) -->
-        <div class="min-w-0 rounded-2xl border border-amber-100 bg-gradient-to-r from-amber-50 via-white to-emerald-50 p-4 shadow-sm sm:p-5 md:p-6">
+        <section class="card min-w-0 border-warning-200 bg-gradient-to-r from-warning-50 via-white to-success-50 p-4 sm:p-5 md:p-6">
             <template v-if="monthlyTopPerformer">
                 <div class="flex min-w-0 flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div class="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
-                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-500 text-base font-bold text-white sm:h-12 sm:w-12 sm:text-lg">
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-warning-500 text-base font-bold text-white sm:h-12 sm:w-12 sm:text-lg" aria-hidden="true">
                             1
-                        </div>
+                        </span>
                         <div class="min-w-0 flex-1">
-                            <div class="mb-2 inline-flex max-w-full flex-wrap items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-semibold text-amber-800 sm:gap-2 sm:px-3 sm:text-xs">
+                            <h2 class="mb-2 inline-flex max-w-full flex-wrap items-center gap-1 rounded-full bg-warning-100 px-2.5 py-1 text-[10px] font-semibold text-warning-800 sm:gap-2 sm:px-3 sm:text-xs">
                                 {{ isSelfDashboardScope ? 'Your performance this month' : 'Top performer of the month' }}
-                            </div>
+                            </h2>
                             <div class="text-lg font-bold text-slate-900 break-words sm:text-xl">{{ monthlyTopPerformer.name }}</div>
                             <div class="text-sm text-slate-600">
                                 {{ monthlyTopPerformer.leads_count || 0 }} leads •
@@ -242,44 +220,44 @@
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-center w-full md:max-w-md md:ml-auto">
-                        <div class="px-3 py-2 bg-white rounded-lg border border-slate-100 min-w-0">
+                        <div class="px-3 py-2 bg-white rounded-control border border-slate-200 min-w-0">
                             <div class="text-xs text-slate-500">Revenue</div>
-                            <div class="text-sm font-bold text-emerald-600 break-words">£{{ formatNumber(monthlyTopPerformer.revenue || 0) }}</div>
+                            <div class="text-sm font-bold text-success-700 tabular-nums break-words">£{{ formatNumber(monthlyTopPerformer.revenue || 0) }}</div>
                         </div>
-                        <div class="px-3 py-2 bg-white rounded-lg border border-slate-100">
+                        <div class="px-3 py-2 bg-white rounded-control border border-slate-200">
                             <div class="text-xs text-slate-500">Sales won</div>
-                            <div class="text-sm font-bold text-slate-900">{{ monthlyTopPerformer.won_products || monthlyTopPerformer.won_count || 0 }}</div>
+                            <div class="text-sm font-bold text-slate-900 tabular-nums">{{ monthlyTopPerformer.won_products || monthlyTopPerformer.won_count || 0 }}</div>
                         </div>
-                        <div class="px-3 py-2 bg-white rounded-lg border border-slate-100">
+                        <div class="px-3 py-2 bg-white rounded-control border border-slate-200">
                             <div class="text-xs text-slate-500">Conversion</div>
-                            <div class="text-sm font-bold text-slate-900">{{ monthlyTopPerformer.conversion_rate || 0 }}%</div>
+                            <div class="text-sm font-bold text-slate-900 tabular-nums">{{ monthlyTopPerformer.conversion_rate || 0 }}%</div>
                         </div>
                     </div>
                 </div>
-                <div class="mt-5 pt-5 border-t border-amber-100/80">
-                    <h4 class="text-sm font-semibold text-slate-800 mb-3">Their targets (this month)</h4>
+                <div class="mt-5 pt-5 border-t border-warning-200">
+                    <h3 class="text-sm font-semibold text-slate-800 mb-3">Their targets (this month)</h3>
                     <div v-if="performerMonthTarget" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div class="rounded-xl bg-white/80 border border-slate-100 p-3">
+                        <div class="rounded-card bg-white/80 border border-slate-200 p-3">
                             <div class="text-xs text-slate-500">Appointments</div>
                             <div class="text-sm font-semibold text-slate-900 tabular-nums">
                                 {{ performerMonthTarget.achieved_appointments }} / {{ performerMonthTarget.target_appointments || 0 }}
                             </div>
-                            <div class="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                            <div class="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden" aria-hidden="true">
                                 <div
-                                    class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
+                                    class="h-full rounded-full bg-success-600"
                                     :style="{ width: `${performerMonthTarget.appointment_progress}%` }"
                                 />
                             </div>
                         </div>
-                        <div class="rounded-xl bg-white/80 border border-slate-100 p-3">
+                        <div class="rounded-card bg-white/80 border border-slate-200 p-3">
                             <div class="text-xs text-slate-500">Sales</div>
                             <div class="text-sm font-semibold text-slate-900 tabular-nums">
                                 {{ performerMonthTarget.achieved_sales }} / {{ performerMonthTarget.target_sales || 0 }}
                             </div>
                         </div>
-                        <div class="rounded-xl bg-white/80 border border-slate-100 p-3">
+                        <div class="rounded-card bg-white/80 border border-slate-200 p-3">
                             <div class="text-xs text-slate-500">Won value vs target</div>
-                            <div class="text-sm font-semibold text-slate-900 break-words">
+                            <div class="text-sm font-semibold text-slate-900 tabular-nums break-words">
                                 £{{ formatNumber(performerMonthTarget.achieved_revenue) }}
                                 <span v-if="num(performerMonthTarget.target_revenue) > 0" class="text-slate-500 font-normal">
                                     / £{{ formatNumber(performerMonthTarget.target_revenue) }}
@@ -287,7 +265,7 @@
                             </div>
                         </div>
                     </div>
-                    <div v-else class="text-sm text-slate-600 rounded-xl bg-white/60 border border-slate-100 p-4">
+                    <div v-else class="text-sm text-slate-600 rounded-card bg-white/60 border border-slate-200 p-4">
                         <p class="font-medium text-slate-800">No formal targets set</p>
                         <p class="text-xs text-slate-500 mt-1">
                             Activity this month: {{ monthlyTopPerformer.appointments_count || 0 }} appointments logged.
@@ -295,86 +273,92 @@
                     </div>
                 </div>
             </template>
-            <div v-else class="text-center py-6 text-slate-600">
-                <p class="font-medium text-slate-800">No performer data for this month</p>
-                <p class="text-sm text-slate-500 mt-1">There are no active sales users with activity in the selected scope yet.</p>
-            </div>
-        </div>
+            <EmptyState
+                v-else
+                heading="No performer data for this month"
+                description="There are no active sales users with activity in the selected scope yet."
+            >
+                <template #icon>
+                    <TrophyIcon class="icon" aria-hidden="true" />
+                </template>
+            </EmptyState>
+        </section>
 
         <!-- Attendance Clock for non-admin -->
         <AttendanceClock />
 
         <!-- Attendance: hours per day (only users who checked in) -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 md:p-6 min-w-0">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-4">
-                <div class="min-w-0">
-                    <h3 class="text-sm font-semibold text-slate-900">Attendance by day</h3>
-                    <p class="text-xs text-slate-500 mt-1 leading-relaxed">
-                        Check-in / check-out times and hours worked. Only staff who recorded attendance in the range appear.
-                        Hover a bar for times.
-                    </p>
+        <BaseCard
+            title="Attendance by day"
+            subtitle="Check-in / check-out times and hours worked. Only staff who recorded attendance in the range appear. Hover a bar for times."
+        >
+            <template #actions>
+                <BaseButton
+                    :variant="attendancePreset === '3d' ? 'primary' : 'outline'"
+                    :aria-pressed="attendancePreset === '3d' ? 'true' : 'false'"
+                    @click="attendancePreset = '3d'"
+                >
+                    Last 3 days
+                </BaseButton>
+                <BaseButton
+                    :variant="attendancePreset === '7d' ? 'primary' : 'outline'"
+                    :aria-pressed="attendancePreset === '7d' ? 'true' : 'false'"
+                    @click="attendancePreset = '7d'"
+                >
+                    Last 7 days
+                </BaseButton>
+                <BaseButton
+                    :variant="attendancePreset === 'month' ? 'primary' : 'outline'"
+                    :aria-pressed="attendancePreset === 'month' ? 'true' : 'false'"
+                    @click="attendancePreset = 'month'"
+                >
+                    This month
+                </BaseButton>
+            </template>
+
+            <div :aria-busy="attendanceChartLoading ? 'true' : 'false'">
+                <div
+                    v-if="attendanceChartLoading"
+                    class="flex items-center justify-center min-h-[200px] text-slate-500 text-sm"
+                    role="status"
+                    aria-live="polite"
+                >
+                    Loading chart…
                 </div>
-                <div class="flex flex-wrap gap-2 shrink-0">
-                    <button
-                        type="button"
-                        :class="attendancePreset === '3d' ? attendancePresetActiveClass : attendancePresetIdleClass"
-                        @click="attendancePreset = '3d'"
-                    >
-                        Last 3 days
-                    </button>
-                    <button
-                        type="button"
-                        :class="attendancePreset === '7d' ? attendancePresetActiveClass : attendancePresetIdleClass"
-                        @click="attendancePreset = '7d'"
-                    >
-                        Last 7 days
-                    </button>
-                    <button
-                        type="button"
-                        :class="attendancePreset === 'month' ? attendancePresetActiveClass : attendancePresetIdleClass"
-                        @click="attendancePreset = 'month'"
-                    >
-                        This month
-                    </button>
+                <div v-else class="overflow-x-auto min-w-0 -mx-1 px-1 sm:mx-0 sm:px-0">
+                    <!-- The canvas below is invisible to a screen reader; this states the same figures in words. -->
+                    <p class="sr-only">{{ attendanceChartSummary }}</p>
+                    <div :class="attendancePreset === 'month' ? 'min-w-[min(100%,720px)] sm:min-w-[860px]' : ''">
+                        <AttendanceWorkHoursChart :payload="attendanceChartPayload" />
+                    </div>
                 </div>
             </div>
-            <div v-if="attendanceChartLoading" class="flex items-center justify-center min-h-[200px] text-slate-500 text-sm">
-                Loading chart…
-            </div>
-            <div v-else class="overflow-x-auto min-w-0 -mx-1 px-1 sm:mx-0 sm:px-0">
-                <div :class="attendancePreset === 'month' ? 'min-w-[min(100%,720px)] sm:min-w-[860px]' : ''">
-                    <AttendanceWorkHoursChart :payload="attendanceChartPayload" />
-                </div>
-            </div>
-        </div>
+        </BaseCard>
 
         <!-- Today's Follow-ups & appointments -->
         <div class="space-y-6">
             <!-- Today's Follow-ups -->
-            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
-                    <h3 class="text-base sm:text-lg font-semibold text-slate-900">📅 Today's Follow-ups</h3>
-                    <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium shrink-0 self-start sm:self-auto">
-                        {{ todayFollowUps.length }}
-                    </span>
-                </div>
-                <div v-if="todayFollowUps.length === 0" class="text-center py-8 text-slate-400">
-                    <svg class="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    No follow-ups scheduled for today
-                </div>
+            <BaseCard title="Today's Follow-ups">
+                <template #actions>
+                    <BaseBadge tone="primary">{{ todayFollowUps.length }} due today</BaseBadge>
+                </template>
+
+                <EmptyState v-if="todayFollowUps.length === 0" heading="No follow-ups scheduled for today">
+                    <template #icon>
+                        <CalendarDaysIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
                 <div v-else class="space-y-3 max-h-80 overflow-y-auto">
                     <div
                         v-for="followUp in todayFollowUps"
                         :key="followUp.id"
-                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors group"
+                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-50 rounded-card hover:bg-slate-100 transition-colors group"
                     >
                         <div class="flex-1 min-w-0">
                             <router-link
                                 v-if="followUp.customer_id"
                                 :to="`/customers/${followUp.customer_id}`"
-                                class="font-medium text-slate-900 text-blue-600 hover:text-blue-800 hover:underline break-words"
+                                class="link break-words"
                             >
                                 {{ followUp.customer?.name || 'Customer' }}
                             </router-link>
@@ -382,55 +366,57 @@
                                 {{ followUp.customer?.name || 'Customer' }}
                             </div>
                             <div class="text-xs text-slate-500">
-                                {{ followUp.assignee?.name || 'Unassigned' }} • 
+                                {{ followUp.assignee?.name || 'Unassigned' }} •
                                 {{ formatTime(followUp.next_follow_up_at) }}
                             </div>
                         </div>
                         <div class="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
-                            <button
+                            <BaseButton
+                                variant="success"
+                                class="flex-1 sm:flex-none sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity"
                                 @click="openActivityModal(followUp)"
-                                class="min-h-10 flex-1 rounded-md bg-green-600 px-3 py-2 text-xs font-medium text-white opacity-100 transition-opacity hover:bg-green-700 touch-manipulation sm:flex-none sm:px-2 sm:py-1.5 sm:opacity-0 sm:group-hover:opacity-100"
                             >
                                 Log
-                            </button>
-                            <router-link
+                            </BaseButton>
+                            <BaseButton
                                 v-if="followUp.customer_id"
+                                variant="primary"
+                                class="flex-1 sm:flex-none"
                                 :to="`/customers/${followUp.customer_id}`"
-                                class="flex min-h-10 flex-1 items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 touch-manipulation sm:min-h-0 sm:flex-none sm:px-2 sm:py-1.5"
                             >
                                 View
-                            </router-link>
+                            </BaseButton>
                         </div>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- Today's Appointments -->
-            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 min-w-0">
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
-                    <h3 class="text-base sm:text-lg font-semibold text-slate-900">📆 Today's Appointments</h3>
-                    <span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium shrink-0 self-start sm:self-auto">
-                        {{ todayAppointments.length }}
-                    </span>
-                </div>
-                <div v-if="todayAppointments.length === 0" class="text-center py-8 text-slate-400">
-                    <svg class="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p class="text-sm font-medium text-slate-500">No appointments for today</p>
-                    <p class="text-xs mt-1 max-w-xs mx-auto">Appointments are always shown for the current date. Add one from a customer or lead (Appointment tab).</p>
-                </div>
+            <BaseCard title="Today's Appointments">
+                <template #actions>
+                    <BaseBadge tone="warning">{{ todayAppointments.length }} today</BaseBadge>
+                </template>
+
+                <EmptyState
+                    v-if="todayAppointments.length === 0"
+                    heading="No appointments for today"
+                    description="Appointments are always shown for the current date. Add one from a customer or lead (Appointment tab)."
+                >
+                    <template #icon>
+                        <CalendarDaysIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
                 <div v-else class="space-y-3 max-h-80 overflow-y-auto">
                     <div
                         v-for="apt in todayAppointments"
                         :key="apt.id"
-                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors group"
+                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-warning-50 rounded-card hover:bg-warning-100 transition-colors group"
                     >
                         <div class="flex-1 min-w-0">
                             <router-link
                                 v-if="apt.customer_id"
                                 :to="`/customers/${apt.customer_id}`"
-                                class="font-medium text-slate-900 text-blue-600 hover:text-blue-800 hover:underline break-words"
+                                class="link break-words"
                             >
                                 {{ apt.customer?.name || 'Customer' }}
                             </router-link>
@@ -438,27 +424,29 @@
                                 {{ apt.customer?.name || 'Customer' }}
                             </div>
                             <div class="text-sm text-slate-600 mt-0.5">{{ apt.description || 'Appointment' }}</div>
-                            <div class="text-xs text-slate-500 mt-1">{{ apt.appointment_time || '10:00' }}</div>
+                            <div class="text-xs text-slate-500 mt-1 tabular-nums">{{ apt.appointment_time || '10:00' }}</div>
                         </div>
                         <div class="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
-                            <button
+                            <BaseButton
                                 v-if="apt.lead_id"
+                                variant="success"
+                                class="flex-1 sm:flex-none sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity"
                                 @click="openCompleteForAppointment(apt)"
-                                class="min-h-10 flex-1 rounded-md bg-green-600 px-3 py-2 text-xs font-medium text-white opacity-100 transition-opacity hover:bg-green-700 touch-manipulation sm:flex-none sm:px-2 sm:py-1.5 sm:opacity-0 sm:group-hover:opacity-100"
                             >
                                 Complete
-                            </button>
-                            <router-link
+                            </BaseButton>
+                            <BaseButton
                                 v-if="apt.customer_id"
+                                variant="primary"
+                                class="flex-1 sm:flex-none"
                                 :to="`/customers/${apt.customer_id}`"
-                                class="flex min-h-10 flex-1 items-center justify-center rounded-md bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700 touch-manipulation sm:min-h-0 sm:flex-none sm:px-2 sm:py-1.5"
                             >
                                 View
-                            </router-link>
+                            </BaseButton>
                         </div>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
         </div>
 
         <!-- Log Activity Modal -->
@@ -470,72 +458,102 @@
         />
 
         <!-- Complete Follow-up / Appointment Modal -->
-        <div v-if="showCompleteModal" class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
-            <div class="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white shadow-xl sm:rounded-xl">
-                <div class="border-b border-slate-200 p-4 sm:p-6">
-                    <h3 class="text-lg font-semibold text-slate-900 sm:text-xl">Complete Follow-up / Appointment</h3>
+        <BaseModal
+            v-model="showCompleteModal"
+            title="Complete Follow-up / Appointment"
+            size="md"
+            :close-on-backdrop="false"
+            @close="closeCompleteModal"
+        >
+            <!-- No `novalidate`: the required Remarks field must still block submit, as before. -->
+            <form id="dashboard-complete-followup-form" class="space-y-4" @submit.prevent="completeFollowUp">
+                <div>
+                    <label class="form-label" for="dashboardview-remarks-notes">
+                        Remarks / Notes <span class="form-required" aria-hidden="true">*</span>
+                    </label>
+                    <textarea id="dashboardview-remarks-notes"
+                        v-model="completeForm.remarks"
+                        rows="4"
+                        required
+                        class="form-textarea"
+                        placeholder="Enter your remarks..."
+                    />
                 </div>
-                <form @submit.prevent="completeFollowUp" class="space-y-4 p-4 sm:p-6">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-2">Remarks / Notes *</label>
-                        <textarea
-                            v-model="completeForm.remarks"
-                            rows="4"
-                            required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Enter your remarks..."
-                        />
-                    </div>
-                    <div>
-                        <label class="flex items-center gap-2">
-                            <input v-model="completeForm.saleHappened" type="checkbox" class="rounded border-slate-300 text-blue-600" />
-                            <span class="text-sm text-slate-700">Sale won (counts as sale; prospect becomes customer)</span>
-                        </label>
-                    </div>
-                    <div v-if="completeForm.saleHappened">
-                        <label class="block text-sm font-medium text-slate-700 mb-2">New Stage</label>
-                        <select v-model="completeForm.newStage" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="lead">Lead</option>
-                            <option value="hot_lead">Hot Lead</option>
-                            <option value="quotation">Quotation</option>
-                            <option value="won">Won</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-2">Next Follow-up Date (Optional)</label>
-                        <input
-                            v-model="completeForm.nextFollowUpAt"
-                            type="datetime-local"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                    <div class="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end sm:gap-3">
-                        <button type="button" @click="closeCompleteModal" :disabled="completingFollowUp" class="min-h-11 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-slate-700 hover:bg-slate-50 disabled:opacity-50 touch-manipulation sm:w-auto">
-                            Cancel
-                        </button>
-                        <button type="submit" :disabled="completingFollowUp" class="min-h-11 w-full rounded-lg bg-green-600 px-4 py-2.5 text-white hover:bg-green-700 disabled:opacity-50 touch-manipulation sm:w-auto">
-                            {{ completingFollowUp ? 'Saving...' : 'Complete' }}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                <div>
+                    <label class="form-choice">
+                        <input v-model="completeForm.saleHappened" type="checkbox" class="form-checkbox" />
+                        <span>Sale won (counts as sale; prospect becomes customer)</span>
+                    </label>
+                </div>
+                <div v-if="completeForm.saleHappened">
+                    <label class="form-label" for="dashboardview-new-stage">New Stage</label>
+                    <select id="dashboardview-new-stage" v-model="completeForm.newStage" class="form-select">
+                        <option value="lead">Lead</option>
+                        <option value="hot_lead">Hot Lead</option>
+                        <option value="quotation">Quotation</option>
+                        <option value="won">Won</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="dashboardview-next-follow-up-date-optional">Next Follow-up Date (Optional)</label>
+                    <input id="dashboardview-next-follow-up-date-optional"
+                        v-model="completeForm.nextFollowUpAt"
+                        type="datetime-local"
+                        class="form-input"
+                    />
+                </div>
+            </form>
+
+            <template #actions>
+                <BaseButton variant="outline" block-mobile :disabled="completingFollowUp" @click="closeCompleteModal">
+                    Cancel
+                </BaseButton>
+                <BaseButton
+                    variant="success"
+                    type="submit"
+                    form="dashboard-complete-followup-form"
+                    block-mobile
+                    :loading="completingFollowUp"
+                >
+                    {{ completingFollowUp ? 'Saving...' : 'Complete' }}
+                </BaseButton>
+            </template>
+        </BaseModal>
     </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
-import { useRouter } from 'vue-router';
 import axios from 'axios';
+import {
+    ArrowTrendingUpIcon,
+    CalendarDaysIcon,
+    CheckCircleIcon,
+    CheckIcon,
+    ChevronDownIcon,
+    ClockIcon,
+    DocumentTextIcon,
+    FunnelIcon,
+    TicketIcon,
+    TrophyIcon,
+    UsersIcon,
+} from '@heroicons/vue/24/outline';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
+import {
+    BaseBadge,
+    BaseButton,
+    BaseCard,
+    BaseModal,
+    EmptyState,
+    StatCard,
+} from '@/components/base';
 import AttendanceClock from '@/components/AttendanceClock.vue';
 import AttendanceWorkHoursChart from '@/components/AttendanceWorkHoursChart.vue';
 import LogActivityModal from '@/components/LogActivityModal.vue';
 
 const auth = useAuthStore();
 const toast = useToastStore();
-const router = useRouter();
 const user = computed(() => auth.user);
 const isAdmin = computed(() => {
     const role = auth.user?.role?.name;
@@ -561,11 +579,6 @@ const dashboardData = ref({});
 const attendancePreset = ref('3d');
 const attendanceChartPayload = ref(null);
 const attendanceChartLoading = ref(false);
-
-const attendancePresetActiveClass =
-    'text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors touch-manipulation bg-slate-900 text-white border-slate-900';
-const attendancePresetIdleClass =
-    'text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors touch-manipulation bg-white border-slate-200 text-slate-700 hover:bg-slate-100';
 
 const todayFollowUps = ref([]);
 const todayAppointments = ref([]);
@@ -602,6 +615,16 @@ const filtersOpen = ref(false);
 /** Tracks which quick preset is selected, or 'custom' after manual date edits. */
 const dateRangePreset = ref('7d');
 
+const DATE_PRESETS = [
+    { key: 'today', label: 'Today' },
+    { key: '2d', label: 'Last 2 days' },
+    { key: '7d', label: 'Last 7 days' },
+    { key: 'last_week', label: 'Last week' },
+    { key: 'week', label: 'This week' },
+    { key: 'month', label: 'This month' },
+    { key: '30d', label: 'Last 30 days' },
+];
+
 const activeFilterCount = computed(() => {
     let n = 0;
     if (dateRangePreset.value !== '7d') n++;
@@ -631,6 +654,35 @@ const filterPeriodLabel = computed(() => {
         if (emp) parts.push(emp.name);
     }
     return parts.length > 0 ? parts.join(' • ') : 'This month';
+});
+
+/** "Units on won line items" plus the line count when the API reported one. */
+const wonProductsCaption = computed(() => {
+    const lines = dashboardData.value.won_product_lines || 0;
+    return lines > 0
+        ? `Units on won line items · ${lines} line(s)`
+        : 'Units on won line items';
+});
+
+/**
+ * The attendance chart is a <canvas>, which exposes nothing to assistive tech.
+ * This sentence restates the same figures the chart is drawing - no extra requests.
+ */
+const attendanceChartSummary = computed(() => {
+    const payload = attendanceChartPayload.value;
+    const users = payload?.users || [];
+    if (!users.length) {
+        return 'Attendance by day: no one recorded attendance in this period, so the chart is empty.';
+    }
+    const dayCount = (payload.label_display || []).length;
+    const perUser = users.map((u) => {
+        const hours = (u.hours || [])
+            .filter((h) => h !== null && h !== undefined && h !== '')
+            .map((h) => num(h));
+        const total = Math.round(hours.reduce((sum, h) => sum + h, 0) * 10) / 10;
+        return `${u.name}: ${total} hours across ${hours.length} ${hours.length === 1 ? 'day' : 'days'}`;
+    });
+    return `Bar chart of hours worked per person over ${dayCount} ${dayCount === 1 ? 'day' : 'days'}. ${perUser.join('. ')}.`;
 });
 
 const formatNumber = (num) => {
@@ -709,14 +761,6 @@ function applyDatePresetRanges(kind) {
         filters.value.from = formatLocalYmd(start);
         filters.value.to = formatLocalYmd(end);
     }
-}
-
-function presetButtonClass(kind) {
-    const base =
-        'text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors touch-manipulation';
-    const active = dateRangePreset.value === kind;
-    if (active) return `${base} bg-slate-900 text-white border-slate-900`;
-    return `${base} bg-white border-slate-200 text-slate-700 hover:bg-slate-100`;
 }
 
 function onDashboardDateManualChange() {
@@ -802,7 +846,7 @@ const loadDashboard = async () => {
         const data = dashboardRes.data;
 
         dashboardMeta.value = data.meta || {};
-        
+
         // Backend always returns stats for the requested from/to (defaults to month if omitted).
         const statsSource = data.stats?.filtered ?? data.stats?.monthly;
         const totalOpportunities =
@@ -810,7 +854,7 @@ const loadDashboard = async () => {
                 ? statsSource.total_opportunities
                 // Fallback for older API responses: approximate using active leads + won
                 : ((statsSource?.leads || 0) + (statsSource?.won || 0));
-        
+
         // Main dashboard data
         dashboardData.value = {
             total_leads: statsSource?.leads || 0,
@@ -1026,35 +1070,23 @@ function ticketsListingQuery(status) {
     return q;
 }
 
-function goToTicketsListing(status) {
-    router.push({ path: '/tickets', query: ticketsListingQuery(status) });
-}
-
-// Navigate from summary cards into detailed lists
-const goToTotalLeadsListing = () => {
+// Summary tiles link into the detailed lists, so they are real links (keyboard + middle-click).
+const totalLeadsRoute = computed(() => {
     // All leads in the selected period (any stage)
     const query = {};
     if (filters.value.from) query.from = filters.value.from;
     if (filters.value.to) query.to = filters.value.to;
     if (filters.value.employee_id) query.assigned_to = filters.value.employee_id;
-    router.push({ path: '/leads', query });
-};
+    return { path: '/leads', query };
+});
 
-const goToFollowUpsListing = () => {
-    const query = {};
-    if (filters.value.from) query.from = filters.value.from;
-    if (filters.value.to) query.to = filters.value.to;
-    if (filters.value.employee_id) query.assigned_to = filters.value.employee_id;
-    router.push({ path: '/followups', query });
-};
-
-const goToLeadsListing = (stage) => {
-    const query = { stage };
+const wonLeadsRoute = computed(() => {
     // For stage-specific views we show all leads in that stage,
     // but still allow narrowing by employee if selected.
+    const query = { stage: 'won' };
     if (filters.value.employee_id) query.assigned_to = filters.value.employee_id;
-    router.push({ path: '/leads', query });
-};
+    return { path: '/leads', query };
+});
 
 onMounted(async () => {
     if (!auth.initialized) {

@@ -18,6 +18,12 @@ const routes = [
         meta: { guest: true },
     },
     {
+        path: '/reset-password',
+        name: 'password.reset',
+        component: () => import('@/views/ResetPasswordView.vue'),
+        meta: { public: true, title: 'Reset password' },
+    },
+    {
         path: '/unsubscribe',
         name: 'unsubscribe',
         component: () => import('@/views/UnsubscribeView.vue'),
@@ -71,7 +77,7 @@ const routes = [
         path: '/leads/pipeline',
         name: 'leads-pipeline',
         component: LeadsPipelineView,
-        meta: { requiresAuth: true, title: 'Lead Pipeline' },
+        meta: { requiresAuth: true, title: 'Lead Pipeline' , section: 'lead_pipeline'},
     },
     {
         path: '/leads/:id',
@@ -83,7 +89,7 @@ const routes = [
         path: '/leads',
         name: 'leads-list',
         component: () => import('@/views/LeadsListView.vue'),
-        meta: { requiresAuth: true, title: 'Leads' },
+        meta: { requiresAuth: true, title: 'Leads' , section: 'all_leads'},
     },
     {
         path: '/tickets',
@@ -113,7 +119,7 @@ const routes = [
         path: '/pos-support',
         name: 'pos-support',
         component: () => import('@/views/PosSupportTicketsView.vue'),
-        meta: { requiresAuth: true, title: 'POS Support' },
+        meta: { requiresAuth: true, title: 'POS Support' , section: 'pos_support'},
     },
     {
         path: '/invoices',
@@ -296,6 +302,12 @@ const routes = [
         meta: { requiresAuth: true, title: 'Email Templates', roles: ['Admin', 'System Admin'] },
     },
     {
+        path: '/import-export',
+        name: 'import-export',
+        component: () => import('@/views/ImportExportView.vue'),
+        meta: { requiresAuth: true, title: 'Import & export', roles: ['Admin', 'Manager', 'System Admin'] },
+    },
+    {
         path: '/access-manager',
         name: 'access-manager',
         component: () => import('@/views/AccessManagerView.vue'),
@@ -312,6 +324,12 @@ const routes = [
         name: 'today-activity',
         component: () => import('@/views/TodaysActivityView.vue'),
         meta: { requiresAuth: true, title: "Today's Activity" },
+    },
+    {
+        path: '/profile',
+        name: 'profile',
+        component: () => import('@/views/ProfileView.vue'),
+        meta: { requiresAuth: true, title: 'My profile' },
     },
     {
         path: '/change-password',
@@ -334,6 +352,18 @@ const routes = [
         name: 'whatsapp-management',
         component: () => import('@/views/WhatsAppManagementView.vue'),
         meta: { requiresAuth: true, title: 'WhatsApp Management' },
+    },
+    {
+        path: '/whatsapp-inbox',
+        name: 'whatsapp-inbox',
+        component: () => import('@/views/WhatsAppInboxView.vue'),
+        meta: { requiresAuth: true, title: 'WhatsApp Inbox', section: 'marketing_whatsapp' },
+    },
+    {
+        path: '/reports/geo',
+        name: 'reports-geo',
+        component: () => import('@/views/GeoMapView.vue'),
+        meta: { requiresAuth: true, title: 'Geo map', roles: ['Admin', 'Manager', 'System Admin'], section: 'report' },
     },
     {
         path: '/whatsapp-templates',
@@ -381,6 +411,12 @@ const routes = [
         component: () => import('@/views/AppointmentDetailView.vue'),
         meta: { requiresAuth: true, title: 'Appointment Details' },
     },
+    {
+        path: '/:pathMatch(.*)*',
+        name: 'not-found',
+        component: () => import('@/views/NotFoundView.vue'),
+        meta: { requiresAuth: true, title: 'Page not found' },
+    },
 ];
 
 const router = createRouter({
@@ -390,7 +426,7 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
     const auth = useAuthStore();
-    
+
     if (!auth.initialized) {
         await auth.bootstrap();
     }
@@ -403,68 +439,42 @@ router.beforeEach(async (to, from, next) => {
         return next({ path: '/' });
     }
 
-    // Role-based routing: redirect sales agents to sales dashboard
-    if (to.name === 'dashboard' && auth.isAuthenticated && auth.user) {
-        const userRole = auth.user.role?.name;
-        if (userRole === 'Sales' || userRole === 'CallAgent') {
-            return next({ name: 'sales-dashboard' });
+    if (!auth.isAuthenticated || !auth.user) {
+        return next();
+    }
+
+    const userRole = auth.user.role?.name;
+    const isFieldRole = userRole === 'Sales' || userRole === 'CallAgent';
+    const homeRoute = isFieldRole ? 'sales-dashboard' : 'dashboard';
+
+    // Field roles get their own dashboard.
+    if (to.name === 'dashboard' && isFieldRole) {
+        return next({ name: 'sales-dashboard' });
+    }
+
+    /** Bounce to the user's home screen and say why, rather than redirecting silently. */
+    const deny = (reason) => next({ name: homeRoute, query: { denied: reason } });
+
+    // Role gate.
+    if (to.meta.roles) {
+        // Any logged-in user may open their own employee page (bank details & documents only in UI).
+        const ownEmployeePage =
+            to.name === 'employee-edit' && Number(to.params.id) === auth.user.id;
+        if (!ownEmployeePage && !to.meta.roles.includes(userRole)) {
+            return deny(to.meta.title || 'that page');
         }
     }
 
-    // Redirect sales agents trying to access admin dashboard
-    if (to.name === 'dashboard' && auth.isAuthenticated && auth.user) {
-        const userRole = auth.user.role?.name;
-        if (userRole === 'Sales' || userRole === 'CallAgent') {
-            return next({ name: 'sales-dashboard' });
-        }
+    // Sidebar-permission gate, driven by meta.section instead of per-route blocks.
+    if (to.meta.section && !auth.navSectionAllowed(to.meta.section)) {
+        return deny(to.meta.title || 'that page');
     }
 
-    // Role-based access control for routes
-    if (to.meta.roles && auth.isAuthenticated && auth.user) {
-        // Any logged-in user may open their own employee edit page (bank details & documents only in UI).
-        if (to.name === 'employee-edit') {
-            const id = Number(to.params.id);
-            if (Number.isFinite(id) && id === auth.user.id) {
-                return next();
-            }
-        }
-        const userRole = auth.user.role?.name;
-        if (!to.meta.roles.includes(userRole)) {
-            // Redirect to dashboard if user doesn't have access
-            return next({ name: 'dashboard' });
-        }
-    }
-
-    // Per-user sidebar permissions: POS Support (nav section pos_support)
-    if (to.name === 'pos-support' && auth.isAuthenticated && auth.user) {
-        if (!auth.navSectionAllowed('pos_support')) {
-            const r = auth.user.role?.name;
-            return next({ name: r === 'Sales' || r === 'CallAgent' ? 'sales-dashboard' : 'dashboard' });
-        }
-    }
-
-    // Per-user sidebar permissions: All Leads / Lead Pipeline
-    if (to.name === 'leads-list' && auth.isAuthenticated && auth.user) {
-        if (!auth.navSectionAllowed('all_leads')) {
-            const r = auth.user.role?.name;
-            return next({ name: r === 'Sales' || r === 'CallAgent' ? 'sales-dashboard' : 'dashboard' });
-        }
-    }
-    if (to.name === 'leads-pipeline' && auth.isAuthenticated && auth.user) {
-        if (!auth.navSectionAllowed('lead_pipeline')) {
-            const r = auth.user.role?.name;
-            return next({ name: r === 'Sales' || r === 'CallAgent' ? 'sales-dashboard' : 'dashboard' });
-        }
-    }
-
-    // Per-user sidebar permissions: Prospects / Customers list
-    if (to.name === 'customers' && auth.isAuthenticated && auth.user) {
-        const t = to.query.type;
-        if (t === 'customer' && !auth.navSectionAllowed('customers')) {
-            return next({ name: auth.user.role?.name === 'Sales' || auth.user.role?.name === 'CallAgent' ? 'sales-dashboard' : 'dashboard' });
-        }
-        if (t === 'prospect' && !auth.navSectionAllowed('prospects')) {
-            return next({ name: auth.user.role?.name === 'Sales' || auth.user.role?.name === 'CallAgent' ? 'sales-dashboard' : 'dashboard' });
+    // Prospects and Customers share one route but are separate permissions.
+    if (to.name === 'customers') {
+        const key = to.query.type === 'customer' ? 'customers' : 'prospects';
+        if (!auth.navSectionAllowed(key)) {
+            return deny(key === 'customers' ? 'Customers' : 'Prospects');
         }
     }
 

@@ -5,16 +5,19 @@
         :badge="slipsBadge"
     >
         <template #actions>
-            <router-link to="/salaries" class="listing-btn-accent w-full sm:w-auto text-center touch-manipulation">
-                + Create salary slip
-            </router-link>
+            <BaseButton variant="primary" to="/salaries" block-mobile>
+                <template #icon>
+                    <PlusIcon class="icon" aria-hidden="true" />
+                </template>
+                Create salary slip
+            </BaseButton>
         </template>
 
         <template #filters>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 items-end">
                 <div>
-                    <label class="listing-label">Employee</label>
-                    <select v-model="filters.user_id" class="listing-input" @change="loadSalaries(1)">
+                    <label class="form-label" for="salaryslipsview-employee">Employee</label>
+                    <select id="salaryslipsview-employee" v-model="filters.user_id" class="form-select" @change="loadSalaries(1)">
                         <option value="">All employees</option>
                         <option v-for="user in users" :key="user.id" :value="user.id">
                             {{ user.name }}
@@ -22,125 +25,122 @@
                     </select>
                 </div>
                 <div>
-                    <label class="listing-label">Month</label>
-                    <input v-model="filters.month" type="month" class="listing-input" @change="loadSalaries(1)" />
+                    <label class="form-label" for="salaryslipsview-month">Month</label>
+                    <input id="salaryslipsview-month" v-model="filters.month" type="month" class="form-input" @change="loadSalaries(1)" />
                 </div>
                 <div>
-                    <label class="listing-label">Currency</label>
-                    <select v-model="filters.currency" class="listing-input" @change="loadSalaries(1)">
+                    <label class="form-label" for="salaryslipsview-currency">Currency</label>
+                    <select id="salaryslipsview-currency" v-model="filters.currency" class="form-select" @change="loadSalaries(1)">
                         <option value="">All currencies</option>
                         <option value="GBP">GBP (£)</option>
                         <option value="PKR">PKR (Rs)</option>
                     </select>
                 </div>
-                <button type="button" class="listing-btn-outline w-full" @click="clearFilters">Clear filters</button>
+                <BaseButton variant="outline" type="button" class="w-full" @click="clearFilters">Clear filters</BaseButton>
             </div>
         </template>
 
-        <div v-if="loading" class="px-5 py-14 text-center text-slate-500 text-sm">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-2 border-slate-200 border-t-blue-600"></div>
-            <p class="mt-2">Loading salary slips…</p>
+        <div v-if="loading" class="px-5 py-8 space-y-3" aria-busy="true">
+            <p class="sr-only">Loading salary slips…</p>
+            <div class="skeleton-text w-1/3"></div>
+            <div class="skeleton-text w-2/3"></div>
+            <div class="skeleton-text w-1/2"></div>
+            <div class="skeleton-text w-3/4"></div>
         </div>
 
-        <div v-else-if="salaries.length === 0" class="px-5 py-12 text-center text-slate-500 text-sm">
-            <p class="text-lg text-slate-700 mb-4">No salary slips found</p>
-            <router-link to="/salaries" class="listing-btn-accent inline-flex touch-manipulation">Create your first salary slip</router-link>
-        </div>
+        <EmptyState
+            v-else-if="salaries.length === 0"
+            heading="No salary slips found"
+            description="No salary slips match the current filters. Create one to get started."
+        >
+            <template #icon>
+                <BanknotesIcon class="icon" aria-hidden="true" />
+            </template>
+            <template #action>
+                <BaseButton variant="soft" to="/salaries">Create your first salary slip</BaseButton>
+            </template>
+        </EmptyState>
 
         <template v-else>
-                <!-- Mobile Card View -->
-                <div class="lg:hidden divide-y divide-slate-200">
-                <div v-for="salary in salaries" :key="salary.id" class="p-4">
-                    <div class="flex justify-between items-start mb-3">
-                        <div>
+            <!-- Mobile Card View -->
+            <div class="lg:hidden p-4 space-y-3">
+                <div v-for="salary in salaries" :key="salary.id" class="table-card">
+                    <div class="flex justify-between items-start gap-3">
+                        <div class="min-w-0">
+                            <div class="text-xs text-slate-500">Employee</div>
                             <div class="font-semibold text-slate-900">{{ salary.user?.name }}</div>
                             <div class="text-xs text-slate-500">{{ salary.user?.role?.name || 'N/A' }}</div>
                         </div>
-                        <div class="text-right">
-                            <div class="font-semibold text-slate-900">
+                        <div class="text-right shrink-0">
+                            <div class="text-xs text-slate-500">Net salary</div>
+                            <div class="font-semibold text-slate-900 tabular-nums">
                                 {{ getCurrencySymbol(salary.currency) }}{{ formatNumber(salary.net_salary) }}
                             </div>
                             <div class="text-xs text-slate-500">{{ salary.currency }}</div>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-2 text-sm mb-3">
+                    <div class="grid grid-cols-2 gap-2 text-sm">
                         <div>
                             <span class="text-slate-500">Month:</span>
                             <span class="ml-2 text-slate-900">{{ formatMonth(salary.month) }}</span>
                         </div>
                         <div>
                             <span class="text-slate-500">Base:</span>
-                            <span class="ml-2 text-slate-900">{{ getCurrencySymbol(salary.currency) }}{{ formatNumber(salary.base_salary) }}</span>
+                            <span class="ml-2 text-slate-900 tabular-nums">{{ getCurrencySymbol(salary.currency) }}{{ formatNumber(salary.base_salary) }}</span>
                         </div>
                         <div>
                             <span class="text-slate-500">Days:</span>
-                            <span class="ml-2 text-slate-900">{{ salary.attendance_days || '-' }}</span>
+                            <span class="ml-2 text-slate-900 tabular-nums">{{ salary.attendance_days || '-' }}</span>
                         </div>
                     </div>
                     <div class="flex gap-2 pt-2 border-t border-slate-200">
-                        <router-link
-                            :to="`/salaries/${salary.id}/edit`"
-                            class="flex-1 px-3 py-2 text-center text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"
-                        >
-                            Edit
-                        </router-link>
-                        <button
-                            @click="downloadSlip(salary.id)"
-                            class="flex-1 px-3 py-2 text-sm bg-green-50 text-green-600 rounded-lg hover:bg-green-100"
-                        >
-                            Download
-                        </button>
-                        <button
-                            @click="sendEmail(salary.id)"
-                            class="flex-1 px-3 py-2 text-sm bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100"
-                        >
-                            Email
-                        </button>
+                        <BaseButton variant="outline" class="flex-1" :to="`/salaries/${salary.id}/edit`">Edit</BaseButton>
+                        <BaseButton variant="outline" type="button" class="flex-1" @click="downloadSlip(salary.id)">Download</BaseButton>
+                        <BaseButton variant="soft" type="button" class="flex-1" @click="sendEmail(salary.id)">Email</BaseButton>
                     </div>
                 </div>
-                </div>
+            </div>
 
-                <div class="hidden lg:block overflow-x-auto">
-                    <table class="w-full min-w-[900px]">
-                        <thead class="listing-thead">
-                            <tr>
-                                <th class="listing-th">Employee</th>
-                                <th class="listing-th">Month</th>
-                                <th class="listing-th">Base salary</th>
-                                <th class="listing-th">Net salary</th>
-                                <th class="listing-th">Currency</th>
-                                <th class="listing-th">Attendance days</th>
-                                <th class="listing-th">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="salary in salaries" :key="salary.id" class="listing-row">
-                                <td class="listing-td-strong whitespace-nowrap">
-                                    <div>{{ salary.user?.name }}</div>
-                                    <div class="text-xs font-normal text-slate-500">{{ salary.user?.role?.name || 'N/A' }}</div>
-                                </td>
-                                <td class="listing-td whitespace-nowrap">{{ formatMonth(salary.month) }}</td>
-                                <td class="listing-td whitespace-nowrap">
-                                    {{ getCurrencySymbol(salary.currency) }}{{ formatNumber(salary.base_salary) }}
-                                </td>
-                                <td class="listing-td whitespace-nowrap font-semibold text-slate-900">
-                                    {{ getCurrencySymbol(salary.currency) }}{{ formatNumber(salary.net_salary) }}
-                                </td>
-                                <td class="listing-td whitespace-nowrap">{{ salary.currency }}</td>
-                                <td class="listing-td whitespace-nowrap">{{ salary.attendance_days || '—' }} days</td>
-                                <td class="listing-td whitespace-nowrap">
-                                    <div class="flex flex-wrap gap-x-3 gap-y-1">
-                                        <router-link :to="`/salaries/${salary.id}/edit`" class="listing-link-edit">Edit</router-link>
-                                        <button type="button" class="listing-link-edit" @click="downloadSlip(salary.id)">Download</button>
-                                        <button type="button" class="text-purple-600 hover:text-purple-800 text-sm font-medium" @click="sendEmail(salary.id)">
-                                            Email
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="hidden lg:block table-wrap">
+                <table class="table min-w-[900px]">
+                    <caption class="sr-only">Salary slips with employee, month, base and net salary, currency, attendance days and available actions</caption>
+                    <thead class="table-thead">
+                        <tr>
+                            <th scope="col" class="table-th">Employee</th>
+                            <th scope="col" class="table-th">Month</th>
+                            <th scope="col" class="table-th-num">Base salary</th>
+                            <th scope="col" class="table-th-num">Net salary</th>
+                            <th scope="col" class="table-th">Currency</th>
+                            <th scope="col" class="table-th-num">Attendance days</th>
+                            <th scope="col" class="table-th">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="salary in salaries" :key="salary.id" class="table-row">
+                            <td class="table-td-strong whitespace-nowrap">
+                                <div>{{ salary.user?.name }}</div>
+                                <div class="text-xs font-normal text-slate-500">{{ salary.user?.role?.name || 'N/A' }}</div>
+                            </td>
+                            <td class="table-td whitespace-nowrap">{{ formatMonth(salary.month) }}</td>
+                            <td class="table-td-num whitespace-nowrap">
+                                {{ getCurrencySymbol(salary.currency) }}{{ formatNumber(salary.base_salary) }}
+                            </td>
+                            <td class="table-td-num whitespace-nowrap font-semibold text-slate-900">
+                                {{ getCurrencySymbol(salary.currency) }}{{ formatNumber(salary.net_salary) }}
+                            </td>
+                            <td class="table-td whitespace-nowrap">{{ salary.currency }}</td>
+                            <td class="table-td-num whitespace-nowrap">{{ salary.attendance_days || '—' }} days</td>
+                            <td class="table-td-actions">
+                                <div class="flex flex-wrap justify-end gap-2">
+                                    <BaseButton variant="ghost" size="sm" :to="`/salaries/${salary.id}/edit`">Edit</BaseButton>
+                                    <BaseButton variant="ghost" size="sm" type="button" @click="downloadSlip(salary.id)">Download</BaseButton>
+                                    <BaseButton variant="ghost" size="sm" type="button" @click="sendEmail(salary.id)">Email</BaseButton>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </template>
 
         <template #pagination>
@@ -162,6 +162,8 @@ import axios from 'axios';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { useToastStore } from '@/stores/toast';
+import { BaseButton, EmptyState } from '@/components/base';
+import { BanknotesIcon, PlusIcon } from '@heroicons/vue/24/outline';
 
 const toast = useToastStore();
 
@@ -284,4 +286,3 @@ onMounted(() => {
     loadUsers();
 });
 </script>
-

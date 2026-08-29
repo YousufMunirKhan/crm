@@ -1,99 +1,126 @@
 <template>
-    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-        <!-- Header -->
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between min-w-0">
-            <div class="min-w-0">
-                <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Monthly Expense Report</h1>
-                <p class="text-sm text-slate-600 mt-1">Detailed breakdown of expenses by currency and category</p>
+    <ListingPageShell
+        title="Monthly Expense Report"
+        subtitle="Detailed breakdown of expenses by currency and category"
+        :badge="monthlyReport ? `${monthlyReport.total_count} expenses` : null"
+    >
+        <template #actions>
+            <BaseButton
+                v-if="monthlyReport"
+                variant="primary"
+                type="button"
+                block-mobile
+                @click="exportMonthlyReport"
+            >
+                <template #icon>
+                    <ArrowDownTrayIcon class="icon" aria-hidden="true" />
+                </template>
+                Export CSV
+            </BaseButton>
+        </template>
+
+        <template #filters>
+            <div class="w-full sm:w-auto min-w-0">
+                <label class="form-label" for="expensesmonthlyreportview-select-month">Select Month</label>
+                <input id="expensesmonthlyreportview-select-month"
+                    v-model="reportMonth"
+                    type="month"
+                    @change="loadMonthlyReport"
+                    class="form-input w-full sm:w-56 min-w-0"
+                />
             </div>
-            <div class="flex flex-col sm:flex-row gap-3 sm:items-end w-full lg:w-auto min-w-0">
-                <div class="w-full sm:w-auto min-w-0">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Select Month</label>
-                    <input
-                        v-model="reportMonth"
-                        type="month"
-                        @change="loadMonthlyReport"
-                        class="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                    />
-                </div>
-                <button
-                    v-if="monthlyReport"
-                    @click="exportMonthlyReport"
-                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 touch-manipulation w-full sm:w-auto shrink-0"
-                >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Export CSV
-                </button>
-            </div>
-        </div>
+        </template>
 
         <!-- Loading State -->
-        <div v-if="loading" class="flex items-center justify-center py-12">
-            <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+        <div v-if="loading" class="px-4 sm:px-6 py-8 space-y-3" aria-busy="true">
+            <p class="sr-only">Loading monthly expense report…</p>
+            <div class="skeleton-text w-1/3"></div>
+            <div class="skeleton-text w-2/3"></div>
+            <div class="skeleton-text w-1/2"></div>
+            <div class="skeleton-text w-3/4"></div>
         </div>
 
         <!-- Report Content -->
-        <div v-else-if="monthlyReport" class="space-y-6">
+        <div v-else-if="monthlyReport" class="px-4 sm:px-6 py-5 space-y-6">
             <!-- Summary Cards -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
-                    <div class="text-blue-100 text-sm font-medium mb-2">Total Expenses</div>
-                    <div class="text-3xl font-bold">{{ monthlyReport.total_count }}</div>
-                    <div class="text-blue-200 text-xs mt-2">Expenses this month</div>
-                </div>
-                <div v-if="monthlyReport.by_currency?.GBP" class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
-                    <div class="text-green-100 text-sm font-medium mb-2">Total (GBP)</div>
-                    <div class="text-3xl font-bold">£{{ formatNumber(monthlyReport.by_currency.GBP.total) }}</div>
-                    <div class="text-green-200 text-xs mt-2">{{ monthlyReport.by_currency.GBP.count }} expenses</div>
-                </div>
-                <div v-if="monthlyReport.by_currency?.PKR" class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
-                    <div class="text-purple-100 text-sm font-medium mb-2">Total (PKR)</div>
-                    <div class="text-3xl font-bold">₨{{ formatNumber(monthlyReport.by_currency.PKR.total) }}</div>
-                    <div class="text-purple-200 text-xs mt-2">{{ monthlyReport.by_currency.PKR.count }} expenses</div>
-                </div>
+                <StatCard
+                    label="Total Expenses"
+                    :value="monthlyReport.total_count"
+                    caption="Expenses this month"
+                    tone="primary"
+                >
+                    <template #icon>
+                        <DocumentTextIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
+                <StatCard
+                    v-if="monthlyReport.by_currency?.GBP"
+                    label="Total (GBP)"
+                    :value="`£${formatNumber(monthlyReport.by_currency.GBP.total)}`"
+                    :caption="`${monthlyReport.by_currency.GBP.count} expenses`"
+                    tone="success"
+                >
+                    <template #icon>
+                        <BanknotesIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
+                <StatCard
+                    v-if="monthlyReport.by_currency?.PKR"
+                    label="Total (PKR)"
+                    :value="`₨${formatNumber(monthlyReport.by_currency.PKR.total)}`"
+                    :caption="`${monthlyReport.by_currency.PKR.count} expenses`"
+                    tone="primary"
+                >
+                    <template #icon>
+                        <BanknotesIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
             </div>
 
             <!-- Currency Breakdown -->
-            <div v-if="monthlyReport.by_currency && Object.keys(monthlyReport.by_currency).length > 0" class="bg-white rounded-xl shadow-sm p-6">
-                <h2 class="text-xl font-semibold text-slate-900 mb-4">Breakdown by Currency</h2>
+            <BaseCard
+                v-if="monthlyReport.by_currency && Object.keys(monthlyReport.by_currency).length > 0"
+                title="Breakdown by Currency"
+            >
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div
                         v-for="(data, currency) in monthlyReport.by_currency"
                         :key="currency"
-                        class="p-4 border-2 rounded-lg"
-                        :class="currency === 'GBP' ? 'border-green-200 bg-green-50' : 'border-purple-200 bg-purple-50'"
+                        class="p-4 border-2 rounded-card"
+                        :class="currency === 'GBP' ? 'border-success-200 bg-success-50' : 'border-primary-200 bg-primary-50'"
                     >
                         <div class="flex items-center justify-between mb-2">
                             <div class="font-semibold text-slate-900">{{ currency }}</div>
-                            <div class="text-2xl font-bold" :class="currency === 'GBP' ? 'text-green-700' : 'text-purple-700'">
+                            <div class="text-2xl font-bold tabular-nums" :class="currency === 'GBP' ? 'text-success-800' : 'text-primary-800'">
                                 {{ currency === 'PKR' ? '₨' : '£' }}{{ formatNumber(data.total) }}
                             </div>
                         </div>
-                        <div class="text-sm text-slate-600">{{ data.count }} expenses</div>
+                        <div class="text-sm text-slate-600 tabular-nums">{{ data.count }} expenses</div>
                         <div class="mt-3 pt-3 border-t border-slate-200">
                             <div class="text-xs text-slate-500">Average per expense:</div>
-                            <div class="text-sm font-medium text-slate-700">
+                            <div class="text-sm font-medium text-slate-700 tabular-nums">
                                 {{ currency === 'PKR' ? '₨' : '£' }}{{ formatNumber(data.total / (data.count || 1)) }}
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- Category Breakdown -->
-            <div v-if="monthlyReport.by_category && Object.keys(monthlyReport.by_category).length > 0" class="bg-white rounded-xl shadow-sm p-6">
-                <h2 class="text-xl font-semibold text-slate-900 mb-4">Breakdown by Category</h2>
+            <BaseCard
+                v-if="monthlyReport.by_category && Object.keys(monthlyReport.by_category).length > 0"
+                title="Breakdown by Category"
+            >
                 <div class="space-y-4">
                     <div
                         v-for="(categoryData, category) in monthlyReport.by_category"
                         :key="category"
-                        class="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                        class="border border-slate-200 rounded-card p-4 hover:shadow-card-hover transition-shadow"
                     >
                         <div class="flex items-center justify-between mb-3">
                             <h3 class="text-lg font-semibold text-slate-900">{{ category || 'Uncategorized' }}</h3>
-                            <div class="text-sm text-slate-500">
+                            <div class="text-sm text-slate-500 tabular-nums">
                                 {{ Object.values(categoryData).reduce((sum, d) => sum + d.count, 0) }} expenses
                             </div>
                         </div>
@@ -101,14 +128,14 @@
                             <div
                                 v-for="(data, currency) in categoryData"
                                 :key="currency"
-                                class="p-3 bg-slate-50 rounded-lg"
+                                class="p-3 bg-slate-50 rounded-card"
                             >
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <div class="text-sm font-medium text-slate-700">{{ currency }}</div>
-                                        <div class="text-xs text-slate-500 mt-1">{{ data.count }} expenses</div>
+                                        <div class="text-xs text-slate-500 mt-1 tabular-nums">{{ data.count }} expenses</div>
                                     </div>
-                                    <div class="text-lg font-bold text-slate-900">
+                                    <div class="text-lg font-bold text-slate-900 tabular-nums">
                                         {{ currency === 'PKR' ? '₨' : '£' }}{{ formatNumber(data.total) }}
                                     </div>
                                 </div>
@@ -116,76 +143,77 @@
                         </div>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- All Expenses Table -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-semibold text-slate-900">All Expenses</h2>
-                    <div class="text-sm text-slate-600">
-                        Total: {{ monthlyReport.expenses.length }} expenses
-                    </div>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-slate-50">
+            <BaseCard title="All Expenses" :padded="false">
+                <template #actions>
+                    <span class="text-sm text-slate-600 tabular-nums">Total: {{ monthlyReport.expenses.length }} expenses</span>
+                </template>
+
+                <div v-if="monthlyReport.expenses.length" class="table-wrap">
+                    <table class="table">
+                        <caption class="sr-only">All expenses for the selected month, with date, reason, category, amount, currency, description and who added them</caption>
+                        <thead class="table-thead">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Date</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Reason</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Category</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Amount</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Currency</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Description</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Added By</th>
+                                <th scope="col" class="table-th">Date</th>
+                                <th scope="col" class="table-th">Reason</th>
+                                <th scope="col" class="table-th">Category</th>
+                                <th scope="col" class="table-th-num">Amount</th>
+                                <th scope="col" class="table-th">Currency</th>
+                                <th scope="col" class="table-th">Description</th>
+                                <th scope="col" class="table-th">Added By</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-200">
+                        <tbody>
                             <tr
                                 v-for="expense in monthlyReport.expenses"
                                 :key="expense.id"
-                                class="hover:bg-slate-50"
+                                class="table-row"
                             >
-                                <td class="px-4 py-3 text-sm text-slate-900">{{ formatDate(expense.date) }}</td>
-                                <td class="px-4 py-3 text-sm font-medium text-slate-900">{{ expense.reason }}</td>
-                                <td class="px-4 py-3">
-                                    <span v-if="expense.category" class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                                        {{ expense.category }}
-                                    </span>
-                                    <span v-else class="text-xs text-slate-400">-</span>
+                                <td class="table-td">{{ formatDate(expense.date) }}</td>
+                                <td class="table-td-strong">{{ expense.reason }}</td>
+                                <td class="table-td">
+                                    <BaseBadge v-if="expense.category" tone="primary">{{ expense.category }}</BaseBadge>
+                                    <span v-else class="text-xs text-slate-500">-</span>
                                 </td>
-                                <td class="px-4 py-3 text-sm font-semibold text-slate-900">
+                                <td class="table-td-num font-semibold text-slate-900">
                                     {{ expense.currency === 'PKR' ? '₨' : '£' }}{{ formatNumber(expense.amount) }}
                                 </td>
-                                <td class="px-4 py-3">
-                                    <span class="px-2 py-1 rounded text-xs font-medium"
-                                        :class="expense.currency === 'PKR' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'"
-                                    >
-                                        {{ expense.currency }}
-                                    </span>
+                                <td class="table-td">
+                                    <BaseBadge :tone="expense.currency === 'PKR' ? 'primary' : 'success'">{{ expense.currency }}</BaseBadge>
                                 </td>
-                                <td class="px-4 py-3 text-sm text-slate-600 max-w-xs truncate">
+                                <td class="table-td max-w-xs truncate">
                                     {{ expense.description || '-' }}
                                 </td>
-                                <td class="px-4 py-3 text-sm text-slate-600">{{ expense.creator?.name || '-' }}</td>
+                                <td class="table-td">{{ expense.creator?.name || '-' }}</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-                <div v-if="monthlyReport.expenses.length === 0" class="text-center py-8 text-slate-400 text-sm">
-                    No expenses found for this month
-                </div>
-            </div>
+                <EmptyState
+                    v-else
+                    heading="No expenses found"
+                    description="No expenses found for this month."
+                >
+                    <template #icon>
+                        <DocumentTextIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
+            </BaseCard>
         </div>
 
         <!-- Empty State -->
-        <div v-else class="bg-white rounded-xl shadow-sm p-12 text-center">
-            <svg class="w-16 h-16 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <h3 class="text-lg font-semibold text-slate-900 mb-2">No Report Data</h3>
-            <p class="text-sm text-slate-600">Select a month to view the expense report</p>
-        </div>
-    </div>
+        <EmptyState
+            v-else
+            heading="No Report Data"
+            description="Select a month to view the expense report"
+        >
+            <template #icon>
+                <DocumentTextIcon class="icon" aria-hidden="true" />
+            </template>
+        </EmptyState>
+    </ListingPageShell>
 </template>
 
 <script setup>
@@ -194,6 +222,9 @@ import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
+import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseBadge, BaseButton, BaseCard, EmptyState, StatCard } from '@/components/base';
+import { ArrowDownTrayIcon, BanknotesIcon, DocumentTextIcon } from '@heroicons/vue/24/outline';
 
 const route = useRoute();
 const router = useRouter();
@@ -219,7 +250,7 @@ const loadMonthlyReport = async () => {
             params: { month: reportMonth.value },
         });
         monthlyReport.value = data;
-        
+
         // Update URL without reloading
         router.replace({ query: { month: reportMonth.value } });
     } catch (error) {
@@ -238,7 +269,7 @@ const exportMonthlyReport = () => {
 
     try {
         const filename = `expenses_monthly_report_${reportMonth.value.replace('-', '_')}.csv`;
-        
+
         const columns = [
             { key: 'date', label: 'Date' },
             { key: 'reason', label: 'Reason' },
@@ -248,7 +279,7 @@ const exportMonthlyReport = () => {
             { key: 'description', label: 'Description' },
             { key: 'creator.name', label: 'Added By' },
         ];
-        
+
         exportCSV(monthlyReport.value.expenses, columns, filename);
         toast.success('Monthly report exported successfully!');
     } catch (error) {
@@ -263,4 +294,3 @@ onMounted(() => {
     }
 });
 </script>
-

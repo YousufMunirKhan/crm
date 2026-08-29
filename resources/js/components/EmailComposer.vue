@@ -1,15 +1,18 @@
 <template>
-    <div class="bg-slate-50/80 rounded-xl border border-slate-200 p-4 sm:p-5">
-        <h3 class="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
-            <span class="text-blue-600">📧</span> Email
-        </h3>
+    <BaseCard class="overflow-hidden">
+        <template #header>
+            <h3 class="card-title flex items-center gap-2">
+                <EnvelopeIcon class="icon text-primary-600" aria-hidden="true" />
+                Email
+            </h3>
+        </template>
 
         <!-- Recipient -->
         <div class="mb-3">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Send to</label>
-            <select
+            <label class="form-label" for="emailcomposer-send-to">Send to</label>
+            <select id="emailcomposer-send-to"
                 v-model="sendToEmail"
-                class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="form-select"
             >
                 <option :value="primaryEmail">{{ primaryEmail || 'Primary email' }}</option>
                 <option v-if="secondaryEmail" :value="secondaryEmail">Secondary</option>
@@ -18,10 +21,10 @@
 
         <!-- Template choice -->
         <div class="mb-3">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Email template</label>
-            <select
+            <label class="form-label" for="emailcomposer-email-template">Email template</label>
+            <select id="emailcomposer-email-template"
                 v-model="selectedTemplateId"
-                class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="form-select"
                 @change="onTemplateSelect"
             >
                 <option value="">— Write your own —</option>
@@ -32,20 +35,20 @@
         <!-- Only show subject/message when writing your own -->
         <template v-if="!selectedTemplateId">
             <div class="mb-3">
-                <label class="block text-xs font-medium text-slate-600 mb-1">Subject</label>
-                <input
+                <label class="form-label" for="emailcomposer-subject">Subject</label>
+                <input id="emailcomposer-subject"
                     v-model="subject"
                     type="text"
-                    class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="form-input"
                     placeholder="Email subject"
                 />
             </div>
             <div class="mb-3">
-                <label class="block text-xs font-medium text-slate-600 mb-1">Message</label>
-                <textarea
+                <label class="form-label" for="emailcomposer-message">Message</label>
+                <textarea id="emailcomposer-message"
                     v-model="message"
                     rows="4"
-                    class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="form-textarea"
                     placeholder="Type your email message..."
                 />
             </div>
@@ -53,50 +56,68 @@
         <p v-else class="mb-3 text-sm text-slate-500">Content will be sent from the selected template. No need to type subject or message.</p>
 
         <div class="flex flex-wrap gap-2 mb-4">
-            <button
+            <BaseButton
                 v-if="selectedTemplateId"
+                variant="primary"
+                :loading="sending"
                 @click="sendWithTemplate"
-                :disabled="sending"
-                class="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
+                <template #icon>
+                    <PaperAirplaneIcon class="icon-sm" aria-hidden="true" />
+                </template>
                 {{ sending ? 'Sending...' : 'Send with template' }}
-            </button>
-            <button
+            </BaseButton>
+            <BaseButton
                 v-else
+                variant="primary"
+                :disabled="!message?.trim() || !subject?.trim()"
+                :loading="sending"
                 @click="sendMessage"
-                :disabled="!message?.trim() || !subject?.trim() || sending"
-                class="px-4 py-2 text-sm font-medium bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
             >
+                <template #icon>
+                    <PaperAirplaneIcon class="icon-sm" aria-hidden="true" />
+                </template>
                 {{ sending ? 'Sending...' : 'Send email' }}
-            </button>
+            </BaseButton>
         </div>
 
-        <div v-if="error" class="mb-3 text-sm text-red-600 bg-red-50 p-2 rounded">
+        <div v-if="error" class="callout callout-danger mb-3" role="alert">
             {{ error }}
         </div>
 
         <!-- Email log -->
         <div v-if="showInlineLogs && logs && logs.length > 0" class="mt-4 pt-4 border-t border-slate-200">
-            <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Sent emails</h4>
+            <h4 class="text-eyebrow text-slate-600 uppercase mb-2">Sent emails</h4>
             <ul class="space-y-2 max-h-48 overflow-y-auto">
                 <li
                     v-for="log in logs"
                     :key="log.id"
-                    class="text-sm p-2 rounded bg-white border border-slate-100"
+                    class="text-sm p-2 rounded-control bg-white border border-slate-100"
                 >
                     <div class="font-medium text-slate-800 truncate">{{ log.subject || '(No subject)' }}</div>
-                    <div class="text-xs text-slate-500 mt-0.5">{{ formatLogDate(log.created_at) }} · {{ formatCommLogStatus(log.status) }}</div>
+                    <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
+                        <span>{{ formatLogDate(log.created_at) }}</span>
+                        <BaseBadge :status="log.status">{{ formatCommLogStatus(log.status) }}</BaseBadge>
+                    </div>
                     <p v-if="log.message" class="text-xs text-slate-600 mt-1 line-clamp-2">{{ stripHtml(log.message) }}</p>
                 </li>
             </ul>
         </div>
-        <p v-else-if="showInlineLogs" class="text-xs text-slate-500 mt-4 pt-4 border-t border-slate-200">No emails sent yet.</p>
-    </div>
+        <div v-else-if="showInlineLogs" class="mt-4 pt-4 border-t border-slate-200">
+            <EmptyState heading="No emails sent yet." description="Emails you send from here are logged in this list.">
+                <template #icon>
+                    <EnvelopeIcon class="icon" aria-hidden="true" />
+                </template>
+            </EmptyState>
+        </div>
+    </BaseCard>
 </template>
 
 <script setup>
 import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
+import { EnvelopeIcon, PaperAirplaneIcon } from '@heroicons/vue/24/outline';
+import { BaseBadge, BaseButton, BaseCard, EmptyState } from '@/components/base';
 import { formatCommLogStatus } from '@/utils/displayFormat';
 
 const props = defineProps({

@@ -1,248 +1,274 @@
 <template>
     <div class="max-w-3xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         <div class="flex items-center gap-2 sm:gap-3 min-w-0">
-            <router-link
+            <BaseButton
+                size="icon"
+                variant="ghost"
                 to="/appointments"
-                class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg shrink-0 touch-manipulation"
-                aria-label="Back to appointments"
+                label="Back to appointments"
+                class="shrink-0"
             >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
-            </router-link>
+                <ArrowLeftIcon class="icon" aria-hidden="true" />
+            </BaseButton>
             <h1 class="text-lg sm:text-xl font-bold text-slate-900 truncate">Appointment Details</h1>
         </div>
 
-        <div v-if="loading" class="text-center py-12 text-slate-500">Loading...</div>
+        <div
+            v-if="loading"
+            class="space-y-3 py-4"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+        >
+            <span class="sr-only">Loading appointment…</span>
+            <div v-for="n in 5" :key="`appointment-skeleton-${n}`" class="skeleton-text" :class="n % 3 === 0 ? 'w-1/2' : 'w-full'" />
+        </div>
         <template v-else-if="appointment">
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
-                <div>
-                    <div class="text-sm text-slate-500">{{ appointmentCustomerTypeLabel }}</div>
-                    <div class="font-semibold text-slate-900">
-                        {{ appointment.business_name || appointment.customer?.business_name || appointment.customer?.name || '-' }}
-                    </div>
-                    <div v-if="appointment.business_name || appointment.customer?.business_name" class="text-sm text-slate-600">
-                        Contact: {{ appointment.customer?.name || 'N/A' }}
-                    </div>
-                    <div class="text-sm text-slate-600">
-                        {{ appointment.customer?.phone || '' }}
-                        {{ appointment.customer?.email || '' }}
-                    </div>
-                    <div v-if="appointment.customer?.address" class="text-sm text-slate-600">
-                        {{ appointment.customer?.address }}
-                    </div>
-                    <div v-if="appointment.customer?.city || appointment.customer?.postcode" class="text-sm text-slate-600">
-                        {{ appointment.customer?.city || '' }}
-                        {{ appointment.customer?.postcode || '' }}
-                    </div>
-                    <div class="mt-2 text-xs text-slate-500 space-y-0.5">
-                        <div>Created by: <span class="font-medium text-slate-700">{{ appointment.user?.name || 'Unknown' }}</span></div>
-                        <div v-if="appointment.assignee">
-                            Assigned to: <span class="font-medium text-slate-700">{{ appointment.assignee.name }}</span>
+            <BaseCard>
+                <div class="space-y-4">
+                    <div>
+                        <div class="text-sm text-slate-500">{{ appointmentCustomerTypeLabel }}</div>
+                        <div class="font-semibold text-slate-900">
+                            {{ appointment.business_name || appointment.customer?.business_name || appointment.customer?.name || '-' }}
                         </div>
-                    </div>
-                </div>
-
-                <div>
-                    <div class="text-sm text-slate-500">Lead #</div>
-                    <router-link :to="`/leads/${appointment.lead_id}`" class="text-blue-600 hover:underline">
-                        {{ appointment.lead_id }}
-                    </router-link>
-                </div>
-
-                <div class="rounded-lg border border-teal-100 bg-teal-50/70 p-4 space-y-3">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                            <div class="text-sm font-semibold text-teal-900">Sales brief</div>
-                            <div class="text-xs text-teal-700">Who this is for, what to sell, and where the lead stands.</div>
+                        <div v-if="appointment.business_name || appointment.customer?.business_name" class="text-sm text-slate-600">
+                            Contact: {{ appointment.customer?.name || 'N/A' }}
                         </div>
-                        <span class="px-2 py-1 rounded bg-white text-xs font-medium text-teal-800 border border-teal-100">
-                            {{ formatStage(appointment.lead?.stage) || 'No stage' }}
-                        </span>
+                        <div class="text-sm text-slate-600">
+                            {{ appointment.customer?.phone || '' }}
+                            {{ appointment.customer?.email || '' }}
+                        </div>
+                        <div v-if="appointment.customer?.address" class="text-sm text-slate-600">
+                            {{ appointment.customer?.address }}
+                        </div>
+                        <div v-if="appointment.customer?.city || appointment.customer?.postcode" class="text-sm text-slate-600">
+                            {{ appointment.customer?.city || '' }}
+                            {{ appointment.customer?.postcode || '' }}
+                        </div>
+                        <div class="mt-2 text-xs text-slate-500 space-y-0.5">
+                            <div>Created by: <span class="font-medium text-slate-700">{{ appointment.user?.name || 'Unknown' }}</span></div>
+                            <div v-if="appointment.assignee">
+                                Assigned to: <span class="font-medium text-slate-700">{{ appointment.assignee.name }}</span>
+                            </div>
+                        </div>
                     </div>
 
                     <div>
-                        <div class="text-xs font-medium text-teal-800 mb-1">What to sell</div>
-                        <div v-if="productsToSell.length" class="flex flex-wrap gap-1.5">
-                            <span
-                                v-for="product in productsToSell"
-                                :key="product"
-                                class="px-2 py-1 rounded bg-white text-teal-800 border border-teal-100 text-xs font-medium"
-                            >
-                                {{ product }}
-                            </span>
+                        <div class="text-sm text-slate-500">Lead #</div>
+                        <router-link :to="`/leads/${appointment.lead_id}`" class="link">
+                            {{ appointment.lead_id }}
+                        </router-link>
+                    </div>
+
+                    <div class="rounded-card border border-primary-100 bg-primary-50/70 p-4 space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <h2 class="text-sm font-semibold text-primary-900">Sales brief</h2>
+                                <div class="text-xs text-primary-700">Who this is for, what to sell, and where the lead stands.</div>
+                            </div>
+                            <BaseBadge tone="primary">
+                                {{ formatStage(appointment.lead?.stage) || 'No stage' }}
+                            </BaseBadge>
                         </div>
-                        <div v-else class="text-sm text-amber-700">
-                            No product is attached to this lead yet. Open the lead and add the product before attending.
+
+                        <div>
+                            <div class="text-xs font-medium text-primary-800 mb-1">What to sell</div>
+                            <div v-if="productsToSell.length" class="flex flex-wrap gap-1.5">
+                                <BaseBadge
+                                    v-for="product in productsToSell"
+                                    :key="product"
+                                    tone="primary"
+                                >
+                                    {{ product }}
+                                </BaseBadge>
+                            </div>
+                            <p v-else class="callout callout-warning">
+                                No product is attached to this lead yet. Open the lead and add the product before attending.
+                            </p>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                            <div>
+                                <div class="text-xs text-primary-800">Source</div>
+                                <div class="font-medium text-slate-900">{{ appointment.lead?.source || 'Not set' }}</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-primary-800">Lead owner</div>
+                                <div class="font-medium text-slate-900">{{ appointment.lead?.assignee?.name || 'Unassigned' }}</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-primary-800">Pipeline value</div>
+                                <div class="font-medium text-slate-900">GBP {{ money(appointment.lead?.pipeline_value || 0) }}</div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                        <div>
-                            <div class="text-xs text-teal-800">Source</div>
-                            <div class="font-medium text-slate-900">{{ appointment.lead?.source || 'Not set' }}</div>
-                        </div>
-                        <div>
-                            <div class="text-xs text-teal-800">Lead owner</div>
-                            <div class="font-medium text-slate-900">{{ appointment.lead?.assignee?.name || 'Unassigned' }}</div>
-                        </div>
-                        <div>
-                            <div class="text-xs text-teal-800">Pipeline value</div>
-                            <div class="font-medium text-slate-900">GBP {{ money(appointment.lead?.pipeline_value || 0) }}</div>
-                        </div>
+                    <div v-if="appointment.description">
+                        <div class="text-sm text-slate-500">Notes</div>
+                        <p class="text-slate-700 whitespace-pre-line">{{ appointment.description }}</p>
                     </div>
                 </div>
+            </BaseCard>
 
-                <div v-if="appointment.description">
-                    <div class="text-sm text-slate-500">Notes</div>
-                    <p class="text-slate-700 whitespace-pre-line">{{ appointment.description }}</p>
-                </div>
-            </div>
-
-            <form @submit.prevent="save" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4 sm:space-y-5">
-                <h2 class="font-semibold text-slate-900">Update appointment</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <BaseCard title="Update appointment">
+                <form id="appointment-update-form" class="space-y-4 sm:space-y-5" @submit.prevent="save">
+                    <div class="form-grid-2">
+                        <div>
+                            <label class="form-label" for="appointmentdetailview-appointment-date">Appointment date</label>
+                            <input id="appointmentdetailview-appointment-date"
+                                v-model="form.appointment_date"
+                                type="date"
+                                class="form-input"
+                            />
+                        </div>
+                        <div>
+                            <label class="form-label" for="appointmentdetailview-appointment-time">Appointment time</label>
+                            <input id="appointmentdetailview-appointment-time"
+                                v-model="form.appointment_time"
+                                type="time"
+                                class="form-input"
+                            />
+                        </div>
+                    </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Appointment date</label>
-                        <input
-                            v-model="form.appointment_date"
-                            type="date"
-                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        <label class="form-label" for="appointmentdetailview-status">Status</label>
+                        <select id="appointmentdetailview-status"
+                            v-model="form.appointment_status"
+                            class="form-select"
+                        >
+                            <option value="pending">Pending</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                            <option value="no_show">No show</option>
+                            <option value="rescheduled">Rescheduled</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" for="appointmentdetailview-what-happened-outcome-notes">What happened (outcome notes)</label>
+                        <textarea id="appointmentdetailview-what-happened-outcome-notes"
+                            v-model="form.outcome_notes"
+                            rows="3"
+                            class="form-textarea resize-none"
+                            placeholder="Summarise what happened at the appointment..."
                         />
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Appointment time</label>
-                        <input
-                            v-model="form.appointment_time"
-                            type="time"
-                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                    <select
-                        v-model="form.appointment_status"
-                        class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="pending">Pending</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                        <option value="no_show">No show</option>
-                        <option value="rescheduled">Rescheduled</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">What happened (outcome notes)</label>
-                    <textarea
-                        v-model="form.outcome_notes"
-                        rows="3"
-                        class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                        placeholder="Summarise what happened at the appointment..."
-                    />
-                </div>
 
-                <div class="border-t border-slate-200 pt-4 space-y-4">
-                    <div class="text-sm font-medium text-slate-700">Lead outcome (optional)</div>
-                    <div class="flex flex-wrap gap-4">
-                        <label class="flex items-center gap-2">
-                            <input type="radio" v-model="form.lead_stage" value="won" class="text-green-600" />
-                            <span>Won</span>
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="radio" v-model="form.lead_stage" value="lost" class="text-red-600" />
-                            <span>Lost</span>
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="radio" v-model="form.lead_stage" value="" class="text-slate-600" />
-                            <span>No change</span>
-                        </label>
-                    </div>
-
-                    <div v-if="form.lead_stage === 'won'" class="mt-4 space-y-4">
-                        <div class="text-sm font-medium text-slate-700">Products achieved</div>
-                        <p class="text-xs text-slate-500">Select products that were sold during this appointment.</p>
-                        <div v-if="!pendingItems.length && !wonItemsList.length" class="text-sm text-slate-500 py-4 bg-slate-50 rounded-lg px-4">
-                            No products on this lead. Add products on the <router-link :to="`/leads/${appointment.lead_id}`" class="text-blue-600 hover:underline">Lead page</router-link> first.
-                        </div>
-                        <div v-else class="space-y-3">
-                            <div
-                                v-for="item in pendingItems"
-                                :key="item.id"
-                                class="flex flex-col sm:flex-row sm:items-center gap-3 p-3 sm:p-4 rounded-lg border border-slate-200 bg-white"
-                            >
-                                <label class="flex items-center gap-2 shrink-0 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        :checked="isItemSelected(item.id)"
-                                        @change="toggleWonItem(item)"
-                                        class="rounded border-slate-300 text-green-600"
-                                    />
-                                    <span class="font-medium text-slate-900">{{ item.product?.name || 'Product' }}</span>
+                    <div class="border-t border-slate-200 pt-4 space-y-4">
+                        <fieldset class="form-fieldset">
+                            <legend class="form-legend">Lead outcome (optional)</legend>
+                            <div class="flex flex-wrap gap-4">
+                                <label class="form-choice">
+                                    <input type="radio" v-model="form.lead_stage" value="won" class="form-radio" />
+                                    <span>Won</span>
                                 </label>
-                                <div v-if="isItemSelected(item.id)" class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1">
-                                    <div class="flex-1 min-w-0 w-full sm:w-auto">
-                                        <label class="block text-xs text-slate-500 mb-0.5">Quantity</label>
+                                <label class="form-choice">
+                                    <input type="radio" v-model="form.lead_stage" value="lost" class="form-radio" />
+                                    <span>Lost</span>
+                                </label>
+                                <label class="form-choice">
+                                    <input type="radio" v-model="form.lead_stage" value="" class="form-radio" />
+                                    <span>No change</span>
+                                </label>
+                            </div>
+                        </fieldset>
+
+                        <div v-if="form.lead_stage === 'won'" class="mt-4 space-y-4">
+                            <div class="text-sm font-medium text-slate-700">Products achieved</div>
+                            <p class="text-xs text-slate-500">Select products that were sold during this appointment.</p>
+                            <p v-if="!pendingItems.length && !wonItemsList.length" class="callout callout-info">
+                                No products on this lead. Add products on the <router-link :to="`/leads/${appointment.lead_id}`" class="link">Lead page</router-link> first.
+                            </p>
+                            <div v-else class="space-y-3">
+                                <div
+                                    v-for="item in pendingItems"
+                                    :key="item.id"
+                                    class="flex flex-col sm:flex-row sm:items-center gap-3 p-3 sm:p-4 rounded-card border border-slate-200 bg-white"
+                                >
+                                    <label class="form-choice shrink-0">
                                         <input
-                                            type="number"
-                                            min="1"
-                                            :value="getWonItemQty(item.id)"
-                                            @input="(e) => setWonItemQty(item.id, e.target.value)"
-                                            class="w-full sm:min-w-[5rem] sm:max-w-[6rem] px-3 py-2.5 text-base sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation"
+                                            type="checkbox"
+                                            :checked="isItemSelected(item.id)"
+                                            @change="toggleWonItem(item)"
+                                            class="form-checkbox"
                                         />
-                                    </div>
-                                    <div class="flex-1 min-w-0 w-full sm:w-auto">
-                                        <label class="block text-xs text-slate-500 mb-0.5">Unit price (GBP)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            :value="getWonItemPrice(item.id)"
-                                            @input="(e) => setWonItemPrice(item.id, e.target.value)"
-                                            class="w-full sm:min-w-[6rem] sm:max-w-[7rem] px-3 py-2.5 text-base sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation"
-                                        />
+                                        <span class="font-medium text-slate-900">{{ item.product?.name || 'Product' }}</span>
+                                    </label>
+                                    <div v-if="isItemSelected(item.id)" class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1">
+                                        <div class="flex-1 min-w-0 w-full sm:w-auto">
+                                            <label class="form-label" :for="`appointmentdetailview-quantity-${item.id}`">Quantity</label>
+                                            <input :id="`appointmentdetailview-quantity-${item.id}`"
+                                                type="number"
+                                                min="1"
+                                                :value="getWonItemQty(item.id)"
+                                                @input="(e) => setWonItemQty(item.id, e.target.value)"
+                                                class="form-input sm:min-w-[5rem] sm:max-w-[6rem] text-base sm:text-sm touch-manipulation"
+                                            />
+                                        </div>
+                                        <div class="flex-1 min-w-0 w-full sm:w-auto">
+                                            <label class="form-label" :for="`appointmentdetailview-unit-price-gbp-${item.id}`">Unit price (GBP)</label>
+                                            <input :id="`appointmentdetailview-unit-price-gbp-${item.id}`"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                :value="getWonItemPrice(item.id)"
+                                                @input="(e) => setWonItemPrice(item.id, e.target.value)"
+                                                class="form-input sm:min-w-[6rem] sm:max-w-[7rem] text-base sm:text-sm touch-manipulation"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
+                                <div
+                                    v-for="item in wonItemsList"
+                                    :key="'won-' + item.id"
+                                    class="flex flex-wrap items-center gap-2 p-3 rounded-card bg-success-50 border border-success-200"
+                                >
+                                    <BaseBadge tone="success">Won</BaseBadge>
+                                    <span class="font-medium text-slate-900">{{ item.product?.name || 'Product' }}</span>
+                                    <span class="text-sm text-slate-600">
+                                        {{ item.quantity }} x GBP {{ parseFloat(item.unit_price || 0).toFixed(2) }}
+                                    </span>
+                                    <span class="text-xs text-slate-500 ml-auto">Already achieved</span>
+                                </div>
                             </div>
-                            <div
-                                v-for="item in wonItemsList"
-                                :key="'won-' + item.id"
-                                class="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-100"
-                            >
-                                <span class="font-medium text-green-700">Won</span>
-                                <span class="font-medium text-slate-900">{{ item.product?.name || 'Product' }}</span>
-                                <span class="text-sm text-slate-600">
-                                    {{ item.quantity }} x GBP {{ parseFloat(item.unit_price || 0).toFixed(2) }}
-                                </span>
-                                <span class="text-xs text-slate-500 ml-auto">Already achieved</span>
-                            </div>
+                        </div>
+
+                        <div v-if="form.lead_stage === 'lost'">
+                            <label class="form-label" for="appointmentdetailview-lost-reason">Lost reason</label>
+                            <input id="appointmentdetailview-lost-reason"
+                                v-model="form.lost_reason"
+                                type="text"
+                                class="form-input"
+                                placeholder="Reason for loss..."
+                            />
                         </div>
                     </div>
 
-                    <div v-if="form.lead_stage === 'lost'">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Lost reason</label>
-                        <input
-                            v-model="form.lost_reason"
-                            type="text"
-                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Reason for loss..."
-                        />
-                    </div>
-                </div>
+                    <p v-if="error" class="callout callout-danger" role="alert">{{ error }}</p>
+                </form>
 
-                <div v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{{ error }}</div>
-                <div class="flex justify-end pt-2">
-                    <button
+                <template #footer>
+                    <BaseButton
+                        variant="primary"
+                        size="lg"
                         type="submit"
-                        :disabled="saving"
-                        class="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium text-base sm:text-sm touch-manipulation min-h-[44px] sm:min-h-0"
+                        form="appointment-update-form"
+                        block-mobile
+                        :loading="saving"
                     >
                         {{ saving ? 'Saving...' : 'Save changes' }}
-                    </button>
-                </div>
-            </form>
+                    </BaseButton>
+                </template>
+            </BaseCard>
         </template>
-        <div v-else class="text-center py-12 text-slate-500">Appointment not found.</div>
+        <EmptyState
+            v-else
+            heading="Appointment not found."
+            :description="error || ''"
+        >
+            <template #icon>
+                <CalendarDaysIcon class="icon" aria-hidden="true" />
+            </template>
+        </EmptyState>
     </div>
 </template>
 
@@ -250,6 +276,8 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import axios from 'axios';
+import { ArrowLeftIcon, CalendarDaysIcon } from '@heroicons/vue/24/outline';
+import { BaseBadge, BaseButton, BaseCard, EmptyState } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 
 const route = useRoute();

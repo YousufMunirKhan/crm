@@ -1,335 +1,335 @@
 <template>
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div class="p-6 border-b border-slate-200">
-                <h2 class="text-xl font-semibold text-slate-900">
-                    {{ lead ? 'Edit Lead' : 'Create New Lead' }}
-                </h2>
+    <BaseModal
+        :model-value="true"
+        :title="lead ? 'Edit Lead' : 'Create New Lead'"
+        size="md"
+        :close-on-backdrop="false"
+        @close="$emit('close')"
+    >
+        <form id="lead-form" class="space-y-4" @submit.prevent="handleSubmit">
+            <div>
+                <label class="form-label" for="leadform-customer">Customer <span class="form-required" aria-hidden="true">*</span></label>
+                <select id="leadform-customer"
+                    v-model="form.customer_id"
+                    required
+                    class="form-select"
+                >
+                    <option value="">Select Customer</option>
+                    <option v-for="customer in customers" :key="customer.id" :value="customer.id">
+                        {{ customer.name }} - {{ customer.phone }}
+                    </option>
+                </select>
             </div>
 
-            <form @submit.prevent="handleSubmit" class="p-6 space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Customer *</label>
-                    <select
-                        v-model="form.customer_id"
-                        required
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+            <div role="group" aria-labelledby="leadform-products-label">
+                <div class="mb-1 flex items-center justify-between gap-3">
+                    <span id="leadform-products-label" class="form-label mb-0">Product(s) <span class="form-required" aria-hidden="true">*</span></span>
+                    <router-link
+                        to="/products"
+                        target="_blank"
+                        class="link text-xs"
                     >
-                        <option value="">Select Customer</option>
-                        <option v-for="customer in customers" :key="customer.id" :value="customer.id">
-                            {{ customer.name }} - {{ customer.phone }}
-                        </option>
+                        + Add New Product
+                    </router-link>
+                </div>
+                <div class="max-h-48 overflow-y-auto rounded-control border border-slate-300 bg-white p-3">
+                    <div v-if="!products || products.length === 0" class="py-4 text-center text-sm text-slate-500">
+                        Loading products...
+                    </div>
+                    <div v-else class="space-y-2">
+                        <label
+                            v-for="product in products"
+                            :key="product.id"
+                            class="flex w-full cursor-pointer items-center gap-3 rounded-control p-2 transition-colors hover:bg-slate-50"
+                            :class="{ 'bg-primary-50 border border-primary-200': form.product_ids.includes(Number(product.id)) }"
+                            :for="`leadform-product-${product.id}`"
+                        >
+                            <input
+                                :id="`leadform-product-${product.id}`"
+                                type="checkbox"
+                                :value="Number(product.id)"
+                                v-model="form.product_ids"
+                                class="form-checkbox"
+                            />
+                            <span class="text-sm text-slate-700">{{ product.name }}</span>
+                        </label>
+                    </div>
+                </div>
+                <p class="form-hint">
+                    Click to select multiple products for this lead.
+                </p>
+                <div v-if="form.product_ids.length > 0" class="mt-2 rounded-control border border-primary-200 bg-primary-50 p-2">
+                    <p class="mb-1 flex items-center gap-1.5 text-sm font-medium text-primary-800">
+                        <CheckIcon class="icon-sm" aria-hidden="true" />
+                        {{ form.product_ids.length }} product(s) selected:
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        <span
+                            v-for="productId in form.product_ids"
+                            :key="productId"
+                            class="chip"
+                        >
+                            {{ products.find(p => p.id == productId)?.name || 'Loading...' }}
+                            <button
+                                type="button"
+                                @click.prevent="removeProductId(productId)"
+                                class="chip-remove"
+                                :aria-label="`Remove ${products.find(p => p.id == productId)?.name || 'product'}`"
+                            >
+                                <XMarkIcon class="icon-sm" aria-hidden="true" />
+                            </button>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-grid-2">
+                <div>
+                    <label class="form-label" for="leadform-stage">Stage <span class="form-required" aria-hidden="true">*</span></label>
+                    <select id="leadform-stage"
+                        v-model="form.stage"
+                        required
+                        class="form-select"
+                    >
+                        <option value="follow_up">Follow Up</option>
+                        <option value="lead">Lead</option>
+                        <option value="hot_lead">Hot Lead</option>
+                        <option value="quotation">Quotation</option>
+                        <option value="won">Won</option>
+                        <option value="lost">Lost</option>
                     </select>
                 </div>
 
                 <div>
-                    <div class="flex justify-between items-center mb-1">
-                        <label class="block text-sm font-medium text-slate-700">Product(s) *</label>
-                        <router-link
-                            to="/products"
-                            target="_blank"
-                            class="text-xs text-blue-600 hover:text-blue-800 underline"
-                        >
-                            + Add New Product
-                        </router-link>
-                    </div>
-                    <div class="border border-slate-300 rounded-lg p-3 bg-white max-h-48 overflow-y-auto">
-                        <div v-if="!products || products.length === 0" class="text-sm text-slate-500 text-center py-4">
-                            Loading products...
-                        </div>
-                        <div v-else class="space-y-2">
-                            <label
-                                v-for="product in products"
-                                :key="product.id"
-                                class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
-                                :class="{ 'bg-blue-50 border border-blue-200': form.product_ids.includes(Number(product.id)) }"
-                            >
-                                <input
-                                    type="checkbox"
-                                    :value="Number(product.id)"
-                                    v-model="form.product_ids"
-                                    class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-                                />
-                                <span class="text-sm text-slate-700">{{ product.name }}</span>
-                            </label>
-                        </div>
-                    </div>
-                    <p class="text-xs text-slate-500 mt-2">
-                        Click to select multiple products for this lead.
+                    <label class="form-label" for="leadform-source">Source</label>
+                    <select id="leadform-source"
+                        v-model="form.source"
+                        class="form-select"
+                    >
+                        <option value="">Select Source</option>
+                        <option value="call_center">Call Center</option>
+                        <option value="ground_field">Ground Field</option>
+                        <option value="website">Website</option>
+                        <option value="meta">Meta</option>
+                        <option value="tiktok">TikTok</option>
+                        <option value="google_ads">Google Ads</option>
+                        <option value="organic_lead">Organic Lead</option>
+                    </select>
+                </div>
+
+                <!-- Assign To - Sales agents can reassign when editing, auto-assign when creating -->
+                <div v-if="canReassign">
+                    <label class="form-label" for="leadform-assigned-to">
+                        {{ isSalesAgent && lead ? 'Reassign To' : 'Assign To' }}
+                    </label>
+                    <select id="leadform-assigned-to"
+                        v-model="form.assigned_to"
+                        class="form-select"
+                        :aria-describedby="isSalesAgent && lead ? 'leadform-assigned-to-hint' : undefined"
+                    >
+                        <option v-if="!isSalesAgent" value="">Unassigned</option>
+                        <option v-for="user in users" :key="user.id" :value="user.id">
+                            {{ user.name }} {{ user.id === auth.user?.id ? '(You)' : '' }}
+                        </option>
+                    </select>
+                    <p v-if="isSalesAgent && lead" id="leadform-assigned-to-hint" class="form-hint">
+                        You can reassign this lead to another team member
                     </p>
-                    <div v-if="form.product_ids.length > 0" class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p class="text-sm font-medium text-blue-900 mb-1">
-                            ✓ {{ form.product_ids.length }} product(s) selected:
-                        </p>
-                        <div class="flex flex-wrap gap-2">
-                            <span
-                                v-for="productId in form.product_ids"
-                                :key="productId"
-                                class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium flex items-center gap-1"
-                            >
-                                {{ products.find(p => p.id == productId)?.name || 'Loading...' }}
-                                <button
-                                    type="button"
-                                    @click.prevent="removeProductId(productId)"
-                                    class="text-blue-600 hover:text-blue-800 ml-1"
-                                >
-                                    ×
-                                </button>
-                            </span>
-                        </div>
-                    </div>
+                </div>
+                <div v-else>
+                    <span class="form-label">Assigned To</span>
+                    <p class="rounded-control border border-slate-200 bg-slate-100 px-3 py-2 text-slate-700">
+                        {{ auth.user?.name }} (You)
+                    </p>
+                    <p class="form-hint">
+                        Lead will be assigned to you automatically
+                    </p>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Stage *</label>
-                        <select
-                            v-model="form.stage"
-                            required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        >
-                            <option value="follow_up">Follow Up</option>
-                            <option value="lead">Lead</option>
-                            <option value="hot_lead">Hot Lead</option>
-                            <option value="quotation">Quotation</option>
-                            <option value="won">Won</option>
-                            <option value="lost">Lost</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Source</label>
-                        <select
-                            v-model="form.source"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        >
-                            <option value="">Select Source</option>
-                            <option value="call_center">Call Center</option>
-                            <option value="ground_field">Ground Field</option>
-                            <option value="website">Website</option>
-                            <option value="meta">Meta</option>
-                            <option value="tiktok">TikTok</option>
-                            <option value="google_ads">Google Ads</option>
-                            <option value="organic_lead">Organic Lead</option>
-                        </select>
-                    </div>
-
-                    <!-- Assign To - Sales agents can reassign when editing, auto-assign when creating -->
-                    <div v-if="canReassign">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">
-                            {{ isSalesAgent && lead ? 'Reassign To' : 'Assign To' }}
-                        </label>
-                        <select
-                            v-model="form.assigned_to"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        >
-                            <option v-if="!isSalesAgent" value="">Unassigned</option>
-                            <option v-for="user in users" :key="user.id" :value="user.id">
-                                {{ user.name }} {{ user.id === auth.user?.id ? '(You)' : '' }}
-                            </option>
-                        </select>
-                        <p v-if="isSalesAgent && lead" class="text-xs text-slate-500 mt-1">
-                            You can reassign this lead to another team member
-                        </p>
-                    </div>
-                    <div v-else>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Assigned To</label>
-                        <div class="px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-700">
-                            {{ auth.user?.name }} (You)
-                        </div>
-                        <p class="text-xs text-slate-500 mt-1">
-                            Lead will be assigned to you automatically
-                        </p>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Pipeline Value (£)</label>
-                        <input
-                            v-model.number="form.pipeline_value"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Next Follow-up</label>
-                        <input
-                            v-model="form.next_follow_up_at"
-                            type="datetime-local"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-                </div>
-
-                <div v-if="form.stage === 'lost'">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Lost Reason *</label>
-                    <textarea
-                        v-model="form.lost_reason"
-                        rows="2"
-                        required
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        placeholder="Please provide a reason why this lead was lost..."
+                <div>
+                    <label class="form-label" for="leadform-pipeline-value">Pipeline Value (£)</label>
+                    <input id="leadform-pipeline-value"
+                        v-model.number="form.pipeline_value"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        class="form-input"
                     />
                 </div>
 
-                <!-- Items Section for Won Stage -->
-                <div v-if="form.stage === 'won'" class="border-2 border-green-200 rounded-lg p-4 bg-green-50/30">
-                    <div class="flex items-start justify-between mb-3">
-                        <div>
-                            <h4 class="text-sm font-semibold text-green-900 mb-1">Items Required to Close Deal</h4>
-                            <p class="text-xs text-green-700">You must add at least one item before closing this deal.</p>
-                        </div>
-                        <button
-                            type="button"
-                            @click="showItemsForm = !showItemsForm"
-                            class="px-3 py-1 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
-                        >
-                            {{ showItemsForm ? 'Hide Items' : (leadItems.length > 0 ? `Edit Items (${leadItems.length})` : 'Add Items') }}
-                        </button>
+                <div>
+                    <label class="form-label" for="leadform-next-follow-up">Next Follow-up</label>
+                    <input id="leadform-next-follow-up"
+                        v-model="form.next_follow_up_at"
+                        type="datetime-local"
+                        class="form-input"
+                    />
+                </div>
+            </div>
+
+            <div v-if="form.stage === 'lost'">
+                <label class="form-label" for="leadform-lost-reason">Lost Reason <span class="form-required" aria-hidden="true">*</span></label>
+                <textarea id="leadform-lost-reason"
+                    v-model="form.lost_reason"
+                    rows="2"
+                    required
+                    class="form-textarea"
+                    placeholder="Please provide a reason why this lead was lost..."
+                />
+            </div>
+
+            <!-- Items Section for Won Stage -->
+            <div v-if="form.stage === 'won'" class="rounded-card border-2 border-success-200 bg-success-50/30 p-4">
+                <div class="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                        <h3 class="mb-1 text-sm font-semibold text-success-800">Items Required to Close Deal</h3>
+                        <p class="text-xs text-success-700">You must add at least one item before closing this deal.</p>
                     </div>
+                    <BaseButton variant="success" size="sm" @click="showItemsForm = !showItemsForm">
+                        {{ showItemsForm ? 'Hide Items' : (leadItems.length > 0 ? `Edit Items (${leadItems.length})` : 'Add Items') }}
+                    </BaseButton>
+                </div>
 
-                    <!-- Show existing items if any -->
-                    <div v-if="leadItems.length > 0 && !showItemsForm" class="mt-3 space-y-2">
-                        <div
-                            v-for="item in leadItems"
-                            :key="item.id"
-                            class="bg-white rounded p-2 border border-green-200"
-                        >
-                            <div class="text-sm font-medium text-slate-900">{{ item.product?.name }}</div>
-                            <div class="text-xs text-slate-600">
-                                Qty: {{ item.quantity }} × £{{ parseFloat(item.unit_price || 0).toFixed(2) }} = £{{ parseFloat(item.total_price || 0).toFixed(2) }}
-                            </div>
+                <!-- Show existing items if any -->
+                <div v-if="leadItems.length > 0 && !showItemsForm" class="mt-3 space-y-2">
+                    <div
+                        v-for="item in leadItems"
+                        :key="item.id"
+                        class="rounded-control border border-success-200 bg-white p-2"
+                    >
+                        <div class="text-sm font-medium text-slate-900">{{ item.product?.name }}</div>
+                        <div class="text-xs text-slate-600">
+                            Qty: {{ item.quantity }} × £{{ parseFloat(item.unit_price || 0).toFixed(2) }} = £{{ parseFloat(item.total_price || 0).toFixed(2) }}
                         </div>
                     </div>
+                </div>
 
-                    <!-- Items Form -->
-                    <div v-if="showItemsForm" class="mt-4 space-y-4">
-                        <div v-for="(item, index) in items" :key="index" class="bg-white rounded-lg p-4 border border-slate-200 space-y-3">
-                            <div class="flex justify-between items-center mb-2">
-                                <h5 class="font-medium text-slate-900">Item {{ index + 1 }}</h5>
-                                <button
-                                    v-if="items.length > 1"
-                                    type="button"
-                                    @click="removeItem(index)"
-                                    class="text-red-600 hover:text-red-800 text-sm"
-                                >
-                                    Remove
-                                </button>
-                            </div>
+                <!-- Items Form -->
+                <div v-if="showItemsForm" class="mt-4 space-y-4">
+                    <div v-for="(item, index) in items" :key="index" class="space-y-3 rounded-card border border-slate-200 bg-white p-4">
+                        <div class="mb-2 flex items-center justify-between gap-3">
+                            <h4 class="font-medium text-slate-900">Item {{ index + 1 }}</h4>
+                            <BaseButton
+                                v-if="items.length > 1"
+                                variant="ghost"
+                                size="sm"
+                                @click="removeItem(index)"
+                            >
+                                <template #icon>
+                                    <TrashIcon class="icon-sm text-danger-700" aria-hidden="true" />
+                                </template>
+                                Remove
+                            </BaseButton>
+                        </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <div class="flex justify-between items-center mb-1">
-                                        <label class="block text-sm font-medium text-slate-700">Product *</label>
-                                        <router-link
-                                            to="/products"
-                                            target="_blank"
-                                            class="text-xs text-blue-600 hover:text-blue-800 underline"
-                                        >
-                                            + Add New
-                                        </router-link>
-                                    </div>
-                                    <select
-                                        v-model="item.product_id"
-                                        required
-                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                        <div class="form-grid-2">
+                            <div>
+                                <div class="mb-1 flex items-center justify-between gap-3">
+                                    <label class="form-label mb-0" :for="`leadform-item-${index}-product`">Product <span class="form-required" aria-hidden="true">*</span></label>
+                                    <router-link
+                                        to="/products"
+                                        target="_blank"
+                                        class="link text-xs"
                                     >
-                                        <option value="">Select product...</option>
-                                        <option v-for="product in products" :key="product.id" :value="product.id">
-                                            {{ product.name }}
-                                        </option>
-                                    </select>
+                                        + Add New
+                                    </router-link>
                                 </div>
-
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Quantity *</label>
-                                    <input
-                                        v-model.number="item.quantity"
-                                        type="number"
-                                        min="1"
-                                        required
-                                        @input="item.quantity = parseInt(item.quantity) || 1"
-                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Unit Price (£) *</label>
-                                    <input
-                                        v-model.number="item.unit_price"
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        required
-                                        @input="item.unit_price = parseFloat(item.unit_price) || 0"
-                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">
-                                        Total: £{{ calculateItemTotal(item).toFixed(2) }}
-                                    </label>
-                                </div>
+                                <select
+                                    :id="`leadform-item-${index}-product`"
+                                    v-model="item.product_id"
+                                    required
+                                    class="form-select"
+                                >
+                                    <option value="">Select product...</option>
+                                    <option v-for="product in products" :key="product.id" :value="product.id">
+                                        {{ product.name }}
+                                    </option>
+                                </select>
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-                                <textarea
-                                    v-model="item.notes"
-                                    rows="2"
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                                    placeholder="Additional notes..."
+                                <label class="form-label" :for="`leadform-item-${index}-quantity`">Quantity <span class="form-required" aria-hidden="true">*</span></label>
+                                <input
+                                    :id="`leadform-item-${index}-quantity`"
+                                    v-model.number="item.quantity"
+                                    type="number"
+                                    min="1"
+                                    required
+                                    @input="item.quantity = parseInt(item.quantity) || 1"
+                                    class="form-input"
                                 />
+                            </div>
+
+                            <div>
+                                <label class="form-label" :for="`leadform-unit-price-${index}`">Unit Price (£) <span class="form-required" aria-hidden="true">*</span></label>
+                                <input :id="`leadform-unit-price-${index}`"
+                                    v-model.number="item.unit_price"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    required
+                                    @input="item.unit_price = parseFloat(item.unit_price) || 0"
+                                    class="form-input"
+                                />
+                            </div>
+
+                            <div>
+                                <span class="form-label">
+                                    Total: £{{ calculateItemTotal(item).toFixed(2) }}
+                                </span>
                             </div>
                         </div>
 
-                        <button
-                            type="button"
-                            @click="addItem"
-                            class="w-full py-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-slate-400 hover:text-slate-700 text-sm"
-                        >
-                            + Add Another Item
-                        </button>
+                        <div>
+                            <label class="form-label" :for="`leadform-notes-${index}`">Notes</label>
+                            <textarea :id="`leadform-notes-${index}`"
+                                v-model="item.notes"
+                                rows="2"
+                                class="form-textarea"
+                                placeholder="Additional notes..."
+                            />
+                        </div>
                     </div>
 
-                    <div v-if="leadItems.length === 0 && !showItemsForm" class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                        <p class="text-sm text-yellow-800">
-                            ⚠️ <strong>No items added yet.</strong> Click "Add Items" above to add products before closing this deal.
-                        </p>
-                    </div>
+                    <BaseButton variant="outline" class="w-full border-dashed" @click="addItem">
+                        <template #icon>
+                            <PlusIcon class="icon-sm" aria-hidden="true" />
+                        </template>
+                        Add Another Item
+                    </BaseButton>
                 </div>
 
-                <div v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded">
-                    {{ error }}
-                </div>
+                <p v-if="leadItems.length === 0 && !showItemsForm" class="callout callout-warning mt-3 flex items-start gap-2">
+                    <ExclamationTriangleIcon class="icon shrink-0 text-warning-800" aria-hidden="true" />
+                    <span><strong>No items added yet.</strong> Click "Add Items" above to add products before closing this deal.</span>
+                </p>
+            </div>
 
-                <div class="flex justify-end gap-3 pt-4 border-t border-slate-200">
-                    <button
-                        type="button"
-                        @click="$emit('close')"
-                        class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        :disabled="loading"
-                        class="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
-                    >
-                        {{ loading ? 'Saving...' : (lead ? 'Update' : 'Create') }}
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
+            <p v-if="error" class="callout callout-danger" role="alert">
+                {{ error }}
+            </p>
+        </form>
+
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="$emit('close')">Cancel</BaseButton>
+            <BaseButton
+                variant="primary"
+                type="submit"
+                form="lead-form"
+                block-mobile
+                :loading="loading"
+            >
+                {{ loading ? 'Saving...' : (lead ? 'Update' : 'Create') }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
+import { CheckIcon, ExclamationTriangleIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/vue/24/outline';
+import { BaseButton, BaseModal } from '@/components/base';
 import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();

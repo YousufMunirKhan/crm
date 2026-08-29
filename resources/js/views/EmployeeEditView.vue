@@ -3,26 +3,35 @@
         <div class="w-full min-w-0 max-w-4xl mx-auto p-3 sm:p-4 lg:p-6 space-y-6">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
                 <div class="flex items-center gap-2 min-w-0">
-                    <button
+                    <BaseButton
+                        variant="ghost"
+                        size="icon"
+                        label="Go back"
+                        class="shrink-0"
                         @click="$router.back()"
-                        class="p-2 hover:bg-white rounded-xl border border-transparent hover:border-slate-200 transition touch-manipulation shrink-0"
                     >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
+                        <template #icon>
+                            <ArrowLeftIcon class="icon" aria-hidden="true" />
+                        </template>
+                    </BaseButton>
                     <h1 class="text-xl lg:text-2xl font-bold text-slate-900">
                         {{ isSelfHrOnly ? 'Bank details & documents' : 'Edit Employee' }}
                     </h1>
                 </div>
             </div>
 
-            <div v-if="loading" class="text-center py-12 text-slate-500">
-                Loading...
+            <div v-if="loading" class="form-card p-6 space-y-3" aria-busy="true">
+                <span class="sr-only">Loading employee…</span>
+                <div class="skeleton-text w-1/3"></div>
+                <div class="skeleton-text w-full"></div>
+                <div class="skeleton-text w-5/6"></div>
+                <div class="skeleton-text w-2/3"></div>
             </div>
 
             <form
                 v-else
+                id="employee-edit-form"
+                novalidate
                 class="form-card min-w-0"
                 @submit.prevent="handleSubmit"
             >
@@ -34,320 +43,386 @@
                         {{ isSelfHrOnly ? 'Update bank details and attachments below.' : 'Personal, job, and payroll-related fields in one place.' }}
                     </p>
                 </div>
+
                 <div class="form-body space-y-8">
-            <div
-                v-if="isSelfHrOnly"
-                class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"
-            >
-                <p class="font-medium text-slate-900">Signed in as {{ form.name || '—' }}</p>
-                <p class="text-slate-600">{{ form.email }}</p>
-                <p class="text-xs text-slate-500 mt-2">
-                    Update your bank details and upload HR documents here. For name, role, or other changes, contact HR.
-                </p>
-            </div>
-
-            <!-- Personal details -->
-            <div v-if="!isSelfHrOnly" class="space-y-4">
-                <h2 class="form-section-title text-base">Personal details</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="form-label">Full name *</label>
-                        <input
-                            v-model="form.name"
-                            type="text"
-                            required
-                            class="form-input"
-                        />
-                    </div>
-                    <div>
-                        <label class="form-label">Email *</label>
-                        <input
-                            v-model="form.email"
-                            type="email"
-                            required
-                            class="form-input"
-                        />
-                    </div>
-                    <div>
-                        <label class="form-label">Phone</label>
-                        <input
-                            v-model="form.phone"
-                            type="text"
-                            class="form-input"
-                        />
-                    </div>
-                    <div>
-                        <label class="form-label">Date of birth</label>
-                        <input
-                            v-model="form.date_of_birth"
-                            type="date"
-                            class="form-input"
-                        />
-                    </div>
-                </div>
-                <div>
-                    <label class="form-label">Address</label>
-                    <textarea
-                        v-model="form.address"
-                        rows="2"
-                        class="form-input resize-none"
-                    />
-                </div>
-            </div>
-
-            <!-- Job & access -->
-            <div v-if="!isSelfHrOnly" class="space-y-4 border-t border-slate-100 pt-6">
-                <h2 class="form-section-title text-base">Job & access</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="form-label">Role *</label>
-                        <select
-                            v-model="form.role_id"
-                            required
-                            class="form-input"
-                        >
-                            <option value="">Select role</option>
-                            <option v-for="role in roles" :key="role.id" :value="role.id">
-                                {{ role.name }}
-                            </option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label">Employee type</label>
-                        <select
-                            v-model="form.employee_type"
-                            class="form-input"
-                        >
-                            <option value="">Select type</option>
-                            <option value="field_worker">Field Worker</option>
-                            <option value="call_center">Call Center</option>
-                            <option value="ticket_manager">Ticket Manager</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label">Hire date</label>
-                        <input
-                            v-model="form.hire_date"
-                            type="date"
-                            class="form-input"
-                        />
-                    </div>
-                    <div>
-                        <label class="form-label">Status</label>
-                        <select
-                            v-model="form.is_active"
-                            class="form-input"
-                        >
-                            <option :value="true">Active</option>
-                            <option :value="false">Inactive</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <div v-if="canEditNavPerms" class="space-y-4 border border-slate-200 rounded-xl p-4 bg-slate-50/80">
-                <h2 class="form-section-title text-base">Sidebar menu access</h2>
-                <p class="text-xs text-slate-600">
-                    Leave this off for default role menu. Turn on to limit this user to selected sections.
-                </p>
-                <label class="inline-flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
-                    <input
-                        v-model="restrictMenu"
-                        type="checkbox"
-                        class="form-checkbox"
-                    />
-                    Limit sidebar to selected sections only
-                </label>
-                <div
-                    v-if="restrictMenu"
-                    class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-56 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-white"
-                >
-                    <label
-                        v-for="opt in NAV_SECTION_OPTIONS"
-                        v-show="opt.key !== 'dashboard'"
-                        :key="opt.key"
-                        class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
-                    >
-                        <input
-                            v-model="sectionChecks[opt.key]"
-                            type="checkbox"
-                            class="form-checkbox"
-                        />
-                        {{ opt.label }}
-                    </label>
-                </div>
-            </div>
-
-            <!-- Bank details -->
-            <div class="space-y-4 border-t border-slate-100 pt-6">
-                <h2 class="form-section-title text-base">Bank details</h2>
-                <p class="text-xs text-slate-500">
-                    These details are used for HR and salary purposes only.
-                </p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="form-label">Account holder name</label>
-                        <input
-                            v-model="form.bank_account_name"
-                            type="text"
-                            class="form-input"
-                        />
-                    </div>
-                    <div>
-                        <label class="form-label">Bank name</label>
-                        <input
-                            v-model="form.bank_name"
-                            type="text"
-                            class="form-input"
-                        />
-                    </div>
-                    <div>
-                        <label class="form-label">Sort code</label>
-                        <input
-                            v-model="form.bank_sort_code"
-                            type="text"
-                            class="form-input"
-                        />
-                    </div>
-                    <div>
-                        <label class="form-label">Account number</label>
-                        <input
-                            v-model="form.bank_account_number"
-                            type="text"
-                            class="form-input"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            <!-- Documents: existing + new attachments -->
-            <div class="space-y-4 border-t border-slate-100 pt-6">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <h2 class="form-section-title text-base">Attachments</h2>
-                    <span class="text-xs text-slate-500">Existing files plus new ones you add here.</span>
-                </div>
-
-                <!-- Existing documents -->
-                <div v-if="documents.length" class="space-y-1 text-xs text-slate-700 border border-slate-200 rounded-lg p-3">
-                    <div class="font-semibold text-slate-800 mb-1">Current files</div>
+                    <!-- Validation summary: focused on a failed submit -->
                     <div
-                        v-for="doc in documents"
-                        :key="doc.id"
-                        class="flex items-center justify-between"
+                        v-if="error || errorFields.length"
+                        ref="errorSummaryRef"
+                        class="callout callout-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-600/40"
+                        role="alert"
+                        tabindex="-1"
                     >
+                        <p class="font-semibold">
+                            {{ errorFields.length ? 'Please fix the following before saving:' : 'This employee could not be saved' }}
+                        </p>
+                        <ul v-if="errorFields.length" class="mt-1.5 list-disc pl-5 space-y-0.5">
+                            <li v-for="failed in errorFields" :key="failed.field">
+                                <span class="font-medium">{{ failed.label }}</span> — {{ failed.message }}
+                            </li>
+                        </ul>
+                        <p v-else class="mt-1">{{ error }}</p>
+                    </div>
+
+                    <div v-if="isSelfHrOnly" class="callout callout-info">
+                        <p class="font-semibold">Signed in as {{ form.name || '—' }}</p>
+                        <p>{{ form.email }}</p>
+                        <p class="text-xs mt-2">
+                            Update your bank details and upload HR documents here. For name, role, or other changes, contact HR.
+                        </p>
+                    </div>
+
+                    <!-- Personal details -->
+                    <div v-if="!isSelfHrOnly" class="space-y-4">
+                        <h2 class="form-section-title text-base">Personal details</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="form-label" for="employeeeditview-full-name">
+                                    Full name<span class="form-required" aria-hidden="true">*</span>
+                                </label>
+                                <input id="employeeeditview-full-name"
+                                    v-model="form.name"
+                                    type="text"
+                                    required
+                                    class="form-input"
+                                    :aria-invalid="fieldErrors.name ? 'true' : undefined"
+                                    :aria-describedby="fieldErrors.name ? 'employeeeditview-full-name-error' : undefined"
+                                />
+                                <p v-if="fieldErrors.name" id="employeeeditview-full-name-error" class="form-error">
+                                    {{ fieldErrors.name }}
+                                </p>
+                            </div>
+                            <div>
+                                <label class="form-label" for="employeeeditview-email">
+                                    Email<span class="form-required" aria-hidden="true">*</span>
+                                </label>
+                                <input id="employeeeditview-email"
+                                    v-model="form.email"
+                                    type="email"
+                                    required
+                                    class="form-input"
+                                    :aria-invalid="fieldErrors.email ? 'true' : undefined"
+                                    :aria-describedby="fieldErrors.email ? 'employeeeditview-email-error' : undefined"
+                                />
+                                <p v-if="fieldErrors.email" id="employeeeditview-email-error" class="form-error">
+                                    {{ fieldErrors.email }}
+                                </p>
+                            </div>
+                            <div>
+                                <label class="form-label" for="employeeeditview-phone">Phone</label>
+                                <input id="employeeeditview-phone"
+                                    v-model="form.phone"
+                                    type="text"
+                                    class="form-input"
+                                />
+                            </div>
+                            <div>
+                                <label class="form-label" for="employeeeditview-date-of-birth">Date of birth</label>
+                                <input id="employeeeditview-date-of-birth"
+                                    v-model="form.date_of_birth"
+                                    type="date"
+                                    class="form-input"
+                                />
+                            </div>
+                        </div>
                         <div>
-                            <span class="font-medium text-slate-900">{{ doc.name }}</span>
-                            <span class="text-slate-500 ml-1">({{ formatDate(doc.created_at) }})</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <a
-                                :href="doc.file_path"
-                                target="_blank"
-                                rel="noopener"
-                                class="text-violet-600 hover:text-violet-800 font-medium"
-                            >
-                                View
-                            </a>
-                            <button
-                                v-if="canManageDocuments"
-                                type="button"
-                                class="text-red-600 hover:underline text-xs disabled:opacity-50"
-                                :disabled="removingDocId === doc.id"
-                                @click="removeDocument(doc)"
-                            >
-                                {{ removingDocId === doc.id ? 'Removing…' : 'Remove' }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Add new attachments -->
-                <div class="grid grid-cols-1 md:grid-cols-[2fr,2fr,auto] gap-3 items-center">
-                    <input
-                        v-model="newDocName"
-                        type="text"
-                        placeholder="Attachment name"
-                        class="form-input"
-                    />
-                    <div>
-                        <label
-                            class="inline-flex items-center gap-2 px-3 py-2 border border-dashed border-slate-300 rounded-lg text-xs text-slate-600 cursor-pointer hover:bg-slate-50"
-                        >
-                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M4 8V7a3 3 0 013-3h4m4 0h2a3 3 0 013 3v1M16 4l-4-4-4 4m4-4v12" />
-                            </svg>
-                            <span>Browse files</span>
-                            <input
-                                ref="fileInput"
-                                type="file"
-                                multiple
-                                class="hidden"
+                            <label class="form-label" for="employeeeditview-address">Address</label>
+                            <textarea id="employeeeditview-address"
+                                v-model="form.address"
+                                rows="2"
+                                class="form-input resize-none"
                             />
+                        </div>
+                    </div>
+
+                    <!-- Job & access -->
+                    <div v-if="!isSelfHrOnly" class="space-y-4 border-t border-slate-100 pt-6">
+                        <h2 class="form-section-title text-base">Job &amp; access</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="form-label" for="employeeeditview-role">
+                                    Role<span class="form-required" aria-hidden="true">*</span>
+                                </label>
+                                <select id="employeeeditview-role"
+                                    v-model="form.role_id"
+                                    required
+                                    class="form-select"
+                                    :aria-invalid="fieldErrors.role_id ? 'true' : undefined"
+                                    :aria-describedby="fieldErrors.role_id ? 'employeeeditview-role-error' : undefined"
+                                >
+                                    <option value="">Select role</option>
+                                    <option v-for="role in roles" :key="role.id" :value="role.id">
+                                        {{ role.name }}
+                                    </option>
+                                </select>
+                                <p v-if="fieldErrors.role_id" id="employeeeditview-role-error" class="form-error">
+                                    {{ fieldErrors.role_id }}
+                                </p>
+                            </div>
+                            <div>
+                                <label class="form-label" for="employeeeditview-employee-type">Employee type</label>
+                                <select
+                                    id="employeeeditview-employee-type"
+                                    v-model="form.employee_type"
+                                    class="form-select"
+                                >
+                                    <option value="">Select type</option>
+                                    <option value="field_worker">Field Worker</option>
+                                    <option value="call_center">Call Center</option>
+                                    <option value="ticket_manager">Ticket Manager</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" for="employeeeditview-hire-date">Hire date</label>
+                                <input id="employeeeditview-hire-date"
+                                    v-model="form.hire_date"
+                                    type="date"
+                                    class="form-input"
+                                />
+                            </div>
+                            <div>
+                                <label class="form-label" for="employeeeditview-status">Status</label>
+                                <select id="employeeeditview-status"
+                                    v-model="form.is_active"
+                                    class="form-select"
+                                >
+                                    <option :value="true">Active</option>
+                                    <option :value="false">Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="canEditNavPerms" class="space-y-4 border border-slate-200 rounded-card p-4 bg-slate-50/80">
+                        <h2 class="form-section-title text-base">Sidebar menu access</h2>
+                        <p class="text-xs text-slate-600">
+                            Leave this off for default role menu. Turn on to limit this user to selected sections.
+                        </p>
+                        <label class="form-choice text-slate-800">
+                            <input
+                                v-model="restrictMenu"
+                                type="checkbox"
+                                class="form-checkbox"
+                            />
+                            Limit sidebar to selected sections only
                         </label>
-                    </div>
-                    <button
-                        type="button"
-                        class="px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-600/20 hover:bg-emerald-700"
-                        @click="queueDocument"
-                    >
-                        Add
-                    </button>
-                </div>
-                <div v-if="queuedDocuments.length" class="space-y-1 text-xs text-slate-700">
-                    <div
-                        v-for="(doc, index) in queuedDocuments"
-                        :key="index"
-                        class="flex items-center justify-between"
-                    >
-                        <span>{{ doc.name }} ({{ doc.file?.name }})</span>
-                        <button
-                            type="button"
-                            class="text-red-600 hover:underline"
-                            @click="removeQueuedDocument(index)"
+                        <fieldset
+                            v-if="restrictMenu"
+                            class="form-fieldset"
                         >
-                            Remove
-                        </button>
+                            <legend class="form-legend">Visible sections</legend>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-56 overflow-y-auto border border-slate-200 rounded-card p-3 bg-white">
+                                <label
+                                    v-for="opt in NAV_SECTION_OPTIONS"
+                                    v-show="opt.key !== 'dashboard'"
+                                    :key="opt.key"
+                                    class="form-choice text-slate-700"
+                                >
+                                    <input
+                                        v-model="sectionChecks[opt.key]"
+                                        type="checkbox"
+                                        class="form-checkbox"
+                                    />
+                                    {{ opt.label }}
+                                </label>
+                            </div>
+                        </fieldset>
                     </div>
-                </div>
-            </div>
 
-            <!-- Password -->
-            <div v-if="!isSelfHrOnly" class="space-y-2 border-t border-slate-100 pt-6">
-                <label class="form-label">Password (leave blank to keep current)</label>
-                <input
-                    v-model="form.password"
-                    type="password"
-                    class="form-input max-w-md"
-                />
-            </div>
+                    <!-- Bank details -->
+                    <div class="space-y-4 border-t border-slate-100 pt-6">
+                        <h2 class="form-section-title text-base">Bank details</h2>
+                        <p class="text-xs text-slate-500">
+                            These details are used for HR and salary purposes only.
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="form-label" for="employeeeditview-account-holder-name">Account holder name</label>
+                                <input id="employeeeditview-account-holder-name"
+                                    v-model="form.bank_account_name"
+                                    type="text"
+                                    class="form-input"
+                                />
+                            </div>
+                            <div>
+                                <label class="form-label" for="employeeeditview-bank-name">Bank name</label>
+                                <input id="employeeeditview-bank-name"
+                                    v-model="form.bank_name"
+                                    type="text"
+                                    class="form-input"
+                                />
+                            </div>
+                            <div>
+                                <label class="form-label" for="employeeeditview-sort-code">Sort code</label>
+                                <input id="employeeeditview-sort-code"
+                                    v-model="form.bank_sort_code"
+                                    type="text"
+                                    class="form-input"
+                                />
+                            </div>
+                            <div>
+                                <label class="form-label" for="employeeeditview-account-number">Account number</label>
+                                <input id="employeeeditview-account-number"
+                                    v-model="form.bank_account_number"
+                                    type="text"
+                                    class="form-input"
+                                />
+                            </div>
+                        </div>
+                    </div>
 
+                    <!-- Documents: existing + new attachments -->
+                    <div class="space-y-4 border-t border-slate-100 pt-6">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <h2 class="form-section-title text-base">Attachments</h2>
+                            <span class="text-xs text-slate-500">Existing files plus new ones you add here.</span>
+                        </div>
+
+                        <!-- Existing documents -->
+                        <div v-if="documents.length" class="space-y-1 text-xs text-slate-700 border border-slate-200 rounded-card p-3">
+                            <div class="font-semibold text-slate-800 mb-1">Current files</div>
+                            <div
+                                v-for="doc in documents"
+                                :key="doc.id"
+                                class="flex items-center justify-between gap-2"
+                            >
+                                <div class="min-w-0">
+                                    <span class="font-medium text-slate-900">{{ doc.name }}</span>
+                                    <span class="text-slate-500 ml-1">({{ formatDate(doc.created_at) }})</span>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <a
+                                        :href="doc.file_path"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="link"
+                                    >
+                                        View
+                                    </a>
+                                    <BaseButton
+                                        v-if="canManageDocuments"
+                                        variant="ghost"
+                                        size="sm"
+                                        :label="`Remove ${doc.name}`"
+                                        :loading="removingDocId === doc.id"
+                                        @click="requestRemoveDocument(doc)"
+                                    >
+                                        <template #icon>
+                                            <TrashIcon class="icon-sm" aria-hidden="true" />
+                                        </template>
+                                        {{ removingDocId === doc.id ? 'Removing…' : 'Remove' }}
+                                    </BaseButton>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Add new attachments -->
+                        <div class="grid grid-cols-1 md:grid-cols-[2fr,2fr,auto] gap-3 items-end">
+                            <div>
+                                <label class="form-label" for="employeeeditview-attachment-name">Attachment name</label>
+                                <input
+                                    id="employeeeditview-attachment-name"
+                                    v-model="newDocName"
+                                    type="text"
+                                    placeholder="Attachment name"
+                                    class="form-input"
+                                />
+                            </div>
+                            <div>
+                                <span class="form-label">Files</span>
+                                <label
+                                    class="inline-flex items-center gap-2 px-3 py-2 min-h-[42px] border border-dashed border-slate-300 rounded-control text-xs text-slate-600 cursor-pointer hover:bg-slate-50 focus-within:outline-none focus-within:ring-2 focus-within:ring-primary-500/40"
+                                >
+                                    <ArrowUpTrayIcon class="icon-sm text-slate-500" aria-hidden="true" />
+                                    <span>Browse files</span>
+                                    <input
+                                        id="employeeeditview-attachment-files"
+                                        ref="fileInput"
+                                        type="file"
+                                        multiple
+                                        class="sr-only"
+                                    />
+                                </label>
+                            </div>
+                            <BaseButton variant="soft" block-mobile @click="queueDocument">
+                                <template #icon>
+                                    <PlusIcon class="icon" aria-hidden="true" />
+                                </template>
+                                Add
+                            </BaseButton>
+                        </div>
+                        <div v-if="queuedDocuments.length" class="space-y-1 text-xs text-slate-700">
+                            <div
+                                v-for="(doc, index) in queuedDocuments"
+                                :key="index"
+                                class="flex items-center justify-between gap-2"
+                            >
+                                <span class="truncate">{{ doc.name }} ({{ doc.file?.name }})</span>
+                                <BaseButton
+                                    variant="ghost"
+                                    size="sm"
+                                    class="shrink-0"
+                                    :label="`Remove ${doc.name}`"
+                                    @click="removeQueuedDocument(index)"
+                                >
+                                    <template #icon>
+                                        <TrashIcon class="icon-sm" aria-hidden="true" />
+                                    </template>
+                                    Remove
+                                </BaseButton>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Password -->
+                    <div v-if="!isSelfHrOnly" class="space-y-2 border-t border-slate-100 pt-6">
+                        <label class="form-label" for="employeeeditview-password-leave-blank-to-keep-current">Password (leave blank to keep current)</label>
+                        <input id="employeeeditview-password-leave-blank-to-keep-current"
+                            v-model="form.password"
+                            type="password"
+                            class="form-input max-w-md"
+                        />
+                    </div>
                 </div>
 
                 <div class="form-actions">
-                    <button
-                        type="button"
-                        class="form-btn-cancel"
-                        @click="$router.back()"
-                    >
+                    <BaseButton variant="outline" block-mobile @click="$router.back()">
                         Cancel
-                    </button>
-                    <button
+                    </BaseButton>
+                    <BaseButton
                         type="submit"
-                        :disabled="saving"
-                        class="form-btn-submit"
+                        variant="primary"
+                        size="lg"
+                        block-mobile
+                        :loading="saving"
+                        form="employee-edit-form"
                     >
                         {{ saving ? 'Saving...' : 'Save changes' }}
-                    </button>
+                    </BaseButton>
                 </div>
             </form>
         </div>
+
+        <ConfirmDialog
+            v-model="confirmRemoveDocOpen"
+            title="Remove this document?"
+            :message="documentToRemove ? `“${documentToRemove.name}” will be permanently removed from this employee.` : 'Remove this document?'"
+            confirm-label="Remove document"
+            cancel-label="Keep document"
+            tone="danger"
+            :loading="removingDocId !== null"
+            @confirm="confirmRemoveDocument"
+            @cancel="cancelRemoveDocument"
+        />
     </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
+import { ArrowLeftIcon, ArrowUpTrayIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import { BaseButton, ConfirmDialog } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
 import { NAV_SECTION_OPTIONS } from '@/constants/navSections';
@@ -383,6 +458,25 @@ const fileInput = ref(null);
 const documents = ref([]);
 const restrictMenu = ref(false);
 const removingDocId = ref(null);
+const error = ref(null);
+const errorSummaryRef = ref(null);
+const fieldErrors = ref({});
+const confirmRemoveDocOpen = ref(false);
+const documentToRemove = ref(null);
+
+const FIELD_LABELS = {
+    name: 'Full name',
+    email: 'Email',
+    role_id: 'Role',
+};
+
+const errorFields = computed(() =>
+    Object.keys(fieldErrors.value).map((field) => ({
+        field,
+        label: FIELD_LABELS[field] || field,
+        message: fieldErrors.value[field],
+    })),
+);
 
 const isElevatedRole = computed(() => {
     const r = auth.user?.role?.name;
@@ -475,7 +569,39 @@ const formatDate = (date) => {
     });
 };
 
+/** Client-side checks only — the payload itself is unchanged. */
+function validate() {
+    const errs = {};
+    if (!isSelfHrOnly.value) {
+        if (!String(form.value.name ?? '').trim()) {
+            errs.name = 'Enter the employee’s full name.';
+        }
+        const email = String(form.value.email ?? '').trim();
+        if (!email) {
+            errs.email = 'Enter an email address.';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            errs.email = 'Enter a valid email address, for example name@example.com.';
+        }
+        if (form.value.role_id === '' || form.value.role_id === null || form.value.role_id === undefined) {
+            errs.role_id = 'Choose a role for this employee.';
+        }
+    }
+    fieldErrors.value = errs;
+    return Object.keys(errs).length === 0;
+}
+
+async function focusErrorSummary() {
+    await nextTick();
+    errorSummaryRef.value?.focus();
+}
+
 const handleSubmit = async () => {
+    error.value = null;
+    if (!validate()) {
+        await focusErrorSummary();
+        return;
+    }
+
     saving.value = true;
     try {
         let payload;
@@ -547,15 +673,29 @@ const handleSubmit = async () => {
             const errs = Object.values(e.response.data.errors).flat();
             msg = errs.join(', ');
         }
+        error.value = msg;
         toast.error(msg);
+        await focusErrorSummary();
     } finally {
         saving.value = false;
     }
 };
 
-const removeDocument = async (doc) => {
+const requestRemoveDocument = (doc) => {
     if (!canManageDocuments.value) return;
-    if (!window.confirm('Remove this document?')) return;
+    documentToRemove.value = doc;
+    confirmRemoveDocOpen.value = true;
+};
+
+const cancelRemoveDocument = () => {
+    if (removingDocId.value !== null) return;
+    confirmRemoveDocOpen.value = false;
+    documentToRemove.value = null;
+};
+
+const confirmRemoveDocument = async () => {
+    const doc = documentToRemove.value;
+    if (!canManageDocuments.value || !doc) return;
     removingDocId.value = doc.id;
     try {
         await axios.delete(`/api/hr/employees/${route.params.id}/documents/${doc.id}`);
@@ -565,6 +705,8 @@ const removeDocument = async (doc) => {
         toast.error(e.response?.data?.message || 'Could not remove document');
     } finally {
         removingDocId.value = null;
+        confirmRemoveDocOpen.value = false;
+        documentToRemove.value = null;
     }
 };
 
@@ -594,4 +736,3 @@ const removeQueuedDocument = (index) => {
     queuedDocuments.value.splice(index, 1);
 };
 </script>
-

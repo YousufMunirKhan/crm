@@ -4,56 +4,61 @@
         :subtitle="accessManagerSubtitle"
         :badge="accessManagerBadge"
     >
-        <div v-if="loading" class="px-5 py-16 text-center text-slate-500 text-sm">Loading roles…</div>
+        <div
+            v-if="loading"
+            class="px-5 py-16 text-center text-slate-500 text-sm"
+            aria-busy="true"
+        >
+            <span class="spinner" role="status" aria-label="Loading" />
+            <span class="ml-2 align-middle">Loading roles…</span>
+        </div>
         <div v-else class="space-y-4 px-3 pb-3 sm:px-5 sm:pb-5">
-            <div
-                v-for="role in managedRoles"
-                :key="role.id"
-                class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
-            >
-                <div class="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-slate-50">
-                    <div>
-                        <h2 class="font-semibold text-slate-900">{{ role.name }}</h2>
+            <div v-for="role in managedRoles" :key="role.id" class="card overflow-hidden">
+                <div class="card-head">
+                    <div class="min-w-0">
+                        <h2 class="card-title">{{ role.name }}</h2>
                         <p v-if="role.description" class="text-xs text-slate-500 mt-0.5">{{ role.description }}</p>
                     </div>
-                    <button
+                    <BaseButton
                         v-if="!isFullAccessRole(role)"
-                        type="button"
-                        :disabled="savingId === role.id"
-                        class="listing-btn-primary disabled:opacity-50"
+                        variant="soft"
+                        :loading="savingId === role.id"
                         @click="saveRole(role)"
                     >
                         {{ savingId === role.id ? 'Saving…' : 'Save' }}
-                    </button>
+                    </BaseButton>
                 </div>
                 <div v-if="uiState[role.id] && isFullAccessRole(role)" class="p-4">
-                    <p class="text-sm text-slate-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                    <p class="callout callout-success">
                         This role always has <strong>full menu access</strong>. Restrictions do not apply.
                     </p>
                 </div>
                 <div v-else-if="uiState[role.id]" class="p-4 space-y-4">
-                    <label class="flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
+                    <label class="form-choice" :for="`role-${role.id}-restrict`">
                         <input
+                            :id="`role-${role.id}-restrict`"
                             v-model="uiState[role.id].restrict"
                             type="checkbox"
-                            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            class="form-checkbox"
                         />
                         Limit sidebar for this role (whitelist checked items only)
                     </label>
                     <div
                         v-if="uiState[role.id].restrict"
-                        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-slate-50"
+                        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto border border-slate-200 rounded-control p-3 bg-slate-50"
                     >
                         <label
                             v-for="opt in sectionOptions"
                             v-show="opt.key !== 'dashboard'"
                             :key="`${role.id}-${opt.key}`"
-                            class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
+                            class="form-choice"
+                            :for="`role-${role.id}-nav-${opt.key}`"
                         >
                             <input
+                                :id="`role-${role.id}-nav-${opt.key}`"
                                 v-model="uiState[role.id].checks[opt.key]"
                                 type="checkbox"
-                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                class="form-checkbox"
                             />
                             {{ opt.label }}
                         </label>
@@ -69,6 +74,7 @@
 import { ref, computed } from 'vue';
 import axios from 'axios';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseButton } from '@/components/base';
 import { NAV_SECTION_OPTIONS } from '@/constants/navSections';
 import { useToastStore } from '@/stores/toast';
 

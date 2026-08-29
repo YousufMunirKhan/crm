@@ -1,97 +1,96 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
-        <!-- Header -->
-        <div class="flex justify-between items-center">
-            <div class="min-w-0 flex-1">
-                <h1 class="text-2xl font-bold text-slate-900">Templates</h1>
-                <p class="text-sm text-slate-600 mt-1">Manage email, SMS, and WhatsApp templates</p>
-                <p v-if="activeTab === 'email'" class="text-sm text-slate-600 mt-2 max-w-xl leading-relaxed">
-                    <a
-                        href="/downloads/email-merge-tags-guide.md"
-                        download="CRM-Email-Merge-Tags-and-Placeholders.md"
-                        class="inline-flex items-center gap-1.5 font-medium text-blue-700 hover:text-blue-900 underline decoration-blue-300 underline-offset-2"
-                    >
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        Email merge tags &amp; placeholders guide
-                    </a>
-                    <span class="text-slate-500 font-normal">
-                        — download: every placeholder, what it becomes, HTML snippets, and a copy-paste block for AI tools.
-                    </span>
-                </p>
-            </div>
-            <div class="flex gap-3">
-                <button
-                    v-if="activeTab === 'email'"
-                    @click="openSendModal"
-                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    Send Email
-                </button>
-                <button
-                    v-if="activeTab === 'email'"
-                    type="button"
-                    @click="showHtmlImport = true"
-                    class="px-4 py-2 border border-slate-300 text-slate-800 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
-                >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    Import HTML
-                </button>
-                <button
-                    v-if="activeTab !== 'assignments'"
-                    @click="openCreateModal"
-                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2"
-                >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    Create Template
-                </button>
-            </div>
-        </div>
-
-        <!-- Tabs -->
-        <div class="bg-white rounded-xl shadow-sm p-2 flex gap-2">
-            <button
-                v-for="tab in tabs"
-                :key="tab.id"
-                @click="activeTab = tab.id; loadTemplates()"
-                class="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                :class="activeTab === tab.id 
-                    ? 'bg-slate-900 text-white' 
-                    : 'text-slate-600 hover:bg-slate-100'"
+    <ListingPageShell
+        title="Templates"
+        subtitle="Email, SMS and WhatsApp message templates, newest first — pick a channel tab to browse, or assign templates to the functions that send them."
+        :badge="templatesBadge"
+    >
+        <template #actions>
+            <BaseButton
+                v-if="activeTab === 'email'"
+                variant="outline"
+                block-mobile
+                @click="openSendModal"
             >
-                <span>{{ tab.icon }}</span>
-                {{ tab.name }}
-            </button>
-        </div>
+                <template #icon><EnvelopeIcon class="icon-sm" aria-hidden="true" /></template>
+                Send Email
+            </BaseButton>
+            <BaseButton
+                v-if="activeTab === 'email'"
+                variant="outline"
+                block-mobile
+                @click="showHtmlImport = true"
+            >
+                <template #icon><ArrowUpTrayIcon class="icon-sm" aria-hidden="true" /></template>
+                Import HTML
+            </BaseButton>
+            <BaseButton
+                v-if="activeTab !== 'assignments'"
+                variant="primary"
+                block-mobile
+                @click="openCreateModal"
+            >
+                <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                Create Template
+            </BaseButton>
+        </template>
+
+        <template #filters>
+            <div class="listing-filters-row">
+                <div class="tab-list" role="tablist" aria-label="Template channel">
+                    <button
+                        v-for="tab in tabs"
+                        :key="tab.id"
+                        type="button"
+                        role="tab"
+                        :aria-selected="activeTab === tab.id ? 'true' : 'false'"
+                        class="tab inline-flex items-center gap-2"
+                        :class="activeTab === tab.id ? 'tab-active' : ''"
+                        @click="activeTab = tab.id; loadTemplates()"
+                    >
+                        <component :is="tab.icon" class="icon-sm" aria-hidden="true" />
+                        {{ tab.name }}
+                    </button>
+                </div>
+            </div>
+        </template>
+
+        <template v-if="activeTab === 'email'" #toolbar>
+            <p class="callout callout-info">
+                <a
+                    href="/downloads/email-merge-tags-guide.md"
+                    download="CRM-Email-Merge-Tags-and-Placeholders.md"
+                    class="link inline-flex items-center gap-1.5 font-medium"
+                >
+                    <DocumentArrowDownIcon class="icon-sm shrink-0" aria-hidden="true" />
+                    Email merge tags &amp; placeholders guide
+                </a>
+                <span class="text-slate-600 font-normal">
+                    — download: every placeholder, what it becomes, HTML snippets, and a copy-paste block for AI tools.
+                </span>
+            </p>
+        </template>
 
         <!-- Template Assignments Tab -->
-        <div v-if="activeTab === 'assignments'" class="bg-white rounded-xl shadow-sm p-6">
-            <h2 class="text-lg font-semibold text-slate-900 mb-4">Template Assignments</h2>
+        <div v-if="activeTab === 'assignments'" class="px-4 sm:px-6 py-5 sm:py-6">
+            <h2 class="text-lg font-semibold text-slate-900 mb-1">Template Assignments</h2>
             <p class="text-sm text-slate-600 mb-6">Assign templates to specific functions (appointments, invoices, etc.)</p>
-            
+
             <div class="space-y-4">
                 <div
                     v-for="functionType in functionTypes"
                     :key="functionType"
-                    class="border border-slate-200 rounded-lg p-4"
+                    class="border border-slate-200 rounded-card p-4"
                 >
                     <h3 class="font-medium text-slate-900 mb-3 capitalize">{{ functionType.replace('_', ' ') }}</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="form-grid-3">
                         <!-- Email Template Assignment -->
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Email Template</label>
+                            <label class="form-label" :for="`templatesview-${functionType}-email`">Email Template</label>
                             <select
+                                :id="`templatesview-${functionType}-email`"
                                 v-model="assignments[functionType].email"
+                                class="form-select w-full"
                                 @change="saveAssignment(functionType, 'email', assignments[functionType].email)"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                                 <option value="">None</option>
                                 <option
@@ -105,11 +104,12 @@
                         </div>
                         <!-- SMS Template Assignment -->
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">SMS Template</label>
+                            <label class="form-label" :for="`templatesview-${functionType}-sms`">SMS Template</label>
                             <select
+                                :id="`templatesview-${functionType}-sms`"
                                 v-model="assignments[functionType].sms"
+                                class="form-select w-full"
                                 @change="saveAssignment(functionType, 'sms', assignments[functionType].sms)"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                                 <option value="">None</option>
                                 <option
@@ -123,11 +123,12 @@
                         </div>
                         <!-- WhatsApp Template Assignment -->
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">WhatsApp Template</label>
+                            <label class="form-label" :for="`templatesview-${functionType}-whatsapp`">WhatsApp Template</label>
                             <select
+                                :id="`templatesview-${functionType}-whatsapp`"
                                 v-model="assignments[functionType].whatsapp"
+                                class="form-select w-full"
                                 @change="saveAssignment(functionType, 'whatsapp', assignments[functionType].whatsapp)"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                                 <option value="">None</option>
                                 <option
@@ -145,190 +146,225 @@
         </div>
 
         <!-- Email Templates Tab -->
-        <div v-if="activeTab === 'email'">
-            <div v-if="loading" class="flex justify-center py-12">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+        <div v-if="activeTab === 'email'" class="px-4 sm:px-6 py-5 sm:py-6">
+            <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true">
+                <span class="sr-only">Loading email templates…</span>
+                <div v-for="n in 3" :key="n" class="card p-4 space-y-3" aria-hidden="true">
+                    <div class="skeleton h-24 w-full rounded-card"></div>
+                    <div class="skeleton-text w-2/3"></div>
+                    <div class="skeleton-text w-full"></div>
+                    <div class="skeleton-text w-1/2"></div>
+                </div>
             </div>
+            <EmptyState
+                v-else-if="templates.length === 0"
+                heading="No email templates yet"
+                description="Email templates hold the subject line and HTML body reused by campaigns and automated sends. Create one, or import an existing HTML design."
+            >
+                <template #icon><EnvelopeIcon class="icon" aria-hidden="true" /></template>
+                <template #action>
+                    <BaseButton variant="primary" @click="openCreateModal">
+                        <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                        Create Template
+                    </BaseButton>
+                </template>
+            </EmptyState>
             <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div
                     v-for="template in templates"
                     :key="template.id"
-                    class="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow overflow-hidden"
+                    class="card overflow-hidden hover:shadow-card-hover transition-shadow"
                 >
-                    <div class="h-32 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                        <div class="text-white text-center">
-                            <div class="text-3xl mb-2">📧</div>
+                    <div class="h-32 bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
+                        <div class="text-white text-center px-3">
+                            <EnvelopeIcon class="w-8 h-8 mx-auto mb-2" aria-hidden="true" />
                             <div class="text-sm font-medium">{{ template.category }}</div>
                         </div>
                     </div>
                     <div class="p-4">
                         <h3 class="font-semibold text-slate-900 mb-1">{{ template.name }}</h3>
                         <p class="text-sm text-slate-600 mb-3 line-clamp-2">{{ template.description || 'No description' }}</p>
-                        <div class="flex items-center justify-between text-xs text-slate-500 mb-3">
-                            <span>Subject: {{ template.subject }}</span>
-                            <span :class="template.is_active ? 'text-green-600' : 'text-red-600'">
+                        <div class="flex items-center justify-between gap-2 text-xs text-slate-500 mb-3">
+                            <span class="truncate">Subject: {{ template.subject }}</span>
+                            <BaseBadge :status="template.is_active ? 'active' : 'inactive'">
                                 {{ template.is_active ? 'Active' : 'Inactive' }}
-                            </span>
+                            </BaseBadge>
                         </div>
                         <div class="flex gap-2">
-                            <button
-                                @click="editTemplate(template)"
-                                class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-                            >
+                            <BaseButton variant="outline" size="sm" class="flex-1" @click="editTemplate(template)">
+                                <template #icon><PencilSquareIcon class="icon-sm" aria-hidden="true" /></template>
                                 Edit
-                            </button>
-                            <button
+                            </BaseButton>
+                            <BaseButton
+                                variant="outline"
+                                size="sm"
+                                :label="`Duplicate ${template.name}`"
                                 @click="duplicateTemplate(template, 'email')"
-                                class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-                                title="Duplicate"
                             >
-                                📋
-                            </button>
-                            <button
+                                <DocumentDuplicateIcon class="icon-sm" aria-hidden="true" />
+                            </BaseButton>
+                            <BaseButton
                                 v-if="!template.is_prebuilt"
-                                @click="deleteTemplate(template, 'email')"
-                                class="px-3 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                                title="Delete"
+                                variant="outline"
+                                size="sm"
+                                class="text-danger-700"
+                                :label="`Delete ${template.name}`"
+                                @click="askDeleteTemplate(template, 'email')"
                             >
-                                🗑️
-                            </button>
+                                <TrashIcon class="icon-sm" aria-hidden="true" />
+                            </BaseButton>
                         </div>
                     </div>
-                </div>
-                <div v-if="templates.length === 0" class="col-span-full text-center py-12">
-                    <div class="text-6xl mb-4">📧</div>
-                    <h3 class="text-lg font-semibold text-slate-900 mb-2">No email templates yet</h3>
-                    <button
-                        @click="openCreateModal"
-                        class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
-                    >
-                        Create Template
-                    </button>
                 </div>
             </div>
         </div>
 
         <!-- SMS Templates Tab -->
-        <div v-if="activeTab === 'sms'">
-            <div v-if="loading" class="flex justify-center py-12">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+        <div v-if="activeTab === 'sms'" class="px-4 sm:px-6 py-5 sm:py-6">
+            <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true">
+                <span class="sr-only">Loading SMS templates…</span>
+                <div v-for="n in 3" :key="n" class="card p-4 space-y-3" aria-hidden="true">
+                    <div class="skeleton h-24 w-full rounded-card"></div>
+                    <div class="skeleton-text w-2/3"></div>
+                    <div class="skeleton-text w-full"></div>
+                    <div class="skeleton-text w-1/2"></div>
+                </div>
             </div>
+            <EmptyState
+                v-else-if="templates.length === 0"
+                heading="No SMS templates yet"
+                description="SMS templates store the short message text and merge tags used for bulk and automated texts. Create your first one to get started."
+            >
+                <template #icon><DevicePhoneMobileIcon class="icon" aria-hidden="true" /></template>
+                <template #action>
+                    <BaseButton variant="primary" @click="openCreateSmsModal">
+                        <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                        Create Template
+                    </BaseButton>
+                </template>
+            </EmptyState>
             <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div
                     v-for="template in templates"
                     :key="template.id"
-                    class="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow overflow-hidden"
+                    class="card overflow-hidden hover:shadow-card-hover transition-shadow"
                 >
-                    <div class="h-32 bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
-                        <div class="text-white text-center">
-                            <div class="text-3xl mb-2">📱</div>
+                    <div class="h-32 bg-gradient-to-br from-success-500 to-success-600 flex items-center justify-center">
+                        <div class="text-white text-center px-3">
+                            <DevicePhoneMobileIcon class="w-8 h-8 mx-auto mb-2" aria-hidden="true" />
                             <div class="text-sm font-medium">{{ template.category }}</div>
                         </div>
                     </div>
                     <div class="p-4">
                         <h3 class="font-semibold text-slate-900 mb-1">{{ template.name }}</h3>
                         <p class="text-sm text-slate-600 mb-3 line-clamp-3">{{ template.message || 'No message' }}</p>
-                        <div class="flex items-center justify-between text-xs text-slate-500 mb-3">
+                        <div class="flex items-center justify-between gap-2 text-xs text-slate-500 mb-3">
                             <span>{{ template.message?.length || 0 }} characters</span>
-                            <span :class="template.is_active ? 'text-green-600' : 'text-red-600'">
+                            <BaseBadge :status="template.is_active ? 'active' : 'inactive'">
                                 {{ template.is_active ? 'Active' : 'Inactive' }}
-                            </span>
+                            </BaseBadge>
                         </div>
                         <div class="flex gap-2">
-                            <button
-                                @click="editSmsTemplate(template)"
-                                class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-                            >
+                            <BaseButton variant="outline" size="sm" class="flex-1" @click="editSmsTemplate(template)">
+                                <template #icon><PencilSquareIcon class="icon-sm" aria-hidden="true" /></template>
                                 Edit
-                            </button>
-                            <button
+                            </BaseButton>
+                            <BaseButton
+                                variant="outline"
+                                size="sm"
+                                :label="`Duplicate ${template.name}`"
                                 @click="duplicateTemplate(template, 'sms')"
-                                class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                             >
-                                📋
-                            </button>
-                            <button
-                                @click="deleteTemplate(template, 'sms')"
-                                class="px-3 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                                <DocumentDuplicateIcon class="icon-sm" aria-hidden="true" />
+                            </BaseButton>
+                            <BaseButton
+                                variant="outline"
+                                size="sm"
+                                class="text-danger-700"
+                                :label="`Delete ${template.name}`"
+                                @click="askDeleteTemplate(template, 'sms')"
                             >
-                                🗑️
-                            </button>
+                                <TrashIcon class="icon-sm" aria-hidden="true" />
+                            </BaseButton>
                         </div>
                     </div>
-                </div>
-                <div v-if="templates.length === 0" class="col-span-full text-center py-12">
-                    <div class="text-6xl mb-4">📱</div>
-                    <h3 class="text-lg font-semibold text-slate-900 mb-2">No SMS templates yet</h3>
-                    <button
-                        @click="openCreateSmsModal"
-                        class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
-                    >
-                        Create Template
-                    </button>
                 </div>
             </div>
         </div>
 
         <!-- WhatsApp Templates Tab -->
-        <div v-if="activeTab === 'whatsapp'">
-            <div v-if="loading" class="flex justify-center py-12">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+        <div v-if="activeTab === 'whatsapp'" class="px-4 sm:px-6 py-5 sm:py-6">
+            <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true">
+                <span class="sr-only">Loading WhatsApp templates…</span>
+                <div v-for="n in 3" :key="n" class="card p-4 space-y-3" aria-hidden="true">
+                    <div class="skeleton h-24 w-full rounded-card"></div>
+                    <div class="skeleton-text w-2/3"></div>
+                    <div class="skeleton-text w-full"></div>
+                    <div class="skeleton-text w-1/2"></div>
+                </div>
             </div>
+            <EmptyState
+                v-else-if="templates.length === 0"
+                heading="No WhatsApp templates yet"
+                description="WhatsApp templates hold the message body and any media attachment sent through the WhatsApp channel. Create your first one to get started."
+            >
+                <template #icon><ChatBubbleLeftRightIcon class="icon" aria-hidden="true" /></template>
+                <template #action>
+                    <BaseButton variant="primary" @click="openCreateWhatsappModal">
+                        <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                        Create Template
+                    </BaseButton>
+                </template>
+            </EmptyState>
             <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div
                     v-for="template in templates"
                     :key="template.id"
-                    class="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow overflow-hidden"
+                    class="card overflow-hidden hover:shadow-card-hover transition-shadow"
                 >
-                    <div class="h-32 bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-                        <div class="text-white text-center">
-                            <div class="text-3xl mb-2">💬</div>
+                    <div class="h-32 bg-gradient-to-br from-success-500 to-primary-600 flex items-center justify-center">
+                        <div class="text-white text-center px-3">
+                            <ChatBubbleLeftRightIcon class="w-8 h-8 mx-auto mb-2" aria-hidden="true" />
                             <div class="text-sm font-medium">{{ template.category }}</div>
                         </div>
                     </div>
                     <div class="p-4">
                         <h3 class="font-semibold text-slate-900 mb-1">{{ template.name }}</h3>
                         <p class="text-sm text-slate-600 mb-3 line-clamp-3">{{ template.message || 'No message' }}</p>
-                        <div v-if="template.media_url" class="text-xs text-slate-500 mb-2">
-                            📎 Media: {{ template.media_type || 'image' }}
-                        </div>
-                        <div class="flex items-center justify-between text-xs text-slate-500 mb-3">
+                        <p v-if="template.media_url" class="flex items-center gap-1.5 text-xs text-slate-500 mb-2">
+                            <PhotoIcon class="icon-sm" aria-hidden="true" />
+                            Media: {{ template.media_type || 'image' }}
+                        </p>
+                        <div class="flex items-center justify-between gap-2 text-xs text-slate-500 mb-3">
                             <span>{{ template.message?.length || 0 }} characters</span>
-                            <span :class="template.is_active ? 'text-green-600' : 'text-red-600'">
+                            <BaseBadge :status="template.is_active ? 'active' : 'inactive'">
                                 {{ template.is_active ? 'Active' : 'Inactive' }}
-                            </span>
+                            </BaseBadge>
                         </div>
                         <div class="flex gap-2">
-                            <button
-                                @click="editWhatsappTemplate(template)"
-                                class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-                            >
+                            <BaseButton variant="outline" size="sm" class="flex-1" @click="editWhatsappTemplate(template)">
+                                <template #icon><PencilSquareIcon class="icon-sm" aria-hidden="true" /></template>
                                 Edit
-                            </button>
-                            <button
+                            </BaseButton>
+                            <BaseButton
+                                variant="outline"
+                                size="sm"
+                                :label="`Duplicate ${template.name}`"
                                 @click="duplicateTemplate(template, 'whatsapp')"
-                                class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                             >
-                                📋
-                            </button>
-                            <button
-                                @click="deleteTemplate(template, 'whatsapp')"
-                                class="px-3 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                                <DocumentDuplicateIcon class="icon-sm" aria-hidden="true" />
+                            </BaseButton>
+                            <BaseButton
+                                variant="outline"
+                                size="sm"
+                                class="text-danger-700"
+                                :label="`Delete ${template.name}`"
+                                @click="askDeleteTemplate(template, 'whatsapp')"
                             >
-                                🗑️
-                            </button>
+                                <TrashIcon class="icon-sm" aria-hidden="true" />
+                            </BaseButton>
                         </div>
                     </div>
-                </div>
-                <div v-if="templates.length === 0" class="col-span-full text-center py-12">
-                    <div class="text-6xl mb-4">💬</div>
-                    <h3 class="text-lg font-semibold text-slate-900 mb-2">No WhatsApp templates yet</h3>
-                    <button
-                        @click="openCreateWhatsappModal"
-                        class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
-                    >
-                        Create Template
-                    </button>
                 </div>
             </div>
         </div>
@@ -359,14 +395,40 @@
             @close="showSendModal = false"
             @sent="handleEmailSent"
         />
-    </div>
+
+        <ConfirmDialog
+            v-model="showDeleteConfirm"
+            title="Delete template"
+            :message="deleteConfirmMessage"
+            confirm-label="Delete template"
+            tone="danger"
+            :loading="deletingTemplate"
+            @confirm="confirmDeleteTemplate"
+            @cancel="cancelDeleteTemplate"
+        />
+    </ListingPageShell>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
+import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseBadge, BaseButton, ConfirmDialog, EmptyState } from '@/components/base';
+import {
+    ArrowUpTrayIcon,
+    ChatBubbleLeftRightIcon,
+    Cog6ToothIcon,
+    DevicePhoneMobileIcon,
+    DocumentArrowDownIcon,
+    DocumentDuplicateIcon,
+    EnvelopeIcon,
+    PencilSquareIcon,
+    PhotoIcon,
+    PlusIcon,
+    TrashIcon,
+} from '@heroicons/vue/24/outline';
 import EmailHtmlImportModal from '@/components/EmailHtmlImportModal.vue';
 import SendEmailModal from '@/components/SendEmailModal.vue';
 import SmsTemplateModal from '@/components/SmsTemplateModal.vue';
@@ -387,13 +449,27 @@ const showSmsModal = ref(false);
 const showWhatsappModal = ref(false);
 const showSendModal = ref(false);
 const editingTemplate = ref(null);
+const showDeleteConfirm = ref(false);
+const deletingTemplate = ref(false);
+const deleteTarget = ref(null);
 
 const tabs = [
-    { id: 'email', name: 'Email Templates', icon: '📧' },
-    { id: 'sms', name: 'SMS Templates', icon: '📱' },
-    { id: 'whatsapp', name: 'WhatsApp Templates', icon: '💬' },
-    { id: 'assignments', name: 'Template Assignments', icon: '⚙️' },
+    { id: 'email', name: 'Email Templates', icon: EnvelopeIcon },
+    { id: 'sms', name: 'SMS Templates', icon: DevicePhoneMobileIcon },
+    { id: 'whatsapp', name: 'WhatsApp Templates', icon: ChatBubbleLeftRightIcon },
+    { id: 'assignments', name: 'Template Assignments', icon: Cog6ToothIcon },
 ];
+
+const templatesBadge = computed(() => {
+    if (activeTab.value === 'assignments') return null;
+    return loading.value ? null : `${templates.value.length} total`;
+});
+
+const deleteConfirmMessage = computed(() =>
+    deleteTarget.value
+        ? `Are you sure you want to delete "${deleteTarget.value.template.name}"? This cannot be undone.`
+        : ''
+);
 
 watch(
     () => route.query.tab,
@@ -561,19 +637,33 @@ const duplicateTemplate = async (template, type) => {
     }
 };
 
-const deleteTemplate = async (template, type) => {
-    if (!confirm(`Are you sure you want to delete "${template.name}"?`)) {
-        return;
-    }
+const askDeleteTemplate = (template, type) => {
+    deleteTarget.value = { template, type };
+    showDeleteConfirm.value = true;
+};
+
+const cancelDeleteTemplate = () => {
+    showDeleteConfirm.value = false;
+    deleteTarget.value = null;
+};
+
+const confirmDeleteTemplate = async () => {
+    if (!deleteTarget.value) return;
+    const { template, type } = deleteTarget.value;
+    deletingTemplate.value = true;
 
     try {
         const endpoint = type === 'email' ? 'email-templates' : type === 'sms' ? 'message-templates' : 'whatsapp-templates';
         await axios.delete(`/api/${endpoint}/${template.id}`);
         toast.success('Template deleted successfully');
+        showDeleteConfirm.value = false;
+        deleteTarget.value = null;
         loadTemplates();
     } catch (error) {
         console.error('Failed to delete template:', error);
         toast.error(error.response?.data?.message || 'Failed to delete template');
+    } finally {
+        deletingTemplate.value = false;
     }
 };
 

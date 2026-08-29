@@ -1,9 +1,9 @@
 <template>
     <div class="email-visual-editor gjs-email-editor-root rounded-lg border border-slate-300 bg-white overflow-hidden min-w-0 h-full flex flex-col">
-        <p v-if="initError" class="text-xs text-red-700 px-3 py-2 bg-red-50 border-b border-red-200 shrink-0">
+        <p v-if="initError" class="text-xs text-danger-700 px-3 py-2 bg-danger-50 border-b border-danger-200 shrink-0">
             {{ initError }}
         </p>
-        <p v-if="complexTemplateNote" class="text-xs text-amber-950 px-3 py-2 bg-amber-50 border-b border-amber-200 shrink-0 leading-relaxed">
+        <p v-if="complexTemplateNote" class="text-xs text-warning-950 px-3 py-2 bg-warning-50 border-b border-warning-200 shrink-0 leading-relaxed">
             {{ complexTemplateNote }}
         </p>
         <p v-if="!compact" class="text-xs text-slate-600 px-3 py-2 border-b border-slate-200 bg-slate-50 shrink-0">

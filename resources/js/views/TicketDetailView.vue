@@ -3,343 +3,377 @@
         <div class="max-w-4xl mx-auto px-3 sm:px-6 py-6 lg:py-8 w-full min-w-0">
             <!-- Back + Header -->
             <div class="mb-6">
-                <router-link
-                    to="/tickets"
-                    class="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 text-sm mb-4"
-                >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
+                <BaseButton to="/tickets" variant="ghost" size="sm" class="mb-4">
+                    <template #icon>
+                        <ArrowLeftIcon class="icon" aria-hidden="true" />
+                    </template>
                     Back to Tickets
-                </router-link>
-                <div v-if="loading && !ticket" class="flex items-center gap-2 text-slate-500">
-                    <svg class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Loading ticket...
-                </div>
-                <div v-else-if="ticket" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
+                </BaseButton>
+
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
                     <div class="min-w-0">
-                        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 break-words">{{ ticket.ticket_number }}</h1>
-                        <p class="text-base sm:text-lg text-slate-700 mt-0.5 break-words">{{ ticket.subject }}</p>
+                        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 break-words">
+                            {{ ticket ? ticket.ticket_number : 'Ticket' }}
+                        </h1>
+                        <p v-if="ticket" class="text-base sm:text-lg text-slate-700 mt-0.5 break-words">{{ ticket.subject }}</p>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <router-link
-                            :to="`/tickets/${ticket.id}/edit`"
-                            class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 shadow-sm"
-                        >
+                    <div v-if="ticket" class="flex flex-wrap items-center gap-2">
+                        <BaseButton :to="`/tickets/${ticket.id}/edit`" variant="outline" size="sm">
+                            <template #icon>
+                                <PencilSquareIcon class="icon-sm" aria-hidden="true" />
+                            </template>
                             Edit ticket
-                        </router-link>
-                        <span
-                            class="px-3 py-1 rounded-lg text-sm font-medium"
-                            :class="getStatusClass(ticket.status)"
-                        >
-                            {{ getStatusLabel(ticket.status) }}
-                        </span>
-                        <span
-                            class="px-3 py-1 rounded-lg text-sm font-medium"
-                            :class="getPriorityClass(ticket.priority)"
-                        >
-                            {{ ticket.priority }}
-                        </span>
+                        </BaseButton>
+                        <BaseBadge :tone="getStatusTone(ticket.status)">{{ getStatusLabel(ticket.status) }}</BaseBadge>
+                        <BaseBadge :tone="getPriorityTone(ticket.priority)">
+                            Priority: {{ ticket.priority }}
+                        </BaseBadge>
                     </div>
+                </div>
+
+                <div v-if="loading && !ticket" class="mt-3 space-y-2 max-w-sm" aria-busy="true">
+                    <span class="sr-only">Loading ticket…</span>
+                    <div class="skeleton-text w-2/3"></div>
+                    <div class="skeleton-text w-1/2"></div>
                 </div>
             </div>
 
             <template v-if="ticket">
                 <!-- Admin lifecycle overview -->
-                <div
-                    v-if="isStaffAdmin"
-                    class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 sm:p-5 mb-6"
-                >
-                    <h2 class="text-sm font-semibold text-indigo-900 uppercase tracking-wide mb-3">Admin overview</h2>
+                <BaseCard v-if="isStaffAdmin" title="Admin overview" class="mb-6">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-                        <div class="bg-white/80 rounded-lg p-3 border border-indigo-100">
-                            <div class="text-indigo-600 text-xs font-medium">Created</div>
+                        <div class="rounded-card p-3 border border-slate-200 bg-slate-50/60">
+                            <div class="text-eyebrow text-slate-500 uppercase">Created</div>
                             <div class="text-slate-900 font-medium mt-0.5">{{ formatDateTime(ticket.created_at) }}</div>
                         </div>
-                        <div class="bg-white/80 rounded-lg p-3 border border-indigo-100">
-                            <div class="text-indigo-600 text-xs font-medium">Expected resolution</div>
+                        <div class="rounded-card p-3 border border-slate-200 bg-slate-50/60">
+                            <div class="text-eyebrow text-slate-500 uppercase">Expected resolution</div>
                             <div class="text-slate-900 font-medium mt-0.5">
                                 {{ ticket.estimated_resolve_hours ? `${ticket.estimated_resolve_hours} hour(s)` : 'Priority-based SLA' }}
                             </div>
                             <div v-if="ticket.sla_due_at" class="text-xs text-slate-600 mt-1">Due by {{ formatDateTime(ticket.sla_due_at) }}</div>
                         </div>
-                        <div class="bg-white/80 rounded-lg p-3 border border-indigo-100">
-                            <div class="text-indigo-600 text-xs font-medium">Resolved</div>
+                        <div class="rounded-card p-3 border border-slate-200 bg-slate-50/60">
+                            <div class="text-eyebrow text-slate-500 uppercase">Resolved</div>
                             <div class="text-slate-900 font-medium mt-0.5">{{ ticket.resolved_at ? formatDateTime(ticket.resolved_at) : 'Not resolved yet' }}</div>
                             <div v-if="ticket.resolved_at && ticket.created_at" class="text-xs text-slate-600 mt-1">
                                 Time to resolve: {{ formatDuration(ticket.created_at, ticket.resolved_at) }}
                             </div>
                         </div>
-                        <div class="bg-white/80 rounded-lg p-3 border border-indigo-100 sm:col-span-2 lg:col-span-3">
-                            <div class="text-indigo-600 text-xs font-medium">Comments</div>
+                        <div class="rounded-card p-3 border border-slate-200 bg-slate-50/60 sm:col-span-2 lg:col-span-3">
+                            <div class="text-eyebrow text-slate-500 uppercase">Comments</div>
                             <div class="text-slate-900 font-medium mt-0.5">{{ (ticket.messages || []).length }} on this ticket — newest at the bottom.</div>
                         </div>
                     </div>
-                </div>
+                </BaseCard>
 
                 <!-- Details Card -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-6">
-                    <div class="px-4 sm:px-6 py-4 border-b border-slate-200 bg-slate-50">
-                        <h2 class="text-base font-semibold text-slate-900">Ticket Details</h2>
-                    </div>
-                    <div class="p-4 sm:p-6">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Customer</span>
-                                <div class="mt-0.5">
-                                    <router-link
-                                        v-if="ticket.customer_id"
-                                        :to="`/customers/${ticket.customer_id}`"
-                                        class="text-slate-900 font-medium hover:text-blue-600 hover:underline"
-                                    >
-                                        {{ ticket.customer?.name || '—' }}
-                                    </router-link>
-                                    <span v-else class="text-slate-600">—</span>
-                                </div>
+                <BaseCard title="Ticket Details" class="mb-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <span class="text-eyebrow text-slate-500 uppercase">Customer</span>
+                            <div class="mt-0.5">
+                                <router-link
+                                    v-if="ticket.customer_id"
+                                    :to="`/customers/${ticket.customer_id}`"
+                                    class="link"
+                                >
+                                    {{ ticket.customer?.name || '—' }}
+                                </router-link>
+                                <span v-else class="text-slate-600">—</span>
                             </div>
-                            <div>
-                                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Assigned</span>
-                                <div class="mt-0.5 text-slate-900">
-                                    <template v-if="ticket.assignees && ticket.assignees.length">
-                                        {{ ticket.assignees.map((a) => a.name).join(', ') }}
+                        </div>
+                        <div>
+                            <span class="text-eyebrow text-slate-500 uppercase">Assigned</span>
+                            <div class="mt-0.5 text-slate-900">
+                                <template v-if="ticket.assignees && ticket.assignees.length">
+                                    {{ ticket.assignees.map((a) => a.name).join(', ') }}
+                                </template>
+                                <template v-else>{{ ticket.assignee?.name || 'Unassigned' }}</template>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-eyebrow text-slate-500 uppercase">Created By</span>
+                            <div class="mt-0.5 text-slate-900">{{ ticket.creator?.name || '—' }}</div>
+                        </div>
+                        <div>
+                            <span class="text-eyebrow text-slate-500 uppercase">Created At</span>
+                            <div class="mt-0.5 text-slate-900">{{ formatDateTime(ticket.created_at) }}</div>
+                        </div>
+                        <div v-if="ticket.resolved_at">
+                            <span class="text-eyebrow text-slate-500 uppercase">Resolved At</span>
+                            <div class="mt-0.5 text-slate-900">{{ formatDateTime(ticket.resolved_at) }}</div>
+                        </div>
+                        <div v-if="ticket.sla_due_at">
+                            <span class="text-eyebrow text-slate-500 uppercase">SLA Due</span>
+                            <div class="mt-0.5 text-slate-900">{{ formatDateTime(ticket.sla_due_at) }}</div>
+                        </div>
+                        <div v-if="ticket.estimated_resolve_hours">
+                            <span class="text-eyebrow text-slate-500 uppercase">Est. resolve (hours)</span>
+                            <div class="mt-0.5 text-slate-900">{{ ticket.estimated_resolve_hours }}</div>
+                        </div>
+                        <div v-if="ticket.reference_url" class="sm:col-span-2">
+                            <span class="text-eyebrow text-slate-500 uppercase">Reference link (Drive / Sheet)</span>
+                            <div class="mt-0.5">
+                                <a
+                                    :href="ticket.reference_url"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="link break-all"
+                                >{{ ticket.reference_url }}</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="ticket.description" class="mt-4 pt-4 border-t border-slate-200">
+                        <span class="text-eyebrow text-slate-500 uppercase">Description</span>
+                        <div class="mt-1 text-slate-700 whitespace-pre-wrap">{{ ticket.description }}</div>
+                    </div>
+
+                    <div class="mt-4 pt-4 border-t border-slate-200">
+                        <div class="callout callout-warning text-xs mb-3">
+                            <span class="font-semibold">Internal file sharing:</span>
+                            for larger files it is <strong>preferred</strong> to use Google Drive or Google Sheets and paste the link above (or in the description). You can still add attachments here.
+                        </div>
+                        <span class="text-eyebrow text-slate-500 uppercase">Attachments</span>
+                        <ul v-if="ticket.attachments && ticket.attachments.length" class="mt-2 space-y-2">
+                            <li
+                                v-for="att in ticket.attachments"
+                                :key="att.id"
+                                class="flex items-center justify-between gap-2 text-sm"
+                            >
+                                <a :href="att.url" target="_blank" rel="noopener noreferrer" class="link truncate">{{ att.original_name }}</a>
+                                <BaseButton
+                                    variant="ghost"
+                                    size="sm"
+                                    class="shrink-0"
+                                    :label="`Remove ${att.original_name}`"
+                                    @click="requestRemoveTicketAttachment(att)"
+                                >
+                                    <template #icon>
+                                        <TrashIcon class="icon-sm" aria-hidden="true" />
                                     </template>
-                                    <template v-else>{{ ticket.assignee?.name || 'Unassigned' }}</template>
-                                </div>
-                            </div>
-                            <div>
-                                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Created By</span>
-                                <div class="mt-0.5 text-slate-900">{{ ticket.creator?.name || '—' }}</div>
-                            </div>
-                            <div>
-                                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Created At</span>
-                                <div class="mt-0.5 text-slate-900">{{ formatDateTime(ticket.created_at) }}</div>
-                            </div>
-                            <div v-if="ticket.resolved_at">
-                                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Resolved At</span>
-                                <div class="mt-0.5 text-slate-900">{{ formatDateTime(ticket.resolved_at) }}</div>
-                            </div>
-                            <div v-if="ticket.sla_due_at">
-                                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">SLA Due</span>
-                                <div class="mt-0.5 text-slate-900">{{ formatDateTime(ticket.sla_due_at) }}</div>
-                            </div>
-                            <div v-if="ticket.estimated_resolve_hours">
-                                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Est. resolve (hours)</span>
-                                <div class="mt-0.5 text-slate-900">{{ ticket.estimated_resolve_hours }}</div>
-                            </div>
-                            <div v-if="ticket.reference_url" class="sm:col-span-2">
-                                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Reference link (Drive / Sheet)</span>
-                                <div class="mt-0.5">
-                                    <a
-                                        :href="ticket.reference_url"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="text-blue-600 font-medium hover:underline break-all"
-                                    >{{ ticket.reference_url }}</a>
-                                </div>
-                            </div>
+                                    Remove
+                                </BaseButton>
+                            </li>
+                        </ul>
+                        <p v-else class="mt-1 text-sm text-slate-500">No files attached yet.</p>
+                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                            <label class="form-label sr-only" for="ticketdetailview-attachments">Add attachments</label>
+                            <input
+                                id="ticketdetailview-attachments"
+                                ref="detailAttachmentInputRef"
+                                type="file"
+                                multiple
+                                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                                class="text-sm text-slate-600 file:mr-2 file:py-1.5 file:px-2 file:rounded file:border-0 file:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded-control"
+                                @change="onDetailAttachmentFilesSelected"
+                            />
+                            <BaseButton
+                                variant="soft"
+                                :disabled="!detailPendingAttachmentFiles.length"
+                                :loading="detailAttachmentUploading"
+                                @click="uploadDetailAttachments"
+                            >
+                                <template #icon>
+                                    <ArrowUpTrayIcon class="icon" aria-hidden="true" />
+                                </template>
+                                {{ detailAttachmentUploading ? 'Uploading…' : 'Upload selected' }}
+                            </BaseButton>
                         </div>
-                        <div v-if="ticket.description" class="mt-4 pt-4 border-t border-slate-200">
-                            <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Description</span>
-                            <div class="mt-1 text-slate-700 whitespace-pre-wrap">{{ ticket.description }}</div>
-                        </div>
-
-                        <div class="mt-4 pt-4 border-t border-slate-200">
-                            <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 mb-3">
-                                <span class="font-semibold">Internal file sharing:</span>
-                                for larger files it is <strong>preferred</strong> to use Google Drive or Google Sheets and paste the link above (or in the description). You can still add attachments here.
-                            </div>
-                            <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Attachments</span>
-                            <ul v-if="ticket.attachments && ticket.attachments.length" class="mt-2 space-y-2">
-                                <li
-                                    v-for="att in ticket.attachments"
-                                    :key="att.id"
-                                    class="flex items-center justify-between gap-2 text-sm"
+                        <ul v-if="detailPendingAttachmentFiles.length" class="mt-2 text-xs text-slate-600 space-y-1">
+                            <li v-for="(f, i) in detailPendingAttachmentFiles" :key="i" class="flex items-center justify-between gap-2">
+                                <span class="truncate">{{ f.name }}</span>
+                                <BaseButton
+                                    variant="ghost"
+                                    size="sm"
+                                    class="shrink-0"
+                                    :label="`Remove ${f.name}`"
+                                    @click="removeDetailPendingFile(i)"
                                 >
-                                    <a :href="att.url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline truncate">{{ att.original_name }}</a>
-                                    <button
-                                        type="button"
-                                        class="text-xs text-red-600 shrink-0"
-                                        @click="removeTicketAttachment(att)"
-                                    >Remove</button>
-                                </li>
-                            </ul>
-                            <p v-else class="mt-1 text-sm text-slate-500">No files attached yet.</p>
-                            <div class="mt-3 flex flex-wrap items-center gap-2">
-                                <input
-                                    ref="detailAttachmentInputRef"
-                                    type="file"
-                                    multiple
-                                    accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                                    class="text-sm text-slate-600 file:mr-2 file:py-1.5 file:px-2 file:rounded file:border-0 file:bg-slate-100"
-                                    @change="onDetailAttachmentFilesSelected"
-                                />
-                                <button
-                                    type="button"
-                                    :disabled="detailAttachmentUploading || !detailPendingAttachmentFiles.length"
-                                    @click="uploadDetailAttachments"
-                                    class="px-3 py-1.5 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
-                                >
-                                    {{ detailAttachmentUploading ? 'Uploading…' : 'Upload selected' }}
-                                </button>
-                            </div>
-                            <ul v-if="detailPendingAttachmentFiles.length" class="mt-2 text-xs text-slate-600 space-y-1">
-                                <li v-for="(f, i) in detailPendingAttachmentFiles" :key="i" class="flex justify-between gap-2">
-                                    <span class="truncate">{{ f.name }}</span>
-                                    <button type="button" class="text-red-600" @click="removeDetailPendingFile(i)">Remove</button>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <!-- Quick edit: Status & Assign -->
-                        <div class="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
-                            <div class="w-full max-w-md">
-                                <label class="block text-xs font-medium text-slate-500 mb-1">Status</label>
-                                <select
-                                    v-model="editStatus"
-                                    @change="updateTicketField('status')"
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                                >
-                                    <option value="open">Open</option>
-                                    <option value="in_progress">Working</option>
-                                    <option value="on_hold">On Hold</option>
-                                    <option value="resolved">Resolved</option>
-                                    <option value="closed">Closed</option>
-                                </select>
-                            </div>
-                            <div v-if="isStaffAdmin" class="w-full min-w-0">
-                                <label class="block text-xs font-medium text-slate-500 mb-1">Assignees</label>
-                                <div class="max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 space-y-1.5">
-                                    <label
-                                        v-for="u in users"
-                                        :key="u.id"
-                                        class="flex items-center gap-2 text-sm text-slate-800 cursor-pointer"
-                                    >
-                                        <input
-                                            v-model="editAssigneeIds"
-                                            type="checkbox"
-                                            :value="Number(u.id)"
-                                            class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
-                                        />
-                                        {{ u.name }}
-                                    </label>
-                                </div>
-                                <div class="mt-3 flex flex-wrap items-center gap-2">
-                                    <button
-                                        type="button"
-                                        class="inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition-colors"
-                                        @click="saveAssignees"
-                                    >
-                                        Save assignees
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                                    <template #icon>
+                                        <TrashIcon class="icon-sm" aria-hidden="true" />
+                                    </template>
+                                    Remove
+                                </BaseButton>
+                            </li>
+                        </ul>
                     </div>
-                </div>
+
+                    <!-- Quick edit: Status & Assign -->
+                    <div class="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
+                        <div class="w-full max-w-md">
+                            <label class="form-label" for="ticketdetailview-status">Status</label>
+                            <select
+                                id="ticketdetailview-status"
+                                v-model="editStatus"
+                                class="form-select"
+                                @change="updateTicketField('status')"
+                            >
+                                <option value="open">Open</option>
+                                <option value="in_progress">Working</option>
+                                <option value="on_hold">On Hold</option>
+                                <option value="resolved">Resolved</option>
+                                <option value="closed">Closed</option>
+                            </select>
+                        </div>
+                        <fieldset v-if="isStaffAdmin" class="form-fieldset w-full min-w-0">
+                            <legend class="form-legend">Assignees</legend>
+                            <div class="max-h-40 overflow-y-auto rounded-card border border-slate-200 bg-white p-2 space-y-1.5">
+                                <label
+                                    v-for="u in users"
+                                    :key="u.id"
+                                    class="form-choice text-slate-800"
+                                >
+                                    <input
+                                        v-model="editAssigneeIds"
+                                        type="checkbox"
+                                        :value="Number(u.id)"
+                                        class="form-checkbox"
+                                    />
+                                    {{ u.name }}
+                                </label>
+                            </div>
+                            <div class="mt-3 flex flex-wrap items-center gap-2">
+                                <BaseButton variant="soft" @click="saveAssignees">
+                                    <template #icon>
+                                        <CheckIcon class="icon" aria-hidden="true" />
+                                    </template>
+                                    Save assignees
+                                </BaseButton>
+                            </div>
+                        </fieldset>
+                    </div>
+                </BaseCard>
 
                 <!-- Comments -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200">
-                    <div class="px-4 sm:px-6 py-4 border-b border-slate-200 bg-slate-50">
-                        <h2 class="text-base font-semibold text-slate-900">Comments</h2>
-                        <p class="text-sm text-slate-500 mt-0.5">{{ (ticket.messages || []).length }} comment(s)</p>
-                    </div>
-                    <div class="p-4 sm:p-6">
-                        <!-- Comment list -->
-                        <div v-if="!(ticket.messages && ticket.messages.length)" class="text-center py-8 text-slate-500 text-sm">
-                            No comments yet. Add one below.
-                        </div>
-                        <div v-else class="space-y-4 mb-6">
-                            <div
-                                v-for="msg in sortedMessages"
-                                :key="msg.id"
-                                class="flex gap-3 p-4 rounded-lg bg-slate-50 border border-slate-100"
-                            >
-                                <div class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-semibold text-sm flex-shrink-0">
-                                    {{ getInitials(msg.user?.name) }}
+                <BaseCard title="Comments" :subtitle="`${(ticket.messages || []).length} comment(s)`">
+                    <!-- Comment list -->
+                    <EmptyState
+                        v-if="!(ticket.messages && ticket.messages.length)"
+                        heading="No comments yet"
+                        description="Add the first comment below — assignees and the ticket creator are notified by email."
+                    >
+                        <template #icon>
+                            <ChatBubbleLeftRightIcon class="icon" aria-hidden="true" />
+                        </template>
+                    </EmptyState>
+                    <div v-else class="space-y-4 mb-6">
+                        <div
+                            v-for="msg in sortedMessages"
+                            :key="msg.id"
+                            class="flex gap-3 p-4 rounded-card bg-slate-50 border border-slate-100"
+                        >
+                            <div class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-semibold text-sm flex-shrink-0" aria-hidden="true">
+                                {{ getInitials(msg.user?.name) }}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex flex-wrap items-baseline gap-2">
+                                    <span class="font-medium text-slate-900">{{ msg.user?.name || 'Unknown' }}</span>
+                                    <span class="text-xs text-slate-500">{{ formatDateTime(msg.created_at) }}</span>
+                                    <BaseBadge v-if="msg.is_internal" tone="warning">Internal</BaseBadge>
                                 </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex flex-wrap items-baseline gap-2">
-                                        <span class="font-medium text-slate-900">{{ msg.user?.name || 'Unknown' }}</span>
-                                        <span class="text-xs text-slate-500">{{ formatDateTime(msg.created_at) }}</span>
-                                        <span
-                                            v-if="msg.is_internal"
-                                            class="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-medium"
-                                        >Internal</span>
-                                    </div>
-                                    <p class="text-slate-700 text-sm mt-1 whitespace-pre-wrap">{{ msg.message }}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Add comment -->
-                        <div class="border-t border-slate-200 pt-4 pb-1">
-                            <label class="block text-sm font-medium text-slate-700 mb-2">Add a comment</label>
-                            <p class="text-xs text-slate-500 mb-2">
-                                Assignees and the ticket creator are notified by email, except the person who posted the comment.
-                                <span v-if="isStaffAdmin"> Internal notes are not emailed.</span>
-                            </p>
-
-                            <div
-                                v-if="newCommentInternal && isStaffAdmin"
-                                class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950"
-                            >
-                                <strong>Internal note:</strong> no email will be sent for this comment.
-                            </div>
-                            <div
-                                v-else-if="commentRecipientRows.length > 0"
-                                class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800"
-                            >
-                                <div class="font-semibold text-slate-900 mb-1">Email will be sent to:</div>
-                                <ul class="space-y-1 list-none">
-                                    <li v-for="row in commentRecipientRows" :key="row.email" class="break-all">
-                                        <span class="font-medium">{{ row.name }}</span>
-                                        <span class="text-slate-600"> — {{ row.email }}</span>
-                                    </li>
-                                </ul>
-                            </div>
-                            <div
-                                v-else-if="!newCommentInternal || !isStaffAdmin"
-                                class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950"
-                            >
-                                No other recipients with a valid email on file (you may be the only assignee, or profiles lack email). The system may still use the admin notification address from
-                                <strong>Settings</strong> if no one else qualifies.
-                            </div>
-
-                            <textarea
-                                ref="commentTextareaRef"
-                                v-model="newComment"
-                                rows="6"
-                                class="w-full min-h-[10rem] max-h-[min(70vh,36rem)] px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 resize-y overflow-x-hidden"
-                                placeholder="Write your comment..."
-                            />
-                            <p class="text-xs text-slate-500 mt-1">Drag the corner to resize; grows with longer notes.</p>
-                            <label v-if="isStaffAdmin" class="mt-3 flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                                <input v-model="newCommentInternal" type="checkbox" class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
-                                Internal note (no email)
-                            </label>
-                            <p v-if="commentError" class="text-sm text-red-600 mt-2">{{ commentError }}</p>
-                            <div class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-4">
-                                <button
-                                    type="button"
-                                    :disabled="commentSending || !newComment.trim()"
-                                    @click="addComment"
-                                    class="w-full sm:w-auto shrink-0 inline-flex justify-center px-5 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                                >
-                                    {{ commentSending ? 'Sending…' : 'Post comment' }}
-                                </button>
+                                <p class="text-slate-700 text-sm mt-1 whitespace-pre-wrap">{{ msg.message }}</p>
                             </div>
                         </div>
                     </div>
-                </div>
+
+                    <!-- Add comment -->
+                    <div class="border-t border-slate-200 pt-4 pb-1">
+                        <label class="form-label" for="ticketdetailview-comment">Add a comment</label>
+                        <p class="text-xs text-slate-500 mb-2">
+                            Assignees and the ticket creator are notified by email, except the person who posted the comment.
+                            <span v-if="isStaffAdmin"> Internal notes are not emailed.</span>
+                        </p>
+
+                        <div
+                            v-if="newCommentInternal && isStaffAdmin"
+                            class="mb-3 callout callout-warning text-xs"
+                        >
+                            <strong>Internal note:</strong> no email will be sent for this comment.
+                        </div>
+                        <div
+                            v-else-if="commentRecipientRows.length > 0"
+                            class="mb-3 callout callout-info text-xs"
+                        >
+                            <div class="font-semibold mb-1">Email will be sent to:</div>
+                            <ul class="space-y-1 list-none">
+                                <li v-for="row in commentRecipientRows" :key="row.email" class="break-all">
+                                    <span class="font-medium">{{ row.name }}</span>
+                                    <span> — {{ row.email }}</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div
+                            v-else-if="!newCommentInternal || !isStaffAdmin"
+                            class="mb-3 callout callout-warning text-xs"
+                        >
+                            No other recipients with a valid email on file (you may be the only assignee, or profiles lack email). The system may still use the admin notification address from
+                            <strong>Settings</strong> if no one else qualifies.
+                        </div>
+
+                        <textarea
+                            id="ticketdetailview-comment"
+                            ref="commentTextareaRef"
+                            v-model="newComment"
+                            rows="6"
+                            class="form-textarea min-h-[10rem] max-h-[min(70vh,36rem)] overflow-x-hidden"
+                            placeholder="Write your comment..."
+                            :aria-invalid="commentError ? 'true' : undefined"
+                            :aria-describedby="commentError ? 'ticketdetailview-comment-error' : undefined"
+                        />
+                        <p class="form-hint">Drag the corner to resize; grows with longer notes.</p>
+                        <label v-if="isStaffAdmin" class="form-choice mt-3">
+                            <input v-model="newCommentInternal" type="checkbox" class="form-checkbox" />
+                            Internal note (no email)
+                        </label>
+                        <p
+                            v-if="commentError"
+                            id="ticketdetailview-comment-error"
+                            class="callout callout-danger mt-2"
+                            role="alert"
+                        >{{ commentError }}</p>
+                        <div class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-4">
+                            <BaseButton
+                                variant="primary"
+                                block-mobile
+                                :loading="commentSending"
+                                @click="addComment"
+                            >
+                                <template #icon>
+                                    <PaperAirplaneIcon class="icon" aria-hidden="true" />
+                                </template>
+                                {{ commentSending ? 'Sending…' : 'Post comment' }}
+                            </BaseButton>
+                        </div>
+                    </div>
+                </BaseCard>
             </template>
 
-            <div v-else-if="!loading && error" class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-                <p class="text-red-700">{{ error }}</p>
-                <router-link to="/tickets" class="inline-block mt-3 text-sm text-red-600 hover:underline">Back to Tickets</router-link>
+            <div v-else-if="!loading && error" class="callout callout-danger text-center" role="alert">
+                <p>{{ error }}</p>
+                <div class="mt-3">
+                    <BaseButton to="/tickets" variant="ghost" size="sm">
+                        <template #icon>
+                            <ArrowLeftIcon class="icon" aria-hidden="true" />
+                        </template>
+                        Back to Tickets
+                    </BaseButton>
+                </div>
             </div>
         </div>
+
+        <ConfirmDialog
+            v-model="confirmRemoveOpen"
+            title="Remove this file?"
+            :message="attachmentToRemove ? `“${attachmentToRemove.original_name}” will be deleted from this ticket.` : 'Remove this file?'"
+            confirm-label="Remove file"
+            cancel-label="Keep file"
+            tone="danger"
+            :loading="removingAttachment"
+            @confirm="confirmRemoveTicketAttachment"
+            @cancel="cancelRemoveTicketAttachment"
+        />
     </div>
 </template>
 
@@ -348,6 +382,16 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useAutosizeTextarea } from '@/composables/useAutosizeTextarea';
 import { useRoute } from 'vue-router';
 import axios from 'axios';
+import {
+    ArrowLeftIcon,
+    ArrowUpTrayIcon,
+    ChatBubbleLeftRightIcon,
+    CheckIcon,
+    PaperAirplaneIcon,
+    PencilSquareIcon,
+    TrashIcon,
+} from '@heroicons/vue/24/outline';
+import { BaseBadge, BaseButton, BaseCard, ConfirmDialog, EmptyState } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
 import { formatTicketStatus } from '@/utils/displayFormat';
@@ -372,6 +416,9 @@ const newCommentInternal = ref(false);
 const detailPendingAttachmentFiles = ref([]);
 const detailAttachmentUploading = ref(false);
 const detailAttachmentInputRef = ref(null);
+const confirmRemoveOpen = ref(false);
+const attachmentToRemove = ref(null);
+const removingAttachment = ref(false);
 
 const isStaffAdmin = computed(() => {
     const n = auth.user?.role?.name;
@@ -443,25 +490,26 @@ function formatDuration(start, end) {
     return `${m}m`;
 }
 
-function getStatusClass(status) {
-    const classes = {
-        open: 'bg-yellow-100 text-yellow-800',
-        in_progress: 'bg-blue-100 text-blue-800',
-        on_hold: 'bg-amber-100 text-amber-800',
-        resolved: 'bg-green-100 text-green-800',
-        closed: 'bg-slate-100 text-slate-800',
+/** Visual tone only — the raw status value is untouched. */
+function getStatusTone(status) {
+    const tones = {
+        open: 'warning',
+        in_progress: 'primary',
+        on_hold: 'warning',
+        resolved: 'success',
+        closed: 'neutral',
     };
-    return classes[status] || 'bg-slate-100 text-slate-800';
+    return tones[status] || 'neutral';
 }
 
-function getPriorityClass(priority) {
-    const classes = {
-        urgent: 'bg-red-100 text-red-800',
-        high: 'bg-orange-100 text-orange-800',
-        medium: 'bg-yellow-100 text-yellow-800',
-        low: 'bg-blue-100 text-blue-800',
+function getPriorityTone(priority) {
+    const tones = {
+        urgent: 'danger',
+        high: 'danger',
+        medium: 'warning',
+        low: 'primary',
     };
-    return classes[priority] || 'bg-slate-100 text-slate-800';
+    return tones[priority] || 'neutral';
 }
 
 function formatDateTime(value) {
@@ -585,19 +633,40 @@ async function uploadDetailAttachments() {
     }
 }
 
-async function removeTicketAttachment(att) {
-    if (!ticket.value?.id) return;
+function requestRemoveTicketAttachment(att) {
+    attachmentToRemove.value = att;
+    confirmRemoveOpen.value = true;
+}
+
+function cancelRemoveTicketAttachment() {
+    if (removingAttachment.value) return;
+    confirmRemoveOpen.value = false;
+    attachmentToRemove.value = null;
+}
+
+async function confirmRemoveTicketAttachment() {
+    const att = attachmentToRemove.value;
+    if (!ticket.value?.id || !att) return;
+    removingAttachment.value = true;
     try {
         await axios.delete(`/api/tickets/${ticket.value.id}/attachments/${att.id}`);
         ticket.value.attachments = (ticket.value.attachments || []).filter((a) => a.id !== att.id);
         toast.success('Attachment removed');
     } catch (err) {
         toast.error(err.response?.data?.message || 'Could not remove file');
+    } finally {
+        removingAttachment.value = false;
+        confirmRemoveOpen.value = false;
+        attachmentToRemove.value = null;
     }
 }
 
 async function addComment() {
-    if (!ticket.value || !newComment.value.trim()) return;
+    if (!ticket.value) return;
+    if (!newComment.value.trim()) {
+        commentError.value = 'Write a comment before posting.';
+        return;
+    }
     commentSending.value = true;
     commentError.value = null;
     try {

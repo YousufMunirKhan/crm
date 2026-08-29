@@ -3,42 +3,26 @@
         <Transition name="slide-fade">
             <div
                 v-if="visible"
-                class="fixed top-4 right-4 z-50 max-w-sm w-full"
+                class="fixed top-4 right-4 z-toast max-w-sm w-full"
+                :role="type === 'error' ? 'alert' : 'status'"
+                :aria-live="type === 'error' ? 'assertive' : 'polite'"
+                aria-atomic="true"
             >
-                <div
-                    class="rounded-xl shadow-2xl p-4 flex items-start gap-3 border"
-                    :class="typeClasses"
-                >
-                    <!-- Icon -->
-                    <div class="flex-shrink-0 w-6 h-6">
-                        <svg v-if="type === 'success'" class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <svg v-else-if="type === 'error'" class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <svg v-else-if="type === 'warning'" class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        <svg v-else class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
+                <div :class="['callout', calloutClass, 'shadow-overlay flex items-start gap-3']">
+                    <component :is="icon" class="w-6 h-6 shrink-0" aria-hidden="true" />
 
-                    <!-- Content -->
                     <div class="flex-1 min-w-0">
-                        <p v-if="title" class="font-semibold text-sm" :class="titleClass">{{ title }}</p>
-                        <p class="text-sm" :class="messageClass">{{ message }}</p>
+                        <p v-if="title" class="font-semibold text-sm">{{ title }}</p>
+                        <p class="text-sm">{{ message }}</p>
                     </div>
 
-                    <!-- Close Button -->
                     <button
+                        type="button"
+                        aria-label="Dismiss notification"
+                        class="shrink-0 p-1 rounded-control hover:bg-slate-900/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
                         @click="close"
-                        class="flex-shrink-0 p-1 rounded-lg hover:bg-black/10 transition-colors"
                     >
-                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <XMarkIcon class="icon-sm" aria-hidden="true" />
                     </button>
                 </div>
             </div>
@@ -48,25 +32,32 @@
 
 <script setup>
 import { computed } from 'vue';
+import {
+    CheckCircleIcon,
+    ExclamationTriangleIcon,
+    InformationCircleIcon,
+    XCircleIcon,
+    XMarkIcon,
+} from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     visible: {
         type: Boolean,
-        default: false
+        default: false,
     },
     type: {
         type: String,
         default: 'info', // success, error, warning, info
-        validator: (value) => ['success', 'error', 'warning', 'info'].includes(value)
+        validator: (value) => ['success', 'error', 'warning', 'info'].includes(value),
     },
     title: {
         type: String,
-        default: ''
+        default: '',
     },
     message: {
         type: String,
-        required: true
-    }
+        required: true,
+    },
 });
 
 const emit = defineEmits(['close']);
@@ -75,44 +66,22 @@ const close = () => {
     emit('close');
 };
 
-const typeClasses = computed(() => {
-    switch (props.type) {
-        case 'success':
-            return 'bg-green-50 border-green-200';
-        case 'error':
-            return 'bg-red-50 border-red-200';
-        case 'warning':
-            return 'bg-amber-50 border-amber-200';
-        default:
-            return 'bg-blue-50 border-blue-200';
-    }
-});
+const CALLOUT = {
+    success: 'callout-success',
+    error: 'callout-danger',
+    warning: 'callout-warning',
+    info: 'callout-info',
+};
 
-const titleClass = computed(() => {
-    switch (props.type) {
-        case 'success':
-            return 'text-green-800';
-        case 'error':
-            return 'text-red-800';
-        case 'warning':
-            return 'text-amber-800';
-        default:
-            return 'text-blue-800';
-    }
-});
+const ICON = {
+    success: CheckCircleIcon,
+    error: XCircleIcon,
+    warning: ExclamationTriangleIcon,
+    info: InformationCircleIcon,
+};
 
-const messageClass = computed(() => {
-    switch (props.type) {
-        case 'success':
-            return 'text-green-700';
-        case 'error':
-            return 'text-red-700';
-        case 'warning':
-            return 'text-amber-700';
-        default:
-            return 'text-blue-700';
-    }
-});
+const calloutClass = computed(() => CALLOUT[props.type] || CALLOUT.info);
+const icon = computed(() => ICON[props.type] || ICON.info);
 </script>
 
 <style scoped>
@@ -134,4 +103,3 @@ const messageClass = computed(() => {
     opacity: 0;
 }
 </style>
-

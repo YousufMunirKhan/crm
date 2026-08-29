@@ -1,237 +1,231 @@
 <template>
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
-        <div class="bg-white rounded-xl shadow-xl p-6 max-w-3xl w-full mx-4 my-8">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-semibold text-slate-900">
-                    {{ employee ? 'Edit Employee' : 'Add New Employee' }}
-                </h3>
-                <button
-                    @click="$emit('close')"
-                    class="text-slate-400 hover:text-slate-600"
-                >
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-
-            <form @submit.prevent="handleSubmit" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Name *</label>
-                        <input
-                            v-model="form.name"
-                            type="text"
-                            required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Email *</label>
-                        <input
-                            v-model="form.email"
-                            type="email"
-                            required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Password {{ employee ? '(leave blank to keep current)' : '*' }}</label>
-                        <input
-                            v-model="form.password"
-                            type="password"
-                            :required="!employee"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-                        <input
-                            v-model="form.phone"
-                            type="text"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Role *</label>
-                        <select
-                            v-model="form.role_id"
-                            required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        >
-                            <option value="">Select Role</option>
-                            <option v-for="role in roles" :key="role.id" :value="role.id">
-                                {{ role.name }}
-                            </option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Employee Type</label>
-                        <select
-                            v-model="form.employee_type"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        >
-                            <option value="">Select Type</option>
-                            <option value="field_worker">Field Worker</option>
-                            <option value="call_center">Call Center</option>
-                            <option value="ticket_manager">Ticket Manager</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                        <select
-                            v-model="form.is_active"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        >
-                            <option :value="true">Active</option>
-                            <option :value="false">Inactive</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Hire Date</label>
-                        <input
-                            v-model="form.hire_date"
-                            type="date"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-                </div>
-
+    <BaseModal
+        :model-value="true"
+        :title="employee ? 'Edit Employee' : 'Add New Employee'"
+        size="lg"
+        :close-on-backdrop="false"
+        @close="$emit('close')"
+    >
+        <form id="employee-form" class="space-y-4" @submit.prevent="handleSubmit">
+            <div class="form-grid-2">
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Address</label>
-                    <textarea
-                        v-model="form.address"
-                        rows="2"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    <label class="form-label" for="employeeform-name">Name <span class="form-required" aria-hidden="true">*</span></label>
+                    <input id="employeeform-name"
+                        v-model="form.name"
+                        type="text"
+                        required
+                        class="form-input"
                     />
                 </div>
 
-                <div v-if="canEditNavPerms" class="border border-slate-200 rounded-lg p-4 bg-slate-50 space-y-3">
-                    <h4 class="text-sm font-medium text-slate-900">Sidebar menu access</h4>
-                    <p class="text-xs text-slate-600">
-                        By default this user gets every menu item their role allows. Turn on to hide sections (Dashboard always stays).
-                    </p>
-                    <label class="flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
-                        <input
-                            v-model="restrictMenu"
-                            type="checkbox"
-                            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        Limit sidebar to selected sections only
-                    </label>
-                    <div
-                        v-if="restrictMenu"
-                        class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-white"
-                    >
-                        <label
-                            v-for="opt in NAV_SECTION_OPTIONS"
-                            v-show="opt.key !== 'dashboard'"
-                            :key="opt.key"
-                            class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
-                        >
-                            <input
-                                v-model="sectionChecks[opt.key]"
-                                type="checkbox"
-                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            {{ opt.label }}
-                        </label>
-                    </div>
+                <div>
+                    <label class="form-label" for="employeeform-email">Email <span class="form-required" aria-hidden="true">*</span></label>
+                    <input id="employeeform-email"
+                        v-model="form.email"
+                        type="email"
+                        required
+                        class="form-input"
+                    />
                 </div>
 
-                <!-- Attachments when creating/editing (optional uploads) -->
-                <div class="border-t pt-4 space-y-3">
-                    <div class="flex items-center justify-between">
-                        <h4 class="text-sm font-medium text-slate-900">Attachments</h4>
-                        <span class="text-xs text-slate-500">Optional – ID, contract, proof, etc.</span>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-[2fr,2fr,auto] gap-3 items-center">
+                <div>
+                    <label class="form-label" for="employeeform-password">Password {{ employee ? '(leave blank to keep current)' : '*' }}</label>
+                    <input id="employeeform-password"
+                        v-model="form.password"
+                        type="password"
+                        :required="!employee"
+                        class="form-input"
+                    />
+                </div>
+
+                <div>
+                    <label class="form-label" for="employeeform-phone">Phone</label>
+                    <input id="employeeform-phone"
+                        v-model="form.phone"
+                        type="text"
+                        class="form-input"
+                    />
+                </div>
+
+                <div>
+                    <label class="form-label" for="employeeform-role">Role <span class="form-required" aria-hidden="true">*</span></label>
+                    <select id="employeeform-role"
+                        v-model="form.role_id"
+                        required
+                        class="form-select"
+                    >
+                        <option value="">Select Role</option>
+                        <option v-for="role in roles" :key="role.id" :value="role.id">
+                            {{ role.name }}
+                        </option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="form-label" for="employeeform-employee-type">Employee Type</label>
+                    <select id="employeeform-employee-type"
+                        v-model="form.employee_type"
+                        class="form-select"
+                    >
+                        <option value="">Select Type</option>
+                        <option value="field_worker">Field Worker</option>
+                        <option value="call_center">Call Center</option>
+                        <option value="ticket_manager">Ticket Manager</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="form-label" for="employeeform-status">Status</label>
+                    <select id="employeeform-status"
+                        v-model="form.is_active"
+                        class="form-select"
+                    >
+                        <option :value="true">Active</option>
+                        <option :value="false">Inactive</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="form-label" for="employeeform-hire-date">Hire Date</label>
+                    <input id="employeeform-hire-date"
+                        v-model="form.hire_date"
+                        type="date"
+                        class="form-input"
+                    />
+                </div>
+            </div>
+
+            <div>
+                <label class="form-label" for="employeeform-address">Address</label>
+                <textarea id="employeeform-address"
+                    v-model="form.address"
+                    rows="2"
+                    class="form-textarea"
+                />
+            </div>
+
+            <fieldset v-if="canEditNavPerms" class="form-fieldset">
+                <legend class="form-legend">Sidebar menu access</legend>
+                <p class="form-hint">
+                    By default this user gets every menu item their role allows. Turn on to hide sections (Dashboard always stays).
+                </p>
+                <label class="form-choice" for="employeeform-restrict-menu">
+                    <input id="employeeform-restrict-menu"
+                        v-model="restrictMenu"
+                        type="checkbox"
+                        class="form-checkbox"
+                    />
+                    Limit sidebar to selected sections only
+                </label>
+                <div
+                    v-if="restrictMenu"
+                    class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto rounded-control border border-slate-200 bg-white p-3"
+                >
+                    <label
+                        v-for="opt in NAV_SECTION_OPTIONS"
+                        v-show="opt.key !== 'dashboard'"
+                        :key="opt.key"
+                        class="form-choice"
+                        :for="`employeeform-nav-${opt.key}`"
+                    >
                         <input
+                            :id="`employeeform-nav-${opt.key}`"
+                            v-model="sectionChecks[opt.key]"
+                            type="checkbox"
+                            class="form-checkbox"
+                        />
+                        {{ opt.label }}
+                    </label>
+                </div>
+            </fieldset>
+
+            <!-- Attachments when creating/editing (optional uploads) -->
+            <div class="border-t border-slate-200 pt-4 space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                    <h3 class="form-section-title">Attachments</h3>
+                    <span class="text-xs text-slate-500">Optional – ID, contract, proof, etc.</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[2fr,2fr,auto] gap-3 items-end">
+                    <div>
+                        <label class="form-label" for="employeeform-attachment-name">Attachment name</label>
+                        <input id="employeeform-attachment-name"
                             v-model="newDocName"
                             type="text"
                             placeholder="Attachment name"
-                            class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input text-sm"
                         />
-                        <div>
-                            <label
-                                class="inline-flex items-center gap-2 px-3 py-2 border border-dashed border-slate-300 rounded-lg text-xs text-slate-600 cursor-pointer hover:bg-slate-50"
-                            >
-                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M4 8V7a3 3 0 013-3h4m4 0h2a3 3 0 013 3v1M16 4l-4-4-4 4m4-4v12" />
-                                </svg>
-                                <span>Browse files</span>
-                                <input
-                                    ref="fileInput"
-                                    type="file"
-                                    multiple
-                                    class="hidden"
-                                />
-                            </label>
-                        </div>
-                        <button
-                            type="button"
-                            class="px-3 py-2 text-xs bg-slate-900 text-white rounded-lg hover:bg-slate-800"
-                            @click="queueDocument"
+                    </div>
+                    <div>
+                        <span class="form-label">Files</span>
+                        <label
+                            class="inline-flex cursor-pointer items-center gap-2 rounded-control border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50 focus-within:ring-2 focus-within:ring-primary-500/40"
                         >
-                            Add
-                        </button>
+                            <ArrowUpTrayIcon class="icon-sm text-slate-500" aria-hidden="true" />
+                            <span>Browse files</span>
+                            <input
+                                ref="fileInput"
+                                type="file"
+                                multiple
+                                class="sr-only"
+                            />
+                        </label>
                     </div>
-                    <div v-if="queuedDocuments.length" class="space-y-1 text-xs text-slate-700">
-                        <div v-for="(doc, index) in queuedDocuments" :key="index" class="flex items-center justify-between">
-                            <span>{{ doc.name }} ({{ doc.file?.name }})</span>
-                            <button
-                                type="button"
-                                class="text-red-600 hover:underline"
-                                @click="removeQueuedDocument(index)"
-                            >
-                                Remove
-                            </button>
-                        </div>
-                    </div>
+                    <BaseButton variant="primary" size="sm" @click="queueDocument">
+                        <template #icon>
+                            <PlusIcon class="icon-sm" aria-hidden="true" />
+                        </template>
+                        Add
+                    </BaseButton>
                 </div>
+                <ul v-if="queuedDocuments.length" class="space-y-1 text-xs text-slate-700">
+                    <li v-for="(doc, index) in queuedDocuments" :key="index" class="flex items-center justify-between gap-3">
+                        <span>{{ doc.name }} ({{ doc.file?.name }})</span>
+                        <BaseButton
+                            variant="ghost"
+                            size="sm"
+                            @click="removeQueuedDocument(index)"
+                        >
+                            <template #icon>
+                                <TrashIcon class="icon-sm text-danger-700" aria-hidden="true" />
+                            </template>
+                            Remove
+                        </BaseButton>
+                    </li>
+                </ul>
+            </div>
 
-                <div v-if="!employee" class="border-t pt-4">
-                    <label class="flex items-center space-x-2">
-                        <input
-                            v-model="form.send_contract"
-                            type="checkbox"
-                            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span class="text-sm text-slate-700">Send employment contract via email</span>
-                    </label>
-                </div>
+            <div v-if="!employee" class="border-t border-slate-200 pt-4">
+                <label class="form-choice" for="employeeform-send-contract">
+                    <input id="employeeform-send-contract"
+                        v-model="form.send_contract"
+                        type="checkbox"
+                        class="form-checkbox"
+                    />
+                    <span>Send employment contract via email</span>
+                </label>
+            </div>
+        </form>
 
-                <div class="flex justify-end space-x-3 pt-4">
-                    <button
-                        type="button"
-                        @click="$emit('close')"
-                        class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        :disabled="loading"
-                        class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
-                    >
-                        {{ loading ? 'Saving...' : (employee ? 'Update' : 'Create') }}
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="$emit('close')">Cancel</BaseButton>
+            <BaseButton
+                variant="primary"
+                type="submit"
+                form="employee-form"
+                block-mobile
+                :loading="loading"
+            >
+                {{ loading ? 'Saving...' : (employee ? 'Update' : 'Create') }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
+import { ArrowUpTrayIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import { BaseButton, BaseModal } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
 import { NAV_SECTION_OPTIONS } from '@/constants/navSections';

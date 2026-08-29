@@ -1,157 +1,164 @@
 <template>
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div class="p-6 border-b border-slate-200">
-                <h2 class="text-xl font-semibold text-slate-900">Import Customers</h2>
+    <BaseModal
+        :model-value="true"
+        title="Import Customers"
+        size="md"
+        :close-on-backdrop="false"
+        @close="$emit('close')"
+    >
+        <div class="space-y-4">
+            <div>
+                <span class="form-label">Upload Excel/CSV File</span>
+                <div class="mt-1 flex justify-center rounded-card border-2 border-dashed border-slate-300 px-6 pt-5 pb-6 transition-colors hover:border-slate-400">
+                    <div class="space-y-1 text-center">
+                        <ArrowUpTrayIcon class="mx-auto h-12 w-12 text-slate-500" aria-hidden="true" />
+                        <div class="flex text-sm text-slate-600">
+                            <label
+                                for="file-upload"
+                                class="relative cursor-pointer rounded-control font-medium text-primary-700 hover:text-primary-800 focus-within:outline-none focus-within:ring-2 focus-within:ring-primary-500/40 focus-within:ring-offset-2"
+                            >
+                                <span>Upload a file</span>
+                                <input id="file-upload" name="file-upload" type="file" class="sr-only" accept=".xlsx,.xls,.csv" @change="handleFileSelect" />
+                            </label>
+                            <p class="pl-1">or drag and drop</p>
+                        </div>
+                        <p class="text-xs text-slate-500">Excel (.xlsx, .xls) or CSV files up to 10MB</p>
+                    </div>
+                </div>
+                <div v-if="selectedFile" class="mt-2 text-sm text-slate-600">
+                    Selected: <span class="font-medium">{{ selectedFile.name }}</span>
+                </div>
             </div>
 
-            <div class="p-6 space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Upload Excel/CSV File</label>
-                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-300 border-dashed rounded-lg hover:border-slate-400 transition">
-                        <div class="space-y-1 text-center">
-                            <svg class="mx-auto h-12 w-12 text-slate-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                            <div class="flex text-sm text-slate-600">
-                                <label for="file-upload" class="relative cursor-pointer rounded-md font-medium text-blue-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 hover:text-blue-500">
-                                    <span>Upload a file</span>
-                                    <input id="file-upload" name="file-upload" type="file" class="sr-only" accept=".xlsx,.xls,.csv" @change="handleFileSelect" />
-                                </label>
-                                <p class="pl-1">or drag and drop</p>
-                            </div>
-                            <p class="text-xs text-slate-500">Excel (.xlsx, .xls) or CSV files up to 10MB</p>
-                        </div>
-                    </div>
-                    <div v-if="selectedFile" class="mt-2 text-sm text-slate-600">
-                        Selected: <span class="font-medium">{{ selectedFile.name }}</span>
-                    </div>
-                </div>
+            <div class="flex gap-2">
+                <BaseButton
+                    variant="outline"
+                    :disabled="downloadingTemplate"
+                    :loading="downloadingTemplate"
+                    @click="downloadTemplate"
+                >
+                    <template #icon>
+                        <ArrowDownTrayIcon class="icon" aria-hidden="true" />
+                    </template>
+                    {{ downloadingTemplate ? 'Downloading...' : 'Download template (with product columns)' }}
+                </BaseButton>
+            </div>
 
-                <div class="flex gap-2">
-                    <button
-                        type="button"
-                        @click="downloadTemplate"
-                        :disabled="downloadingTemplate"
-                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-slate-100 text-slate-800 rounded-lg hover:bg-slate-200 border border-slate-300 disabled:opacity-50"
+            <div class="callout callout-info">
+                <h3 class="mb-2 text-sm font-semibold">Expected Format:</h3>
+                <ul class="list-inside list-disc space-y-1 text-xs">
+                    <li>First row: headers. Name and Phone are required. Optional: contact_person_2_name, contact_person_2_phone, email, address, city, postcode, vat_number, business_name, owner_name, whatsapp_number, sms_number, notes, source, remote_1_anydesk_rustdesk, remote_1_passwords, remote_1_epos_type, remote_1_lic_days (and remote_2_*, remote_3_* for multiple Remote &amp; License entries), birthday, category.</li>
+                    <li>Template includes one column per product in your DB — use numeric value for quantity purchased, or Y/Yes for prospect.</li>
+                </ul>
+            </div>
+
+            <!-- Column Mapping -->
+            <div v-if="preview.length > 0 && previewHeaders.length > 0" class="rounded-card border border-slate-200 p-4">
+                <h3 class="mb-3 text-sm font-semibold text-slate-800">Column Mapping</h3>
+                <div class="space-y-2">
+                    <div
+                        v-for="field in requiredFields"
+                        :key="field.key"
+                        class="flex items-center gap-3"
                     >
-                        {{ downloadingTemplate ? 'Downloading...' : 'Download template (with product columns)' }}
-                    </button>
-                </div>
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h3 class="text-sm font-medium text-blue-900 mb-2">Expected Format:</h3>
-                    <ul class="text-xs text-blue-800 space-y-1 list-disc list-inside">
-                        <li>First row: headers. Name and Phone are required. Optional: contact_person_2_name, contact_person_2_phone, email, address, city, postcode, vat_number, business_name, owner_name, whatsapp_number, sms_number, notes, source, remote_1_anydesk_rustdesk, remote_1_passwords, remote_1_epos_type, remote_1_lic_days (and remote_2_*, remote_3_* for multiple Remote & License entries), birthday, category.</li>
-                        <li>Template includes one column per product in your DB — use numeric value for quantity purchased, or Y/Yes for prospect.</li>
-                    </ul>
-                </div>
-
-                <!-- Column Mapping -->
-                <div v-if="preview.length > 0 && previewHeaders.length > 0" class="border border-slate-200 rounded-lg p-4">
-                    <h3 class="text-sm font-medium text-slate-700 mb-3">Column Mapping</h3>
-                    <div class="space-y-2">
-                        <div
-                            v-for="field in requiredFields"
-                            :key="field.key"
-                            class="flex items-center gap-3"
+                        <label class="w-32 shrink-0 text-sm text-slate-700" :for="`import-map-${field.key}`">
+                            {{ field.label }}
+                            <span v-if="field.required" class="form-required" aria-hidden="true">*</span>
+                        </label>
+                        <select
+                            :id="`import-map-${field.key}`"
+                            v-model="columnMapping[field.key]"
+                            class="form-select flex-1"
                         >
-                            <label class="text-sm text-slate-700 w-32">
-                                {{ field.label }}
-                                <span v-if="field.required" class="text-red-500">*</span>
-                            </label>
-                            <select
-                                v-model="columnMapping[field.key]"
-                                class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">-- Select Column --</option>
-                                <option v-for="header in previewHeaders" :key="header" :value="header">
-                                    {{ header }}
-                                </option>
-                            </select>
-                        </div>
-                        <div
-                            v-for="field in optionalFields"
-                            :key="field.key"
-                            class="flex items-center gap-3"
+                            <option value="">-- Select Column --</option>
+                            <option v-for="header in previewHeaders" :key="header" :value="header">
+                                {{ header }}
+                            </option>
+                        </select>
+                    </div>
+                    <div
+                        v-for="field in optionalFields"
+                        :key="field.key"
+                        class="flex items-center gap-3"
+                    >
+                        <label class="w-32 shrink-0 text-sm text-slate-700" :for="`import-map-${field.key}`">{{ field.label }}</label>
+                        <select
+                            :id="`import-map-${field.key}`"
+                            v-model="columnMapping[field.key]"
+                            class="form-select flex-1"
                         >
-                            <label class="text-sm text-slate-700 w-32">{{ field.label }}</label>
-                            <select
-                                v-model="columnMapping[field.key]"
-                                class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">-- Select Column (Optional) --</option>
-                                <option v-for="header in previewHeaders" :key="header" :value="header">
+                            <option value="">-- Select Column (Optional) --</option>
+                            <option v-for="header in previewHeaders" :key="header" :value="header">
+                                {{ header }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="preview.length > 0" class="overflow-hidden rounded-card border border-slate-200">
+                <div class="border-b border-slate-200 bg-slate-50 px-4 py-2">
+                    <p class="text-sm font-semibold text-slate-800">Preview (first 5 rows):</p>
+                </div>
+                <div class="table-wrap max-h-64 overflow-y-auto">
+                    <table class="table">
+                        <caption class="sr-only">Preview of the first five rows of the uploaded file</caption>
+                        <thead class="table-thead table-thead-sticky">
+                            <tr>
+                                <th v-for="header in previewHeaders" :key="header" scope="col" class="table-th">
                                     {{ header }}
-                                </option>
-                            </select>
-                        </div>
-                    </div>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(row, index) in preview" :key="index" class="table-row">
+                                <td v-for="header in previewHeaders" :key="header" class="table-td text-xs">
+                                    {{ row[header] || '-' }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
+            </div>
 
-                <div v-if="preview.length > 0" class="border border-slate-200 rounded-lg overflow-hidden">
-                    <div class="bg-slate-50 px-4 py-2 border-b border-slate-200">
-                        <p class="text-sm font-medium text-slate-700">Preview (first 5 rows):</p>
-                    </div>
-                    <div class="overflow-x-auto max-h-64">
-                        <table class="min-w-full divide-y divide-slate-200">
-                            <thead class="bg-slate-50">
-                                <tr>
-                                    <th v-for="header in previewHeaders" :key="header" class="px-3 py-2 text-left text-xs font-medium text-slate-700 uppercase">
-                                        {{ header }}
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-slate-200">
-                                <tr v-for="(row, index) in preview" :key="index">
-                                    <td v-for="header in previewHeaders" :key="header" class="px-3 py-2 text-xs text-slate-600">
-                                        {{ row[header] || '-' }}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <div v-if="error" class="callout callout-danger" role="alert">
+                {{ error }}
+            </div>
 
-                <div v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded">
-                    {{ error }}
-                </div>
-
-                <div v-if="importResult" class="text-sm bg-green-50 p-3 rounded">
-                    <p class="text-green-800 font-medium">Import completed!</p>
-                    <p class="text-green-700 mt-1">
-                        Successfully imported: {{ importResult.success }} customers
-                        <span v-if="importResult.errors > 0" class="text-red-600">
-                            <br>Errors: {{ importResult.errors }} rows
-                        </span>
-                    </p>
-                </div>
-
-                <div class="flex justify-end gap-3 pt-4 border-t border-slate-200">
-                    <button
-                        type="button"
-                        @click="$emit('close')"
-                        class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        @click="handleImport"
-                        :disabled="!selectedFile || loading || preview.length === 0"
-                        class="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
-                    >
-                        {{ loading ? 'Importing...' : 'Import Customers' }}
-                    </button>
-                </div>
+            <div v-if="importResult" class="callout callout-success" role="status" aria-live="polite">
+                <p class="font-semibold">Import completed!</p>
+                <p class="mt-1">
+                    Successfully imported: {{ importResult.success }} customers
+                    <span v-if="importResult.errors > 0" class="text-danger-700">
+                        <br>Errors: {{ importResult.errors }} rows
+                    </span>
+                </p>
             </div>
         </div>
-    </div>
+
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="$emit('close')">
+                Cancel
+            </BaseButton>
+            <BaseButton
+                variant="primary"
+                block-mobile
+                :disabled="!selectedFile || loading || preview.length === 0"
+                :loading="loading"
+                @click="handleImport"
+            >
+                {{ loading ? 'Importing...' : 'Import Customers' }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
 import { ref } from 'vue';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import { ArrowDownTrayIcon, ArrowUpTrayIcon } from '@heroicons/vue/24/outline';
+import { BaseButton, BaseModal } from '@/components/base';
 
 const emit = defineEmits(['close', 'imported']);
 
@@ -222,7 +229,7 @@ const handleFileSelect = (event) => {
     previewHeaders.value = [];
 
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
         try {
             const data = new Uint8Array(e.target.result);
@@ -237,7 +244,7 @@ const handleFileSelect = (event) => {
 
             // First row as headers
             previewHeaders.value = jsonData[0].map(h => String(h).trim());
-            
+
             // Convert to object format for preview
             preview.value = jsonData.slice(1, 6).map(row => {
                 const obj = {};
@@ -265,7 +272,7 @@ const handleFileSelect = (event) => {
 const autoDetectMapping = () => {
     const mapping = {};
     const headerLower = previewHeaders.value.map(h => h.toLowerCase().trim());
-    
+
     // Map required fields
     requiredFields.forEach(field => {
         const possibleNames = [
@@ -273,7 +280,7 @@ const autoDetectMapping = () => {
             field.key.replace('_', ' '),
             field.key.replace('_', ''),
         ];
-        
+
         for (const name of possibleNames) {
             const index = headerLower.findIndex(h => h.includes(name) || name.includes(h));
             if (index !== -1) {
@@ -290,7 +297,7 @@ const autoDetectMapping = () => {
             field.key.replace('_', ' '),
             field.key.replace('_', ''),
         ];
-        
+
         for (const name of possibleNames) {
             const index = headerLower.findIndex(h => h.includes(name) || name.includes(h));
             if (index !== -1) {
@@ -336,7 +343,7 @@ const handleImport = async () => {
         });
 
         importResult.value = response.data;
-        
+
         // Emit success and close after 2 seconds
         setTimeout(() => {
             emit('imported');
@@ -356,4 +363,3 @@ const handleImport = async () => {
     }
 };
 </script>
-

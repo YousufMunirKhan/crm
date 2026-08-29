@@ -6,8 +6,8 @@
     >
         <template #filters>
             <div>
-                <label class="listing-label">Status</label>
-                <select v-model="statusFilter" class="listing-input w-full sm:w-56" @change="loadItems(1)">
+                <label class="listing-label" for="possupportticketsview-status">Status</label>
+                <select id="possupportticketsview-status" v-model="statusFilter" class="listing-input w-full sm:w-56" @change="loadItems(1)">
                     <option value="">All statuses</option>
                     <option value="pending">Pending</option>
                     <option value="solved">Solved</option>
@@ -16,7 +16,7 @@
             </div>
         </template>
 
-        <div v-if="loading" class="px-5 py-14 text-center text-slate-500 text-sm">Loading…</div>
+        <div v-if="loading" class="px-5 py-14 text-center text-slate-500 text-sm" role="status" aria-live="polite">Loading…</div>
         <template v-else>
             <div class="overflow-x-auto min-w-0">
                 <table class="w-full min-w-[900px]">
@@ -38,16 +38,22 @@
                             </td>
                             <td class="listing-td">{{ row.pos_telephone || '—' }}</td>
                             <td class="listing-td">
-                                <span class="px-2 py-1 rounded text-xs font-medium" :class="statusClass(row.pos_support_status)">
+                                <BaseBadge :tone="statusTone(row.pos_support_status)">
                                     {{ statusLabel(row.pos_support_status) }}
-                                </span>
+                                </BaseBadge>
                             </td>
                             <td class="listing-td whitespace-nowrap">{{ formatDt(row.pos_submitted_at || row.created_at) }}</td>
-                            <td class="listing-td text-right space-x-2">
-                                <router-link :to="`/tickets/${row.id}`" class="listing-link-edit">View</router-link>
-                                <button type="button" class="text-sm font-medium text-slate-800 hover:underline" @click="openStatusModal(row)">
-                                    Update status
-                                </button>
+                            <td class="listing-td text-right">
+                                <div class="flex justify-end gap-2">
+                                    <BaseButton size="sm" variant="outline" :to="`/tickets/${row.id}`">
+                                        <template #icon><EyeIcon class="icon-sm" aria-hidden="true" /></template>
+                                        View
+                                    </BaseButton>
+                                    <BaseButton size="sm" variant="ghost" @click="openStatusModal(row)">
+                                        <template #icon><PencilSquareIcon class="icon-sm" aria-hidden="true" /></template>
+                                        Update status
+                                    </BaseButton>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -67,52 +73,58 @@
         </template>
     </ListingPageShell>
 
-    <div
-        v-if="showModal"
-        class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-        @click.self="closeModal"
+    <BaseModal
+        v-model="showModal"
+        title="Update status"
+        :description="modalDescription"
+        size="md"
+        :close-on-backdrop="false"
+        @close="closeModal"
     >
-        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 space-y-4">
-            <h2 class="text-lg font-semibold text-slate-900">Update status</h2>
-            <p class="text-sm text-slate-600">{{ editing?.pos_shop_name }} — POS ID {{ editing?.pos_external_id }}</p>
+        <form id="pos-support-status-form" class="space-y-4" novalidate @submit.prevent="saveStatus">
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                <select v-model="formStatus" class="w-full border rounded-lg px-3 py-2 text-sm">
+                <label class="form-label" for="possupportticketsview-status-2">Status</label>
+                <select id="possupportticketsview-status-2" v-model="formStatus" class="form-select">
                     <option value="pending">Pending</option>
                     <option value="solved">Solved</option>
                     <option value="not_an_issue">Not an Issue</option>
                 </select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">
+                <label class="form-label" for="possupportticketsview-resolution-notes">
                     Resolution / reason notes
-                    <span v-if="formStatus !== 'pending'" class="text-red-600">*</span>
+                    <span v-if="formStatus !== 'pending'" class="form-required">*</span>
                 </label>
                 <textarea
+                    id="possupportticketsview-resolution-notes"
                     v-model="formNotes"
                     rows="4"
-                    class="w-full border rounded-lg px-3 py-2 text-sm"
+                    class="form-textarea"
                     :placeholder="formStatus === 'solved' ? 'Describe how the issue was resolved…' : formStatus === 'not_an_issue' ? 'Explain why this was not an issue…' : 'Optional while Pending'"
                 />
-                <p v-if="formError" class="text-sm text-red-600 mt-1">{{ formError }}</p>
+                <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
             </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button type="button" class="px-4 py-2 text-sm border rounded-lg" @click="closeModal">Cancel</button>
-                <button
-                    type="button"
-                    class="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg disabled:opacity-50"
-                    :disabled="saving"
-                    @click="saveStatus"
-                >{{ saving ? 'Saving…' : 'Save' }}</button>
-            </div>
-        </div>
-    </div>
+        </form>
+
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="closeModal">Cancel</BaseButton>
+            <BaseButton
+                variant="primary"
+                type="submit"
+                form="pos-support-status-form"
+                block-mobile
+                :loading="saving"
+            >{{ saving ? 'Saving…' : 'Save' }}</BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
+import { EyeIcon, PencilSquareIcon } from '@heroicons/vue/24/outline';
 import { useToastStore } from '@/stores/toast';
+import { BaseBadge, BaseButton, BaseModal } from '@/components/base';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import Pagination from '@/components/Pagination.vue';
 
@@ -142,6 +154,11 @@ const formNotes = ref('');
 const formError = ref(null);
 const saving = ref(false);
 
+const modalDescription = computed(() => {
+    if (!editing.value) return '';
+    return `${editing.value.pos_shop_name ?? ''} — POS ID ${editing.value.pos_external_id ?? ''}`;
+});
+
 function messagePreview(row) {
     const m = row.description?.split('\n').find((l) => l.startsWith('Message: '));
     if (m) return m.replace(/^Message:\s*/, '').slice(0, 140) || '—';
@@ -154,10 +171,10 @@ function statusLabel(s) {
     return 'Pending';
 }
 
-function statusClass(s) {
-    if (s === 'solved') return 'bg-green-100 text-green-800';
-    if (s === 'not_an_issue') return 'bg-slate-200 text-slate-800';
-    return 'bg-amber-100 text-amber-900';
+function statusTone(s) {
+    if (s === 'solved') return 'success';
+    if (s === 'not_an_issue') return 'neutral';
+    return 'warning';
 }
 
 function formatDt(v) {

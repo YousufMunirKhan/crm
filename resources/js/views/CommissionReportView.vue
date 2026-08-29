@@ -1,36 +1,42 @@
 <template>
     <ListingPageShell title="Commission Reports" :subtitle="subtitle" :badge="badgeText">
         <template #actions>
-            <router-link to="/commission/allocate" class="listing-btn-outline w-full sm:w-auto text-center">
-                Allocation
-            </router-link>
+            <BaseButton variant="outline" to="/commission/allocate" block-mobile>Allocation</BaseButton>
         </template>
 
         <template #filters>
             <div class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">From</label>
-                        <input v-model="filters.from" type="date" class="listing-input" />
+                        <label class="form-label" for="commissionreportview-from">From</label>
+                        <input id="commissionreportview-from" v-model="filters.from" type="date" class="form-input" />
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">To</label>
-                        <input v-model="filters.to" type="date" class="listing-input" />
+                        <label class="form-label" for="commissionreportview-to">To</label>
+                        <input id="commissionreportview-to" v-model="filters.to" type="date" class="form-input" />
                     </div>
                     <div>
                         <div class="mb-1">
-                            <HelpLabel label="User" tooltip="Choose All users for an admin report, or choose one employee for an individual report." />
+                            <HelpLabel
+                                label="User"
+                                for-id="commissionreportview-user"
+                                tooltip="Choose All users for an admin report, or choose one employee for an individual report."
+                            />
                         </div>
-                        <select v-model="filters.user_id" class="listing-input">
+                        <select id="commissionreportview-user" v-model="filters.user_id" class="form-select">
                             <option value="">All users</option>
                             <option v-for="u in users" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
                         </select>
                     </div>
                     <div>
                         <div class="mb-1">
-                            <HelpLabel label="Currency" tooltip="Filter to one currency, or leave All to show GBP and PKR separately." />
+                            <HelpLabel
+                                label="Currency"
+                                for-id="commissionreportview-currency"
+                                tooltip="Filter to one currency, or leave All to show GBP and PKR separately."
+                            />
                         </div>
-                        <select v-model="filters.currency" class="listing-input">
+                        <select id="commissionreportview-currency" v-model="filters.currency" class="form-select">
                             <option value="">All</option>
                             <option value="GBP">GBP</option>
                             <option value="PKR">PKR</option>
@@ -38,131 +44,163 @@
                     </div>
                     <div>
                         <div class="mb-1">
-                            <HelpLabel label="Role" tooltip="Filter by why the commission was given: single owner, appointment creator, or closer." />
+                            <HelpLabel
+                                label="Role"
+                                for-id="commissionreportview-role"
+                                tooltip="Filter by why the commission was given: single owner, appointment creator, or closer."
+                            />
                         </div>
-                        <select v-model="filters.commission_role" class="listing-input">
+                        <select id="commissionreportview-role" v-model="filters.commission_role" class="form-select">
                             <option value="">All roles</option>
                             <option value="single_owner">Single Owner</option>
                             <option value="appointment_creator">Appointment Creator</option>
                             <option value="closer">Closer</option>
                         </select>
                     </div>
-                    <button type="button" class="listing-btn-primary w-full" :disabled="loading" @click="loadReport">
+                    <BaseButton variant="primary" type="button" class="w-full" :disabled="loading" :loading="loading" @click="loadReport">
                         {{ loading ? 'Loading...' : 'Apply' }}
-                    </button>
+                    </BaseButton>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <button type="button" class="px-3 py-2 text-xs sm:text-sm rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50" @click="applyDatePreset('thisMonth')">
-                        This month
-                    </button>
-                    <button type="button" class="px-3 py-2 text-xs sm:text-sm rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50" @click="applyDatePreset('lastMonth')">
-                        Last month
-                    </button>
-                    <button type="button" class="px-3 py-2 text-xs sm:text-sm rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50" @click="resetFilters">
-                        Reset
-                    </button>
+                    <BaseButton variant="outline" size="sm" type="button" @click="applyDatePreset('thisMonth')">This month</BaseButton>
+                    <BaseButton variant="outline" size="sm" type="button" @click="applyDatePreset('lastMonth')">Last month</BaseButton>
+                    <BaseButton variant="ghost" size="sm" type="button" @click="resetFilters">Reset</BaseButton>
                 </div>
             </div>
         </template>
 
         <div class="p-4 sm:p-6 space-y-6">
             <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
-                <div v-for="card in summaryCards" :key="card.label" class="rounded-lg border border-slate-200 bg-white p-4">
-                    <HelpLabel :label="card.label" :tooltip="card.tooltip" />
-                    <p class="mt-2 text-2xl font-bold text-slate-950">{{ card.value }}</p>
-                    <p class="mt-1 text-xs text-slate-500">{{ card.detail }}</p>
-                </div>
+                <StatCard
+                    v-for="card in summaryCards"
+                    :key="card.label"
+                    :label="card.label"
+                    :value="card.value"
+                    :caption="card.detail"
+                    :title="card.tooltip"
+                />
             </section>
 
-            <section class="rounded-lg border border-sky-200 bg-sky-50/70 p-4">
+            <section class="callout callout-info">
                 <h2 class="font-semibold text-slate-950">How to read commission reports</h2>
                 <div class="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-700 md:grid-cols-3">
-                    <div class="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-sky-100">
+                    <div class="rounded-control bg-white/80 px-3 py-2 ring-1 ring-primary-100">
                         <span class="font-semibold text-slate-900">1. Set filters</span>
                         <span class="block text-xs text-slate-500">Date, user, currency, and role control every number below.</span>
                     </div>
-                    <div class="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-sky-100">
+                    <div class="rounded-control bg-white/80 px-3 py-2 ring-1 ring-primary-100">
                         <span class="font-semibold text-slate-900">2. Review totals</span>
                         <span class="block text-xs text-slate-500">Summary boxes and user cards update from the filtered data.</span>
                     </div>
-                    <div class="rounded-lg bg-white/80 px-3 py-2 ring-1 ring-sky-100">
+                    <div class="rounded-control bg-white/80 px-3 py-2 ring-1 ring-primary-100">
                         <span class="font-semibold text-slate-900">3. Send report</span>
                         <span class="block text-xs text-slate-500">Use admin email for all users, or select one user for their report.</span>
                     </div>
                 </div>
             </section>
 
-            <section class="rounded-lg border border-slate-200 bg-white overflow-hidden">
-                <div class="px-4 py-3 border-b border-slate-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <HelpLabel label="Monthly Report" tooltip="This report uses commission record dates, not the original sale date." text-class="font-semibold text-slate-900" />
-                        <p class="text-sm text-slate-500">{{ periodText }}</p>
-                    </div>
+            <BaseCard :padded="false">
+                <template #header>
+                    <HelpLabel label="Monthly Report" tooltip="This report uses commission record dates, not the original sale date." text-class="font-semibold text-slate-900" />
+                    <p class="text-sm text-slate-500">{{ periodText }}</p>
+                </template>
+                <template #actions>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full lg:w-auto">
-                        <button
+                        <BaseButton
+                            variant="outline"
                             type="button"
-                            class="listing-btn-outline w-full disabled:opacity-50"
+                            class="w-full"
                             title="Download one consolidated PDF using the current filters."
                             :disabled="!rows.length || downloadingFullPdf"
+                            :loading="downloadingFullPdf"
                             @click="downloadFullPdf"
                         >
+                            <template #icon>
+                                <ArrowDownTrayIcon class="icon" aria-hidden="true" />
+                            </template>
                             {{ downloadingFullPdf ? 'Preparing...' : 'Download full PDF' }}
-                        </button>
-                        <button
+                        </BaseButton>
+                        <BaseButton
+                            variant="outline"
                             type="button"
-                            class="listing-btn-outline w-full disabled:opacity-50"
+                            class="w-full"
                             title="Download a PDF for the selected user. Select one person first."
                             :disabled="!canSendSelectedUser || downloadingUserPdf"
+                            :loading="downloadingUserPdf"
                             @click="downloadUserPdf"
                         >
+                            <template #icon>
+                                <ArrowDownTrayIcon class="icon" aria-hidden="true" />
+                            </template>
                             {{ downloadingUserPdf ? 'Preparing...' : 'User PDF' }}
-                        </button>
-                        <button
+                        </BaseButton>
+                        <BaseButton
+                            variant="soft"
                             type="button"
-                            class="listing-btn-primary w-full disabled:opacity-50"
+                            class="w-full"
                             title="Email the filtered commission report to configured admin and manager recipients."
                             :disabled="!rows.length || sendingInternal"
+                            :loading="sendingInternal"
                             @click="sendInternal"
                         >
+                            <template #icon>
+                                <EnvelopeIcon class="icon" aria-hidden="true" />
+                            </template>
                             {{ sendingInternal ? 'Sending...' : 'Email admins' }}
-                        </button>
+                        </BaseButton>
                     </div>
-                </div>
+                </template>
 
-                <div v-if="loading" class="p-6 text-sm text-slate-500">Loading commission report...</div>
-                <div v-else-if="!rows.length" class="p-6 text-sm text-slate-500">No commission entries found for this filter.</div>
+                <div v-if="loading" class="p-6 space-y-3" aria-busy="true">
+                    <p class="sr-only">Loading commission report…</p>
+                    <div class="skeleton-text w-1/3"></div>
+                    <div class="skeleton-text w-2/3"></div>
+                    <div class="skeleton-text w-1/2"></div>
+                    <div class="skeleton-text w-3/4"></div>
+                </div>
+                <EmptyState
+                    v-else-if="!rows.length"
+                    heading="No commission entries"
+                    description="No commission entries found for this filter."
+                >
+                    <template #icon>
+                        <BanknotesIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
                 <div v-else class="grid grid-cols-1 xl:grid-cols-[18rem_minmax(0,1fr)]">
                     <aside class="border-b xl:border-b-0 xl:border-r border-slate-100 bg-slate-50 p-3">
                         <div class="px-2 pb-2">
-                            <HelpLabel label="People" tooltip="Select All users to inspect the full report, or select one person to download/email their individual PDF." text-class="text-xs font-semibold uppercase tracking-wide text-slate-500" />
+                            <HelpLabel label="People" tooltip="Select All users to inspect the full report, or select one person to download/email their individual PDF." text-class="text-eyebrow text-slate-500 uppercase" />
                         </div>
                         <div class="space-y-2 max-h-80 xl:max-h-[44rem] overflow-y-auto">
                             <button
                                 type="button"
-                                class="w-full rounded-lg border px-3 py-3 text-left transition-colors"
-                                :class="selectedUserId == null ? 'border-slate-900 bg-white shadow-sm' : 'border-transparent bg-white/70 hover:bg-white hover:border-slate-200'"
+                                class="w-full rounded-control border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                                :class="selectedUserId == null ? 'border-slate-900 bg-white shadow-card' : 'border-transparent bg-white/70 hover:bg-white hover:border-slate-200'"
+                                :aria-pressed="selectedUserId == null ? 'true' : 'false'"
                                 @click="selectUser(null)"
                             >
                                 <span class="block font-semibold text-slate-900">All users</span>
-                                <span class="mt-1 block text-xs text-slate-500">{{ rows.length }} entries</span>
+                                <span class="mt-1 block text-xs text-slate-500 tabular-nums">{{ rows.length }} entries</span>
                                 <span class="mt-2 flex flex-wrap gap-1 text-xs text-slate-700">
-                                    <span class="rounded bg-slate-100 px-2 py-1">{{ formatMoney('GBP', totals.GBP) }}</span>
-                                    <span class="rounded bg-slate-100 px-2 py-1">{{ formatMoney('PKR', totals.PKR) }}</span>
+                                    <span class="rounded bg-slate-100 px-2 py-1 tabular-nums">{{ formatMoney('GBP', totals.GBP) }}</span>
+                                    <span class="rounded bg-slate-100 px-2 py-1 tabular-nums">{{ formatMoney('PKR', totals.PKR) }}</span>
                                 </span>
                             </button>
                             <button
                                 v-for="s in userSummaries"
                                 :key="s.id"
                                 type="button"
-                                class="w-full rounded-lg border px-3 py-3 text-left transition-colors"
-                                :class="selectedUserId === s.id ? 'border-slate-900 bg-white shadow-sm' : 'border-transparent bg-white/70 hover:bg-white hover:border-slate-200'"
+                                class="w-full rounded-control border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                                :class="selectedUserId === s.id ? 'border-slate-900 bg-white shadow-card' : 'border-transparent bg-white/70 hover:bg-white hover:border-slate-200'"
+                                :aria-pressed="selectedUserId === s.id ? 'true' : 'false'"
                                 @click="selectUser(s.id)"
                             >
                                 <span class="block font-semibold text-slate-900 truncate">{{ s.name }}</span>
-                                <span class="mt-1 block text-xs text-slate-500">{{ s.count }} entries</span>
+                                <span class="mt-1 block text-xs text-slate-500 tabular-nums">{{ s.count }} entries</span>
                                 <span class="mt-2 flex flex-wrap gap-1 text-xs text-slate-700">
-                                    <span class="rounded bg-slate-100 px-2 py-1">{{ formatMoney('GBP', s.totals.GBP) }}</span>
-                                    <span class="rounded bg-slate-100 px-2 py-1">{{ formatMoney('PKR', s.totals.PKR) }}</span>
+                                    <span class="rounded bg-slate-100 px-2 py-1 tabular-nums">{{ formatMoney('GBP', s.totals.GBP) }}</span>
+                                    <span class="rounded bg-slate-100 px-2 py-1 tabular-nums">{{ formatMoney('PKR', s.totals.PKR) }}</span>
                                 </span>
                             </button>
                         </div>
@@ -172,46 +210,52 @@
                         <div class="px-4 py-3 border-b border-slate-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                             <div>
                                 <HelpLabel :label="selectedUserName" tooltip="The table below shows commission entries for the selected person, or all users when All users is selected." text-class="font-semibold text-slate-900" />
-                                <p class="text-sm text-slate-500">
+                                <p class="text-sm text-slate-500 tabular-nums">
                                     {{ displayRows.length }} commission {{ displayRows.length === 1 ? 'entry' : 'entries' }}
                                 </p>
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <button
+                                <BaseButton
+                                    variant="soft"
                                     type="button"
-                                    class="listing-btn-primary w-full disabled:opacity-50"
+                                    class="w-full"
                                     title="Email the selected user's commission PDF to their saved profile email."
                                     :disabled="!canSendSelectedUser || sendingUser"
+                                    :loading="sendingUser"
                                     @click="sendToUser"
                                 >
+                                    <template #icon>
+                                        <EnvelopeIcon class="icon" aria-hidden="true" />
+                                    </template>
                                     {{ sendingUser ? 'Sending...' : 'Email this user' }}
-                                </button>
-                                <p v-if="selectedUserId && !selectedUserEmail" class="text-sm text-amber-700 sm:self-center">
+                                </BaseButton>
+                                <p v-if="selectedUserId && !selectedUserEmail" class="text-sm text-warning-800 sm:self-center">
                                     User email missing.
                                 </p>
                             </div>
                         </div>
 
-                        <div class="hidden lg:block overflow-x-auto">
-                            <table class="min-w-full text-sm">
-                                <thead class="bg-slate-50 text-slate-600">
+                        <div class="hidden lg:block table-wrap">
+                            <table class="table">
+                                <caption class="sr-only">Commission entries with date, customer, product, role, who assigned them and the commission amount</caption>
+                                <thead class="table-thead">
                                     <tr>
-                                        <th class="px-4 py-3 text-left">Date</th>
-                                        <th class="px-4 py-3 text-left">Customer</th>
-                                        <th class="px-4 py-3 text-left">Product</th>
-                                        <th class="px-4 py-3 text-left">Role</th>
-                                        <th class="px-4 py-3 text-left">Assigned by</th>
-                                        <th class="px-4 py-3 text-right">Amount</th>
+                                        <th scope="col" class="table-th">Date</th>
+                                        <th scope="col" class="table-th">Customer</th>
+                                        <th scope="col" class="table-th">Product</th>
+                                        <th scope="col" class="table-th">Role</th>
+                                        <th scope="col" class="table-th">Assigned by</th>
+                                        <th scope="col" class="table-th-num">Amount</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-100">
-                                    <tr v-for="r in displayRows" :key="r.id" class="hover:bg-slate-50/70">
-                                        <td class="px-4 py-3 whitespace-nowrap text-slate-600">{{ formatDate(r.created_at) }}</td>
-                                        <td class="px-4 py-3">{{ r.customer_name || '-' }}</td>
-                                        <td class="px-4 py-3">{{ r.product_name || '-' }}</td>
-                                        <td class="px-4 py-3">{{ humanRole(r.commission_role) }}</td>
-                                        <td class="px-4 py-3">{{ r.assigned_by_user_name || '-' }}</td>
-                                        <td class="px-4 py-3 text-right font-semibold text-slate-950">{{ formatMoney(r.commission_currency, r.commission_amount) }}</td>
+                                <tbody>
+                                    <tr v-for="r in displayRows" :key="r.id" class="table-row">
+                                        <td class="table-td whitespace-nowrap">{{ formatDate(r.created_at) }}</td>
+                                        <td class="table-td">{{ r.customer_name || '-' }}</td>
+                                        <td class="table-td">{{ r.product_name || '-' }}</td>
+                                        <td class="table-td">{{ humanRole(r.commission_role) }}</td>
+                                        <td class="table-td">{{ r.assigned_by_user_name || '-' }}</td>
+                                        <td class="table-td-num font-semibold text-slate-950">{{ formatMoney(r.commission_currency, r.commission_amount) }}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -221,10 +265,15 @@
                             <article v-for="r in displayRows" :key="r.id" class="p-4 space-y-3">
                                 <div class="flex items-start justify-between gap-3">
                                     <div class="min-w-0">
+                                        <p class="text-xs text-slate-500">Customer</p>
                                         <p class="font-semibold text-slate-900 break-words">{{ r.customer_name || '-' }}</p>
+                                        <p class="mt-2 text-xs text-slate-500">Product</p>
                                         <p class="text-sm text-slate-600 break-words">{{ r.product_name || '-' }}</p>
                                     </div>
-                                    <p class="font-semibold text-slate-950 whitespace-nowrap">{{ formatMoney(r.commission_currency, r.commission_amount) }}</p>
+                                    <div class="text-right shrink-0">
+                                        <p class="text-xs text-slate-500">Amount</p>
+                                        <p class="font-semibold text-slate-950 whitespace-nowrap tabular-nums">{{ formatMoney(r.commission_currency, r.commission_amount) }}</p>
+                                    </div>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2 text-sm">
                                     <div>
@@ -244,7 +293,7 @@
                         </div>
                     </div>
                 </div>
-            </section>
+            </BaseCard>
         </div>
     </ListingPageShell>
 </template>
@@ -254,6 +303,8 @@ import { computed, defineComponent, h, reactive, ref, watch } from 'vue';
 import axios from 'axios';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { useToastStore } from '@/stores/toast';
+import { BaseButton, BaseCard, EmptyState, StatCard } from '@/components/base';
+import { ArrowDownTrayIcon, BanknotesIcon, EnvelopeIcon } from '@heroicons/vue/24/outline';
 
 const toast = useToastStore();
 const loading = ref(false);
@@ -642,6 +693,8 @@ const HelpLabel = defineComponent({
         tooltip: { type: String, required: true },
         textClass: { type: String, default: 'text-xs font-medium text-slate-500' },
         align: { type: String, default: 'left' },
+        /** When set, the text renders as a real <label for> tied to that control id. */
+        forId: { type: String, default: '' },
     },
     setup(props) {
         return () => h('div', {
@@ -651,16 +704,23 @@ const HelpLabel = defineComponent({
             ],
             title: props.tooltip,
         }, [
-            h('span', { class: ['min-w-0 truncate', props.textClass] }, props.label),
+            h(
+                props.forId ? 'label' : 'span',
+                {
+                    class: ['min-w-0 truncate', props.textClass],
+                    ...(props.forId ? { for: props.forId } : {}),
+                },
+                props.label,
+            ),
             h('span', { class: 'group relative inline-flex shrink-0' }, [
                 h('button', {
                     type: 'button',
-                    class: 'grid h-4 w-4 place-items-center rounded-full border border-slate-300 bg-white text-[10px] font-bold leading-none text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-200',
+                    class: 'grid h-4 w-4 place-items-center rounded-full border border-slate-300 bg-white text-[10px] font-bold leading-none text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
                     'aria-label': `${props.label}: ${props.tooltip}`,
                 }, '?'),
                 h('span', {
                     class: [
-                        'pointer-events-none absolute bottom-full z-40 mb-2 hidden w-60 rounded-md bg-slate-900 px-3 py-2 text-left text-[11px] font-medium leading-4 text-white shadow-lg group-hover:block group-focus-within:block',
+                        'pointer-events-none absolute bottom-full z-dropdown mb-2 hidden w-60 rounded-md bg-slate-900 px-3 py-2 text-left text-[11px] font-medium leading-4 text-white shadow-dropdown group-hover:block group-focus-within:block',
                         props.align === 'right' ? 'right-0' : 'left-0',
                     ],
                 }, props.tooltip),

@@ -1,60 +1,66 @@
 <template>
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="px-4 sm:px-6 py-4 border-b border-slate-200 bg-slate-50">
-            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                <div>
-                    <h3 class="text-lg font-semibold text-slate-900">History</h3>
-                    <p class="text-sm text-slate-500 mt-0.5">Messages, appointments, notes, and stage changes in one place</p>
-                </div>
-                <select
-                    v-model="filterType"
-                    @change="applyFilters"
-                    class="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 bg-white"
-                >
-                    <option value="all">All activity</option>
-                    <option value="communication">All messages</option>
-                    <option value="email">Email</option>
-                    <option value="sms">SMS</option>
-                    <option value="whatsapp">WhatsApp</option>
-                    <option value="lead_created">Leads</option>
-                    <option value="call">Calls</option>
-                    <option value="meeting">Meetings</option>
-                    <option value="appointment">Appointments</option>
-                    <option value="note">Notes</option>
-                    <option value="reminder">Follow-ups</option>
-                    <option value="stage_change">Stage changes</option>
-                    <option value="won">Won</option>
-                    <option value="lost">Lost</option>
-                    <option value="ticket">Tickets</option>
-                </select>
+    <BaseCard class="overflow-hidden" :padded="false">
+        <template #header>
+            <div>
+                <h3 class="card-title">History</h3>
+                <p class="card-subtitle">Messages, appointments, notes, and stage changes in one place</p>
             </div>
-        </div>
+        </template>
+        <template #actions>
+            <label class="sr-only" for="timelinesection-filter-type">Filter activity</label>
+            <select id="timelinesection-filter-type"
+                v-model="filterType"
+                @change="applyFilters"
+                class="form-select w-auto"
+            >
+                <option value="all">All activity</option>
+                <option value="communication">All messages</option>
+                <option value="email">Email</option>
+                <option value="sms">SMS</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="lead_created">Leads</option>
+                <option value="call">Calls</option>
+                <option value="meeting">Meetings</option>
+                <option value="appointment">Appointments</option>
+                <option value="note">Notes</option>
+                <option value="reminder">Follow-ups</option>
+                <option value="stage_change">Stage changes</option>
+                <option value="won">Won</option>
+                <option value="lost">Lost</option>
+                <option value="ticket">Tickets</option>
+            </select>
+        </template>
 
         <div class="p-4 sm:p-6 max-h-[500px] overflow-y-auto">
-            <div v-if="groupedTimeline.length === 0" class="text-center py-12 text-slate-400">
-                <p class="text-sm">No activity yet.</p>
-                <p class="text-xs mt-1">Log calls, meetings, or send messages to build the timeline.</p>
-            </div>
+            <EmptyState
+                v-if="groupedTimeline.length === 0"
+                heading="No activity yet."
+                description="Log calls, meetings, or send messages to build the timeline."
+            >
+                <template #icon>
+                    <ClockIcon class="icon" aria-hidden="true" />
+                </template>
+            </EmptyState>
 
             <div v-else class="space-y-6">
                 <div v-for="group in groupedTimeline" :key="group.date" class="space-y-3">
-                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">{{ group.label }}</div>
+                    <div class="text-eyebrow text-slate-500 uppercase">{{ group.label }}</div>
                     <div class="space-y-2">
                         <div
                             v-for="item in group.items"
                             :key="item.id"
-                            class="flex gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors"
+                            class="flex gap-3 p-3 rounded-control hover:bg-slate-50 transition-colors"
                         >
                             <div
-                                class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                                class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-white"
                                 :class="getTimelineIconClass(item)"
                             >
-                                <span class="text-base">{{ getTimelineIcon(item) }}</span>
+                                <component :is="getTimelineIcon(item)" class="icon" aria-hidden="true" />
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div class="flex flex-wrap items-baseline gap-2">
                                     <span class="font-medium text-slate-900">{{ item.title }}</span>
-                                    <span class="text-xs text-slate-400">{{ item.when }}</span>
+                                    <span class="text-xs text-slate-500">{{ item.when }}</span>
                                 </div>
                                 <p v-if="item.body" class="text-sm text-slate-600 mt-0.5 whitespace-pre-wrap">{{ item.body }}</p>
                                 <p v-if="item.meta" class="text-xs text-slate-500 mt-1">{{ item.meta }}</p>
@@ -64,11 +70,29 @@
                 </div>
             </div>
         </div>
-    </div>
+    </BaseCard>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed } from 'vue';
+import {
+    ArrowPathIcon,
+    BuildingOfficeIcon,
+    CalendarDaysIcon,
+    ChatBubbleLeftRightIcon,
+    CheckCircleIcon,
+    ClipboardDocumentIcon,
+    ClockIcon,
+    DevicePhoneMobileIcon,
+    EnvelopeIcon,
+    InformationCircleIcon,
+    PencilSquareIcon,
+    PhoneIcon,
+    TicketIcon,
+    UsersIcon,
+    XCircleIcon,
+} from '@heroicons/vue/24/outline';
+import { BaseCard, EmptyState } from '@/components/base';
 
 const props = defineProps({
     timeline: {
@@ -103,7 +127,7 @@ const groupedTimeline = computed(() => {
     filteredTimeline.value.forEach(item => {
         // Use created_at if available, otherwise parse "when" string
         let itemDate = new Date();
-        
+
         if (item.created_at) {
             itemDate = new Date(item.created_at);
         } else {
@@ -150,61 +174,66 @@ const groupedTimeline = computed(() => {
     return order.filter(key => groups[key]).map(key => groups[key]);
 });
 
+const CHANNEL_ICONS = {
+    email: EnvelopeIcon,
+    sms: DevicePhoneMobileIcon,
+    whatsapp: ChatBubbleLeftRightIcon,
+};
+
+const TYPE_ICONS = {
+    communication: ChatBubbleLeftRightIcon,
+    activity: PencilSquareIcon,
+    ticket: TicketIcon,
+    note: PencilSquareIcon,
+    call: PhoneIcon,
+    meeting: UsersIcon,
+    appointment: CalendarDaysIcon,
+    visit: BuildingOfficeIcon,
+    reminder: ClockIcon,
+    lead_created: ClipboardDocumentIcon,
+    stage_change: ArrowPathIcon,
+    won: CheckCircleIcon,
+    lost: XCircleIcon,
+};
+
 const getTimelineIcon = (item) => {
     const type = item.type;
     if (type === 'communication' && item.channel) {
-        const ch = { email: '📧', sms: '📱', whatsapp: '💬' };
-        return ch[item.channel] || '💬';
+        return CHANNEL_ICONS[item.channel] || ChatBubbleLeftRightIcon;
     }
-    const icons = {
-        communication: '💬',
-        activity: '📝',
-        ticket: '🎫',
-        note: '📝',
-        call: '📞',
-        meeting: '🤝',
-        appointment: '📅',
-        visit: '🏢',
-        reminder: '⏰',
-        lead_created: '📋',
-        stage_change: '🔄',
-        won: '✓',
-        lost: '✗',
-    };
-    return icons[type] || '•';
+    return TYPE_ICONS[type] || InformationCircleIcon;
 };
 
 const getTimelineIconClass = (item) => {
     const type = item.type;
     if (type === 'communication' && item.channel === 'email') {
-        return 'bg-blue-500';
+        return 'bg-primary-500';
     }
     if (type === 'communication' && item.channel === 'sms') {
-        return 'bg-purple-500';
+        return 'bg-primary-500';
     }
     if (type === 'communication' && item.channel === 'whatsapp') {
-        return 'bg-emerald-500';
+        return 'bg-success-500';
     }
     const classes = {
-        communication: 'bg-emerald-500',
-        activity: 'bg-blue-500',
-        ticket: 'bg-orange-500',
-        note: 'bg-purple-500',
-        call: 'bg-indigo-500',
-        meeting: 'bg-pink-500',
-        appointment: 'bg-violet-500',
-        visit: 'bg-teal-500',
-        reminder: 'bg-amber-500',
-        lead_created: 'bg-cyan-500',
-        stage_change: 'bg-sky-500',
-        won: 'bg-green-500',
-        lost: 'bg-red-500',
+        communication: 'bg-success-500',
+        activity: 'bg-primary-500',
+        ticket: 'bg-warning-500',
+        note: 'bg-primary-500',
+        call: 'bg-primary-500',
+        meeting: 'bg-primary-600',
+        appointment: 'bg-primary-500',
+        visit: 'bg-primary-500',
+        reminder: 'bg-warning-500',
+        lead_created: 'bg-primary-500',
+        stage_change: 'bg-primary-500',
+        won: 'bg-success-500',
+        lost: 'bg-danger-500',
     };
-    return classes[type] || 'bg-slate-400';
+    return classes[type] || 'bg-slate-500';
 };
 
 const applyFilters = () => {
     // Filter is applied via computed property
 };
 </script>
-

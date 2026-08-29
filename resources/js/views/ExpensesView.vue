@@ -6,59 +6,64 @@
     >
         <template #actions>
             <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-stretch sm:justify-end">
-                <button type="button" class="listing-btn-outline flex-1 min-w-[10rem] sm:flex-initial" @click="downloadTemplate">
+                <BaseButton variant="outline" class="flex-1 min-w-[10rem] sm:flex-initial" @click="downloadTemplate">
+                    <template #icon><ArrowDownTrayIcon class="icon-sm" aria-hidden="true" /></template>
                     Download template
-                </button>
-                <button type="button" class="listing-btn-outline flex-1 min-w-[10rem] sm:flex-initial" @click="triggerFileInput">
+                </BaseButton>
+                <BaseButton variant="outline" class="flex-1 min-w-[10rem] sm:flex-initial" @click="triggerFileInput">
+                    <template #icon><ArrowUpTrayIcon class="icon-sm" aria-hidden="true" /></template>
                     Import CSV
-                </button>
-                <input ref="fileInput" type="file" accept=".csv" class="hidden" @change="handleFileSelect" />
-                <router-link
+                </BaseButton>
+                <input ref="fileInput" type="file" accept=".csv" class="hidden" aria-hidden="true" tabindex="-1" @change="handleFileSelect" />
+                <BaseButton
+                    variant="primary"
                     :to="{ name: 'expense-create' }"
-                    class="listing-btn-accent flex-1 min-w-[10rem] sm:flex-initial touch-manipulation text-center"
+                    class="flex-1 min-w-[10rem] sm:flex-initial"
                 >
-                    + Add expense
-                </router-link>
+                    <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                    Add expense
+                </BaseButton>
             </div>
         </template>
 
         <template #filters>
             <div class="flex flex-col xl:flex-row xl:flex-wrap gap-3 xl:items-end">
                 <div>
-                    <label class="listing-label">From</label>
-                    <input v-model="filters.from_date" type="date" class="listing-input w-full sm:w-40" />
+                    <label class="listing-label" for="expensesview-from">From</label>
+                    <input id="expensesview-from" v-model="filters.from_date" type="date" class="form-input w-full sm:w-40" />
                 </div>
                 <div>
-                    <label class="listing-label">To</label>
-                    <input v-model="filters.to_date" type="date" class="listing-input w-full sm:w-40" />
+                    <label class="listing-label" for="expensesview-to">To</label>
+                    <input id="expensesview-to" v-model="filters.to_date" type="date" class="form-input w-full sm:w-40" />
                 </div>
                 <div>
-                    <label class="listing-label">Category</label>
-                    <select v-model="filters.category" class="listing-input w-full sm:w-44">
+                    <label class="listing-label" for="expensesview-category">Category</label>
+                    <select id="expensesview-category" v-model="filters.category" class="form-select w-full sm:w-44">
                         <option value="">All categories</option>
                         <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
                     </select>
                 </div>
                 <div>
-                    <label class="listing-label">Month</label>
-                    <input v-model="filters.month" type="month" class="listing-input w-full sm:w-44" />
+                    <label class="listing-label" for="expensesview-month">Month</label>
+                    <input id="expensesview-month" v-model="filters.month" type="month" class="form-input w-full sm:w-44" />
                 </div>
                 <div>
-                    <label class="listing-label">Status</label>
-                    <select v-model="filters.status" class="listing-input w-full sm:w-36">
+                    <label class="listing-label" for="expensesview-status">Status</label>
+                    <select id="expensesview-status" v-model="filters.status" class="form-select w-full sm:w-36">
                         <option value="">All</option>
                         <option value="open">Open</option>
                         <option value="closed">Closed</option>
                     </select>
                 </div>
-                <button type="button" class="listing-btn-primary" @click="loadExpenses(1)">Apply</button>
-                <button type="button" class="listing-btn-outline" @click="resetFilters">Reset</button>
-                <router-link
+                <BaseButton variant="soft" @click="loadExpenses(1)">Apply</BaseButton>
+                <BaseButton variant="outline" @click="resetFilters">Reset</BaseButton>
+                <BaseButton
+                    variant="outline"
+                    class="w-full xl:w-auto"
                     :to="{ name: 'expenses-monthly-report', query: { month: filters.month || new Date().toISOString().slice(0, 7) } }"
-                    class="listing-btn-outline text-center w-full xl:w-auto"
                 >
                     Monthly report
-                </router-link>
+                </BaseButton>
             </div>
         </template>
 
@@ -69,7 +74,7 @@
                     <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
                         <input
                             type="checkbox"
-                            class="rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                            class="form-checkbox"
                             :checked="allOnPageSelected"
                             @change="toggleSelectAllOnPage"
                         />
@@ -78,14 +83,14 @@
                     <span v-if="selectedExpenseIds.length" class="text-sm text-slate-600">
                         {{ selectedExpenseIds.length }} selected
                     </span>
-                    <button
+                    <BaseButton
                         v-if="selectedOpenExpenseIds.length"
-                        type="button"
+                        variant="soft"
+                        size="sm"
                         @click="bulkCloseSelected"
-                        class="px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700"
                     >
                         Close selected ({{ selectedOpenExpenseIds.length }})
-                    </button>
+                    </BaseButton>
                 </div>
                 <div class="flex items-center gap-4">
                     <div class="flex gap-4 text-sm text-slate-600">
@@ -96,31 +101,31 @@
                             Total (PKR): <span class="font-bold text-slate-900">₨{{ formatNumber(totalByCurrency.PKR) }}</span>
                         </div>
                     </div>
-                    <button
-                        @click="exportExpenses"
-                        class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-2"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+                    <BaseButton variant="outline" size="sm" @click="exportExpenses">
+                        <template #icon><ArrowDownTrayIcon class="icon-sm" aria-hidden="true" /></template>
                         Export CSV
-                    </button>
+                    </BaseButton>
                 </div>
             </div>
-            <div v-if="expenses.length === 0" class="text-center py-8 text-slate-400 text-sm">
-                No expenses found
-            </div>
+            <EmptyState
+                v-if="expenses.length === 0"
+                heading="No expenses found"
+                description="Adjust the filters above, or add your first expense."
+            >
+                <template #icon><CurrencyPoundIcon class="icon" aria-hidden="true" /></template>
+            </EmptyState>
             <div v-else class="space-y-3">
                 <div
                     v-for="expense in expenses"
                     :key="expense.id"
-                    class="flex items-center justify-between gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50/40 hover:border-slate-300 cursor-pointer"
+                    class="flex items-center justify-between gap-3 p-4 rounded-card border border-slate-200 bg-slate-50/40 hover:border-slate-300 cursor-pointer"
                     @click="goToEdit(expense.id)"
                 >
                     <div class="flex items-start gap-3 shrink-0" @click.stop>
                         <input
                             type="checkbox"
-                            class="mt-1 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                            class="mt-1 form-checkbox"
+                            :aria-label="`Select expense ${expense.reason}`"
                             :checked="selectedExpenseIds.includes(expense.id)"
                             @change="toggleExpenseSelected(expense.id)"
                         />
@@ -128,12 +133,9 @@
                     <div class="flex-1 min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="font-medium text-slate-900">{{ expense.reason }}</span>
-                            <span
-                                class="text-xs font-medium px-2 py-0.5 rounded-full"
-                                :class="(expense.status || 'open') === 'closed' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800'"
-                            >
+                            <BaseBadge :tone="(expense.status || 'open') === 'closed' ? 'neutral' : 'warning'">
                                 {{ (expense.status || 'open') === 'closed' ? 'Closed' : 'Open' }}
-                            </span>
+                            </BaseBadge>
                             <span
                                 v-if="expense.attachments && expense.attachments.length"
                                 class="text-xs text-slate-500"
@@ -144,7 +146,7 @@
                         </div>
                         <div class="text-xs text-slate-500 mt-1">
                             {{ formatDate(expense.date) }}
-                            <span v-if="expense.category" class="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                            <span v-if="expense.category" class="ml-2 px-2 py-0.5 bg-primary-100 text-primary-800 rounded text-xs">
                                 {{ expense.category }}
                             </span>
                         </div>
@@ -177,70 +179,63 @@
         </template>
     </ListingPageShell>
 
-        <!-- Import Results Modal -->
-        <div
-            v-if="showImportModal"
-            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-            @click.self="closeImportModal"
-        >
-            <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                <div class="p-6 border-b border-slate-200">
-                    <h2 class="text-xl font-bold text-slate-900">Import Results</h2>
-                </div>
-                <div class="p-6">
-                    <div v-if="importing" class="text-center py-8">
-                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900 mb-4"></div>
-                        <p class="text-slate-600">Importing expenses...</p>
-                    </div>
-                    <div v-else-if="importResult">
-                        <div class="mb-4 p-4 rounded-lg" :class="importResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'">
-                            <p class="font-semibold" :class="importResult.success ? 'text-green-800' : 'text-red-800'">
-                                {{ importResult.message || (importResult.success ? 'Import completed successfully!' : 'Import failed') }}
-                            </p>
-                            <div class="mt-2 text-sm" :class="importResult.success ? 'text-green-700' : 'text-red-700'">
-                                <p>Imported: {{ importResult.imported || 0 }} expense(s)</p>
-                                <p v-if="importResult.skipped > 0">Skipped: {{ importResult.skipped }} row(s)</p>
-                            </div>
-                        </div>
-                        <div v-if="importResult.errors && importResult.errors.length > 0" class="mt-4">
-                            <h3 class="font-semibold text-slate-900 mb-2">Errors:</h3>
-                            <div class="max-h-64 overflow-y-auto overflow-x-auto border border-slate-200 rounded-lg">
-                                <table class="min-w-full divide-y divide-slate-200">
-                                    <thead class="bg-slate-50">
-                                        <tr>
-                                            <th class="px-4 py-2 text-left text-xs font-medium text-slate-700">Row</th>
-                                            <th class="px-4 py-2 text-left text-xs font-medium text-slate-700">Error</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-slate-200">
-                                        <tr v-for="(error, idx) in importResult.errors" :key="idx">
-                                            <td class="px-4 py-2 text-sm text-slate-900">{{ error.row }}</td>
-                                            <td class="px-4 py-2 text-sm text-red-600">{{ error.error }}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+        <!-- Import Results -->
+        <BaseModal v-model="showImportModal" title="Import Results" size="md" @close="closeImportModal">
+            <div v-if="importing" class="text-center py-8">
+                <span class="spinner w-8 h-8 text-slate-900 mb-4" role="status" aria-label="Importing" />
+                <p class="text-slate-600">Importing expenses...</p>
+            </div>
+            <div v-else-if="importResult">
+                <div :class="['callout', importResult.success ? 'callout-success' : 'callout-danger']" role="status">
+                    <p class="font-semibold">
+                        {{ importResult.message || (importResult.success ? 'Import completed successfully!' : 'Import failed') }}
+                    </p>
+                    <div class="mt-2 text-sm">
+                        <p>Imported: {{ importResult.imported || 0 }} expense(s)</p>
+                        <p v-if="importResult.skipped > 0">Skipped: {{ importResult.skipped }} row(s)</p>
                     </div>
                 </div>
-                <div class="p-6 border-t border-slate-200 flex justify-end gap-2">
-                    <button
-                        @click="closeImportModal"
-                        class="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300"
-                    >
-                        Close
-                    </button>
+                <div v-if="importResult.errors && importResult.errors.length > 0" class="mt-4">
+                    <h3 class="font-semibold text-slate-900 mb-2">Errors:</h3>
+                    <div class="max-h-64 overflow-y-auto table-wrap border border-slate-200 rounded-card">
+                        <table class="table">
+                            <caption class="sr-only">Rows that could not be imported</caption>
+                            <thead class="table-thead">
+                                <tr>
+                                    <th scope="col" class="table-th">Row</th>
+                                    <th scope="col" class="table-th">Error</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(error, idx) in importResult.errors" :key="idx">
+                                    <td class="table-td">{{ error.row }}</td>
+                                    <td class="table-td text-danger-700">{{ error.error }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </div>
+
+            <template #actions>
+                <BaseButton variant="outline" block-mobile @click="closeImportModal">Close</BaseButton>
+            </template>
+        </BaseModal>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
+import {
+    ArrowDownTrayIcon,
+    ArrowUpTrayIcon,
+    CurrencyPoundIcon,
+    PlusIcon,
+} from '@heroicons/vue/24/outline';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseBadge, BaseButton, BaseModal, EmptyState } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
 

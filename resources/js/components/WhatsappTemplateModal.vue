@@ -1,142 +1,134 @@
 <template>
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div class="p-6 border-b border-slate-200 flex items-center justify-between">
-                <div>
-                    <h2 class="text-xl font-semibold text-slate-900">
-                        {{ template?.id ? 'Edit WhatsApp Template' : 'Create WhatsApp Template' }}
-                    </h2>
-                    <p class="text-sm text-slate-500 mt-1">Create WhatsApp message template</p>
-                </div>
-                <button @click="$emit('close')" class="text-slate-400 hover:text-slate-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+    <BaseModal
+        :model-value="true"
+        :title="template?.id ? 'Edit WhatsApp Template' : 'Create WhatsApp Template'"
+        description="Create WhatsApp message template"
+        size="md"
+        :close-on-backdrop="false"
+        @close="$emit('close')"
+    >
+        <form id="whatsapp-template-form" class="space-y-4" @submit.prevent="saveTemplate">
+            <div>
+                <label class="form-label" for="whatsapptemplatemodal-template-name">Template Name *</label>
+                <input id="whatsapptemplatemodal-template-name"
+                    v-model="form.name"
+                    type="text"
+                    required
+                    class="form-input"
+                    placeholder="Appointment Reminder"
+                />
             </div>
 
-            <form @submit.prevent="saveTemplate" class="flex-1 overflow-y-auto p-6 space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Template Name *</label>
+            <div>
+                <label class="form-label" for="whatsapptemplatemodal-category">Category *</label>
+                <select id="whatsapptemplatemodal-category"
+                    v-model="form.category"
+                    required
+                    class="form-select"
+                >
+                    <option value="appointment_reminder">Appointment Reminder</option>
+                    <option value="follow_up">Follow-up</option>
+                    <option value="payment_reminder">Payment Reminder</option>
+                    <option value="thank_you">Thank You</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="form-label" for="whatsapptemplatemodal-message">Message *</label>
+                <textarea id="whatsapptemplatemodal-message"
+                    ref="messageInput"
+                    v-model="form.message"
+                    rows="6"
+                    required
+                    class="form-textarea"
+                    placeholder="Hello {{customer_name}}, your appointment is scheduled for {{appointment_date}} at {{appointment_time}}."
+                />
+            </div>
+
+            <div class="space-y-2">
+                <label class="form-label" for="whatsapptemplatemodal-media-type">Media (Optional)</label>
+                <select
+                    id="whatsapptemplatemodal-media-type"
+                    v-model="form.media_type"
+                    class="form-select"
+                >
+                    <option value="">No Media</option>
+                    <option value="image">Image</option>
+                    <option value="video">Video</option>
+                    <option value="document">Document</option>
+                </select>
+                <div v-if="form.media_type">
+                    <label class="form-label" for="whatsapptemplatemodal-media-file">Media file</label>
                     <input
-                        v-model="form.name"
-                        type="text"
-                        required
-                        class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Appointment Reminder"
+                        id="whatsapptemplatemodal-media-file"
+                        ref="mediaInput"
+                        type="file"
+                        @change="handleMediaUpload"
+                        :accept="getMediaAccept()"
+                        class="form-input"
                     />
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Category *</label>
-                    <select
-                        v-model="form.category"
-                        required
-                        class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="appointment_reminder">Appointment Reminder</option>
-                        <option value="follow_up">Follow-up</option>
-                        <option value="payment_reminder">Payment Reminder</option>
-                        <option value="thank_you">Thank You</option>
-                        <option value="custom">Custom</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Message *</label>
-                    <textarea
-                        v-model="form.message"
-                        rows="6"
-                        required
-                        class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Hello {{customer_name}}, your appointment is scheduled for {{appointment_date}} at {{appointment_time}}."
-                    />
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Media (Optional)</label>
-                    <div class="space-y-2">
-                        <select
-                            v-model="form.media_type"
-                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">No Media</option>
-                            <option value="image">Image</option>
-                            <option value="video">Video</option>
-                            <option value="document">Document</option>
-                        </select>
-                        <div v-if="form.media_type">
-                            <input
-                                ref="mediaInput"
-                                type="file"
-                                @change="handleMediaUpload"
-                                :accept="getMediaAccept()"
-                                class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                            <div v-if="form.media_url" class="mt-2">
-                                <img
-                                    v-if="form.media_type === 'image'"
-                                    :src="form.media_url"
-                                    alt="Preview"
-                                    class="max-w-full h-32 object-contain rounded"
-                                />
-                                <div v-else class="p-3 bg-slate-100 rounded">
-                                    📎 {{ form.media_type }} uploaded
-                                </div>
-                            </div>
+                    <div v-if="form.media_url" class="mt-2">
+                        <img
+                            v-if="form.media_type === 'image'"
+                            :src="form.media_url"
+                            alt="Preview"
+                            class="max-w-full h-32 object-contain rounded"
+                        />
+                        <div v-else class="flex items-center gap-2 p-3 bg-slate-100 rounded text-sm text-slate-700">
+                            <DocumentTextIcon class="icon-sm" aria-hidden="true" />
+                            <span>{{ form.media_type }} uploaded</span>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Available Variables</label>
-                    <div class="flex flex-wrap gap-2">
-                        <button
-                            v-for="variable in variables"
-                            :key="variable"
-                            type="button"
-                            @click="insertVariable(variable)"
-                            class="px-3 py-1 text-xs bg-slate-100 border border-slate-300 rounded hover:bg-slate-200"
-                        >
-                            {{ variable }}
-                        </button>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <input
-                        v-model="form.is_active"
-                        type="checkbox"
-                        id="whatsapp_active"
-                        class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-                    />
-                    <label for="whatsapp_active" class="text-sm text-slate-700">Active</label>
-                </div>
-
-                <div class="flex justify-end gap-3 pt-4 border-t border-slate-200">
-                    <button
-                        type="button"
-                        @click="$emit('close')"
-                        class="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50"
+            <div>
+                <p id="whatsapp-variables-label" class="form-label">Available Variables</p>
+                <div class="flex flex-wrap gap-2" role="group" aria-labelledby="whatsapp-variables-label">
+                    <BaseButton
+                        v-for="variable in variables"
+                        :key="variable"
+                        variant="outline"
+                        size="sm"
+                        @click="insertVariable(variable)"
                     >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        :disabled="saving"
-                        class="px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
-                    >
-                        {{ saving ? 'Saving...' : 'Save Template' }}
-                    </button>
+                        {{ variable }}
+                    </BaseButton>
                 </div>
-            </form>
-        </div>
-    </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <input
+                    v-model="form.is_active"
+                    type="checkbox"
+                    id="whatsapp_active"
+                    class="form-checkbox"
+                />
+                <label for="whatsapp_active" class="text-sm text-slate-700">Active</label>
+            </div>
+        </form>
+
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="$emit('close')">Cancel</BaseButton>
+            <BaseButton
+                variant="primary"
+                type="submit"
+                form="whatsapp-template-form"
+                block-mobile
+                :loading="saving"
+            >
+                {{ saving ? 'Saving...' : 'Save Template' }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
 import { ref, reactive } from 'vue';
 import axios from 'axios';
+import { DocumentTextIcon } from '@heroicons/vue/24/outline';
+import { BaseButton, BaseModal } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 
 const toast = useToastStore();
@@ -152,6 +144,7 @@ const emit = defineEmits(['close', 'saved']);
 
 const saving = ref(false);
 const mediaInput = ref(null);
+const messageInput = ref(null);
 
 const variables = [
     '{{customer_name}}',
@@ -210,7 +203,7 @@ const handleMediaUpload = async () => {
 };
 
 const insertVariable = (variable) => {
-    const textarea = document.querySelector('textarea');
+    const textarea = messageInput.value;
     if (textarea) {
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
@@ -240,4 +233,3 @@ const saveTemplate = async () => {
     }
 };
 </script>
-

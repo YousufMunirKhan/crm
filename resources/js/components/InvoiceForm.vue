@@ -1,166 +1,166 @@
 <template>
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div class="p-6 border-b border-slate-200">
-                <h2 class="text-xl font-semibold text-slate-900">
-                    {{ invoice ? 'Edit Invoice' : 'Create New Invoice' }}
-                </h2>
-            </div>
-
-            <form @submit.prevent="handleSubmit" class="p-6 space-y-4">
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Customer *</label>
-                        <select
-                            v-model="form.customer_id"
-                            required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        >
-                            <option value="">Select Customer</option>
-                            <option v-for="customer in customers" :key="customer.id" :value="customer.id">
-                                {{ customer.name }} - {{ customer.phone }}
-                            </option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Invoice Date</label>
-                        <input
-                            v-model="form.invoice_date"
-                            type="date"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Due Date</label>
-                        <input
-                            v-model="form.due_date"
-                            type="date"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">VAT Rate (%)</label>
-                        <input
-                            v-model.number="form.vat_rate"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max="100"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                    </div>
+    <BaseModal
+        :model-value="true"
+        :title="invoice ? 'Edit Invoice' : 'Create New Invoice'"
+        size="lg"
+        :close-on-backdrop="false"
+        @close="$emit('close')"
+    >
+        <form id="invoice-form" class="space-y-4" @submit.prevent="handleSubmit">
+            <div class="form-grid-2">
+                <div>
+                    <label class="form-label" for="invoiceform-customer">Customer <span class="form-required" aria-hidden="true">*</span></label>
+                    <select id="invoiceform-customer"
+                        v-model="form.customer_id"
+                        required
+                        class="form-select"
+                    >
+                        <option value="">Select Customer</option>
+                        <option v-for="customer in customers" :key="customer.id" :value="customer.id">
+                            {{ customer.name }} - {{ customer.phone }}
+                        </option>
+                    </select>
                 </div>
 
                 <div>
-                    <div class="flex justify-between items-center mb-2">
-                        <label class="block text-sm font-medium text-slate-700">Invoice Items *</label>
-                        <button
-                            type="button"
-                            @click="addItem"
-                            class="text-sm text-blue-600 hover:underline"
-                        >
-                            + Add Item
-                        </button>
-                    </div>
+                    <label class="form-label" for="invoiceform-invoice-date">Invoice Date</label>
+                    <input id="invoiceform-invoice-date"
+                        v-model="form.invoice_date"
+                        type="date"
+                        class="form-input"
+                    />
+                </div>
 
-                    <div class="space-y-2">
-                        <div
-                            v-for="(item, index) in form.items"
-                            :key="index"
-                            class="grid grid-cols-12 gap-2 items-end"
-                        >
-                            <div class="col-span-5">
-                                <input
-                                    v-model="item.description"
-                                    type="text"
-                                    placeholder="Description"
-                                    required
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                                />
-                            </div>
-                            <div class="col-span-2">
-                                <input
-                                    v-model.number="item.quantity"
-                                    type="number"
-                                    min="1"
-                                    placeholder="Qty"
-                                    required
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                                />
-                            </div>
-                            <div class="col-span-2">
-                                <input
-                                    v-model.number="item.unit_price"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    placeholder="Unit Price"
-                                    required
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                                />
-                            </div>
-                            <div class="col-span-2 text-sm font-medium text-slate-700">
-                                £{{ ((item.quantity || 0) * (item.unit_price || 0)).toFixed(2) }}
-                            </div>
-                            <div class="col-span-1">
-                                <button
-                                    type="button"
-                                    @click="removeItem(index)"
-                                    class="text-red-600 hover:text-red-800"
-                                >
-                                    ×
-                                </button>
-                            </div>
+                <div>
+                    <label class="form-label" for="invoiceform-due-date">Due Date</label>
+                    <input id="invoiceform-due-date"
+                        v-model="form.due_date"
+                        type="date"
+                        class="form-input"
+                    />
+                </div>
+
+                <div>
+                    <label class="form-label" for="invoiceform-vat-rate">VAT Rate (%)</label>
+                    <input id="invoiceform-vat-rate"
+                        v-model.number="form.vat_rate"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        class="form-input"
+                    />
+                </div>
+            </div>
+
+            <div>
+                <div class="mb-2 flex items-center justify-between gap-3">
+                    <span class="form-label mb-0">Invoice Items <span class="form-required" aria-hidden="true">*</span></span>
+                    <BaseButton variant="ghost" size="sm" @click="addItem">
+                        <template #icon>
+                            <PlusIcon class="icon-sm" aria-hidden="true" />
+                        </template>
+                        Add Item
+                    </BaseButton>
+                </div>
+
+                <div class="space-y-2">
+                    <div
+                        v-for="(item, index) in form.items"
+                        :key="index"
+                        class="grid grid-cols-12 gap-2 items-end"
+                    >
+                        <div class="col-span-5">
+                            <label class="sr-only" :for="`invoiceform-item-${index}-description`">Item {{ index + 1 }} description</label>
+                            <input :id="`invoiceform-item-${index}-description`"
+                                v-model="item.description"
+                                type="text"
+                                placeholder="Description"
+                                required
+                                class="form-input text-sm"
+                            />
+                        </div>
+                        <div class="col-span-2">
+                            <label class="sr-only" :for="`invoiceform-item-${index}-quantity`">Item {{ index + 1 }} quantity</label>
+                            <input :id="`invoiceform-item-${index}-quantity`"
+                                v-model.number="item.quantity"
+                                type="number"
+                                min="1"
+                                placeholder="Qty"
+                                required
+                                class="form-input text-sm"
+                            />
+                        </div>
+                        <div class="col-span-2">
+                            <label class="sr-only" :for="`invoiceform-item-${index}-unit-price`">Item {{ index + 1 }} unit price</label>
+                            <input :id="`invoiceform-item-${index}-unit-price`"
+                                v-model.number="item.unit_price"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="Unit Price"
+                                required
+                                class="form-input text-sm"
+                            />
+                        </div>
+                        <div class="col-span-2 text-sm font-medium text-slate-700">
+                            £{{ ((item.quantity || 0) * (item.unit_price || 0)).toFixed(2) }}
+                        </div>
+                        <div class="col-span-1">
+                            <BaseButton
+                                variant="ghost"
+                                size="icon"
+                                :label="`Remove item ${index + 1}`"
+                                @click="removeItem(index)"
+                            >
+                                <TrashIcon class="icon-sm text-danger-700" aria-hidden="true" />
+                            </BaseButton>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="bg-slate-50 p-4 rounded-lg">
-                    <div class="flex justify-between text-sm mb-1">
-                        <span>Subtotal:</span>
-                        <span class="font-medium">£{{ subtotal.toFixed(2) }}</span>
-                    </div>
-                    <div class="flex justify-between text-sm mb-1">
-                        <span>VAT ({{ form.vat_rate || 20 }}%):</span>
-                        <span class="font-medium">£{{ vatAmount.toFixed(2) }}</span>
-                    </div>
-                    <div class="flex justify-between text-lg font-semibold pt-2 border-t border-slate-200">
-                        <span>Total:</span>
-                        <span>£{{ total.toFixed(2) }}</span>
-                    </div>
+            <div class="rounded-card bg-slate-50 p-4">
+                <div class="flex justify-between text-sm mb-1">
+                    <span>Subtotal:</span>
+                    <span class="font-medium">£{{ subtotal.toFixed(2) }}</span>
                 </div>
+                <div class="flex justify-between text-sm mb-1">
+                    <span>VAT ({{ form.vat_rate || 20 }}%):</span>
+                    <span class="font-medium">£{{ vatAmount.toFixed(2) }}</span>
+                </div>
+                <div class="flex justify-between text-lg font-semibold pt-2 border-t border-slate-200">
+                    <span>Total:</span>
+                    <span>£{{ total.toFixed(2) }}</span>
+                </div>
+            </div>
 
-                <div v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded">
-                    {{ error }}
-                </div>
+            <p v-if="error" class="callout callout-danger" role="alert">
+                {{ error }}
+            </p>
+        </form>
 
-                <div class="flex justify-end gap-3 pt-4 border-t border-slate-200">
-                    <button
-                        type="button"
-                        @click="$emit('close')"
-                        class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        :disabled="loading || form.items.length === 0"
-                        class="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
-                    >
-                        {{ loading ? 'Saving...' : (invoice ? 'Update' : 'Create') }}
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="$emit('close')">Cancel</BaseButton>
+            <BaseButton
+                variant="primary"
+                type="submit"
+                form="invoice-form"
+                block-mobile
+                :loading="loading"
+                :disabled="form.items.length === 0"
+            >
+                {{ loading ? 'Saving...' : (invoice ? 'Update' : 'Create') }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
+import { PlusIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import { BaseButton, BaseModal } from '@/components/base';
 
 const props = defineProps({
     invoice: {

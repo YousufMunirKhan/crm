@@ -1,321 +1,331 @@
 <template>
-    <div class="w-full min-w-0 max-w-4xl mx-auto p-3 sm:p-4 lg:p-6 space-y-4 lg:space-y-6">
-        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div>
-                <h1 class="text-xl lg:text-2xl font-bold text-slate-900">{{ editingSalary ? 'Edit Salary' : 'Add Salary' }}</h1>
-                <p class="text-xs lg:text-sm text-slate-600 mt-1">Generate salary slip for employees</p>
-            </div>
-            <router-link
-                to="/salaries/list"
-                class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm lg:text-base text-center touch-manipulation w-full sm:w-auto"
-            >
-                ← Back to Salary Slips
-            </router-link>
-        </div>
+    <ListingPageShell
+        :title="editingSalary ? 'Edit Salary' : 'Add Salary'"
+        subtitle="Build a monthly salary slip for one employee — earnings first, then deductions, with the net total recalculated as you type."
+        :badge="editingSalary ? 'Editing' : 'New'"
+    >
+        <template #actions>
+            <BaseButton variant="outline" to="/salaries/list" block-mobile>
+                <template #icon><ArrowLeftIcon class="icon-sm" aria-hidden="true" /></template>
+                Back to Salary Slips
+            </BaseButton>
+            <BaseButton v-if="editingSalary" variant="outline" block-mobile @click="downloadSalarySlip">
+                <template #icon><ArrowDownTrayIcon class="icon-sm" aria-hidden="true" /></template>
+                Download Slip
+            </BaseButton>
+            <BaseButton v-if="editingSalary" variant="outline" block-mobile @click="sendSalarySlipEmail">
+                <template #icon><EnvelopeIcon class="icon-sm" aria-hidden="true" /></template>
+                Send Email
+            </BaseButton>
+        </template>
 
-        <div class="bg-white rounded-xl shadow-sm p-4 lg:p-6">
-            <form @submit.prevent="saveSalary" class="space-y-4 lg:space-y-6">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="px-4 sm:px-6 py-5 sm:py-6">
+            <form id="salary-form" class="max-w-3xl space-y-5 lg:space-y-6" @submit.prevent="saveSalary">
+                <div class="form-grid-2">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Employee *</label>
-                        <select
+                        <label class="form-label" for="salaryview-employee">Employee <span class="form-required">*</span></label>
+                        <select id="salaryview-employee"
                             v-model="salaryForm.user_id"
                             required
                             :disabled="editingSalary"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-select w-full"
                         >
                             <option value="">Select employee...</option>
                             <option v-for="user in employees" :key="user.id" :value="user.id">
                                 {{ user.name }} ({{ user.role?.name || 'N/A' }})
                             </option>
                         </select>
-                        <p v-if="!employees.length" class="text-xs text-red-600 mt-1">Loading employees...</p>
+                        <div v-if="!employees.length" class="mt-2" aria-busy="true">
+                            <span class="sr-only">Loading employees…</span>
+                            <div class="skeleton-text w-40" aria-hidden="true"></div>
+                        </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Month *</label>
-                        <input
+                        <label class="form-label" for="salaryview-month">Month <span class="form-required">*</span></label>
+                        <input id="salaryview-month"
                             v-model="salaryForm.month"
                             type="month"
                             required
                             :disabled="editingSalary"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input w-full"
                         />
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Currency *</label>
-                    <select
+                    <label class="form-label" for="salaryview-currency">Currency <span class="form-required">*</span></label>
+                    <select id="salaryview-currency"
                         v-model="salaryForm.currency"
                         required
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                        class="form-select w-full"
                     >
                         <option value="GBP">GBP (£)</option>
                         <option value="PKR">PKR (₨)</option>
                     </select>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="form-grid-2">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Base Salary *</label>
-                        <input
+                        <label class="form-label" for="salaryview-base-salary">Base Salary <span class="form-required">*</span></label>
+                        <input id="salaryview-base-salary"
                             v-model.number="salaryForm.base_salary"
                             type="number"
                             step="0.01"
                             min="0"
                             required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input w-full"
                         />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">House Allowance</label>
-                        <input
+                        <label class="form-label" for="salaryview-house-allowance">House Allowance</label>
+                        <input id="salaryview-house-allowance"
                             v-model.number="salaryForm.house_allowance"
                             type="number"
                             step="0.01"
                             min="0"
                             placeholder="0.00"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input w-full"
                         />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Transport Allowance</label>
-                        <input
+                        <label class="form-label" for="salaryview-transport-allowance">Transport Allowance</label>
+                        <input id="salaryview-transport-allowance"
                             v-model.number="salaryForm.allowances"
                             type="number"
                             step="0.01"
                             min="0"
                             placeholder="Enter amount or 0"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input w-full"
                         />
-                        <p class="text-xs text-slate-500 mt-1">This amount will be added to the base salary</p>
+                        <p class="form-hint">This amount will be added to the base salary</p>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Medical Allowance</label>
-                        <input
+                        <label class="form-label" for="salaryview-medical-allowance">Medical Allowance</label>
+                        <input id="salaryview-medical-allowance"
                             v-model.number="salaryForm.medical_allowance"
                             type="number"
                             step="0.01"
                             min="0"
                             placeholder="0.00"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input w-full"
                         />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Other Allowance</label>
-                        <input
+                        <label class="form-label" for="salaryview-other-allowance">Other Allowance</label>
+                        <input id="salaryview-other-allowance"
                             v-model.number="salaryForm.other_allowance"
                             type="number"
                             step="0.01"
                             min="0"
                             placeholder="0.00"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            class="form-input w-full"
                         />
                     </div>
                 </div>
 
-                <div class="border-t border-slate-200 pt-4">
-                    <h3 class="text-sm font-semibold text-slate-700 mb-3">Deductions</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <fieldset class="form-fieldset border-t border-slate-200 pt-4">
+                    <legend class="form-legend">Deductions</legend>
+                    <div class="form-grid-2">
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Tax</label>
-                            <input
+                            <label class="form-label" for="salaryview-tax">Tax</label>
+                            <input id="salaryview-tax"
                                 v-model.number="salaryForm.tax"
                                 type="number"
                                 step="0.01"
                                 min="0"
                                 placeholder="0.00"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                class="form-input w-full"
                             />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Loan Deduction</label>
-                            <input
+                            <label class="form-label" for="salaryview-loan-deduction">Loan Deduction</label>
+                            <input id="salaryview-loan-deduction"
                                 v-model.number="salaryForm.loan_deduction"
                                 type="number"
                                 step="0.01"
                                 min="0"
                                 placeholder="0.00"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                class="form-input w-full"
                             />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Other Deduction</label>
-                            <input
+                            <label class="form-label" for="salaryview-other-deduction">Other Deduction</label>
+                            <input id="salaryview-other-deduction"
                                 v-model.number="salaryForm.other_deduction"
                                 type="number"
                                 step="0.01"
                                 min="0"
                                 placeholder="0.00"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                class="form-input w-full"
                             />
                         </div>
                     </div>
-                </div>
+                </fieldset>
 
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Attendance Days</label>
-                    <input
+                    <label class="form-label" for="salaryview-attendance-days">Attendance Days</label>
+                    <input id="salaryview-attendance-days"
                         v-model.number="salaryForm.attendance_days"
                         type="number"
                         min="0"
                         max="31"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                        class="form-input w-full"
                     />
                 </div>
 
                 <!-- Bonuses Section -->
                 <div>
-                    <div class="flex justify-between items-center mb-2">
-                        <label class="block text-sm font-medium text-slate-700">Bonuses</label>
-                        <button
-                            type="button"
-                            @click="addBonus"
-                            class="text-sm text-blue-600 hover:text-blue-700"
-                        >
-                            + Add Bonus
-                        </button>
+                    <div class="flex justify-between items-center gap-3 mb-2">
+                        <span class="form-label mb-0">Bonuses</span>
+                        <BaseButton variant="ghost" size="sm" @click="addBonus">
+                            <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                            Add Bonus
+                        </BaseButton>
                     </div>
-                    <div v-if="salaryForm.bonuses.length === 0" class="text-sm text-slate-500 italic">
+                    <p v-if="salaryForm.bonuses.length === 0" class="form-hint">
                         No bonuses added
-                    </div>
+                    </p>
                     <div v-else class="space-y-2">
                         <div v-for="(bonus, index) in salaryForm.bonuses" :key="index" class="flex gap-2">
-                            <input
-                                v-model="bonus.name"
-                                type="text"
-                                placeholder="Bonus name"
-                                class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                            />
-                            <input
-                                v-model.number="bonus.amount"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                placeholder="Amount"
-                                class="w-32 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                            />
-                            <button
-                                type="button"
+                            <div class="flex-1 min-w-0">
+                                <label class="sr-only" :for="`salaryview-bonus-name-${index}`">Bonus {{ index + 1 }} name</label>
+                                <input
+                                    :id="`salaryview-bonus-name-${index}`"
+                                    v-model="bonus.name"
+                                    type="text"
+                                    placeholder="Bonus name"
+                                    class="form-input w-full"
+                                />
+                            </div>
+                            <div class="w-32 shrink-0">
+                                <label class="sr-only" :for="`salaryview-bonus-amount-${index}`">Bonus {{ index + 1 }} amount</label>
+                                <input
+                                    :id="`salaryview-bonus-amount-${index}`"
+                                    v-model.number="bonus.amount"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="Amount"
+                                    class="form-input w-full"
+                                />
+                            </div>
+                            <BaseButton
+                                variant="ghost"
+                                size="icon"
+                                :label="`Remove bonus ${index + 1}`"
+                                class="text-danger-700 shrink-0"
                                 @click="removeBonus(index)"
-                                class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
                             >
-                                Remove
-                            </button>
+                                <TrashIcon class="icon" aria-hidden="true" />
+                            </BaseButton>
                         </div>
                     </div>
                 </div>
 
                 <!-- Deductions Detail Section -->
                 <div>
-                    <div class="flex justify-between items-center mb-2">
-                        <label class="block text-sm font-medium text-slate-700">Deductions Detail</label>
-                        <button
-                            type="button"
-                            @click="addDeduction"
-                            class="text-sm text-blue-600 hover:text-blue-700"
-                        >
-                            + Add Deduction
-                        </button>
+                    <div class="flex justify-between items-center gap-3 mb-2">
+                        <span class="form-label mb-0">Deductions Detail</span>
+                        <BaseButton variant="ghost" size="sm" @click="addDeduction">
+                            <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                            Add Deduction
+                        </BaseButton>
                     </div>
-                    <div v-if="salaryForm.deductions_detail.length === 0" class="text-sm text-slate-500 italic">
+                    <p v-if="salaryForm.deductions_detail.length === 0" class="form-hint">
                         No detailed deductions added
-                    </div>
+                    </p>
                     <div v-else class="space-y-2">
                         <div v-for="(deduction, index) in salaryForm.deductions_detail" :key="index" class="flex gap-2">
-                            <input
-                                v-model="deduction.name"
-                                type="text"
-                                placeholder="Deduction name"
-                                class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                            />
-                            <input
-                                v-model.number="deduction.amount"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                placeholder="Amount"
-                                class="w-32 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                            />
-                            <button
-                                type="button"
+                            <div class="flex-1 min-w-0">
+                                <label class="sr-only" :for="`salaryview-deduction-name-${index}`">Deduction {{ index + 1 }} name</label>
+                                <input
+                                    :id="`salaryview-deduction-name-${index}`"
+                                    v-model="deduction.name"
+                                    type="text"
+                                    placeholder="Deduction name"
+                                    class="form-input w-full"
+                                />
+                            </div>
+                            <div class="w-32 shrink-0">
+                                <label class="sr-only" :for="`salaryview-deduction-amount-${index}`">Deduction {{ index + 1 }} amount</label>
+                                <input
+                                    :id="`salaryview-deduction-amount-${index}`"
+                                    v-model.number="deduction.amount"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="Amount"
+                                    class="form-input w-full"
+                                />
+                            </div>
+                            <BaseButton
+                                variant="ghost"
+                                size="icon"
+                                :label="`Remove deduction ${index + 1}`"
+                                class="text-danger-700 shrink-0"
                                 @click="removeDeduction(index)"
-                                class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
                             >
-                                Remove
-                            </button>
+                                <TrashIcon class="icon" aria-hidden="true" />
+                            </BaseButton>
                         </div>
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-                    <textarea
+                    <label class="form-label" for="salaryview-notes">Notes</label>
+                    <textarea id="salaryview-notes"
                         v-model="salaryForm.notes"
                         rows="3"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                        class="form-textarea w-full"
                         placeholder="Additional notes or comments..."
                     ></textarea>
                 </div>
 
                 <!-- Net Salary Display -->
-                <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                    <div class="flex justify-between items-center">
+                <div class="rounded-card bg-slate-50 p-4 border border-slate-200">
+                    <div class="flex flex-wrap justify-between items-center gap-2">
                         <div class="text-sm text-slate-600">Net Salary:</div>
-                        <div class="text-2xl font-bold text-slate-900">
+                        <div class="text-metric text-slate-900">
                             {{ salaryForm.currency === 'PKR' ? '₨' : '£' }}{{ formatNumber(calculateNetSalary()) }}
                             <span class="text-sm text-slate-500 ml-2">({{ salaryForm.currency }})</span>
                         </div>
                     </div>
                 </div>
 
-                <div v-if="salaryError" class="text-sm text-red-600 bg-red-50 p-3 rounded">
+                <div v-if="salaryError" class="callout callout-danger" role="alert">
                     {{ salaryError }}
                 </div>
 
-                <div class="flex justify-between items-center pt-4 border-t border-slate-200">
-                    <div v-if="editingSalary" class="flex gap-2">
-                        <button
-                            type="button"
-                            @click="downloadSalarySlip"
-                            class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700"
-                        >
-                            📥 Download Slip
-                        </button>
-                        <button
-                            type="button"
-                            @click="sendSalarySlipEmail"
-                            class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                        >
-                            📧 Send Email
-                        </button>
-                    </div>
-                    <div class="flex gap-3 ml-auto">
-                        <router-link
-                            to="/hr"
-                            class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
-                        >
-                            Cancel
-                        </router-link>
-                        <button
-                            type="submit"
-                            :disabled="savingSalary"
-                            class="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
-                        >
-                            {{ savingSalary ? 'Saving...' : (editingSalary ? 'Update Salary' : 'Create Salary') }}
-                        </button>
-                    </div>
+                <div class="form-actions pt-4 border-t border-slate-200">
+                    <BaseButton variant="outline" to="/hr" block-mobile>Cancel</BaseButton>
+                    <BaseButton
+                        variant="primary"
+                        type="submit"
+                        block-mobile
+                        :loading="savingSalary"
+                    >
+                        {{ savingSalary ? 'Saving...' : (editingSalary ? 'Update Salary' : 'Create Salary') }}
+                    </BaseButton>
                 </div>
             </form>
         </div>
-    </div>
+    </ListingPageShell>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
+import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseButton } from '@/components/base';
+import {
+    ArrowLeftIcon,
+    ArrowDownTrayIcon,
+    EnvelopeIcon,
+    PlusIcon,
+    TrashIcon,
+} from '@heroicons/vue/24/outline';
 
 const toast = useToastStore();
 const route = useRoute();
@@ -411,7 +421,7 @@ const calculateNetSalary = () => {
     const loanDeduction = parseFloat(salaryForm.value.loan_deduction) || 0;
     const otherDeduction = parseFloat(salaryForm.value.other_deduction) || 0;
     const deductionsDetail = salaryForm.value.deductions_detail.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
-    
+
     // Total Earnings - Total Deductions
     const totalEarnings = base + transportAllowance + houseAllowance + medicalAllowance + otherAllowance + bonuses;
     const totalDeductions = tax + loanDeduction + otherDeduction + deductionsDetail;
@@ -461,12 +471,12 @@ const saveSalary = async () => {
 
 const downloadSalarySlip = async () => {
     if (!editingSalary.value) return;
-    
+
     try {
         const response = await axios.get(`/api/hr/salaries/${editingSalary.value.id}/slip`, {
             responseType: 'blob',
         });
-        
+
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
@@ -475,7 +485,7 @@ const downloadSalarySlip = async () => {
         link.click();
         link.remove();
         window.URL.revokeObjectURL(url);
-        
+
         toast.success('Salary slip downloaded!');
     } catch (error) {
         console.error('Failed to download salary slip:', error);
@@ -485,7 +495,7 @@ const downloadSalarySlip = async () => {
 
 const sendSalarySlipEmail = async () => {
     if (!editingSalary.value) return;
-    
+
     try {
         await axios.post(`/api/hr/salaries/${editingSalary.value.id}/send-email`);
         toast.success('Salary slip sent via email!');
@@ -497,7 +507,7 @@ const sendSalarySlipEmail = async () => {
 
 onMounted(async () => {
     await loadEmployees();
-    
+
     // Check if editing existing salary
     if (route.params.id) {
         await loadSalary(route.params.id);
@@ -507,4 +517,3 @@ onMounted(async () => {
     }
 });
 </script>
-

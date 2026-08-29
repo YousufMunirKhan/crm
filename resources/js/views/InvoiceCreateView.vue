@@ -3,16 +3,11 @@
         <div class="max-w-3xl mx-auto px-3 sm:px-6 py-6 lg:py-8 w-full min-w-0">
             <!-- Back + Title -->
             <div class="mb-6">
-                <router-link
-                    to="/invoices"
-                    class="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 text-sm mb-4"
-                >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
+                <BaseButton variant="ghost" size="sm" to="/invoices" class="-ml-2 mb-3">
+                    <template #icon><ArrowLeftIcon class="icon-sm" aria-hidden="true" /></template>
                     Back to Invoices
-                </router-link>
-                <h1 class="text-2xl font-bold text-slate-900">{{ isEditMode ? 'Edit Invoice' : 'Create Invoice' }}</h1>
+                </BaseButton>
+                <h1 class="text-page-title text-slate-900">{{ isEditMode ? 'Edit Invoice' : 'Create Invoice' }}</h1>
             </div>
 
             <div v-if="loadingInvoice" class="flex items-center justify-center py-12 text-slate-500">
@@ -47,28 +42,50 @@
                             </label>
                         </div>
 
-                        <!-- Searchable customer select - dropdown in Teleport so it is never clipped -->
+                        <!--
+                          Combobox. The listbox is teleported because .form-card is
+                          overflow-hidden - an in-flow panel would be clipped.
+                        -->
                         <div v-if="customerMode === 'existing'" class="space-y-1">
-                            <label class="form-label">Search & select customer *</label>
+                            <label class="form-label" for="invoice-customer-search">Search &amp; select customer *</label>
                             <div class="relative" ref="customerSelectRef">
                                 <input
+                                    id="invoice-customer-search"
                                     v-model="customerSearch"
                                     type="text"
+                                    role="combobox"
+                                    autocomplete="off"
+                                    aria-autocomplete="list"
+                                    aria-controls="invoice-customer-listbox"
+                                    :aria-expanded="showCustomerDropdown"
+                                    :aria-activedescendant="
+                                        showCustomerDropdown && customerOptions[customerActiveIndex]
+                                            ? `invoice-customer-option-${customerOptions[customerActiveIndex].id}`
+                                            : undefined
+                                    "
                                     placeholder="Type name, phone or email..."
                                     class="form-input"
                                     @focus="showCustomerDropdown = true; updateDropdownPosition()"
                                     @input="debounceCustomerSearch"
+                                    @keydown.down.prevent="moveCustomerActive(1)"
+                                    @keydown.up.prevent="moveCustomerActive(-1)"
+                                    @keydown.enter.prevent="chooseActiveCustomer"
+                                    @keydown.esc="showCustomerDropdown = false"
                                 />
                                 <Teleport to="body">
                                     <div
                                         v-if="showCustomerDropdown && customerSelectRef"
+                                        id="invoice-customer-listbox"
                                         ref="dropdownPanelRef"
-                                        class="fixed z-[100] bg-white border border-slate-200 rounded-lg shadow-xl max-h-56 overflow-y-auto min-w-[200px]"
+                                        role="listbox"
+                                        aria-label="Matching customers"
+                                        class="popover-panel fixed max-h-56 overflow-y-auto min-w-[200px]"
                                         :style="dropdownStyle"
                                     >
                                         <div
                                             v-if="customerSearchLoading"
                                             class="px-3 py-4 text-center text-sm text-slate-500"
+                                            role="status"
                                         >
                                             Searching...
                                         </div>
@@ -85,10 +102,17 @@
                                             No customers found. Try another search or add a new customer.
                                         </div>
                                         <button
-                                            v-for="c in customerOptions"
+                                            v-for="(c, i) in customerOptions"
+                                            :id="`invoice-customer-option-${c.id}`"
                                             :key="c.id"
                                             type="button"
-                                            class="w-full text-left px-3 py-2.5 text-sm hover:bg-slate-50 border-b border-slate-100 last:border-0 break-words"
+                                            role="option"
+                                            :aria-selected="i === customerActiveIndex"
+                                            :class="[
+                                                'w-full text-left px-3 py-2.5 text-sm border-b border-slate-100 last:border-0 break-words',
+                                                i === customerActiveIndex ? 'bg-primary-50' : 'hover:bg-slate-50',
+                                            ]"
+                                            @mouseenter="customerActiveIndex = i"
                                             @click="selectCustomer(c)"
                                         >
                                             <span class="font-medium text-slate-900">{{ c.name }}</span>
@@ -102,7 +126,7 @@
                                 Selected: <strong>{{ selectedCustomer.name }}</strong>
                                 <button
                                     type="button"
-                                    class="ml-2 text-red-600 hover:underline text-sm"
+                                    class="ml-2 text-danger-600 hover:underline text-sm"
                                     @click="clearSelectedCustomer"
                                 >
                                     Clear
@@ -120,8 +144,8 @@
                         <!-- New customer fields: name, phone, email, address, VAT -->
                         <div v-if="customerMode === 'new'" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="sm:col-span-2">
-                                <label class="form-label">Name *</label>
-                                <input
+                                <label class="form-label" for="invoicecreateview-name">Name *</label>
+                                <input id="invoicecreateview-name"
                                     v-model="newCustomer.name"
                                     type="text"
                                     required
@@ -130,8 +154,8 @@
                                 />
                             </div>
                             <div>
-                                <label class="form-label">Phone *</label>
-                                <input
+                                <label class="form-label" for="invoicecreateview-phone">Phone *</label>
+                                <input id="invoicecreateview-phone"
                                     v-model="newCustomer.phone"
                                     type="text"
                                     required
@@ -140,8 +164,8 @@
                                 />
                             </div>
                             <div>
-                                <label class="form-label">Email</label>
-                                <input
+                                <label class="form-label" for="invoicecreateview-email">Email</label>
+                                <input id="invoicecreateview-email"
                                     v-model="newCustomer.email"
                                     type="email"
                                     placeholder="Email (optional)"
@@ -149,8 +173,8 @@
                                 />
                             </div>
                             <div class="sm:col-span-2">
-                                <label class="form-label">Address</label>
-                                <input
+                                <label class="form-label" for="invoicecreateview-address">Address</label>
+                                <input id="invoicecreateview-address"
                                     v-model="newCustomer.address"
                                     type="text"
                                     placeholder="Address (optional)"
@@ -158,8 +182,8 @@
                                 />
                             </div>
                             <div>
-                                <label class="form-label">VAT number</label>
-                                <input
+                                <label class="form-label" for="invoicecreateview-vat-number">VAT number</label>
+                                <input id="invoicecreateview-vat-number"
                                     v-model="newCustomer.vat_number"
                                     type="text"
                                     placeholder="VAT number (optional)"
@@ -179,8 +203,8 @@
                     <div class="form-body">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label class="form-label">Invoice date *</label>
-                                <input
+                                <label class="form-label" for="invoicecreateview-invoice-date">Invoice date *</label>
+                                <input id="invoicecreateview-invoice-date"
                                     v-model="form.invoice_date"
                                     type="date"
                                     required
@@ -188,16 +212,16 @@
                                 />
                             </div>
                             <div>
-                                <label class="form-label">Due date</label>
-                                <input
+                                <label class="form-label" for="invoicecreateview-due-date">Due date</label>
+                                <input id="invoicecreateview-due-date"
                                     v-model="form.due_date"
                                     type="date"
                                     class="form-input"
                                 />
                             </div>
                             <div>
-                                <label class="form-label">VAT rate (%)</label>
-                                <input
+                                <label class="form-label" for="invoicecreateview-vat-rate">VAT rate (%)</label>
+                                <input id="invoicecreateview-vat-rate"
                                     v-model.number="form.vat_rate"
                                     type="number"
                                     step="0.01"
@@ -226,11 +250,11 @@
                             </div>
                             <div>
                                 <div class="text-xs text-slate-500">Paid</div>
-                                <div class="font-semibold text-emerald-700">GBP {{ formatNumber(invoiceAmountPaid) }}</div>
+                                <div class="font-semibold text-success-700">GBP {{ formatNumber(invoiceAmountPaid) }}</div>
                             </div>
                             <div>
                                 <div class="text-xs text-slate-500">Outstanding</div>
-                                <div class="font-semibold" :class="invoiceOutstanding > 0 ? 'text-rose-700' : 'text-slate-700'">GBP {{ formatNumber(invoiceOutstanding) }}</div>
+                                <div class="font-semibold" :class="invoiceOutstanding > 0 ? 'text-danger-700' : 'text-slate-700'">GBP {{ formatNumber(invoiceOutstanding) }}</div>
                             </div>
                         </div>
 
@@ -252,7 +276,7 @@
                                         <td class="px-3 py-2">{{ payment.method || '-' }}</td>
                                         <td class="px-3 py-2">{{ payment.reference || '-' }}</td>
                                         <td class="px-3 py-2 text-right">
-                                            <button type="button" class="text-red-600 hover:text-red-800 font-medium" :disabled="deletingPaymentId === payment.id" @click="deletePayment(payment)">
+                                            <button type="button" class="text-danger-600 hover:text-danger-800 font-medium" :disabled="deletingPaymentId === payment.id" @click="deletePayment(payment)">
                                                 {{ deletingPaymentId === payment.id ? 'Removing...' : 'Remove' }}
                                             </button>
                                         </td>
@@ -266,32 +290,32 @@
 
                         <div v-if="invoiceOutstanding > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <label class="form-label">Payment date</label>
-                                <input v-model="paymentForm.payment_date" type="date" class="form-input" />
+                                <label class="form-label" for="invoicecreateview-payment-date">Payment date</label>
+                                <input id="invoicecreateview-payment-date" v-model="paymentForm.payment_date" type="date" class="form-input" />
                             </div>
                             <div>
-                                <label class="form-label">Amount</label>
-                                <input v-model.number="paymentForm.amount" type="number" min="0.01" step="0.01" class="form-input" />
+                                <label class="form-label" for="invoicecreateview-amount">Amount</label>
+                                <input id="invoicecreateview-amount" v-model.number="paymentForm.amount" type="number" min="0.01" step="0.01" class="form-input" />
                             </div>
                             <div>
-                                <label class="form-label">Method</label>
-                                <input v-model="paymentForm.method" type="text" class="form-input" placeholder="Bank transfer, cash..." />
+                                <label class="form-label" for="invoicecreateview-method">Method</label>
+                                <input id="invoicecreateview-method" v-model="paymentForm.method" type="text" class="form-input" placeholder="Bank transfer, cash..." />
                             </div>
                             <div>
-                                <label class="form-label">Reference</label>
-                                <input v-model="paymentForm.reference" type="text" class="form-input" placeholder="Optional reference" />
+                                <label class="form-label" for="invoicecreateview-reference">Reference</label>
+                                <input id="invoicecreateview-reference" v-model="paymentForm.reference" type="text" class="form-input" placeholder="Optional reference" />
                             </div>
                             <div class="sm:col-span-2">
-                                <label class="form-label">Notes</label>
-                                <textarea v-model="paymentForm.notes" class="form-input min-h-24 resize-y" placeholder="Optional internal note"></textarea>
+                                <label class="form-label" for="invoicecreateview-notes">Notes</label>
+                                <textarea id="invoicecreateview-notes" v-model="paymentForm.notes" class="form-input min-h-24 resize-y" placeholder="Optional internal note"></textarea>
                             </div>
                             <div class="sm:col-span-2 flex justify-end">
-                                <button type="button" class="form-btn-submit w-full sm:w-auto" :disabled="savingPayment" @click="savePayment">
+                                <button type="button" class="btn btn-lg btn-primary btn-block-mobile" :disabled="savingPayment" @click="savePayment">
                                     {{ savingPayment ? 'Saving payment...' : 'Record payment' }}
                                 </button>
                             </div>
                         </div>
-                        <p v-if="paymentError" class="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-100">{{ paymentError }}</p>
+                        <p v-if="paymentError" class="text-sm text-danger-600 bg-danger-50 p-3 rounded-xl border border-danger-100">{{ paymentError }}</p>
                     </div>
                 </div>
 
@@ -305,7 +329,7 @@
                         <button
                             type="button"
                             @click="addItem"
-                            class="text-sm font-semibold text-emerald-700 hover:text-emerald-900 shrink-0"
+                            class="text-sm font-semibold text-success-700 hover:text-success-900 shrink-0"
                         >
                             + Add item
                         </button>
@@ -332,7 +356,9 @@
                                         <div
                                             v-if="showProductDropdown && activeProductRow === index && productInputRefs[index]"
                                             ref="productDropdownRef"
-                                            class="fixed z-[100] bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto min-w-[200px]"
+                                            role="listbox"
+                                            aria-label="Matching products"
+                                            class="popover-panel fixed max-h-52 overflow-y-auto min-w-[200px]"
                                             :style="productDropdownStyle(index)"
                                         >
                                             <div v-if="productSearchLoading" class="px-3 py-3 text-center text-sm text-slate-500">
@@ -346,6 +372,8 @@
                                                     v-for="p in productOptions"
                                                     :key="p.id"
                                                     type="button"
+                                                    role="option"
+                                                    :aria-selected="false"
                                                     class="w-full text-left px-3 py-2.5 text-sm hover:bg-slate-50 border-b border-slate-100 last:border-0 break-words"
                                                     @click="selectProduct(index, p)"
                                                 >
@@ -354,7 +382,7 @@
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    class="w-full text-left px-3 py-2.5 text-sm hover:bg-violet-50 border-t border-slate-200 text-violet-700 font-medium"
+                                                    class="w-full text-left px-3 py-2.5 text-sm hover:bg-primary-50 border-t border-slate-200 text-primary-700 font-medium"
                                                     @click="addNewProduct(index)"
                                                 >
                                                     + Add "{{ item.description.trim() }}" as new product
@@ -391,7 +419,7 @@
                                     <button
                                         type="button"
                                         @click="removeItem(index)"
-                                        class="text-red-600 hover:text-red-800 p-2"
+                                        class="text-danger-600 hover:text-danger-800 p-2"
                                         :disabled="form.items.length === 1"
                                     >
                                         ×
@@ -407,16 +435,68 @@
                     </div>
                 </div>
 
-                <p v-if="submitError" class="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-100">{{ submitError }}</p>
+                <div v-if="!isEditMode" class="form-card">
+                    <div class="form-section-head">
+                        <h2 class="form-section-title">Payment received now</h2>
+                        <p class="form-section-desc">Optional. Use this when the customer pays some or all money while you create the invoice.</p>
+                    </div>
+                    <div class="form-body space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+                            <div>
+                                <div class="text-xs text-slate-500">Invoice total</div>
+                                <div class="font-semibold text-slate-900">GBP {{ formatNumber(total) }}</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-slate-500">Paid now</div>
+                                <div class="font-semibold text-success-700">GBP {{ formatNumber(paymentForm.amount) }}</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-slate-500">Due after saving</div>
+                                <div class="font-semibold" :class="createPaymentOutstanding > 0 ? 'text-danger-700' : 'text-slate-700'">GBP {{ formatNumber(createPaymentOutstanding) }}</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="form-label" for="invoicecreateview-payment-date-2">Payment date</label>
+                                <input id="invoicecreateview-payment-date-2" v-model="paymentForm.payment_date" type="date" class="form-input" />
+                            </div>
+                            <div>
+                                <div class="flex items-center justify-between gap-2">
+                                    <label class="form-label">Amount paid</label>
+                                    <button type="button" class="text-xs font-semibold text-success-700 hover:text-success-900" @click="setFullPaymentAmount">
+                                        Full amount
+                                    </button>
+                                </div>
+                                <input v-model.number="paymentForm.amount" type="number" min="0" step="0.01" class="form-input" placeholder="Leave 0 if not paid yet" />
+                            </div>
+                            <div>
+                                <label class="form-label" for="invoicecreateview-method-2">Method</label>
+                                <input id="invoicecreateview-method-2" v-model="paymentForm.method" type="text" class="form-input" placeholder="Bank transfer, cash..." />
+                            </div>
+                            <div>
+                                <label class="form-label" for="invoicecreateview-reference-2">Reference</label>
+                                <input id="invoicecreateview-reference-2" v-model="paymentForm.reference" type="text" class="form-input" placeholder="Optional reference" />
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="form-label" for="invoicecreateview-notes-2">Notes</label>
+                                <textarea id="invoicecreateview-notes-2" v-model="paymentForm.notes" class="form-input min-h-24 resize-y" placeholder="Optional internal note"></textarea>
+                            </div>
+                        </div>
+                        <p v-if="initialPaymentError" class="text-sm text-danger-600 bg-danger-50 p-3 rounded-xl border border-danger-100">{{ initialPaymentError }}</p>
+                    </div>
+                </div>
+
+                <p v-if="submitError" class="text-sm text-danger-600 bg-danger-50 p-3 rounded-xl border border-danger-100">{{ submitError }}</p>
 
                 <div class="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
-                    <router-link to="/invoices" class="form-btn-cancel text-center">
+                    <router-link to="/invoices" class="btn btn-md btn-outline btn-block-mobile text-center">
                         Cancel
                     </router-link>
                     <button
                         type="submit"
                         :disabled="loading || !canSubmit"
-                        class="form-btn-submit"
+                        class="btn btn-lg btn-primary btn-block-mobile"
                     >
                         {{ loading ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update invoice' : 'Create invoice') }}
                     </button>
@@ -428,6 +508,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ArrowLeftIcon } from '@heroicons/vue/24/outline';
+import { BaseButton } from '@/components/base';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
@@ -444,6 +526,7 @@ const customerSearch = ref('');
 const customerOptions = ref([]);
 const customerSearchLoading = ref(false);
 const showCustomerDropdown = ref(false);
+const customerActiveIndex = ref(0);
 const selectedCustomer = ref(null);
 const customerSelectRef = ref(null);
 const dropdownPanelRef = ref(null);
@@ -469,6 +552,9 @@ const invoicePayments = ref([]);
 const savingPayment = ref(false);
 const deletingPaymentId = ref(null);
 const paymentError = ref('');
+// The create-mode card and the edit-mode ledger card each need their own
+// error slot; sharing one made an error in either surface in both.
+const initialPaymentError = ref('');
 const paymentForm = ref({
     payment_date: '',
     amount: '',
@@ -489,6 +575,7 @@ const total = computed(() => subtotal.value + vatAmount.value);
 const invoiceAmountPaid = computed(() => invoicePayments.value.reduce((sum, payment) => sum + Number(payment.amount || 0), 0));
 const invoiceTotalForPayments = computed(() => total.value);
 const invoiceOutstanding = computed(() => Math.max(0, Number(invoiceTotalForPayments.value || 0) - Number(invoiceAmountPaid.value || 0)));
+const createPaymentOutstanding = computed(() => Math.max(0, Number(total.value || 0) - Number(paymentForm.value.amount || 0)));
 
 const canSubmit = computed(() => {
     if (form.value.items.length === 0) return false;
@@ -530,11 +617,16 @@ function formatDate(date) {
 function resetPaymentForm() {
     paymentForm.value = {
         payment_date: todayYmd(),
-        amount: invoiceOutstanding.value > 0 ? invoiceOutstanding.value.toFixed(2) : '',
+        // v-model.number expects a number; toFixed() returns a string.
+        amount: invoiceOutstanding.value > 0 ? Number(invoiceOutstanding.value.toFixed(2)) : null,
         method: '',
         reference: '',
         notes: '',
     };
+}
+
+function setFullPaymentAmount() {
+    paymentForm.value.amount = total.value > 0 ? Number(total.value.toFixed(2)) : null;
 }
 
 function updateDropdownPosition() {
@@ -558,6 +650,7 @@ function debounceCustomerSearch() {
         try {
             const { data } = await axios.get('/api/customers', { params: { search: q, per_page: 20 } });
             customerOptions.value = Array.isArray(data) ? data : (data.data || []);
+            customerActiveIndex.value = 0;
         } catch (_) {
             customerOptions.value = [];
         } finally {
@@ -570,6 +663,23 @@ function selectCustomer(c) {
     selectedCustomer.value = c;
     customerSearch.value = c.name;
     showCustomerDropdown.value = false;
+    customerActiveIndex.value = 0;
+}
+
+/** Arrow-key navigation over the customer listbox. */
+function moveCustomerActive(delta) {
+    if (!showCustomerDropdown.value) {
+        showCustomerDropdown.value = true;
+        updateDropdownPosition();
+    }
+    const count = customerOptions.value.length;
+    if (!count) return;
+    customerActiveIndex.value = (customerActiveIndex.value + delta + count) % count;
+}
+
+function chooseActiveCustomer() {
+    const option = customerOptions.value[customerActiveIndex.value];
+    if (showCustomerDropdown.value && option) selectCustomer(option);
 }
 
 function clearSelectedCustomer() {
@@ -669,7 +779,15 @@ async function handleSubmit() {
     if (!canSubmit.value) return;
     loading.value = true;
     submitError.value = null;
+    initialPaymentError.value = '';
     try {
+        const paymentAmount = Number(paymentForm.value.amount || 0);
+        if (!isEditMode.value && paymentAmount > total.value + 0.01) {
+            initialPaymentError.value = 'Payment amount cannot be greater than the invoice total.';
+            loading.value = false;
+            return;
+        }
+
         const payload = {
             invoice_date: form.value.invoice_date,
             due_date: form.value.due_date || null,
@@ -690,6 +808,15 @@ async function handleSubmit() {
                 email: newCustomer.value.email?.trim() || null,
                 address: newCustomer.value.address?.trim() || null,
                 vat_number: newCustomer.value.vat_number?.trim() || null,
+            };
+        }
+        if (!isEditMode.value && paymentAmount > 0) {
+            payload.initial_payment = {
+                payment_date: paymentForm.value.payment_date || todayYmd(),
+                amount: paymentAmount,
+                method: paymentForm.value.method || null,
+                reference: paymentForm.value.reference || null,
+                notes: paymentForm.value.notes || null,
             };
         }
         if (isEditMode.value) {
@@ -786,6 +913,7 @@ watch(invoiceId, (id) => {
 
 onMounted(() => {
     document.addEventListener('click', onDocumentClick);
+    resetPaymentForm();
 });
 
 onUnmounted(() => {

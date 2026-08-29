@@ -6,8 +6,9 @@ const DYNAMIC_CACHE = 'crm-dynamic-v1';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
-  '/icons/icon-192x192.svg',
-  '/icons/icon-512x512.svg',
+  '/favicon.ico',
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png',
 ];
 
 // Install event - cache static assets
@@ -130,10 +131,4 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Background sync (for future use)
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-data') {
-    console.log('[Service Worker] Syncing data...');
-  }
-});
 

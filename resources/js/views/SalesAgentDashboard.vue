@@ -1,347 +1,369 @@
 <template>
     <div class="max-w-7xl mx-auto w-full min-w-0 p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+        <div class="min-w-0">
+            <h1 class="text-page-title text-slate-900 break-words">My dashboard</h1>
+            <p class="text-xs text-slate-500 mt-1.5 sm:text-sm leading-relaxed">
+                Your follow-ups, appointments and pipeline.
+            </p>
+        </div>
+
         <!-- Attendance & Stats Row (no Revenue) -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             <div class="min-w-0">
                 <AttendanceClock />
             </div>
             <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 min-w-0">
-                <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 md:p-6 min-w-0">
-                    <div class="text-sm text-slate-600 mb-1">Today's Active Leads</div>
-                    <div class="text-2xl font-bold text-slate-900 tabular-nums">{{ stats.daily?.leads || 0 }}</div>
-                    <div class="text-xs text-slate-500 mt-1">Won: {{ stats.daily?.won || 0 }}</div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 md:p-6 min-w-0">
-                    <div class="text-sm text-slate-600 mb-1">Monthly Active Leads</div>
-                    <div class="text-2xl font-bold text-slate-900 tabular-nums">{{ stats.monthly?.leads || 0 }}</div>
-                    <div class="text-xs text-slate-500 mt-1">Won: {{ stats.monthly?.won || 0 }}</div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm p-3 sm:p-4 md:p-6 min-w-0">
-                    <div class="text-sm text-slate-600 mb-1">Yearly Active Leads</div>
-                    <div class="text-2xl font-bold text-slate-900 tabular-nums">{{ stats.yearly?.leads || 0 }}</div>
-                    <div class="text-xs text-slate-500 mt-1">Won: {{ stats.yearly?.won || 0 }}</div>
-                </div>
+                <StatCard
+                    label="Today's Active Leads"
+                    :value="stats.daily?.leads || 0"
+                    :caption="`Won: ${stats.daily?.won || 0}`"
+                    tone="primary"
+                >
+                    <template #icon>
+                        <CalendarDaysIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
+                <StatCard
+                    label="Monthly Active Leads"
+                    :value="stats.monthly?.leads || 0"
+                    :caption="`Won: ${stats.monthly?.won || 0}`"
+                    tone="primary"
+                >
+                    <template #icon>
+                        <ChartBarIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
+                <StatCard
+                    label="Yearly Active Leads"
+                    :value="stats.yearly?.leads || 0"
+                    :caption="`Won: ${stats.yearly?.won || 0}`"
+                    tone="primary"
+                >
+                    <template #icon>
+                        <ArrowTrendingUpIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
             </div>
         </div>
 
         <!-- My Targets (if admin has set them for this month) -->
-        <div
+        <section
             v-if="myTarget"
-            class="bg-gradient-to-r from-sky-50 via-white to-emerald-50 border border-sky-100 rounded-2xl shadow-sm px-4 py-4 md:px-6 md:py-5 flex flex-col gap-4"
+            class="card bg-gradient-to-r from-primary-50 via-white to-success-50 border-primary-200 px-4 py-4 md:px-6 md:py-5 flex flex-col gap-4"
         >
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-full bg-sky-100 flex items-center justify-center text-sky-700">
-                        🎯
-                    </div>
+                    <span class="w-9 h-9 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 shrink-0">
+                        <ViewfinderCircleIcon class="icon" aria-hidden="true" />
+                    </span>
                     <div>
-                        <h3 class="text-sm md:text-base font-semibold text-slate-900">My Targets (this month)</h3>
+                        <h2 class="text-sm md:text-base font-semibold text-slate-900">My Targets (this month)</h2>
                         <p class="text-[11px] md:text-xs text-slate-500">
                             Set by your admin. Updated automatically from your appointments and won sales.
                         </p>
                     </div>
                 </div>
-                <div class="flex flex-wrap gap-2 sm:gap-3 text-[11px] md:text-xs text-slate-500">
-                    <div class="px-2 py-1 rounded-full bg-white/70 border border-slate-200 flex items-center gap-1">
-                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-                        <span>{{ myTarget.achieved_appointments }} / {{ myTarget.target_appointments || 0 }} appointments</span>
-                    </div>
-                    <div class="px-2 py-1 rounded-full bg-white/70 border border-slate-200 flex items-center gap-1">
-                        <span class="inline-block w-2 h-2 rounded-full bg-indigo-500"></span>
-                        <span>{{ myTarget.achieved_sales }} / {{ myTarget.target_sales || 0 }} sales</span>
-                    </div>
+                <div class="flex flex-wrap gap-2 sm:gap-3">
+                    <span class="chip tabular-nums">
+                        <span class="inline-block w-2 h-2 rounded-full bg-success-600" aria-hidden="true"></span>
+                        {{ myTarget.achieved_appointments }} / {{ myTarget.target_appointments || 0 }} appointments
+                    </span>
+                    <span class="chip tabular-nums">
+                        <span class="inline-block w-2 h-2 rounded-full bg-primary-600" aria-hidden="true"></span>
+                        {{ myTarget.achieved_sales }} / {{ myTarget.target_sales || 0 }} sales
+                    </span>
                 </div>
             </div>
             <div class="space-y-2">
                 <div class="flex justify-between items-center text-xs text-slate-500">
                     <span>Overall progress</span>
-                    <span class="font-medium text-slate-700">{{ myTarget.overall_progress }}%</span>
+                    <span class="font-medium text-slate-700 tabular-nums">{{ myTarget.overall_progress }}%</span>
                 </div>
-                <div class="w-full bg-slate-200/80 rounded-full h-2.5 overflow-hidden">
+                <div class="w-full bg-slate-200/80 rounded-full h-2.5 overflow-hidden" aria-hidden="true">
                     <div
-                        class="h-2.5 rounded-full bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-500 transition-all duration-500"
+                        class="h-2.5 rounded-full bg-primary-600 transition-all duration-500"
                         :style="{ width: `${Math.min(100, myTarget.overall_progress || 0)}%` }"
                     ></div>
                 </div>
-                <p v-if="myTarget.target_revenue > 0" class="text-[11px] text-slate-500">
+                <p v-if="myTarget.target_revenue > 0" class="text-[11px] text-slate-500 tabular-nums">
                     Revenue: {{ formatNumber(myTarget.achieved_revenue) }} / {{ formatNumber(myTarget.target_revenue) }}
                     ({{ myTarget.revenue_progress }}%)
                 </p>
             </div>
-        </div>
+        </section>
 
         <!-- Monthly #1 Spotlight (all users) -->
-        <div
+        <section
             v-if="monthlyTopPerformer"
-            class="bg-gradient-to-r from-amber-50 via-white to-emerald-50 border border-amber-100 rounded-2xl shadow-sm px-4 py-4 md:px-6 md:py-5 min-w-0"
+            class="card bg-gradient-to-r from-warning-50 via-white to-success-50 border-warning-200 px-4 py-4 md:px-6 md:py-5 min-w-0"
         >
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold">1</div>
+                    <span class="w-10 h-10 rounded-full bg-warning-500 text-white flex items-center justify-center font-bold shrink-0" aria-hidden="true">1</span>
                     <div>
-                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold mb-1">
-                            🏅 Top Performer of the Month
-                        </div>
+                        <h2 class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-warning-100 text-warning-800 text-xs font-semibold mb-1">
+                            <TrophyIcon class="icon-sm" aria-hidden="true" />
+                            Top Performer of the Month
+                        </h2>
                         <div class="text-lg font-bold text-slate-900">{{ monthlyTopPerformer.name }}</div>
-                        <div class="text-xs text-slate-600">
+                        <div class="text-xs text-slate-600 tabular-nums">
                             {{ monthlyTopPerformer.leads_count || 0 }} leads •
                             {{ monthlyTopPerformer.won_products || monthlyTopPerformer.won_count || 0 }} won
                         </div>
                     </div>
                 </div>
                 <div class="text-left sm:text-right text-sm w-full sm:w-auto shrink-0">
-                    <div class="font-bold text-emerald-600 break-words">£{{ formatNumber(monthlyTopPerformer.revenue || 0) }}</div>
-                    <div class="text-xs text-slate-500">{{ monthlyTopPerformer.conversion_rate || 0 }}% conv.</div>
+                    <div class="font-bold text-success-700 tabular-nums break-words">£{{ formatNumber(monthlyTopPerformer.revenue || 0) }}</div>
+                    <div class="text-xs text-slate-500 tabular-nums">{{ monthlyTopPerformer.conversion_rate || 0 }}% conv.</div>
                 </div>
             </div>
-        </div>
+        </section>
 
         <!-- Quick Actions -->
         <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
-            <router-link
-                :to="{ path: '/customers', query: { type: 'prospect' } }"
-                class="w-full sm:w-auto text-center px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm touch-manipulation"
-            >
+            <BaseButton variant="primary" block-mobile :to="{ path: '/customers', query: { type: 'prospect' } }">
+                <template #icon>
+                    <UserPlusIcon class="icon" aria-hidden="true" />
+                </template>
                 Add Customer
-            </router-link>
-            <router-link
-                to="/leads/pipeline"
-                class="w-full sm:w-auto text-center px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm touch-manipulation"
-            >
+            </BaseButton>
+            <BaseButton variant="success" block-mobile to="/leads/pipeline">
+                <template #icon>
+                    <PlusCircleIcon class="icon" aria-hidden="true" />
+                </template>
                 Add Lead
-            </router-link>
+            </BaseButton>
         </div>
 
         <!-- Follow-ups & Appointments Section -->
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-            <!-- Date Picker & Tabs -->
-            <div class="p-4 border-b border-slate-200 bg-slate-50">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
-                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0 w-full sm:w-auto">
-                        <label class="text-sm font-medium text-slate-700 shrink-0">View date:</label>
-                        <input
-                            v-model="selectedDate"
-                            type="date"
-                            @change="onDateChange"
-                            class="w-full sm:w-auto min-w-0 max-w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <button
-                            v-if="selectedDate !== todayStr"
-                            @click="resetDate"
-                            class="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
-                        >
-                            Today
-                        </button>
-                    </div>
-                    <div class="flex flex-wrap gap-2 w-full sm:w-auto">
-                        <button
-                            @click="activeTab = 'today'"
-                            :class="[
-                                'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                                activeTab === 'today'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                            ]"
-                        >
-                            Today
-                        </button>
-                        <button
-                            @click="activeTab = 'next7'"
-                            :class="[
-                                'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                                activeTab === 'next7'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                            ]"
-                        >
-                            Next 7 Days
-                        </button>
-                    </div>
+        <BaseCard>
+            <template #header>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0 w-full">
+                    <label class="text-sm font-medium text-slate-700 shrink-0" for="salesagentdashboard-view-date">View date:</label>
+                    <input id="salesagentdashboard-view-date"
+                        v-model="selectedDate"
+                        type="date"
+                        class="form-input w-full sm:w-auto min-w-0 max-w-full"
+                        @change="onDateChange"
+                    />
+                    <BaseButton
+                        v-if="selectedDate !== todayStr"
+                        variant="ghost"
+                        class="shrink-0"
+                        @click="resetDate"
+                    >
+                        Today
+                    </BaseButton>
                 </div>
-            </div>
-
-            <div class="p-4 md:p-6">
-                <!-- Today / Selected Date Follow-ups -->
-                <div v-show="activeTab === 'today'" class="space-y-6">
-                    <div>
-                        <h3 class="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                            <span class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">📅</span>
-                            {{ selectedDate === todayStr ? "Today's Follow-ups" : `Follow-ups for ${formatSelectedDateLabel(selectedDate)}` }}
-                        </h3>
-                        <div v-if="loading" class="text-center py-8 text-slate-500">Loading...</div>
-                        <div v-else-if="displayFollowUpsToday.length === 0" class="text-center py-8 text-slate-400 rounded-lg bg-slate-50">
-                            <span>{{ selectedDate === todayStr ? 'No follow-ups scheduled for today' : 'No follow-ups for this date' }}</span>
-                        </div>
-                        <div v-else class="space-y-3">
-                            <div
-                                v-for="fu in displayFollowUpsToday"
-                                :key="fu.id"
-                                class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors group min-w-0"
-                            >
-                                <div class="flex-1 min-w-0">
-                                    <router-link
-                                        v-if="fu.customer_id"
-                                        :to="`/customers/${fu.customer_id}`"
-                                        class="font-medium text-slate-900 text-blue-600 hover:text-blue-800 hover:underline"
-                                    >
-                                        {{ fu.customer?.name || 'Customer' }}
-                                    </router-link>
-                                    <div v-else class="font-medium text-slate-900">
-                                        {{ fu.customer?.name || 'Customer' }}
-                                    </div>
-                                    <div class="text-sm text-slate-600 mt-0.5">
-                                        {{ fu.items?.length ? fu.items.map(i => i.product?.name).filter(Boolean).join(', ') : '-' }}
-                                    </div>
-                                    <div class="text-xs text-slate-500 mt-1">{{ formatDateTime(fu.next_follow_up_at) }}</div>
-                                </div>
-                                <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
-                                    <button
-                                        @click="openActivityModal(fu)"
-                                        class="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 touch-manipulation"
-                                    >
-                                        Log Activity
-                                    </button>
-                                    <button
-                                        @click="openCompleteModal(fu)"
-                                        class="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 touch-manipulation"
-                                    >
-                                        Mark as Done
-                                    </button>
-                                    <router-link
-                                        v-if="fu.customer_id"
-                                        :to="`/customers/${fu.customer_id}`"
-                                        class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 touch-manipulation"
-                                    >
-                                        View
-                                    </router-link>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Today's Appointments -->
-                    <div>
-                        <h3 class="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                            <span class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">📆</span>
-                            Today's Appointments
-                        </h3>
-                        <div v-if="todayAppointments.length === 0" class="text-center py-6 text-slate-400 rounded-lg bg-slate-50">
-                            No appointments scheduled for today
-                        </div>
-                        <div v-else class="space-y-3">
-                            <div
-                                v-for="apt in todayAppointments"
-                                :key="apt.id"
-                                class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors min-w-0"
-                            >
-                                <div class="flex-1 min-w-0">
-                                    <router-link
-                                        v-if="apt.customer_id"
-                                        :to="`/customers/${apt.customer_id}`"
-                                        class="font-medium text-slate-900 text-blue-600 hover:text-blue-800 hover:underline"
-                                    >
-                                        {{ apt.customer?.name || 'Customer' }}
-                                    </router-link>
-                                    <div v-else class="font-medium text-slate-900">
-                                        {{ apt.customer?.name || 'Customer' }}
-                                    </div>
-                                    <div class="text-sm text-slate-600 mt-0.5">{{ apt.description || 'Appointment' }}</div>
-                                    <div class="text-xs text-slate-500 mt-1">{{ apt.appointment_time || '10:00' }}</div>
-                                </div>
-                                <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
-                                    <button
-                                        v-if="apt.lead_id"
-                                        @click="openCompleteModal({ id: apt.lead_id })"
-                                        class="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 touch-manipulation"
-                                    >
-                                        Complete
-                                    </button>
-                                    <router-link
-                                        v-if="apt.customer_id"
-                                        :to="`/customers/${apt.customer_id}`"
-                                        class="px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 touch-manipulation"
-                                    >
-                                        View
-                                    </router-link>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+            </template>
+            <template #actions>
+                <div class="tab-list" role="group" aria-label="Follow-up range">
+                    <button
+                        type="button"
+                        :class="['tab', activeTab === 'today' ? 'tab-active' : '']"
+                        :aria-pressed="activeTab === 'today' ? 'true' : 'false'"
+                        @click="activeTab = 'today'"
+                    >
+                        Today
+                    </button>
+                    <button
+                        type="button"
+                        :class="['tab', activeTab === 'next7' ? 'tab-active' : '']"
+                        :aria-pressed="activeTab === 'next7' ? 'true' : 'false'"
+                        @click="activeTab = 'next7'"
+                    >
+                        Next 7 Days
+                    </button>
                 </div>
+            </template>
 
-                <!-- Next 7 Days Follow-ups -->
-                <div v-show="activeTab === 'next7'" class="space-y-4">
-                    <h3 class="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                        <span class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">📋</span>
-                        Follow-ups (Next 7 Days)
-                    </h3>
-                    <div v-if="next7DaysFollowUps.length === 0" class="text-center py-12 text-slate-400 rounded-lg bg-slate-50">
-                        No follow-ups scheduled in the next 7 days
-                    </div>
-                    <div v-else class="space-y-3 max-h-96 overflow-y-auto">
+            <!-- Today / Selected Date Follow-ups -->
+            <div v-show="activeTab === 'today'" class="space-y-6">
+                <section>
+                    <h2 class="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-control bg-primary-100 text-primary-700 flex items-center justify-center shrink-0">
+                            <CalendarDaysIcon class="icon" aria-hidden="true" />
+                        </span>
+                        {{ selectedDate === todayStr ? "Today's Follow-ups" : `Follow-ups for ${formatSelectedDateLabel(selectedDate)}` }}
+                    </h2>
+                    <p v-if="loading" class="text-center py-8 text-slate-500" role="status" aria-live="polite">Loading...</p>
+                    <EmptyState
+                        v-else-if="displayFollowUpsToday.length === 0"
+                        :heading="selectedDate === todayStr ? 'No follow-ups scheduled for today' : 'No follow-ups for this date'"
+                    >
+                        <template #icon>
+                            <CalendarDaysIcon class="icon" aria-hidden="true" />
+                        </template>
+                    </EmptyState>
+                    <div v-else class="space-y-3">
                         <div
-                            v-for="fu in next7DaysFollowUps"
+                            v-for="fu in displayFollowUpsToday"
                             :key="fu.id"
-                            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors group min-w-0"
+                            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-slate-50 rounded-card hover:bg-slate-100 transition-colors group min-w-0"
                         >
-                                <div class="flex-1 min-w-0">
-                                    <router-link
-                                        v-if="fu.customer_id"
-                                        :to="`/customers/${fu.customer_id}`"
-                                        class="font-medium text-slate-900 text-blue-600 hover:text-blue-800 hover:underline"
-                                    >
-                                        {{ fu.customer?.name || 'Customer' }}
-                                    </router-link>
-                                    <div v-else class="font-medium text-slate-900">
-                                        {{ fu.customer?.name || 'Customer' }}
-                                    </div>
-                                <div class="text-sm text-slate-600 mt-0.5">
-                                    {{ fu.items?.length ? fu.items.map(i => i.product?.name).filter(Boolean).join(', ') : '-' }}
-                                </div>
-                                <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
-                                    <span class="font-medium">{{ formatDateOnly(fu.next_follow_up_at) }}</span>
-                                    {{ formatTimeOnly(fu.next_follow_up_at) }}
-                                </div>
-                            </div>
-                            <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
-                                <button
-                                    @click="openActivityModal(fu)"
-                                    class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-opacity touch-manipulation"
-                                >
-                                    Log
-                                </button>
+                            <div class="flex-1 min-w-0">
                                 <router-link
                                     v-if="fu.customer_id"
                                     :to="`/customers/${fu.customer_id}`"
-                                    class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 touch-manipulation"
+                                    class="link break-words"
+                                >
+                                    {{ fu.customer?.name || 'Customer' }}
+                                </router-link>
+                                <div v-else class="font-medium text-slate-900">
+                                    {{ fu.customer?.name || 'Customer' }}
+                                </div>
+                                <div class="text-sm text-slate-600 mt-0.5">
+                                    {{ fu.items?.length ? fu.items.map(i => i.product?.name).filter(Boolean).join(', ') : '-' }}
+                                </div>
+                                <div class="text-xs text-slate-500 mt-1 tabular-nums">{{ formatDateTime(fu.next_follow_up_at) }}</div>
+                            </div>
+                            <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
+                                <BaseButton variant="outline" @click="openActivityModal(fu)">Log Activity</BaseButton>
+                                <BaseButton variant="success" @click="openCompleteModal(fu)">Mark as Done</BaseButton>
+                                <BaseButton
+                                    v-if="fu.customer_id"
+                                    variant="primary"
+                                    :to="`/customers/${fu.customer_id}`"
                                 >
                                     View
-                                </router-link>
+                                </BaseButton>
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Today's Appointments -->
+                <section>
+                    <h2 class="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-control bg-warning-100 text-warning-800 flex items-center justify-center shrink-0">
+                            <ClockIcon class="icon" aria-hidden="true" />
+                        </span>
+                        Today's Appointments
+                    </h2>
+                    <EmptyState v-if="todayAppointments.length === 0" heading="No appointments scheduled for today">
+                        <template #icon>
+                            <ClockIcon class="icon" aria-hidden="true" />
+                        </template>
+                    </EmptyState>
+                    <div v-else class="space-y-3">
+                        <div
+                            v-for="apt in todayAppointments"
+                            :key="apt.id"
+                            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-warning-50 rounded-card hover:bg-warning-100 transition-colors min-w-0"
+                        >
+                            <div class="flex-1 min-w-0">
+                                <router-link
+                                    v-if="apt.customer_id"
+                                    :to="`/customers/${apt.customer_id}`"
+                                    class="link break-words"
+                                >
+                                    {{ apt.customer?.name || 'Customer' }}
+                                </router-link>
+                                <div v-else class="font-medium text-slate-900">
+                                    {{ apt.customer?.name || 'Customer' }}
+                                </div>
+                                <div class="text-sm text-slate-600 mt-0.5">{{ apt.description || 'Appointment' }}</div>
+                                <div class="text-xs text-slate-500 mt-1 tabular-nums">{{ apt.appointment_time || '10:00' }}</div>
+                            </div>
+                            <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
+                                <BaseButton
+                                    v-if="apt.lead_id"
+                                    variant="success"
+                                    @click="openCompleteModal({ id: apt.lead_id })"
+                                >
+                                    Complete
+                                </BaseButton>
+                                <BaseButton
+                                    v-if="apt.customer_id"
+                                    variant="primary"
+                                    :to="`/customers/${apt.customer_id}`"
+                                >
+                                    View
+                                </BaseButton>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Next 7 Days Follow-ups -->
+            <div v-show="activeTab === 'next7'" class="space-y-4">
+                <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-control bg-success-100 text-success-800 flex items-center justify-center shrink-0">
+                        <ListBulletIcon class="icon" aria-hidden="true" />
+                    </span>
+                    Follow-ups (Next 7 Days)
+                </h2>
+                <EmptyState v-if="next7DaysFollowUps.length === 0" heading="No follow-ups scheduled in the next 7 days">
+                    <template #icon>
+                        <ListBulletIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
+                <div v-else class="space-y-3 max-h-96 overflow-y-auto">
+                    <div
+                        v-for="fu in next7DaysFollowUps"
+                        :key="fu.id"
+                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-slate-50 rounded-card hover:bg-slate-100 transition-colors group min-w-0"
+                    >
+                        <div class="flex-1 min-w-0">
+                            <router-link
+                                v-if="fu.customer_id"
+                                :to="`/customers/${fu.customer_id}`"
+                                class="link break-words"
+                            >
+                                {{ fu.customer?.name || 'Customer' }}
+                            </router-link>
+                            <div v-else class="font-medium text-slate-900">
+                                {{ fu.customer?.name || 'Customer' }}
+                            </div>
+                            <div class="text-sm text-slate-600 mt-0.5">
+                                {{ fu.items?.length ? fu.items.map(i => i.product?.name).filter(Boolean).join(', ') : '-' }}
+                            </div>
+                            <div class="text-xs text-slate-500 mt-1 flex items-center gap-2 tabular-nums">
+                                <span class="font-medium">{{ formatDateOnly(fu.next_follow_up_at) }}</span>
+                                {{ formatTimeOnly(fu.next_follow_up_at) }}
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
+                            <BaseButton
+                                variant="outline"
+                                class="sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity"
+                                @click="openActivityModal(fu)"
+                            >
+                                Log
+                            </BaseButton>
+                            <BaseButton
+                                v-if="fu.customer_id"
+                                variant="primary"
+                                :to="`/customers/${fu.customer_id}`"
+                            >
+                                View
+                            </BaseButton>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </BaseCard>
 
         <!-- Recent Leads & Assigned Customers -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white rounded-xl shadow-sm p-4 md:p-6">
-                <h3 class="text-lg font-semibold text-slate-900 mb-4">Recent Leads</h3>
-                <div v-if="recentLeads.length === 0" class="text-center text-slate-500 py-8">
-                    No recent leads
-                </div>
+            <BaseCard title="Recent Leads">
+                <EmptyState v-if="recentLeads.length === 0" heading="No recent leads">
+                    <template #icon>
+                        <DocumentTextIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
                 <div v-else class="space-y-3">
                     <div
                         v-for="lead in recentLeads"
                         :key="lead.id"
-                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-50 rounded-lg group min-w-0"
+                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-50 rounded-card group min-w-0"
                     >
                         <div class="flex-1 min-w-0">
                             <router-link
                                 v-if="lead.customer_id"
                                 :to="`/customers/${lead.customer_id}`"
-                                class="font-medium text-slate-900 text-blue-600 hover:text-blue-800 hover:underline"
+                                class="link break-words"
                             >
                                 {{ lead.customer?.name || 'Customer' }}
                             </router-link>
@@ -352,136 +374,154 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 sm:justify-end">
                             <div class="text-sm font-medium text-slate-700 tabular-nums">£{{ formatNumber(getLeadValue(lead)) }}</div>
-                            <button
+                            <BaseButton
+                                variant="success"
+                                class="sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity"
                                 @click="openActivityModal(lead)"
-                                class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 px-2 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-opacity touch-manipulation"
                             >
                                 Log
-                            </button>
-                            <router-link
+                            </BaseButton>
+                            <BaseButton
                                 v-if="lead.customer_id"
+                                variant="primary"
+                                class="sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity"
                                 :to="`/customers/${lead.customer_id}`"
-                                class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 px-2 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-opacity touch-manipulation"
                             >
                                 View
-                            </router-link>
+                            </BaseButton>
                         </div>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
 
-            <div class="bg-white rounded-xl shadow-sm p-4 md:p-6 min-w-0">
-                <h3 class="text-lg font-semibold text-slate-900 mb-4">Assigned Customers</h3>
-                <div v-if="assignedCustomers.length === 0" class="text-center text-slate-500 py-8">
-                    No assigned customers
-                </div>
+            <BaseCard title="Assigned Customers">
+                <EmptyState v-if="assignedCustomers.length === 0" heading="No assigned customers">
+                    <template #icon>
+                        <UsersIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
                 <div v-else class="space-y-3">
                     <div
                         v-for="customer in assignedCustomers"
                         :key="customer.id"
-                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors min-w-0"
+                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-50 rounded-card hover:bg-slate-100 transition-colors min-w-0"
                     >
                         <div class="flex-1 min-w-0">
                             <div class="font-medium text-slate-900 break-words">{{ customer.name }}</div>
                             <div class="text-xs text-slate-500">{{ customer.phone }}</div>
                         </div>
-                        <router-link
+                        <BaseButton
+                            variant="primary"
+                            block-mobile
+                            class="shrink-0"
                             :to="`/customers/${customer.id}`"
-                            class="w-full sm:w-auto text-center px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 touch-manipulation shrink-0"
                         >
                             View
-                        </router-link>
+                        </BaseButton>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
         </div>
 
         <!-- Pipeline Summary -->
-        <div class="bg-white rounded-xl shadow-sm p-4 md:p-6 min-w-0">
-            <h3 class="text-lg font-semibold text-slate-900 mb-4">Pipeline Summary</h3>
+        <section class="min-w-0 space-y-3 sm:space-y-4">
+            <h2 class="text-base font-semibold text-slate-900">Pipeline Summary</h2>
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-                <div class="text-center p-2 sm:p-3 bg-slate-50 rounded-lg min-w-0">
-                    <div class="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums">{{ pipeline.follow_up || 0 }}</div>
-                    <div class="text-xs text-slate-600 mt-1">Follow Up</div>
-                </div>
-                <div class="text-center p-2 sm:p-3 bg-slate-50 rounded-lg min-w-0">
-                    <div class="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums">{{ pipeline.lead || 0 }}</div>
-                    <div class="text-xs text-slate-600 mt-1">Lead</div>
-                </div>
-                <div class="text-center p-2 sm:p-3 bg-slate-50 rounded-lg min-w-0">
-                    <div class="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums">{{ pipeline.hot_lead || 0 }}</div>
-                    <div class="text-xs text-slate-600 mt-1">Hot Lead</div>
-                </div>
-                <div class="text-center p-2 sm:p-3 bg-slate-50 rounded-lg min-w-0">
-                    <div class="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums">{{ pipeline.quotation || 0 }}</div>
-                    <div class="text-xs text-slate-600 mt-1">Quotation</div>
-                </div>
-                <div class="text-center p-2 sm:p-3 bg-green-50 rounded-lg min-w-0">
-                    <div class="text-xl sm:text-2xl font-bold text-green-700 tabular-nums">{{ pipeline.won || 0 }}</div>
-                    <div class="text-xs text-green-600 mt-1">Won</div>
-                </div>
-                <div class="text-center p-2 sm:p-3 bg-red-50 rounded-lg min-w-0">
-                    <div class="text-xl sm:text-2xl font-bold text-red-700 tabular-nums">{{ pipeline.lost || 0 }}</div>
-                    <div class="text-xs text-red-600 mt-1">Lost</div>
-                </div>
+                <StatCard label="Follow Up" :value="pipeline.follow_up || 0" tone="neutral">
+                    <template #icon>
+                        <ArrowPathIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
+                <StatCard label="Lead" :value="pipeline.lead || 0" tone="neutral">
+                    <template #icon>
+                        <UserPlusIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
+                <StatCard label="Hot Lead" :value="pipeline.hot_lead || 0" tone="warning">
+                    <template #icon>
+                        <BoltIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
+                <StatCard label="Quotation" :value="pipeline.quotation || 0" tone="primary">
+                    <template #icon>
+                        <DocumentTextIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
+                <StatCard label="Won" :value="pipeline.won || 0" tone="success">
+                    <template #icon>
+                        <CheckCircleIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
+                <StatCard label="Lost" :value="pipeline.lost || 0" tone="danger">
+                    <template #icon>
+                        <XCircleIcon class="icon" aria-hidden="true" />
+                    </template>
+                </StatCard>
             </div>
-        </div>
+        </section>
 
         <!-- Complete Follow-up Modal -->
-        <div
-            v-if="showCompleteModal"
-            class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            @click.self="closeCompleteModal"
+        <BaseModal
+            v-model="showCompleteModal"
+            title="Complete Follow-up"
+            size="md"
+            :close-on-backdrop="false"
+            @close="closeCompleteModal"
         >
-            <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div class="p-6 border-b border-slate-200">
-                    <h3 class="text-xl font-semibold text-slate-900">Complete Follow-up</h3>
+            <!-- No `novalidate`: the required Remarks field must still block submit, as before. -->
+            <form id="sales-agent-complete-followup-form" class="space-y-4" @submit.prevent="completeFollowUp">
+                <div>
+                    <label class="form-label" for="salesagentdashboard-remarks-notes">
+                        Remarks / Notes <span class="form-required" aria-hidden="true">*</span>
+                    </label>
+                    <textarea id="salesagentdashboard-remarks-notes"
+                        v-model="completeForm.remarks"
+                        rows="4"
+                        required
+                        class="form-textarea"
+                        placeholder="Enter your remarks..."
+                    />
                 </div>
-                <form @submit.prevent="completeFollowUp" class="p-6 space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-2">Remarks / Notes *</label>
-                        <textarea
-                            v-model="completeForm.remarks"
-                            rows="4"
-                            required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Enter your remarks..."
-                        />
-                    </div>
-                    <div>
-                        <label class="flex items-center gap-2">
-                            <input v-model="completeForm.saleHappened" type="checkbox" class="rounded border-slate-300 text-blue-600" />
-                            <span class="text-sm text-slate-700">Sale happened</span>
-                        </label>
-                    </div>
-                    <div v-if="completeForm.saleHappened">
-                        <label class="block text-sm font-medium text-slate-700 mb-2">New Stage</label>
-                        <select v-model="completeForm.newStage" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="lead">Lead</option>
-                            <option value="hot_lead">Hot Lead</option>
-                            <option value="quotation">Quotation</option>
-                            <option value="won">Won</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-2">Next Follow-up Date (Optional)</label>
-                        <input
-                            v-model="completeForm.nextFollowUpAt"
-                            type="datetime-local"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                    <div class="flex justify-end gap-3 pt-4">
-                        <button type="button" @click="closeCompleteModal" :disabled="completingFollowUp" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-                            Cancel
-                        </button>
-                        <button type="submit" :disabled="completingFollowUp" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
-                            {{ completingFollowUp ? 'Saving...' : 'Complete Follow-up' }}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                <div>
+                    <label class="form-choice">
+                        <input v-model="completeForm.saleHappened" type="checkbox" class="form-checkbox" />
+                        <span>Sale happened</span>
+                    </label>
+                </div>
+                <div v-if="completeForm.saleHappened">
+                    <label class="form-label" for="salesagentdashboard-new-stage">New Stage</label>
+                    <select id="salesagentdashboard-new-stage" v-model="completeForm.newStage" class="form-select">
+                        <option value="lead">Lead</option>
+                        <option value="hot_lead">Hot Lead</option>
+                        <option value="quotation">Quotation</option>
+                        <option value="won">Won</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="salesagentdashboard-next-follow-up-date-optional">Next Follow-up Date (Optional)</label>
+                    <input id="salesagentdashboard-next-follow-up-date-optional"
+                        v-model="completeForm.nextFollowUpAt"
+                        type="datetime-local"
+                        class="form-input"
+                    />
+                </div>
+            </form>
+
+            <template #actions>
+                <BaseButton variant="outline" block-mobile :disabled="completingFollowUp" @click="closeCompleteModal">
+                    Cancel
+                </BaseButton>
+                <BaseButton
+                    variant="success"
+                    type="submit"
+                    form="sales-agent-complete-followup-form"
+                    block-mobile
+                    :loading="completingFollowUp"
+                >
+                    {{ completingFollowUp ? 'Saving...' : 'Complete Follow-up' }}
+                </BaseButton>
+            </template>
+        </BaseModal>
 
         <LogActivityModal
             v-if="showActivityModal && activityLead"
@@ -495,8 +535,32 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
+import {
+    ArrowPathIcon,
+    ArrowTrendingUpIcon,
+    BoltIcon,
+    CalendarDaysIcon,
+    ChartBarIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    DocumentTextIcon,
+    ListBulletIcon,
+    PlusCircleIcon,
+    TrophyIcon,
+    UserPlusIcon,
+    UsersIcon,
+    ViewfinderCircleIcon,
+    XCircleIcon,
+} from '@heroicons/vue/24/outline';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
+import {
+    BaseButton,
+    BaseCard,
+    BaseModal,
+    EmptyState,
+    StatCard,
+} from '@/components/base';
 import AttendanceClock from '@/components/AttendanceClock.vue';
 import LogActivityModal from '@/components/LogActivityModal.vue';
 import { formatLeadStage } from '@/utils/displayFormat';

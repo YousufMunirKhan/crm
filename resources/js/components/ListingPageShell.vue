@@ -1,19 +1,17 @@
 <template>
     <div class="listing-shell-outer w-full min-w-0 max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
-        <div
-            class="rounded-2xl bg-white shadow-md shadow-slate-900/[0.06] border border-slate-200/90 overflow-hidden"
-        >
+        <div class="rounded-panel bg-white shadow-card border border-slate-200/90 overflow-hidden">
             <header
                 class="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between border-b border-slate-100"
             >
                 <div class="min-w-0 flex-1 space-y-1.5">
                     <div class="flex flex-wrap items-center gap-3 gap-y-2">
-                        <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">
+                        <h1 class="text-page-title text-slate-900">
                             {{ title }}
                         </h1>
                         <span
                             v-if="badge !== null && badge !== undefined && badge !== ''"
-                            class="inline-flex items-center rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-semibold text-violet-900 ring-1 ring-inset ring-violet-200/80"
+                            class="badge badge-primary"
                         >
                             {{ badge }}
                         </span>

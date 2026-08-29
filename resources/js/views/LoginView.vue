@@ -30,42 +30,38 @@
 
                 <form @submit.prevent="handleLogin" class="space-y-5">
                     <div>
-                        <label class="block text-sm font-medium text-slate-800 mb-1.5">Email Address</label>
-                        <input
+                        <label class="block text-sm font-medium text-slate-800 mb-1.5" for="loginview-email-address">Email Address</label>
+                        <input id="loginview-email-address"
                             v-model="form.email"
                             type="email"
                             required
                             autocomplete="email"
-                            class="login-input w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/30 focus:border-[#7C3AED]"
+                            class="login-input w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30 focus-visible:border-primary-600"
                             placeholder="Enter your email address"
                         />
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-slate-800 mb-1.5">Password</label>
+                        <label class="block text-sm font-medium text-slate-800 mb-1.5" for="loginview-password">Password</label>
                         <div class="relative">
                             <input
+                                id="loginview-password"
                                 v-model="form.password"
                                 :type="showPassword ? 'text' : 'password'"
                                 required
                                 autocomplete="current-password"
-                                class="login-input w-full px-4 py-2.5 pr-11 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/30 focus:border-[#7C3AED]"
+                                class="login-input w-full px-4 py-2.5 pr-11 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30 focus-visible:border-primary-600"
                                 placeholder="Enter your password"
                             />
                             <button
                                 type="button"
                                 @click="showPassword = !showPassword"
-                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 focus:outline-none p-0.5"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded p-0.5"
                                 tabindex="-1"
                                 aria-label="Toggle password visibility"
                             >
-                                <svg v-if="showPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                                </svg>
-                                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
+                                <EyeSlashIcon v-if="showPassword" class="icon" aria-hidden="true" />
+                                <EyeIcon v-else class="icon" aria-hidden="true" />
                             </button>
                         </div>
                     </div>
@@ -76,27 +72,27 @@
                                 v-model="form.remember"
                                 type="checkbox"
                                 id="remember"
-                                class="w-4 h-4 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED]"
+                                class="form-checkbox w-4 h-4"
                             />
                             <label for="remember" class="ml-2 text-sm text-slate-700">Remember me</label>
                         </div>
                         <button
                             type="button"
                             @click="showForgotPasswordModal = true"
-                            class="text-sm font-medium text-[#2563EB] hover:text-[#1d4ed8] focus:outline-none shrink-0"
+                            class="link text-sm shrink-0"
                         >
                             Forgot password?
                         </button>
                     </div>
 
-                    <div v-if="error" class="text-sm text-red-700 bg-red-50 border border-red-100 p-3 rounded-xl">
+                    <div v-if="error" class="callout callout-danger" role="alert">
                         {{ error }}
                     </div>
 
                     <button
                         type="submit"
                         :disabled="loading"
-                        class="login-btn-primary w-full py-3 rounded-xl text-white font-semibold text-base shadow-lg shadow-violet-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="login-btn-primary w-full py-3 rounded-xl text-white font-semibold text-base shadow-lg shadow-primary-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {{ loading ? 'Signing in...' : 'Sign In to Dashboard' }}
                     </button>
@@ -104,65 +100,56 @@
             </div>
         </div>
 
-        <!-- Forgot Password Modal -->
-        <div
-            v-if="showForgotPasswordModal"
-            class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            @click.self="showForgotPasswordModal = false"
+        <!-- Forgot Password -->
+        <BaseModal
+            v-model="showForgotPasswordModal"
+            title="Forgot Password"
+            description="Enter your email address and we'll send you a link to reset your password."
+            size="sm"
+            :close-on-backdrop="false"
+            @close="resetForgotPassword"
         >
-            <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-md border border-slate-100">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-teal-600">
-                        Forgot Password
-                    </h2>
-                    <button
-                        @click="showForgotPasswordModal = false; forgotPasswordEmail = ''; forgotPasswordMessage = ''; forgotPasswordSuccess = false;"
-                        class="text-slate-400 hover:text-slate-600 focus:outline-none text-lg leading-none p-1"
-                    >
-                        ✕
-                    </button>
+            <form id="forgot-password-form" class="space-y-4" novalidate @submit.prevent="handleForgotPassword">
+                <div>
+                    <label class="form-label" for="loginview-email-address-2">Email Address</label>
+                    <input
+                        id="loginview-email-address-2"
+                        v-model="forgotPasswordEmail"
+                        type="email"
+                        required
+                        class="form-input"
+                        placeholder="Enter your email address"
+                    />
                 </div>
-                <p class="text-sm text-slate-600 mb-4">
-                    Enter your email address and we'll send you a link to reset your password.
-                </p>
-                <form @submit.prevent="handleForgotPassword" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-800 mb-1.5">Email Address</label>
-                        <input
-                            v-model="forgotPasswordEmail"
-                            type="email"
-                            required
-                            class="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/30 focus:border-[#7C3AED]"
-                            placeholder="Enter your email address"
-                        />
-                    </div>
-                    <div v-if="forgotPasswordMessage" class="text-sm p-3 rounded-xl" :class="forgotPasswordSuccess ? 'text-green-800 bg-green-50 border border-green-100' : 'text-red-700 bg-red-50 border border-red-100'">
-                        {{ forgotPasswordMessage }}
-                    </div>
-                    <div class="flex gap-3">
-                        <button
-                            type="button"
-                            @click="showForgotPasswordModal = false; forgotPasswordEmail = ''; forgotPasswordMessage = ''; forgotPasswordSuccess = false;"
-                            class="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition font-medium"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            :disabled="forgotPasswordLoading"
-                            class="login-btn-primary flex-1 px-4 py-2.5 text-white rounded-xl font-semibold shadow-lg shadow-violet-600/25 transition disabled:opacity-50"
-                        >
-                            {{ forgotPasswordLoading ? 'Sending...' : 'Send Reset Link' }}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                <div
+                    v-if="forgotPasswordMessage"
+                    :class="['callout', forgotPasswordSuccess ? 'callout-success' : 'callout-danger']"
+                    :role="forgotPasswordSuccess ? 'status' : 'alert'"
+                >
+                    {{ forgotPasswordMessage }}
+                </div>
+            </form>
+
+            <template #actions>
+                <BaseButton variant="outline" block-mobile @click="cancelForgotPassword">Cancel</BaseButton>
+                <BaseButton
+                    variant="primary"
+                    type="submit"
+                    form="forgot-password-form"
+                    block-mobile
+                    :loading="forgotPasswordLoading"
+                >
+                    Send Reset Link
+                </BaseButton>
+            </template>
+        </BaseModal>
     </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline';
+import { BaseButton, BaseModal } from '@/components/base';
 import { useAuthStore } from '@/stores/auth';
 import axios from 'axios';
 
@@ -173,6 +160,18 @@ const form = ref({
     password: '',
     remember: false,
 });
+
+/** Runs on Escape and the close button, mirroring what Cancel always did. */
+function resetForgotPassword() {
+    forgotPasswordEmail.value = '';
+    forgotPasswordMessage.value = '';
+    forgotPasswordSuccess.value = false;
+}
+
+function cancelForgotPassword() {
+    showForgotPasswordModal.value = false;
+    resetForgotPassword();
+}
 
 const loading = ref(false);
 const error = ref(null);
@@ -240,21 +239,24 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Full-page horizontal gradient: blue → teal (matches app sidebar palette) */
+/*
+ * One primary hue. This page used to gradient blue -> teal and paint its CTA
+ * violet, which put three brand colours on the first screen a user ever sees.
+ * Both now run off the primary ramp, matching the sidebar.
+ */
 .login-page-bg {
-    background: linear-gradient(to right, #2563eb, #0d9488);
+    background: linear-gradient(to right, var(--color-primary-600), var(--color-primary-800));
 }
 
-/* Primary actions: violet (dashboard CTA style) */
 .login-btn-primary {
-    background-color: #7c3aed;
+    background-color: var(--color-primary-600);
 }
 
 .login-btn-primary:hover:not(:disabled) {
-    background-color: #6d28d9;
+    background-color: var(--color-primary-700);
 }
 
 .login-btn-primary:active:not(:disabled) {
-    background-color: #5b21b6;
+    background-color: var(--color-primary-800);
 }
 </style>

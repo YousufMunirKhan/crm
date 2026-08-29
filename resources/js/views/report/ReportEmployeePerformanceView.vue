@@ -7,8 +7,8 @@
         <template #filters>
             <div class="flex flex-col sm:flex-row flex-wrap gap-3 sm:items-end">
                 <div class="w-full sm:w-56">
-                    <label class="listing-label">Employee</label>
-                    <select v-model="selectedEmployeeId" class="listing-input w-full" @change="loadData">
+                    <label class="form-label" for="reportemployeeperformanceview-employee">Employee</label>
+                    <select id="reportemployeeperformanceview-employee" v-model="selectedEmployeeId" class="form-select w-full" @change="loadData">
                         <option value="">Select employee</option>
                         <option v-for="emp in employees" :key="emp.id" :value="String(emp.id)">
                             {{ emp.name }}
@@ -16,98 +16,129 @@
                     </select>
                 </div>
                 <div class="w-full sm:w-48">
-                    <label class="listing-label">Month (targets + month sales)</label>
-                    <select v-model="selectedMonth" class="listing-input w-full" @change="loadData">
+                    <label class="form-label" for="reportemployeeperformanceview-month">Month (targets + month sales)</label>
+                    <select id="reportemployeeperformanceview-month" v-model="selectedMonth" class="form-select w-full" @change="loadData">
                         <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
                     </select>
                 </div>
-                <button type="button" class="listing-btn-primary" :disabled="loading || !selectedEmployeeId" @click="loadData">
+                <BaseButton
+                    variant="primary"
+                    type="button"
+                    :disabled="loading || !selectedEmployeeId"
+                    :loading="loading"
+                    block-mobile
+                    @click="loadData"
+                >
+                    <template #icon>
+                        <ArrowPathIcon class="icon" aria-hidden="true" />
+                    </template>
                     {{ loading ? 'Loading…' : 'Refresh' }}
-                </button>
+                </BaseButton>
             </div>
         </template>
 
-        <div v-if="!selectedEmployeeId" class="mx-3 sm:mx-5 mb-4 rounded-xl border border-slate-200 bg-slate-50/50 p-8 text-center text-slate-500 text-sm">
-            Choose an employee to see last week, that month’s sales, and targets.
-        </div>
+        <EmptyState
+            v-if="!selectedEmployeeId"
+            heading="No employee selected"
+            description="Choose an employee to see last week, that month’s sales, and targets."
+        >
+            <template #icon>
+                <UsersIcon class="icon" aria-hidden="true" />
+            </template>
+        </EmptyState>
 
-        <div v-else-if="loading" class="flex justify-center py-16">
-            <svg class="animate-spin h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path
-                    class="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-            </svg>
+        <div v-else-if="loading" class="px-3 sm:px-5 py-8 space-y-3" aria-busy="true">
+            <p class="sr-only">Loading employee performance…</p>
+            <div class="skeleton-text w-1/3"></div>
+            <div class="skeleton-text w-2/3"></div>
+            <div class="skeleton-text w-1/2"></div>
+            <div class="skeleton-text w-3/4"></div>
         </div>
 
         <div v-else class="space-y-8 px-3 sm:px-5 pb-6">
             <section v-if="self" class="space-y-3">
                 <h2 class="text-base font-semibold text-slate-900">Target achievement — {{ monthLabel }}</h2>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-                        <div class="text-sm text-slate-500 mb-1">Appointments</div>
-                        <div class="text-xl font-bold text-slate-900">
+                    <BaseCard>
+                        <div class="stat-label">Appointments</div>
+                        <div class="text-xl font-bold text-slate-900 tabular-nums">
                             {{ self.achieved_appointments }} <span class="text-slate-500 font-normal">/ {{ self.target_appointments }}</span>
                         </div>
-                        <div class="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                            class="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden"
+                            role="progressbar"
+                            aria-label="Appointment target progress"
+                            :aria-valuenow="Math.min(self.appointment_progress || 0, 100)"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                        >
                             <div
-                                class="h-2 bg-emerald-500 rounded-full"
+                                class="h-2 bg-success-600 rounded-full"
                                 :style="{ width: `${Math.min(self.appointment_progress || 0, 100)}%` }"
                             ></div>
                         </div>
-                    </div>
-                    <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-                        <div class="text-sm text-slate-500 mb-1">Sales (won line items)</div>
-                        <div class="text-xl font-bold text-slate-900">
+                    </BaseCard>
+                    <BaseCard>
+                        <div class="stat-label">Sales (won line items)</div>
+                        <div class="text-xl font-bold text-slate-900 tabular-nums">
                             {{ self.achieved_sales }} <span class="text-slate-500 font-normal">/ {{ self.target_sales }}</span>
                         </div>
-                        <div class="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                            class="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden"
+                            role="progressbar"
+                            aria-label="Sales target progress"
+                            :aria-valuenow="Math.min(self.sales_progress || 0, 100)"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                        >
                             <div
-                                class="h-2 bg-blue-500 rounded-full"
+                                class="h-2 bg-primary-600 rounded-full"
                                 :style="{ width: `${Math.min(self.sales_progress || 0, 100)}%` }"
                             ></div>
                         </div>
-                    </div>
-                    <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-                        <div class="text-sm text-slate-500 mb-1">Revenue</div>
-                        <div class="text-xl font-bold text-slate-900">
+                    </BaseCard>
+                    <BaseCard>
+                        <div class="stat-label">Revenue</div>
+                        <div class="text-xl font-bold text-slate-900 tabular-nums">
                             £{{ formatNumber(self.achieved_revenue) }}
                             <span class="text-slate-500 font-normal">/ £{{ formatNumber(self.target_revenue) }}</span>
                         </div>
-                        <div class="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                            class="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden"
+                            role="progressbar"
+                            aria-label="Revenue target progress"
+                            :aria-valuenow="Math.min(self.revenue_progress || 0, 100)"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                        >
                             <div
-                                class="h-2 bg-indigo-500 rounded-full"
+                                class="h-2 bg-primary-500 rounded-full"
                                 :style="{ width: `${Math.min(self.revenue_progress || 0, 100)}%` }"
                             ></div>
                         </div>
-                    </div>
+                    </BaseCard>
                 </div>
-                <div
-                    v-if="self.sales_target_lines?.length"
-                    class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm"
-                >
-                    <div class="px-4 py-2 border-b border-slate-100 text-sm font-medium text-slate-800">Product & category targets</div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-slate-50 text-left text-xs text-slate-600">
+                <BaseCard v-if="self.sales_target_lines?.length" title="Product & category targets" :padded="false">
+                    <div class="table-wrap">
+                        <table class="table">
+                            <caption class="sr-only">Product and category targets with achieved and target quantities</caption>
+                            <thead class="table-thead">
                                 <tr>
-                                    <th class="px-4 py-2">Line</th>
-                                    <th class="px-4 py-2">Achieved</th>
-                                    <th class="px-4 py-2">Target</th>
+                                    <th scope="col" class="table-th">Line</th>
+                                    <th scope="col" class="table-th-num">Achieved</th>
+                                    <th scope="col" class="table-th-num">Target</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                <tr v-for="(ln, idx) in self.sales_target_lines" :key="idx">
-                                    <td class="px-4 py-2">{{ ln.label }}</td>
-                                    <td class="px-4 py-2 font-medium">{{ ln.achieved_quantity }}</td>
-                                    <td class="px-4 py-2 text-slate-600">{{ ln.target_quantity }}</td>
+                            <tbody>
+                                <tr v-for="(ln, idx) in self.sales_target_lines" :key="idx" class="table-row">
+                                    <td class="table-td">{{ ln.label }}</td>
+                                    <td class="table-td-num font-medium">{{ ln.achieved_quantity }}</td>
+                                    <td class="table-td-num">{{ ln.target_quantity }}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </BaseCard>
                 <p v-else-if="self.rank" class="text-sm text-slate-600">Leaderboard rank: <strong>#{{ self.rank }}</strong></p>
             </section>
 
@@ -142,6 +173,8 @@ import { useRoute } from 'vue-router';
 import axios from 'axios';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import SoldLinesTable from '@/components/report/SoldLinesTable.vue';
+import { BaseButton, BaseCard, EmptyState } from '@/components/base';
+import { ArrowPathIcon, UsersIcon } from '@heroicons/vue/24/outline';
 
 const route = useRoute();
 

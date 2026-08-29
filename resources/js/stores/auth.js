@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
 import router from '@/router';
+import { navLegacyGrants } from '@/constants/navSections';
 
 export const useAuthStore = defineStore('auth', {
     state: () => ({
@@ -35,25 +36,11 @@ export const useAuthStore = defineStore('auth', {
 
             const userP = state.user.nav_permissions;
             if (userP && typeof userP === 'object' && Object.keys(userP).length > 0) {
-                if (userP[sectionKey]) return true;
-                if (
-                    (sectionKey === 'all_leads' || sectionKey === 'lead_pipeline') &&
-                    userP.leads_pipeline
-                ) {
-                    return true;
-                }
-                return false;
+                return !!userP[sectionKey] || navLegacyGrants(userP, sectionKey);
             }
             const roleP = state.user.role?.nav_permissions;
             if (roleP && typeof roleP === 'object' && Object.keys(roleP).length > 0) {
-                if (roleP[sectionKey]) return true;
-                if (
-                    (sectionKey === 'all_leads' || sectionKey === 'lead_pipeline') &&
-                    roleP.leads_pipeline
-                ) {
-                    return true;
-                }
-                return false;
+                return !!roleP[sectionKey] || navLegacyGrants(roleP, sectionKey);
             }
             return true;
         },

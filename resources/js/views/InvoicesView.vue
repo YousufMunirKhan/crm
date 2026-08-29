@@ -5,31 +5,38 @@
         :badge="invoicesBadge"
     >
         <template #actions>
-            <router-link to="/invoices/create" class="listing-btn-accent w-full sm:w-auto text-center touch-manipulation">
-                + Create invoice
-            </router-link>
+            <BaseButton variant="primary" to="/invoices/create" block-mobile>
+                <template #icon><PlusIcon class="icon" aria-hidden="true" /></template>
+                Create invoice
+            </BaseButton>
         </template>
 
         <template #filters>
             <div class="space-y-4">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <h2 class="text-sm font-semibold text-slate-700">Filters</h2>
-                    <button
-                        type="button"
+                    <BaseButton
+                        variant="ghost"
+                        size="sm"
+                        class="self-start sm:self-auto"
+                        :aria-expanded="showFilters ? 'true' : 'false'"
                         @click="showFilters = !showFilters"
-                        class="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 touch-manipulation self-start sm:self-auto font-medium"
                     >
-                        <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': showFilters }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
+                        <template #icon>
+                            <ChevronDownIcon
+                                class="icon-sm transition-transform"
+                                :class="{ 'rotate-180': showFilters }"
+                                aria-hidden="true"
+                            />
+                        </template>
                         {{ showFilters ? 'Hide' : 'Show' }} filters
-                    </button>
+                    </BaseButton>
                 </div>
 
                 <div v-show="showFilters" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
-                        <label class="listing-label">Search</label>
-                        <input
+                        <label class="listing-label" for="invoicesview-search">Search</label>
+                        <input id="invoicesview-search"
                             v-model="filters.search"
                             type="text"
                             placeholder="Invoice # or customer..."
@@ -38,8 +45,8 @@
                         />
                     </div>
                     <div>
-                        <label class="listing-label">Status</label>
-                        <select v-model="filters.status" class="listing-input" @change="applyFilters">
+                        <label class="listing-label" for="invoicesview-status">Status</label>
+                        <select id="invoicesview-status" v-model="filters.status" class="listing-input" @change="applyFilters">
                             <option value="">All statuses</option>
                             <option value="draft">Draft</option>
                             <option value="sent">Sent</option>
@@ -49,8 +56,8 @@
                         </select>
                     </div>
                     <div v-if="isAdmin">
-                        <label class="listing-label">Created by</label>
-                        <select v-model="filters.created_by" class="listing-input" @change="applyFilters">
+                        <label class="listing-label" for="invoicesview-created-by">Created by</label>
+                        <select id="invoicesview-created-by" v-model="filters.created_by" class="listing-input" @change="applyFilters">
                             <option value="">All users</option>
                             <option v-for="user in users" :key="user.id" :value="user.id">
                                 {{ user.name }}
@@ -58,8 +65,8 @@
                         </select>
                     </div>
                     <div>
-                        <label class="listing-label">Customer</label>
-                        <select v-model="filters.customer_id" class="listing-input" @change="applyFilters">
+                        <label class="listing-label" for="invoicesview-customer">Customer</label>
+                        <select id="invoicesview-customer" v-model="filters.customer_id" class="listing-input" @change="applyFilters">
                             <option value="">All customers</option>
                             <option v-for="customer in customers" :key="customer.id" :value="customer.id">
                                 {{ customer.name }}
@@ -67,30 +74,32 @@
                         </select>
                     </div>
                     <div>
-                        <label class="listing-label">From date</label>
-                        <input v-model="filters.from_date" type="date" class="listing-input" @change="applyFilters" />
+                        <label class="listing-label" for="invoicesview-from-date">From date</label>
+                        <input id="invoicesview-from-date" v-model="filters.from_date" type="date" class="listing-input" @change="applyFilters" />
                     </div>
                     <div>
-                        <label class="listing-label">To date</label>
-                        <input v-model="filters.to_date" type="date" class="listing-input" @change="applyFilters" />
+                        <label class="listing-label" for="invoicesview-to-date">To date</label>
+                        <input id="invoicesview-to-date" v-model="filters.to_date" type="date" class="listing-input" @change="applyFilters" />
                     </div>
-                    <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
-                        <button type="button" class="listing-btn-primary" @click="applyFilters">Apply</button>
-                        <button type="button" class="listing-btn-outline" @click="clearFilters">Clear</button>
+                    <div class="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-4">
+                        <BaseButton variant="soft" @click="applyFilters">
+                            <template #icon><FunnelIcon class="icon" aria-hidden="true" /></template>
+                            Apply
+                        </BaseButton>
+                        <BaseButton variant="outline" @click="clearFilters">Clear</BaseButton>
                     </div>
                 </div>
 
                 <div v-if="hasActiveFilters" class="flex flex-wrap gap-2">
-                    <span
-                        v-for="(value, key) in activeFilterTags"
-                        :key="key"
-                        class="inline-flex items-center gap-1 px-2.5 py-1 bg-sky-50 text-sky-900 rounded-full text-xs font-medium ring-1 ring-sky-100"
-                    >
+                    <span v-for="(value, key) in activeFilterTags" :key="key" class="chip">
                         {{ key }}: {{ value }}
-                        <button type="button" @click="removeFilter(key)" class="hover:text-sky-700">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                        <button
+                            type="button"
+                            class="chip-remove"
+                            :aria-label="`Remove ${key} filter`"
+                            @click="removeFilter(key)"
+                        >
+                            <XMarkIcon class="icon-sm" aria-hidden="true" />
                         </button>
                     </span>
                 </div>
@@ -137,27 +146,25 @@
                         <td class="listing-td">{{ invoice.customer?.name || '—' }}</td>
                         <td class="listing-td text-slate-600">{{ formatDate(invoice.invoice_date) }}</td>
                         <td class="listing-td font-semibold text-slate-900">£{{ formatNumber(invoice.total) }}</td>
-                        <td class="listing-td font-semibold text-emerald-700">GBP {{ formatNumber(invoice.amount_paid) }}</td>
-                        <td class="listing-td font-semibold" :class="outstanding(invoice) > 0 ? 'text-rose-700' : 'text-slate-700'">
+                        <td class="listing-td font-semibold text-success-700">GBP {{ formatNumber(invoice.amount_paid) }}</td>
+                        <td class="listing-td font-semibold" :class="outstanding(invoice) > 0 ? 'text-danger-700' : 'text-slate-700'">
                             GBP {{ formatNumber(outstanding(invoice)) }}
                         </td>
                         <td class="listing-td">
-                            <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium" :class="getStatusClass(invoice.status)">
-                                {{ formatStatus(invoice.status) }}
-                            </span>
+                            <BaseBadge :status="badgeStatus(invoice.status)">{{ formatStatus(invoice.status) }}</BaseBadge>
                         </td>
                         <td class="listing-td text-slate-600">{{ invoice.creator?.name || '—' }}</td>
                         <td class="listing-td">
                             <div class="flex flex-wrap gap-x-3 gap-y-1">
-                                <button type="button" class="text-indigo-600 hover:text-indigo-800 font-medium text-sm" @click="openSendEmail(invoice)">
+                                <button type="button" class="listing-link-edit rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40" @click="openSendEmail(invoice)">
                                     Send email
                                 </button>
-                                <button type="button" class="text-emerald-700 hover:text-emerald-900 font-medium text-sm disabled:opacity-40" :disabled="outstanding(invoice) <= 0" @click="openPaymentModal(invoice)">
+                                <button type="button" class="text-success-700 hover:text-success-800 font-medium text-sm rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 disabled:opacity-40" :disabled="outstanding(invoice) <= 0" @click="openPaymentModal(invoice)">
                                     Record payment
                                 </button>
                                 <router-link :to="`/invoices/${invoice.id}/edit`" class="listing-link-edit">Edit</router-link>
-                                <button type="button" class="listing-link-edit" @click="generatePDF(invoice.id)">PDF</button>
-                                <button type="button" class="listing-link-delete" @click="openDeleteConfirm(invoice)">Delete</button>
+                                <button type="button" class="listing-link-edit rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40" @click="generatePDF(invoice.id)">PDF</button>
+                                <button type="button" class="listing-link-delete rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40" @click="openDeleteConfirm(invoice)">Delete</button>
                             </div>
                         </td>
                     </tr>
@@ -173,9 +180,7 @@
             >
                 <div class="flex items-start justify-between gap-2">
                     <div class="text-sm font-semibold text-slate-900">{{ invoice.invoice_number }}</div>
-                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium" :class="getStatusClass(invoice.status)">
-                        {{ formatStatus(invoice.status) }}
-                    </span>
+                    <BaseBadge :status="badgeStatus(invoice.status)">{{ formatStatus(invoice.status) }}</BaseBadge>
                 </div>
                 <div class="text-sm text-slate-600">Customer: {{ invoice.customer?.name || '—' }}</div>
                 <div class="text-sm text-slate-600">Date: {{ formatDate(invoice.invoice_date) }}</div>
@@ -184,19 +189,19 @@
                 <div class="grid grid-cols-2 gap-2 text-sm">
                     <div>
                         <div class="text-xs text-slate-500">Paid</div>
-                        <div class="font-semibold text-emerald-700">GBP {{ formatNumber(invoice.amount_paid) }}</div>
+                        <div class="font-semibold text-success-700">GBP {{ formatNumber(invoice.amount_paid) }}</div>
                     </div>
                     <div>
                         <div class="text-xs text-slate-500">Due</div>
-                        <div class="font-semibold" :class="outstanding(invoice) > 0 ? 'text-rose-700' : 'text-slate-700'">GBP {{ formatNumber(outstanding(invoice)) }}</div>
+                        <div class="font-semibold" :class="outstanding(invoice) > 0 ? 'text-danger-700' : 'text-slate-700'">GBP {{ formatNumber(outstanding(invoice)) }}</div>
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-3 pt-1">
-                    <button type="button" class="text-indigo-600 hover:text-indigo-800 font-medium text-sm" @click="openSendEmail(invoice)">Send email</button>
-                    <button type="button" class="text-emerald-700 hover:text-emerald-900 font-medium text-sm disabled:opacity-40" :disabled="outstanding(invoice) <= 0" @click="openPaymentModal(invoice)">Record payment</button>
+                    <button type="button" class="listing-link-edit rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40" @click="openSendEmail(invoice)">Send email</button>
+                    <button type="button" class="text-success-700 hover:text-success-800 font-medium text-sm rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 disabled:opacity-40" :disabled="outstanding(invoice) <= 0" @click="openPaymentModal(invoice)">Record payment</button>
                     <router-link :to="`/invoices/${invoice.id}/edit`" class="listing-link-edit">Edit</router-link>
-                    <button type="button" class="listing-link-edit" @click="generatePDF(invoice.id)">PDF</button>
-                    <button type="button" class="listing-link-delete" @click="openDeleteConfirm(invoice)">Delete</button>
+                    <button type="button" class="listing-link-edit rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40" @click="generatePDF(invoice.id)">PDF</button>
+                    <button type="button" class="listing-link-delete rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40" @click="openDeleteConfirm(invoice)">Delete</button>
                 </div>
             </div>
         </div>
@@ -222,49 +227,50 @@
         @sent="handleEmailSent"
     />
 
-    <div v-if="showPaymentModal" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
-        <div class="w-full max-w-lg rounded-xl bg-white shadow-xl">
-            <div class="border-b border-slate-200 px-5 py-4">
-                <h2 class="text-lg font-semibold text-slate-900">Record payment</h2>
-                <p class="mt-1 text-sm text-slate-500">
-                    {{ paymentInvoice?.invoice_number }} - outstanding GBP {{ formatNumber(outstanding(paymentInvoice)) }}
-                </p>
-            </div>
-            <div class="space-y-4 p-5">
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                        <label class="listing-label">Payment date</label>
-                        <input v-model="paymentForm.payment_date" type="date" class="listing-input" />
-                    </div>
-                    <div>
-                        <label class="listing-label">Amount</label>
-                        <input v-model.number="paymentForm.amount" type="number" min="0.01" step="0.01" class="listing-input" />
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                        <label class="listing-label">Method</label>
-                        <input v-model="paymentForm.method" type="text" class="listing-input" placeholder="Bank transfer, cash..." />
-                    </div>
-                    <div>
-                        <label class="listing-label">Reference</label>
-                        <input v-model="paymentForm.reference" type="text" class="listing-input" placeholder="Optional reference" />
-                    </div>
+    <BaseModal
+        v-model="showPaymentModal"
+        title="Record payment"
+        :description="paymentModalDescription"
+        size="md"
+        :dismissible="!savingPayment"
+        :close-on-backdrop="false"
+        @close="closePaymentModal"
+    >
+        <form id="record-payment-form" class="space-y-4" novalidate @submit.prevent="savePayment">
+            <div class="form-grid-2">
+                <div>
+                    <label class="form-label" for="invoicesview-payment-date">Payment date</label>
+                    <input id="invoicesview-payment-date" v-model="paymentForm.payment_date" type="date" class="form-input" />
                 </div>
                 <div>
-                    <label class="listing-label">Notes</label>
-                    <textarea v-model="paymentForm.notes" class="listing-input min-h-24 resize-y" placeholder="Optional internal note"></textarea>
+                    <label class="form-label" for="invoicesview-amount">Amount</label>
+                    <input id="invoicesview-amount" v-model.number="paymentForm.amount" type="number" min="0.01" step="0.01" class="form-input" />
                 </div>
-                <p v-if="paymentError" class="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ paymentError }}</p>
             </div>
-            <div class="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
-                <button type="button" class="listing-btn-outline w-full sm:w-auto" :disabled="savingPayment" @click="closePaymentModal">Cancel</button>
-                <button type="button" class="listing-btn-primary w-full sm:w-auto" :disabled="savingPayment" @click="savePayment">
-                    {{ savingPayment ? 'Saving...' : 'Save payment' }}
-                </button>
+            <div class="form-grid-2">
+                <div>
+                    <label class="form-label" for="invoicesview-method">Method</label>
+                    <input id="invoicesview-method" v-model="paymentForm.method" type="text" class="form-input" placeholder="Bank transfer, cash..." />
+                </div>
+                <div>
+                    <label class="form-label" for="invoicesview-reference">Reference</label>
+                    <input id="invoicesview-reference" v-model="paymentForm.reference" type="text" class="form-input" placeholder="Optional reference" />
+                </div>
             </div>
-        </div>
-    </div>
+            <div>
+                <label class="form-label" for="invoicesview-notes">Notes</label>
+                <textarea id="invoicesview-notes" v-model="paymentForm.notes" class="form-textarea" placeholder="Optional internal note"></textarea>
+            </div>
+            <p v-if="paymentError" class="callout callout-danger" role="alert">{{ paymentError }}</p>
+        </form>
+
+        <template #actions>
+            <BaseButton variant="outline" block-mobile :disabled="savingPayment" @click="closePaymentModal">Cancel</BaseButton>
+            <BaseButton variant="soft" type="submit" form="record-payment-form" block-mobile :loading="savingPayment">
+                {{ savingPayment ? 'Saving...' : 'Save payment' }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 
     <InvoiceForm
         v-if="showForm"
@@ -291,6 +297,8 @@ import InvoiceSendEmailModal from '@/components/InvoiceSendEmailModal.vue';
 import DeleteConfirm from '@/components/DeleteConfirm.vue';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseBadge, BaseButton, BaseModal } from '@/components/base';
+import { ChevronDownIcon, FunnelIcon, PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
 import { formatInvoiceStatus } from '@/utils/displayFormat';
@@ -366,16 +374,17 @@ const formatDate = (date) => {
 
 const formatStatus = formatInvoiceStatus;
 
-const getStatusClass = (status) => {
-    const classes = {
-        paid: 'bg-green-100 text-green-800',
-        partially_paid: 'bg-yellow-100 text-yellow-800',
-        sent: 'bg-blue-100 text-blue-800',
-        overdue: 'bg-red-100 text-red-800',
-        draft: 'bg-slate-100 text-slate-800',
-    };
-    return classes[status] || 'bg-slate-100 text-slate-800';
-};
+/**
+ * Normalises an invoice status onto a key BaseBadge's STATUS_TONE knows,
+ * so the tone map stays the single source of truth.
+ */
+const badgeStatus = (status) => (status === 'partially_paid' ? 'partial' : status || 'draft');
+
+const paymentModalDescription = computed(() =>
+    paymentInvoice.value
+        ? `${paymentInvoice.value.invoice_number} - outstanding GBP ${formatNumber(outstanding(paymentInvoice.value))}`
+        : '',
+);
 
 const hasActiveFilters = computed(() => {
     return filters.value.search || 

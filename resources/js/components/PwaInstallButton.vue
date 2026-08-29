@@ -3,12 +3,12 @@
     <Transition name="slide-up">
         <div
             v-if="pwa.shouldShowInstallButton && !dismissed"
-            class="fixed bottom-0 left-0 right-0 z-50 p-4 md:hidden"
+            class="fixed bottom-0 left-0 right-0 z-modal p-4 md:hidden"
         >
             <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl shadow-2xl p-4 border border-slate-700">
                 <div class="flex items-center gap-4">
                     <!-- App Icon -->
-                    <div class="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden">
+                    <div class="w-14 h-14 bg-primary-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden">
                         <img
                             v-if="branding.faviconUrl"
                             :src="faviconDisplayUrl"
@@ -21,7 +21,7 @@
                     <!-- Text -->
                     <div class="flex-1 min-w-0">
                         <h3 class="font-semibold text-white text-sm">Install CRM App</h3>
-                        <p class="text-slate-400 text-xs mt-0.5 truncate">
+                        <p class="text-slate-500 text-xs mt-0.5 truncate">
                             Add to home screen for quick access
                         </p>
                     </div>
@@ -33,20 +33,15 @@
                             class="p-2 text-slate-500 hover:text-slate-300 transition-colors"
                             aria-label="Dismiss"
                         >
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+<XMarkIcon class="icon" aria-hidden="true" />
                         </button>
                         <button
                             @click="handleInstall"
                             :disabled="installing"
-                            class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-500 transition-all disabled:opacity-50 shadow-lg shadow-blue-500/25"
+                            class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-control hover:bg-primary-700 transition-colors disabled:opacity-50 shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
                         >
                             <span v-if="installing" class="flex items-center gap-2">
-                                <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
+                                <span class="spinner" role="status" aria-label="Installing" />
                                 Installing...
                             </span>
                             <span v-else>Install</span>
@@ -61,11 +56,9 @@
     <button
         v-if="pwa.shouldShowInstallButton && !dismissed && showDesktop"
         @click="handleInstall"
-        class="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-500 transition-all"
+        class="hidden md:flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-control hover:bg-primary-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
     >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-        </svg>
+<ArrowDownTrayIcon class="icon-sm" aria-hidden="true" />
         Install App
     </button>
 
@@ -77,6 +70,7 @@
 </template>
 
 <script setup>
+import { ArrowDownTrayIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import { ref, computed } from 'vue';
 import { usePwaStore } from '@/stores/pwa';
 import { useToastStore } from '@/stores/toast';

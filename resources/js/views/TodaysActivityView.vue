@@ -7,52 +7,54 @@
         <template #filters>
             <div class="listing-filters-row">
                 <div>
-                    <label class="listing-label">Filter by date</label>
-                    <input
+                    <label class="listing-label" for="todaysactivityview-filter-by-date">Filter by date</label>
+                    <input id="todaysactivityview-filter-by-date"
                         v-model="filterDate"
                         type="date"
-                        class="listing-input w-full sm:w-44"
+                        class="form-input w-full sm:w-44"
                         @change="loadActivities(1)"
                     />
                 </div>
-                <button
-                    v-if="filterDate !== todayStr"
-                    type="button"
-                    class="listing-btn-outline"
-                    @click="resetDateFilter"
-                >
+                <BaseButton v-if="filterDate !== todayStr" variant="outline" @click="resetDateFilter">
                     Today
-                </button>
+                </BaseButton>
             </div>
         </template>
 
-        <div class="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5 mx-3 mt-3 mb-4 sm:mx-5">
+        <div class="rounded-card border border-slate-200 bg-slate-50/50 p-4 sm:p-5 mx-3 mt-3 mb-4 sm:mx-5">
             <h2 class="text-sm font-semibold text-slate-800 mb-3">Add activity</h2>
             <form @submit.prevent="submitActivity" class="space-y-4">
                 <div>
-                    <label class="listing-label">Date</label>
-                    <input v-model="form.activity_date" type="date" required class="listing-input max-w-xs" />
+                    <label class="listing-label" for="todaysactivityview-date">Date</label>
+                    <input id="todaysactivityview-date" v-model="form.activity_date" type="date" required class="form-input max-w-xs" />
                 </div>
                 <div>
-                    <label class="listing-label">What did you do? *</label>
-                    <textarea
+                    <label class="listing-label" for="todaysactivityview-what-did-you-do">What did you do? *</label>
+                    <textarea id="todaysactivityview-what-did-you-do"
                         v-model="form.description"
                         rows="4"
                         required
                         placeholder="E.g. Called 5 customers, sent 2 quotations, followed up with ABC Ltd…"
-                        class="listing-input resize-none"
+                        class="form-textarea resize-none"
                     />
                 </div>
-                <button type="submit" :disabled="saving" class="listing-btn-accent disabled:opacity-50 touch-manipulation">
-                    {{ saving ? 'Saving…' : 'Add activity' }}
-                </button>
+                <BaseButton variant="primary" type="submit" :loading="saving">
+                    <template #icon><PlusIcon class="icon-sm" aria-hidden="true" /></template>
+                    Add activity
+                </BaseButton>
             </form>
         </div>
 
-        <div v-if="loading" class="px-5 py-14 text-center text-slate-500 text-sm">Loading…</div>
-        <div v-else-if="activities.length === 0" class="px-5 py-12 text-center text-slate-500 text-sm">
-            No activities yet. Add one above to get started.
+        <div v-if="loading" class="px-4 sm:px-6 py-6 space-y-3" aria-busy="true">
+            <span v-for="n in 4" :key="`sk-${n}`" class="skeleton-text block w-full" />
         </div>
+        <EmptyState
+            v-else-if="activities.length === 0"
+            heading="No activities yet"
+            description="Add one above to get started."
+        >
+            <template #icon><BoltIcon class="icon" aria-hidden="true" /></template>
+        </EmptyState>
         <div v-else class="divide-y divide-slate-100 border-t border-slate-100">
             <div
                 v-for="activity in activities"
@@ -69,26 +71,25 @@
                         </div>
                     </div>
                     <div class="flex gap-2 sm:flex-shrink-0">
-                        <button
-                            type="button"
-                            class="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                        <BaseButton
+                            variant="ghost"
+                            size="icon"
+                            label="Edit activity"
                             title="Edit"
                             @click="editActivity(activity)"
                         >
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                        </button>
-                        <button
-                            type="button"
-                            class="p-2 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                            <PencilSquareIcon class="icon" aria-hidden="true" />
+                        </BaseButton>
+                        <BaseButton
+                            variant="ghost"
+                            size="icon"
+                            label="Delete activity"
                             title="Delete"
+                            class="hover:text-danger-700 hover:bg-danger-50"
                             @click="confirmDelete(activity)"
                         >
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                        </button>
+                            <TrashIcon class="icon" aria-hidden="true" />
+                        </BaseButton>
                     </div>
                 </div>
             </div>
@@ -106,49 +107,57 @@
         </template>
     </ListingPageShell>
 
-    <div v-if="editing" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="editing = null">
-        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
-            <h3 class="text-lg font-semibold text-slate-900 mb-4">Edit activity</h3>
+    <BaseModal
+        :model-value="!!editing"
+        title="Edit activity"
+        size="sm"
+        :close-on-backdrop="false"
+        @update:model-value="editing = null"
+    >
+        <form id="edit-activity-form" novalidate @submit.prevent="saveEdit">
+            <label class="form-label" for="todaysactivityview-edit-description">What did you do?</label>
             <textarea
+                id="todaysactivityview-edit-description"
                 v-model="editForm.description"
                 rows="4"
-                class="listing-input mb-4"
+                class="form-textarea"
                 placeholder="What did you do?"
             />
-            <div class="flex justify-end gap-2">
-                <button type="button" class="listing-btn-outline" @click="editing = null">Cancel</button>
-                <button type="button" :disabled="saving" class="listing-btn-primary disabled:opacity-50" @click="saveEdit">
-                    Save
-                </button>
-            </div>
-        </div>
-    </div>
+        </form>
 
-    <div v-if="deleting" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="deleting = null">
-        <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
-            <h3 class="text-lg font-semibold text-slate-900 mb-2">Delete activity?</h3>
-            <p class="text-sm text-slate-600 mb-4">This cannot be undone.</p>
-            <div class="flex justify-end gap-2">
-                <button type="button" class="listing-btn-outline" @click="deleting = null">Cancel</button>
-                <button
-                    type="button"
-                    :disabled="saving"
-                    class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-                    @click="doDelete"
-                >
-                    Delete
-                </button>
-            </div>
-        </div>
-    </div>
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="editing = null">Cancel</BaseButton>
+            <BaseButton
+                variant="primary"
+                type="submit"
+                form="edit-activity-form"
+                block-mobile
+                :loading="saving"
+            >
+                Save
+            </BaseButton>
+        </template>
+    </BaseModal>
+
+    <ConfirmDialog
+        :model-value="!!deleting"
+        title="Delete activity?"
+        message="This cannot be undone."
+        confirm-label="Delete"
+        :loading="saving"
+        @cancel="deleting = null"
+        @confirm="doDelete"
+    />
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
+import { BoltIcon, PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseButton, BaseModal, ConfirmDialog, EmptyState } from '@/components/base';
 
 const toast = useToastStore();
 const activities = ref([]);

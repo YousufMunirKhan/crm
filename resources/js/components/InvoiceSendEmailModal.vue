@@ -1,77 +1,83 @@
 <template>
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/50">
-        <div
-            class="bg-white rounded-xl shadow-xl w-full max-w-md my-8"
-            @click.stop
-        >
-            <!-- Header with logo -->
-            <div class="px-4 sm:px-6 pt-6 pb-4 text-center border-b border-slate-200">
+    <!--
+      `title` (not #header) so BaseModal keeps its aria-labelledby wiring; the
+      branding strip rides at the top of the body instead.
+    -->
+    <BaseModal
+        :model-value="true"
+        title="Send invoice by email"
+        size="sm"
+        :close-on-backdrop="false"
+        @close="$emit('close')"
+    >
+        <div class="space-y-4">
+            <div class="text-center">
                 <img
                     v-if="logoUrl"
                     :src="logoUrl"
                     :alt="companyName"
-                    class="h-12 mx-auto object-contain mb-3"
+                    class="mx-auto h-12 object-contain"
                 />
-                <div v-else class="h-12 flex items-center justify-center text-slate-400 text-2xl font-bold mb-3">
+                <div v-else class="flex h-12 items-center justify-center text-2xl font-bold text-slate-500">
                     {{ companyName || 'Invoice' }}
                 </div>
-                <h2 class="text-lg font-semibold text-slate-900">Send invoice by email</h2>
+            </div>
+            <p class="text-sm leading-relaxed text-slate-600">
+                This is your invoice. It is valid from <strong>{{ validFromLabel }}</strong>.
+                The invoice PDF will be sent to the email address below. You can change the email if needed.
+            </p>
+
+            <div>
+                <label class="form-label" for="invoicesendemailmodal-invoice-will-be-sent-to">Invoice will be sent to</label>
+                <input
+                    id="invoicesendemailmodal-invoice-will-be-sent-to"
+                    v-model="email"
+                    type="email"
+                    required
+                    placeholder="customer@example.com"
+                    class="form-input"
+                />
             </div>
 
-            <div class="px-4 sm:px-6 py-4 space-y-4">
-                <p class="text-sm text-slate-600 leading-relaxed">
-                    This is your invoice. It is valid from <strong>{{ validFromLabel }}</strong>.
-                    The invoice PDF will be sent to the email address below. You can change the email if needed.
-                </p>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Invoice will be sent to</label>
-                    <input
-                        v-model="email"
-                        type="email"
-                        required
-                        placeholder="customer@example.com"
-                        class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                    />
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Message (optional)</label>
-                    <textarea
-                        v-model="message"
-                        rows="3"
-                        placeholder="Add a short message to include in the email..."
-                        class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 resize-none"
-                    />
-                </div>
-
-                <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+            <div>
+                <label class="form-label" for="invoicesendemailmodal-message-optional">Message (optional)</label>
+                <textarea
+                    id="invoicesendemailmodal-message-optional"
+                    v-model="message"
+                    rows="3"
+                    placeholder="Add a short message to include in the email..."
+                    class="form-textarea resize-none"
+                />
             </div>
 
-            <div class="px-4 sm:px-6 py-4 border-t border-slate-200 flex flex-col-reverse sm:flex-row gap-2 justify-end">
-                <button
-                    type="button"
-                    @click="$emit('close')"
-                    class="px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                    Cancel
-                </button>
-                <button
-                    type="button"
-                    :disabled="sending || !email"
-                    @click="send"
-                    class="px-4 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
-                >
-                    {{ sending ? 'Sending...' : 'Send invoice' }}
-                </button>
-            </div>
+            <p v-if="error" class="callout callout-danger" role="alert">{{ error }}</p>
         </div>
-    </div>
+
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="$emit('close')">
+                Cancel
+            </BaseButton>
+            <BaseButton
+                variant="primary"
+                block-mobile
+                :disabled="sending || !email"
+                :loading="sending"
+                @click="send"
+            >
+                <template #icon>
+                    <PaperAirplaneIcon class="icon" aria-hidden="true" />
+                </template>
+                {{ sending ? 'Sending...' : 'Send invoice' }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue';
 import axios from 'axios';
+import { PaperAirplaneIcon } from '@heroicons/vue/24/outline';
+import { BaseButton, BaseModal } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 
 const props = defineProps({

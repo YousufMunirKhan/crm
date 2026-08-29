@@ -7,33 +7,25 @@
                 <button
                     @click="refreshStatus"
                     :disabled="loading"
-                    class="min-h-9 min-w-9 inline-flex items-center justify-center rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 touch-manipulation"
+                    class="min-h-9 min-w-9 inline-flex items-center justify-center rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-600 touch-manipulation"
                     title="Refresh"
                     type="button"
                 >
-                    <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
+<ArrowPathIcon class="icon-sm" :class="{ 'animate-spin': loading }" aria-hidden="true" />
                 </button>
             </div>
         </div>
 
-        <div v-if="loading" class="flex items-center justify-center py-8">
-            <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+        <div v-if="loading" class="flex items-center justify-center py-8" aria-busy="true">
+            <span class="spinner w-8 h-8 border-4 text-primary-600" role="status" aria-label="Loading attendance" />
         </div>
 
         <div v-else class="space-y-4">
             <div class="flex min-w-0 items-center gap-3 rounded-lg p-3 sm:gap-4 sm:p-4" :class="statusBgClass">
                 <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12" :class="statusIconClass">
-                    <svg v-if="status.checked_in && !status.checked_out" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                    <svg v-else-if="status.checked_out" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <CheckIcon v-if="status.checked_in && !status.checked_out" class="w-6 h-6" aria-hidden="true" />
+                    <ArrowRightOnRectangleIcon v-else-if="status.checked_out" class="w-6 h-6" aria-hidden="true" />
+                    <ClockIcon v-else class="w-6 h-6" aria-hidden="true" />
                 </div>
                 <div class="min-w-0 flex-1">
                     <div class="font-semibold text-slate-900 break-words">{{ statusText }}</div>
@@ -51,7 +43,7 @@
                     v-if="!status.checked_in"
                     @click="checkIn"
                     :disabled="actionLoading"
-                    class="min-h-11 flex-1 rounded-lg bg-green-600 px-4 py-3 font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
+                    class="min-h-11 flex-1 rounded-lg bg-success-600 px-4 py-3 font-medium text-white transition-colors hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
                 >
                     {{ actionLoading ? 'Capturing proof...' : 'Time In' }}
                 </button>
@@ -59,7 +51,7 @@
                     v-else-if="!status.checked_out"
                     @click="checkOut"
                     :disabled="actionLoading"
-                    class="min-h-11 flex-1 rounded-lg bg-red-600 px-4 py-3 font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
+                    class="min-h-11 flex-1 rounded-lg bg-danger-600 px-4 py-3 font-medium text-white transition-colors hover:bg-danger-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
                 >
                     {{ actionLoading ? 'Capturing proof...' : 'Time Out' }}
                 </button>
@@ -72,7 +64,7 @@
                 Camera and location permission are required for attendance proof.
             </p>
 
-            <div v-if="proofError" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div v-if="proofError" class="rounded-lg border border-danger-200 bg-danger-50 p-3 text-sm text-danger-700">
                 {{ proofError }}
             </div>
 
@@ -92,7 +84,7 @@
                                 :href="status.attendance.check_in_map_url"
                                 target="_blank"
                                 rel="noopener"
-                                class="font-medium text-blue-700 hover:underline"
+                                class="font-medium text-primary-700 hover:underline"
                             >
                                 Open map
                             </a>
@@ -123,7 +115,7 @@
                                 :href="status.attendance.check_out_map_url"
                                 target="_blank"
                                 rel="noopener"
-                                class="font-medium text-blue-700 hover:underline"
+                                class="font-medium text-primary-700 hover:underline"
                             >
                                 Open map
                             </a>
@@ -150,6 +142,12 @@
 </template>
 
 <script setup>
+import {
+    ArrowPathIcon,
+    ArrowRightOnRectangleIcon,
+    CheckIcon,
+    ClockIcon,
+} from '@heroicons/vue/24/outline';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
@@ -187,14 +185,14 @@ const statusText = computed(() => {
 
 const statusBgClass = computed(() => {
     if (status.value.checked_out) return 'bg-slate-100';
-    if (status.value.checked_in) return 'bg-green-50';
-    return 'bg-amber-50';
+    if (status.value.checked_in) return 'bg-success-50';
+    return 'bg-warning-50';
 });
 
 const statusIconClass = computed(() => {
     if (status.value.checked_out) return 'bg-slate-200 text-slate-600';
-    if (status.value.checked_in) return 'bg-green-200 text-green-600';
-    return 'bg-amber-200 text-amber-600';
+    if (status.value.checked_in) return 'bg-success-200 text-success-700';
+    return 'bg-warning-200 text-warning-800';
 });
 
 const workingHours = computed(() => {

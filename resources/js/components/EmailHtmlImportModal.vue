@@ -1,159 +1,221 @@
 <template>
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @click.self="$emit('close')">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
-            <div class="p-5 border-b border-slate-200 flex items-start justify-between gap-4">
-                <div>
-                    <h2 class="text-lg font-semibold text-slate-900">Import HTML email template</h2>
-                    <p class="text-sm text-slate-600 mt-1">
-                        Upload a <code class="text-xs bg-slate-100 px-1 rounded">.html</code> file. Use the merge tags below inside your markup (same as sent email).
-                    </p>
-                    <p class="text-xs text-slate-500 mt-2">
-                        Full guide:
-                        <code class="bg-slate-100 px-1 rounded">docs/EMAIL_TEMPLATE_HTML_AND_MERGE_TAGS.md</code>
-                        · AI / copy-paste tag table + prompt:
-                        <code class="bg-slate-100 px-1 rounded">docs/EMAIL_MERGE_TAGS_AI_PROMPT_PACK.md</code>
-                    </p>
-                </div>
-                <button type="button" class="text-slate-400 hover:text-slate-600 p-1" aria-label="Close" @click="$emit('close')">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+    <BaseModal
+        :model-value="true"
+        title="Import HTML email template"
+        description="Upload a .html file. Use the merge tags below inside your markup (same as sent email)."
+        size="lg"
+        :close-on-backdrop="false"
+        @close="$emit('close')"
+    >
+        <form id="email-html-import-form" class="space-y-4" @submit.prevent="submit">
+            <p class="text-xs text-slate-500">
+                Full guide:
+                <code class="rounded bg-slate-100 px-1">docs/EMAIL_TEMPLATE_HTML_AND_MERGE_TAGS.md</code>
+                · AI / copy-paste tag table + prompt:
+                <code class="rounded bg-slate-100 px-1">docs/EMAIL_MERGE_TAGS_AI_PROMPT_PACK.md</code>
+            </p>
+
+            <div>
+                <label class="form-label" for="emailhtmlimportmodal-html-file">
+                    HTML file <span class="form-required" aria-hidden="true">*</span>
+                </label>
+                <input
+                    id="emailhtmlimportmodal-html-file"
+                    ref="fileInput"
+                    type="file"
+                    accept=".html,.htm,.txt,text/html"
+                    required
+                    class="block w-full rounded-control text-sm text-slate-600 file:mr-3 file:rounded-control file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                    @change="onFile"
+                />
             </div>
 
-            <form class="flex-1 overflow-y-auto p-5 space-y-4" @submit.prevent="submit">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">HTML file *</label>
+            <div class="form-grid-2">
+                <div class="sm:col-span-2">
+                    <label class="form-label" for="emailhtmlimportmodal-template-name">
+                        Template name <span class="form-required" aria-hidden="true">*</span>
+                    </label>
                     <input
-                        ref="fileInput"
-                        type="file"
-                        accept=".html,.htm,.txt,text/html"
+                        id="emailhtmlimportmodal-template-name"
+                        v-model="name"
+                        type="text"
                         required
-                        class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-800"
-                        @change="onFile"
+                        maxlength="255"
+                        class="form-input"
+                        placeholder="e.g. Spring promo"
                     />
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="sm:col-span-2">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Template name *</label>
-                        <input v-model="name" type="text" required maxlength="255" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="e.g. Spring promo" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Category *</label>
-                        <select v-model="category" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-                            <option value="custom">Custom</option>
-                            <option value="welcome">Welcome</option>
-                            <option value="follow_up">Follow-up</option>
-                            <option value="quote">Quote</option>
-                            <option value="thank_you">Thank you</option>
-                            <option value="reminder">Reminder</option>
-                            <option value="appointment">Appointment</option>
-                            <option value="invoice">Invoice</option>
-                            <option value="epos">Epos</option>
-                            <option value="teya">Teya</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Subject *</label>
-                        <input v-model="subject" type="text" required maxlength="255" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Hello {{first_name}}" />
-                    </div>
-                    <div class="sm:col-span-2">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                        <input v-model="description" type="text" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-                    </div>
-                    <div class="sm:col-span-2">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Preview line (inbox snippet)</label>
-                        <input v-model="previewLine" type="text" maxlength="500" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Optional preheader text" />
-                    </div>
-                </div>
-                <div class="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <label class="flex items-start gap-2 text-sm text-slate-800 cursor-pointer">
-                        <input v-model="extractBody" type="checkbox" class="mt-1 rounded border-slate-300" />
-                        <span>
-                            <strong>Extract &lt;body&gt; only</strong> (recommended if the file is a full HTML page). Styles in
-                            <code class="text-xs">&lt;head&gt;</code> are not kept—put important styles inline on elements.
-                        </span>
+                <div>
+                    <label class="form-label" for="emailhtmlimportmodal-category">
+                        Category <span class="form-required" aria-hidden="true">*</span>
                     </label>
-                    <label class="flex items-start gap-2 text-sm text-slate-800 cursor-pointer">
-                        <input v-model="skipBrandFooter" type="checkbox" class="mt-1 rounded border-slate-300" />
-                        <span>
-                            <strong>Skip default CRM footer</strong> (use if your HTML already has unsubscribe / company block).
-                        </span>
+                    <select id="emailhtmlimportmodal-category" v-model="category" class="form-select">
+                        <option value="custom">Custom</option>
+                        <option value="welcome">Welcome</option>
+                        <option value="follow_up">Follow-up</option>
+                        <option value="quote">Quote</option>
+                        <option value="thank_you">Thank you</option>
+                        <option value="reminder">Reminder</option>
+                        <option value="appointment">Appointment</option>
+                        <option value="invoice">Invoice</option>
+                        <option value="epos">Epos</option>
+                        <option value="teya">Teya</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="emailhtmlimportmodal-subject">
+                        Subject <span class="form-required" aria-hidden="true">*</span>
                     </label>
+                    <input
+                        id="emailhtmlimportmodal-subject"
+                        v-model="subject"
+                        type="text"
+                        required
+                        maxlength="255"
+                        class="form-input"
+                        placeholder="Hello {{first_name}}"
+                    />
                 </div>
-
-                <div v-if="loadingTags" class="text-sm text-slate-500">Loading merge tags…</div>
-                <div v-else class="border border-slate-200 rounded-lg overflow-hidden">
-                    <button
-                        type="button"
-                        class="w-full flex items-center justify-between px-3 py-2 bg-slate-100 text-left text-sm font-medium text-slate-800"
-                        @click="showTags = !showTags"
-                    >
-                        Merge tags &amp; HTML examples
-                        <span>{{ showTags ? '▼' : '▶' }}</span>
-                    </button>
-                    <div v-show="showTags" class="p-3 max-h-64 overflow-y-auto space-y-4 bg-white">
-                        <div v-if="htmlExamples && Object.keys(htmlExamples).length" class="space-y-2">
-                            <p class="text-xs font-semibold text-slate-700 uppercase tracking-wide">Copy-paste snippets</p>
-                            <div v-for="(code, key) in htmlExamples" :key="key" class="text-xs">
-                                <div class="flex items-center justify-between gap-2 mb-1">
-                                    <span class="font-mono text-slate-600">{{ formatExampleKey(key) }}</span>
-                                    <button type="button" class="text-blue-600 hover:underline shrink-0" @click="copyText(code)">Copy</button>
-                                </div>
-                                <pre class="p-2 bg-slate-900 text-slate-100 rounded overflow-x-auto whitespace-pre-wrap break-all">{{ code }}</pre>
-                            </div>
-                        </div>
-                        <div class="space-y-3">
-                            <p class="text-xs font-semibold text-slate-700 uppercase tracking-wide">All tags</p>
-                            <div v-for="(items, group) in groupedTags" :key="group">
-                                <p class="text-xs font-medium text-slate-500 mb-1">{{ group }}</p>
-                                <table class="w-full text-xs border-collapse">
-                                    <tbody>
-                                        <tr v-for="row in items" :key="row.tag" class="border-b border-slate-100">
-                                            <td class="py-1.5 pr-2 align-top whitespace-nowrap">
-                                                <button
-                                                    type="button"
-                                                    class="font-mono text-blue-700 hover:underline"
-                                                    :title="'Copy ' + row.tag"
-                                                    @click="copyText(row.tag)"
-                                                >
-                                                    {{ row.tag }}
-                                                </button>
-                                            </td>
-                                            <td class="py-1.5 text-slate-600 align-top">{{ row.description }}</td>
-                                            <td class="py-1.5 pl-2 text-slate-400 align-top w-24">{{ row.example }}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
+                <div class="sm:col-span-2">
+                    <label class="form-label" for="emailhtmlimportmodal-description">Description</label>
+                    <input
+                        id="emailhtmlimportmodal-description"
+                        v-model="description"
+                        type="text"
+                        class="form-input"
+                    />
                 </div>
-
-                <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-            </form>
-
-            <div class="p-5 border-t border-slate-200 flex justify-end gap-3 bg-slate-50">
-                <button type="button" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-white" @click="$emit('close')">
-                    Cancel
-                </button>
-                <button
-                    type="button"
-                    :disabled="submitting || !file"
-                    class="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                    @click="submit"
-                >
-                    {{ submitting ? 'Importing…' : 'Create template' }}
-                </button>
+                <div class="sm:col-span-2">
+                    <label class="form-label" for="emailhtmlimportmodal-preview-line-inbox-snippet">
+                        Preview line (inbox snippet)
+                    </label>
+                    <input
+                        id="emailhtmlimportmodal-preview-line-inbox-snippet"
+                        v-model="previewLine"
+                        type="text"
+                        maxlength="500"
+                        class="form-input"
+                        placeholder="Optional preheader text"
+                    />
+                </div>
             </div>
-        </div>
-    </div>
+
+            <fieldset class="form-fieldset space-y-2 rounded-control border border-slate-200 bg-slate-50 p-3">
+                <legend class="sr-only">Import options</legend>
+                <label class="flex cursor-pointer items-start gap-2 text-sm text-slate-800">
+                    <input v-model="extractBody" type="checkbox" class="form-checkbox mt-1" />
+                    <span>
+                        <strong>Extract &lt;body&gt; only</strong> (recommended if the file is a full HTML page). Styles in
+                        <code class="text-xs">&lt;head&gt;</code> are not kept—put important styles inline on elements.
+                    </span>
+                </label>
+                <label class="flex cursor-pointer items-start gap-2 text-sm text-slate-800">
+                    <input v-model="skipBrandFooter" type="checkbox" class="form-checkbox mt-1" />
+                    <span>
+                        <strong>Skip default CRM footer</strong> (use if your HTML already has unsubscribe / company block).
+                    </span>
+                </label>
+            </fieldset>
+
+            <p v-if="loadingTags" class="text-sm text-slate-500" role="status" aria-live="polite">Loading merge tags…</p>
+            <div v-else class="overflow-hidden rounded-control border border-slate-200">
+                <button
+                    id="emailhtmlimportmodal-tags-toggle"
+                    type="button"
+                    class="flex w-full items-center justify-between gap-2 bg-slate-100 px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500/40"
+                    :aria-expanded="showTags ? 'true' : 'false'"
+                    aria-controls="emailhtmlimportmodal-tags-panel"
+                    @click="showTags = !showTags"
+                >
+                    Merge tags &amp; HTML examples
+                    <ChevronDownIcon v-if="showTags" class="icon-sm" aria-hidden="true" />
+                    <ChevronRightIcon v-else class="icon-sm" aria-hidden="true" />
+                </button>
+                <div
+                    id="emailhtmlimportmodal-tags-panel"
+                    v-show="showTags"
+                    role="region"
+                    aria-labelledby="emailhtmlimportmodal-tags-toggle"
+                    class="max-h-64 space-y-4 overflow-y-auto bg-white p-3"
+                >
+                    <div v-if="htmlExamples && Object.keys(htmlExamples).length" class="space-y-2">
+                        <p class="text-eyebrow text-slate-600 uppercase">Copy-paste snippets</p>
+                        <div v-for="(code, key) in htmlExamples" :key="key" class="text-xs">
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <span class="font-mono text-slate-600">{{ formatExampleKey(key) }}</span>
+                                <button
+                                    type="button"
+                                    class="link shrink-0 inline-flex items-center gap-1 text-xs"
+                                    :aria-label="`Copy ${formatExampleKey(key)} snippet`"
+                                    @click="copyText(code)"
+                                >
+                                    <ClipboardDocumentIcon class="icon-sm" aria-hidden="true" />
+                                    Copy
+                                </button>
+                            </div>
+                            <pre class="overflow-x-auto whitespace-pre-wrap break-all rounded bg-slate-900 p-2 text-slate-100">{{ code }}</pre>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <p class="text-eyebrow text-slate-600 uppercase">All tags</p>
+                        <div v-for="(items, group) in groupedTags" :key="group">
+                            <p class="mb-1 text-xs font-medium text-slate-500">{{ group }}</p>
+                            <table class="w-full border-collapse text-xs">
+                                <caption class="sr-only">{{ group }} merge tags</caption>
+                                <thead class="sr-only">
+                                    <tr>
+                                        <th scope="col">Merge tag</th>
+                                        <th scope="col">Description</th>
+                                        <th scope="col">Example</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="row in items" :key="row.tag" class="border-b border-slate-100">
+                                        <td class="whitespace-nowrap py-1.5 pr-2 align-top">
+                                            <button
+                                                type="button"
+                                                class="link font-mono text-xs"
+                                                :title="'Copy ' + row.tag"
+                                                :aria-label="'Copy ' + row.tag"
+                                                @click="copyText(row.tag)"
+                                            >
+                                                {{ row.tag }}
+                                            </button>
+                                        </td>
+                                        <td class="py-1.5 align-top text-slate-600">{{ row.description }}</td>
+                                        <td class="w-24 py-1.5 pl-2 align-top text-slate-500">{{ row.example }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p v-if="error" class="callout callout-danger" role="alert">{{ error }}</p>
+        </form>
+
+        <template #actions>
+            <BaseButton variant="outline" block-mobile @click="$emit('close')">Cancel</BaseButton>
+            <BaseButton
+                variant="primary"
+                block-mobile
+                :disabled="!file"
+                :loading="submitting"
+                @click="submit"
+            >
+                {{ submitting ? 'Importing…' : 'Create template' }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
+import { ChevronDownIcon, ChevronRightIcon, ClipboardDocumentIcon } from '@heroicons/vue/24/outline';
 import { useToastStore } from '@/stores/toast';
+import { BaseButton, BaseModal } from '@/components/base';
 
 const emit = defineEmits(['close', 'imported']);
 

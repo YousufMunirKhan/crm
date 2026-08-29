@@ -7,23 +7,23 @@
         <template #filters>
             <div class="listing-filters-row">
                 <div class="w-full sm:w-48">
-                    <label class="listing-label">From</label>
-                    <input v-model="filters.from_date" type="date" class="listing-input" @change="loadReport(1)" />
+                    <label class="form-label" for="attendancereportview-from">From</label>
+                    <input id="attendancereportview-from" v-model="filters.from_date" type="date" class="form-input" @change="loadReport(1)" />
                 </div>
                 <div class="w-full sm:w-48">
-                    <label class="listing-label">To</label>
-                    <input v-model="filters.to_date" type="date" class="listing-input" @change="loadReport(1)" />
+                    <label class="form-label" for="attendancereportview-to">To</label>
+                    <input id="attendancereportview-to" v-model="filters.to_date" type="date" class="form-input" @change="loadReport(1)" />
                 </div>
                 <div class="w-full sm:w-64">
-                    <label class="listing-label">Employee</label>
-                    <select v-model="filters.user_id" class="listing-input" @change="loadReport(1)">
+                    <label class="form-label" for="attendancereportview-employee">Employee</label>
+                    <select id="attendancereportview-employee" v-model="filters.user_id" class="form-select" @change="loadReport(1)">
                         <option value="">All employees</option>
                         <option v-for="user in users" :key="user.id" :value="user.id">{{ user.name }}</option>
                     </select>
                 </div>
                 <div class="w-full sm:w-48">
-                    <label class="listing-label">Proof</label>
-                    <select v-model="filters.proof" class="listing-input" @change="loadReport(1)">
+                    <label class="form-label" for="attendancereportview-proof">Proof</label>
+                    <select id="attendancereportview-proof" v-model="filters.proof" class="form-select" @change="loadReport(1)">
                         <option value="">All records</option>
                         <option value="with_check_in">With check-in proof</option>
                         <option value="missing_check_in">Missing check-in proof</option>
@@ -36,58 +36,84 @@
 
         <template #actions>
             <div class="flex flex-wrap gap-2 w-full sm:w-auto">
-                <button type="button" class="listing-btn-outline flex-1 sm:flex-none" @click="setToday">Today</button>
-                <button type="button" class="listing-btn-outline flex-1 sm:flex-none" @click="setThisMonth">This month</button>
-                <button type="button" class="listing-btn-outline flex-1 sm:flex-none" :disabled="monthlyEmployees.length === 0" @click="exportMonthlySummary">
+                <BaseButton variant="outline" type="button" class="flex-1 sm:flex-none" @click="setToday">Today</BaseButton>
+                <BaseButton variant="outline" type="button" class="flex-1 sm:flex-none" @click="setThisMonth">This month</BaseButton>
+                <BaseButton
+                    variant="outline"
+                    type="button"
+                    class="flex-1 sm:flex-none"
+                    :disabled="monthlyEmployees.length === 0"
+                    @click="exportMonthlySummary"
+                >
+                    <template #icon>
+                        <ArrowDownTrayIcon class="icon" aria-hidden="true" />
+                    </template>
                     Export Monthly Summary
-                </button>
-                <button type="button" class="listing-btn-primary flex-1 sm:flex-none" :disabled="attendanceList.length === 0" @click="exportAttendance">
+                </BaseButton>
+                <BaseButton
+                    variant="primary"
+                    type="button"
+                    class="flex-1 sm:flex-none"
+                    :disabled="attendanceList.length === 0"
+                    @click="exportAttendance"
+                >
+                    <template #icon>
+                        <ArrowDownTrayIcon class="icon" aria-hidden="true" />
+                    </template>
                     Export CSV
-                </button>
+                </BaseButton>
             </div>
         </template>
 
-        <div class="px-3 pb-3 sm:px-5">
-            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <h2 class="text-base font-semibold text-slate-900">Monthly evaluation</h2>
-                        <p class="text-sm text-slate-500">{{ reportRangeLabel }}</p>
-                    </div>
-                    <div class="text-sm font-semibold text-slate-700">
+        <div class="px-3 pb-3 sm:px-5 pt-3">
+            <BaseCard title="Monthly evaluation" :subtitle="reportRangeLabel">
+                <template #actions>
+                    <span class="text-sm font-semibold text-slate-700 tabular-nums">
                         {{ monthlyReport?.employee_count || 0 }} employee{{ (monthlyReport?.employee_count || 0) === 1 ? '' : 's' }}
-                    </div>
-                </div>
+                    </span>
+                </template>
 
-                <div v-if="monthlyLoading" class="py-8 text-center text-sm text-slate-500">
-                    Loading monthly summary...
+                <div v-if="monthlyLoading" class="py-6 space-y-3" aria-busy="true">
+                    <p class="sr-only">Loading monthly summary…</p>
+                    <div class="skeleton-text w-1/3"></div>
+                    <div class="skeleton-text w-2/3"></div>
+                    <div class="skeleton-text w-1/2"></div>
                 </div>
 
                 <template v-else>
-                    <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                        <div class="rounded-lg bg-slate-50 p-3">
-                            <MetricLabel label="Total hours" tooltip="Total completed work hours in the selected period. Open shifts are not counted until check-out." />
-                            <div class="mt-1 text-xl font-bold text-slate-900">{{ formatHours(monthlyTotals.total_hours) }}h</div>
-                        </div>
-                        <div class="rounded-lg bg-slate-50 p-3">
-                            <MetricLabel label="Present days" tooltip="Number of days where an employee checked in during the selected period." />
-                            <div class="mt-1 text-xl font-bold text-slate-900">{{ monthlyTotals.present_days }}</div>
-                        </div>
-                        <div class="rounded-lg bg-slate-50 p-3">
-                            <MetricLabel label="Completed shifts" tooltip="Attendance records with both check-in and check-out. These records calculate work hours." />
-                            <div class="mt-1 text-xl font-bold text-slate-900">{{ monthlyTotals.completed_shifts }}</div>
-                        </div>
-                        <div class="rounded-lg bg-slate-50 p-3">
-                            <MetricLabel label="Open shifts" tooltip="Employees checked in but have not checked out yet. Hours are not final for these records." />
-                            <div class="mt-1 text-xl font-bold text-slate-900">{{ monthlyTotals.open_shifts }}</div>
-                        </div>
-                        <div class="rounded-lg bg-slate-50 p-3 sm:col-span-2 lg:col-span-1">
-                            <MetricLabel label="Missing proof" tooltip="Count of check-in or check-out records missing photo proof or GPS location proof." />
-                            <div class="mt-1 text-xl font-bold text-slate-900">{{ monthlyMissingProof }}</div>
-                        </div>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                        <StatCard
+                            label="Total hours"
+                            :value="`${formatHours(monthlyTotals.total_hours)}h`"
+                            caption="Completed work hours; open shifts are not counted until check-out."
+                        />
+                        <StatCard
+                            label="Present days"
+                            :value="monthlyTotals.present_days"
+                            caption="Days where an employee checked in during the period."
+                        />
+                        <StatCard
+                            label="Completed shifts"
+                            :value="monthlyTotals.completed_shifts"
+                            caption="Records with both check-in and check-out."
+                            tone="success"
+                        />
+                        <StatCard
+                            label="Open shifts"
+                            :value="monthlyTotals.open_shifts"
+                            caption="Checked in but not checked out yet."
+                            tone="warning"
+                        />
+                        <StatCard
+                            class="sm:col-span-2 lg:col-span-1"
+                            label="Missing proof"
+                            :value="monthlyMissingProof"
+                            caption="Check-in or check-out records missing photo or GPS proof."
+                            tone="danger"
+                        />
                     </div>
 
-                    <div v-if="monthlyEmployees.length === 0" class="mt-4 rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
+                    <div v-if="monthlyEmployees.length === 0" class="mt-4 callout callout-info">
                         No monthly attendance data found for this selection.
                     </div>
 
@@ -96,7 +122,7 @@
                             <div
                                 v-for="employee in monthlyEmployees"
                                 :key="employee.user_id"
-                                class="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                                class="table-card"
                             >
                                 <div class="font-semibold text-slate-900">{{ employee.employee_name }}</div>
                                 <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
@@ -120,40 +146,41 @@
                             </div>
                         </div>
 
-                        <div class="hidden overflow-x-auto lg:block">
-                            <table class="w-full">
-                                <thead class="bg-slate-50">
+                        <div class="hidden table-wrap lg:block">
+                            <table class="table">
+                                <caption class="sr-only">Monthly attendance summary per employee: total hours, present days, completed and open shifts, average hours per day and missing proof</caption>
+                                <thead class="table-thead">
                                     <tr>
-                                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Employee</th>
-                                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        <th scope="col" class="table-th">Employee</th>
+                                        <th scope="col" class="table-th-num">
                                             <MetricLabel label="Total Hours" tooltip="Total completed work hours in the selected period." align="right" />
                                         </th>
-                                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        <th scope="col" class="table-th-num">
                                             <MetricLabel label="Present Days" tooltip="Days where the employee checked in." align="right" />
                                         </th>
-                                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        <th scope="col" class="table-th-num">
                                             <MetricLabel label="Completed" tooltip="Records with both check-in and check-out." align="right" />
                                         </th>
-                                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        <th scope="col" class="table-th-num">
                                             <MetricLabel label="Open" tooltip="Checked-in records without check-out." align="right" />
                                         </th>
-                                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        <th scope="col" class="table-th-num">
                                             <MetricLabel label="Avg / Day" tooltip="Total completed hours divided by checked-in days." align="right" />
                                         </th>
-                                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        <th scope="col" class="table-th-num">
                                             <MetricLabel label="Missing Proof" tooltip="Missing photo or GPS proof for check-in/check-out." align="right" />
                                         </th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-200 bg-white">
-                                    <tr v-for="employee in monthlyEmployees" :key="employee.user_id" class="hover:bg-slate-50">
-                                        <td class="px-3 py-3 text-sm font-medium text-slate-900">{{ employee.employee_name }}</td>
-                                        <td class="px-3 py-3 text-right text-sm font-semibold text-slate-900">{{ formatHours(employee.total_hours) }}h</td>
-                                        <td class="px-3 py-3 text-right text-sm text-slate-700">{{ employee.present_days }}</td>
-                                        <td class="px-3 py-3 text-right text-sm text-slate-700">{{ employee.completed_shifts }}</td>
-                                        <td class="px-3 py-3 text-right text-sm text-slate-700">{{ employee.open_shifts }}</td>
-                                        <td class="px-3 py-3 text-right text-sm text-slate-700">{{ formatHours(employee.average_hours_per_present_day) }}h</td>
-                                        <td class="px-3 py-3 text-right text-sm text-slate-700">
+                                <tbody>
+                                    <tr v-for="employee in monthlyEmployees" :key="employee.user_id" class="table-row">
+                                        <td class="table-td-strong">{{ employee.employee_name }}</td>
+                                        <td class="table-td-num font-semibold text-slate-900">{{ formatHours(employee.total_hours) }}h</td>
+                                        <td class="table-td-num">{{ employee.present_days }}</td>
+                                        <td class="table-td-num">{{ employee.completed_shifts }}</td>
+                                        <td class="table-td-num">{{ employee.open_shifts }}</td>
+                                        <td class="table-td-num">{{ formatHours(employee.average_hours_per_present_day) }}h</td>
+                                        <td class="table-td-num">
                                             {{ employee.missing_check_in_proof + employee.missing_check_out_proof }}
                                         </td>
                                     </tr>
@@ -162,40 +189,46 @@
                         </div>
                     </div>
                 </template>
-            </div>
+            </BaseCard>
         </div>
 
-        <div v-if="loading" class="px-5 py-14 text-center text-sm text-slate-500">
-            Loading attendance...
+        <div v-if="loading" class="px-5 py-8 space-y-3" aria-busy="true">
+            <p class="sr-only">Loading attendance…</p>
+            <div class="skeleton-text w-1/3"></div>
+            <div class="skeleton-text w-2/3"></div>
+            <div class="skeleton-text w-1/2"></div>
+            <div class="skeleton-text w-3/4"></div>
         </div>
 
-        <div v-else-if="attendanceList.length === 0" class="px-5 py-12 text-center text-sm text-slate-500">
-            No attendance records found for the selected filters.
-        </div>
+        <EmptyState
+            v-else-if="attendanceList.length === 0"
+            heading="No attendance records"
+            description="No attendance records found for the selected filters."
+        >
+            <template #icon>
+                <ClockIcon class="icon" aria-hidden="true" />
+            </template>
+        </EmptyState>
 
         <div v-else class="space-y-3 px-3 pb-3 sm:px-5">
-            <div
+            <BaseCard
                 v-for="record in attendanceList"
                 :key="record.id"
-                class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
             >
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <div class="font-semibold text-slate-900">{{ record.user?.name || 'Unknown employee' }}</div>
-                            <span
-                                class="rounded px-2 py-1 text-xs font-medium"
-                                :class="record.check_out_at ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
-                            >
+                            <BaseBadge :tone="record.check_out_at ? 'success' : 'warning'">
                                 {{ record.check_out_at ? 'Completed' : 'In progress' }}
-                            </span>
+                            </BaseBadge>
                         </div>
                         <div class="mt-1 text-sm text-slate-500">
                             {{ formatDate(record.date) }} | {{ formatTime(record.check_in_at) }} to {{ record.check_out_at ? formatTime(record.check_out_at) : 'In progress' }}
                         </div>
                     </div>
 
-                    <div class="text-sm font-semibold text-slate-700 lg:text-right">
+                    <div class="text-sm font-semibold text-slate-700 lg:text-right tabular-nums">
                         {{ Number(record.work_hours || 0).toFixed(2) }}h
                     </div>
                 </div>
@@ -222,7 +255,7 @@
                         :captured-at="record.check_out_location_captured_at"
                     />
                 </div>
-            </div>
+            </BaseCard>
         </div>
 
         <template #pagination>
@@ -245,6 +278,8 @@ import ListingPageShell from '@/components/ListingPageShell.vue';
 import Pagination from '@/components/Pagination.vue';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
 import { useToastStore } from '@/stores/toast';
+import { BaseBadge, BaseButton, BaseCard, EmptyState, StatCard } from '@/components/base';
+import { ArrowDownTrayIcon, ClockIcon } from '@heroicons/vue/24/outline';
 
 const toast = useToastStore();
 
@@ -478,12 +513,12 @@ const MetricLabel = defineComponent({
             h('span', { class: 'group relative inline-flex shrink-0' }, [
                 h('button', {
                     type: 'button',
-                    class: 'grid h-4 w-4 place-items-center rounded-full border border-slate-300 bg-white text-[10px] font-bold leading-none text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-200',
+                    class: 'grid h-4 w-4 place-items-center rounded-full border border-slate-300 bg-white text-[10px] font-bold leading-none text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
                     'aria-label': `${props.label}: ${props.tooltip}`,
                 }, '?'),
                 h('span', {
                     class: [
-                        'pointer-events-none absolute bottom-full z-30 mb-2 hidden w-56 rounded-md bg-slate-900 px-3 py-2 text-left text-[11px] font-medium normal-case leading-4 tracking-normal text-white shadow-lg group-hover:block group-focus-within:block',
+                        'pointer-events-none absolute bottom-full z-dropdown mb-2 hidden w-56 rounded-md bg-slate-900 px-3 py-2 text-left text-[11px] font-medium normal-case leading-4 tracking-normal text-white shadow-dropdown group-hover:block group-focus-within:block',
                         props.align === 'right' ? 'right-0' : 'left-0',
                     ],
                 }, props.tooltip),
@@ -509,7 +544,7 @@ const ProofPanel = defineComponent({
         const photoNode = () => {
             if (!props.photoUrl) {
                 return h('div', {
-                    class: 'grid aspect-[4/3] w-full place-items-center rounded-lg border border-dashed border-slate-300 bg-white text-sm font-medium text-slate-400',
+                    class: 'grid aspect-[4/3] w-full place-items-center rounded-control border border-dashed border-slate-300 bg-white text-sm font-medium text-slate-500',
                 }, 'No photo captured');
             }
 
@@ -517,7 +552,7 @@ const ProofPanel = defineComponent({
                 href: props.photoUrl,
                 target: '_blank',
                 rel: 'noopener',
-                class: 'block overflow-hidden rounded-lg border border-slate-200 bg-white',
+                class: 'block overflow-hidden rounded-control border border-slate-200 bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
                 title: 'Open attendance photo',
             }, [
                 h('img', {
@@ -554,11 +589,11 @@ const ProofPanel = defineComponent({
                                     href: props.mapUrl,
                                     target: '_blank',
                                     rel: 'noopener',
-                                    class: 'inline-flex min-h-9 items-center rounded-md border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100',
+                                    class: 'inline-flex min-h-9 items-center rounded-control border border-primary-200 bg-primary-50 px-3 text-xs font-semibold text-primary-700 hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
                                 }, 'View on map')
                                 : null,
                         ])
-                        : h('div', { class: 'mt-1 text-sm font-medium text-slate-400' }, 'No location captured'),
+                        : h('div', { class: 'mt-1 text-sm font-medium text-slate-500' }, 'No location captured'),
                 ]),
             ]),
         ]);

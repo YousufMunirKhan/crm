@@ -5,32 +5,30 @@
         :badge="employeesBadge"
     >
         <template #actions>
-            <button
-                v-if="canAddEmployee"
-                type="button"
-                @click="openCreateForm"
-                class="listing-btn-accent w-full sm:w-auto touch-manipulation"
-            >
-                + Add employee
-            </button>
-            <button type="button" @click="goToGoals" class="listing-btn-outline w-full sm:w-auto touch-manipulation">
+            <BaseButton v-if="canAddEmployee" variant="primary" block-mobile @click="openCreateForm">
+                <template #icon><PlusIcon class="icon" aria-hidden="true" /></template>
+                Add employee
+            </BaseButton>
+            <BaseButton variant="outline" block-mobile @click="goToGoals">
                 Set targets
-            </button>
-            <button
+            </BaseButton>
+            <BaseButton
                 v-if="canBulkResetPasswords"
-                type="button"
-                class="listing-btn-outline w-full sm:w-auto touch-manipulation border-amber-300 text-amber-900 hover:bg-amber-50"
+                variant="outline"
+                block-mobile
+                class="border-warning-300 text-warning-800 hover:bg-warning-50"
                 @click="openResetAllModal"
             >
+                <template #icon><KeyIcon class="icon" aria-hidden="true" /></template>
                 Reset all passwords
-            </button>
+            </BaseButton>
         </template>
 
         <template #filters>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 lg:gap-4 items-end w-full min-w-0">
                 <div class="sm:col-span-2 lg:col-span-3">
-                    <label class="listing-label">Search</label>
-                    <input
+                    <label class="listing-label" for="employeesview-search">Search</label>
+                    <input id="employeesview-search"
                         v-model="search"
                         type="text"
                         placeholder="Employee name or email..."
@@ -39,8 +37,8 @@
                     />
                 </div>
                 <div class="sm:col-span-1 lg:col-span-2">
-                    <label class="listing-label">Role</label>
-                    <select v-model="filters.role" class="listing-input" @change="loadEmployees(1)">
+                    <label class="listing-label" for="employeesview-role">Role</label>
+                    <select id="employeesview-role" v-model="filters.role" class="listing-input" @change="loadEmployees(1)">
                         <option value="">All roles</option>
                         <option v-for="role in roles" :key="role.id" :value="role.name">
                             {{ role.name }}
@@ -48,8 +46,8 @@
                     </select>
                 </div>
                 <div class="sm:col-span-1 lg:col-span-2">
-                    <label class="listing-label">Type</label>
-                    <select v-model="filters.employee_type" class="listing-input" @change="loadEmployees(1)">
+                    <label class="listing-label" for="employeesview-type">Type</label>
+                    <select id="employeesview-type" v-model="filters.employee_type" class="listing-input" @change="loadEmployees(1)">
                         <option value="">All types</option>
                         <option value="field_worker">Field Worker</option>
                         <option value="call_center">Call Center</option>
@@ -57,17 +55,18 @@
                     </select>
                 </div>
                 <div class="sm:col-span-1 lg:col-span-2">
-                    <label class="listing-label">Status</label>
-                    <select v-model="filters.is_active" class="listing-input" @change="loadEmployees(1)">
+                    <label class="listing-label" for="employeesview-status">Status</label>
+                    <select id="employeesview-status" v-model="filters.is_active" class="listing-input" @change="loadEmployees(1)">
                         <option value="1">Active</option>
                         <option value="0">Inactive</option>
                         <option value="all">All</option>
                     </select>
                 </div>
                 <div class="sm:col-span-2 lg:col-span-3 flex flex-wrap gap-2">
-                    <button type="button" class="listing-btn-primary w-full sm:w-auto" @click="loadEmployees(1)">
+                    <BaseButton variant="soft" block-mobile @click="loadEmployees(1)">
+                        <template #icon><FunnelIcon class="icon" aria-hidden="true" /></template>
                         Filter
-                    </button>
+                    </BaseButton>
                 </div>
             </div>
         </template>
@@ -96,21 +95,18 @@
                         <td class="listing-td">{{ employee.email }}</td>
                         <td class="listing-td">{{ employee.role?.name || '—' }}</td>
                         <td class="listing-td">
-                            <span v-if="employee.employee_type" class="inline-flex rounded-md bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800 ring-1 ring-sky-100">
+                            <BaseBadge v-if="employee.employee_type" tone="primary">
                                 {{ formatEmployeeType(employee.employee_type) }}
-                            </span>
-                            <span v-else class="text-slate-400">—</span>
+                            </BaseBadge>
+                            <span v-else class="text-slate-500">—</span>
                         </td>
                         <td class="listing-td">
-                            <span
-                                v-if="employee.is_active === false || employee.is_active === 0"
-                                class="listing-badge-inactive"
-                            >
+                            <BaseBadge v-if="employee.is_active === false || employee.is_active === 0" tone="danger" dot>
                                 Inactive
-                            </span>
-                            <span v-else class="listing-badge-active">
+                            </BaseBadge>
+                            <BaseBadge v-else tone="success" dot>
                                 Active
-                            </span>
+                            </BaseBadge>
                         </td>
                         <td class="listing-td">{{ employee.phone || '—' }}</td>
                         <td class="listing-td">
@@ -138,16 +134,16 @@
                                 <button
                                     v-if="employee.email !== 'admin@switchsave.com' && (employee.is_active === false || employee.is_active === 0)"
                                     type="button"
-                                    class="text-emerald-600 hover:text-emerald-800 font-medium text-sm"
-                                    @click="toggleStatus(employee, true)"
+                                    class="text-success-700 hover:text-success-800 font-medium text-sm rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                                    @click="askToggleStatus(employee, true)"
                                 >
                                     Activate
                                 </button>
                                 <button
                                     v-else-if="employee.email !== 'admin@switchsave.com'"
                                     type="button"
-                                    class="listing-link-delete"
-                                    @click="toggleStatus(employee, false)"
+                                    class="listing-link-delete rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                                    @click="askToggleStatus(employee, false)"
                                 >
                                     Inactivate
                                 </button>
@@ -166,8 +162,8 @@
             >
                 <div class="flex items-start justify-between gap-2">
                     <div class="text-sm font-semibold text-slate-900">{{ employee.name }}</div>
-                    <span v-if="employee.is_active === false || employee.is_active === 0" class="listing-badge-inactive">Inactive</span>
-                    <span v-else class="listing-badge-active">Active</span>
+                    <BaseBadge v-if="employee.is_active === false || employee.is_active === 0" tone="danger" dot>Inactive</BaseBadge>
+                    <BaseBadge v-else tone="success" dot>Active</BaseBadge>
                 </div>
                 <div class="text-sm text-slate-600">{{ employee.email }}</div>
                 <div class="text-sm text-slate-600">Role: {{ employee.role?.name || '—' }}</div>
@@ -205,51 +201,64 @@
         @saved="handleSaved"
     />
 
-    <div
-        v-if="showResetAllModal"
-        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="reset-all-passwords-title"
-        @click.self="closeResetAllModal"
+    <BaseModal
+        v-model="showResetAllModal"
+        title="Reset password for all users"
+        size="sm"
+        :dismissible="!resetAllSubmitting"
+        :close-on-backdrop="false"
     >
-        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 sm:p-6 space-y-4 border border-slate-200">
-            <h2 id="reset-all-passwords-title" class="text-lg font-semibold text-slate-900">Reset password for all users</h2>
+        <form id="reset-all-passwords-form" class="space-y-4" novalidate @submit.prevent="submitResetAllPasswords">
             <p class="text-sm text-slate-600">
                 Sets the <strong>same new password</strong> for every account except yours (you stay signed in). Optional: keep the protected admin login unchanged.
                 All affected users are signed out on other devices and must log in again.
             </p>
             <div class="space-y-3">
                 <div>
-                    <label class="listing-label">New password (min 8 characters)</label>
-                    <input v-model="resetAllForm.password" type="password" autocomplete="new-password" class="listing-input w-full" />
+                    <label class="form-label" for="employeesview-new-password-min-8-characters">New password (min 8 characters)</label>
+                    <input id="employeesview-new-password-min-8-characters" v-model="resetAllForm.password" type="password" autocomplete="new-password" class="form-input" />
                 </div>
                 <div>
-                    <label class="listing-label">Confirm password</label>
-                    <input v-model="resetAllForm.password_confirmation" type="password" autocomplete="new-password" class="listing-input w-full" />
+                    <label class="form-label" for="employeesview-confirm-password">Confirm password</label>
+                    <input id="employeesview-confirm-password" v-model="resetAllForm.password_confirmation" type="password" autocomplete="new-password" class="form-input" />
                 </div>
                 <div>
-                    <label class="listing-label">Type <code class="text-xs bg-slate-100 px-1 rounded">RESET ALL</code> to confirm</label>
-                    <input v-model="resetAllForm.confirm_phrase" type="text" class="listing-input w-full" placeholder="RESET ALL" autocomplete="off" />
+                    <label class="form-label" for="employeesview-type-reset-all-to-confirm">Type <code class="kbd">RESET ALL</code> to confirm</label>
+                    <input id="employeesview-type-reset-all-to-confirm" v-model="resetAllForm.confirm_phrase" type="text" class="form-input" placeholder="RESET ALL" autocomplete="off" />
                 </div>
-                <label class="flex items-start gap-2 text-sm text-slate-700 cursor-pointer">
-                    <input v-model="resetAllForm.skip_protected_accounts" type="checkbox" class="mt-1 rounded border-slate-300" />
-                    <span>Do not change <code class="text-xs bg-slate-100 px-1 rounded">admin@switchsave.com</code></span>
+                <label class="form-choice">
+                    <input v-model="resetAllForm.skip_protected_accounts" type="checkbox" class="form-checkbox" />
+                    <span>Do not change <code class="kbd">admin@switchsave.com</code></span>
                 </label>
             </div>
-            <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
-                <button type="button" class="listing-btn-outline w-full sm:w-auto" :disabled="resetAllSubmitting" @click="closeResetAllModal">Cancel</button>
-                <button
-                    type="button"
-                    class="w-full sm:w-auto px-4 py-2.5 rounded-lg text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
-                    :disabled="resetAllSubmitting"
-                    @click="submitResetAllPasswords"
-                >
-                    {{ resetAllSubmitting ? 'Working…' : 'Apply to all users' }}
-                </button>
-            </div>
-        </div>
-    </div>
+        </form>
+
+        <template #actions>
+            <BaseButton variant="outline" block-mobile :disabled="resetAllSubmitting" @click="closeResetAllModal">
+                Cancel
+            </BaseButton>
+            <BaseButton
+                variant="danger"
+                type="submit"
+                form="reset-all-passwords-form"
+                block-mobile
+                :loading="resetAllSubmitting"
+            >
+                {{ resetAllSubmitting ? 'Working…' : 'Apply to all users' }}
+            </BaseButton>
+        </template>
+    </BaseModal>
+
+    <ConfirmDialog
+        v-model="showStatusConfirm"
+        :title="statusConfirmTitle"
+        :message="statusConfirmMessage"
+        :confirm-label="statusTarget?.makeActive ? 'Activate' : 'Inactivate'"
+        :tone="statusTarget?.makeActive ? 'primary' : 'danger'"
+        :loading="statusSubmitting"
+        @confirm="toggleStatus"
+        @cancel="closeStatusConfirm"
+    />
 </template>
 
 <script setup>
@@ -261,6 +270,8 @@ import { useToastStore } from '@/stores/toast';
 import EmployeeForm from '@/components/EmployeeForm.vue';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
+import { BaseBadge, BaseButton, BaseModal, ConfirmDialog } from '@/components/base';
+import { FunnelIcon, KeyIcon, PlusIcon } from '@heroicons/vue/24/outline';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -297,6 +308,22 @@ const resetAllForm = ref({
     password_confirmation: '',
     confirm_phrase: '',
     skip_protected_accounts: true,
+});
+
+/** Activate / inactivate confirmation (replaces window.confirm). */
+const showStatusConfirm = ref(false);
+const statusSubmitting = ref(false);
+const statusTarget = ref(null);
+
+const statusConfirmTitle = computed(() =>
+    statusTarget.value?.makeActive ? 'Activate employee' : 'Inactivate employee',
+);
+
+const statusConfirmMessage = computed(() => {
+    if (!statusTarget.value) return '';
+    return statusTarget.value.makeActive
+        ? `Do you want to activate ${statusTarget.value.employee.name}?`
+        : `Do you want to inactivate ${statusTarget.value.employee.name}?`;
 });
 
 const employeesBadge = computed(() =>
@@ -404,18 +431,27 @@ const handleSaved = () => {
     loadEmployees(pagination.value?.current_page || 1);
 };
 
-const toggleStatus = async (employee, makeActive) => {
+const askToggleStatus = (employee, makeActive) => {
+    statusTarget.value = { employee, makeActive };
+    showStatusConfirm.value = true;
+};
+
+const closeStatusConfirm = () => {
+    if (statusSubmitting.value) return;
+    showStatusConfirm.value = false;
+    statusTarget.value = null;
+};
+
+const toggleStatus = async () => {
+    if (!statusTarget.value || statusSubmitting.value) return;
+    const { employee, makeActive } = statusTarget.value;
     const actionText = makeActive ? 'activate' : 'inactivate';
-    const confirmMessage = makeActive
-        ? `Do you want to activate ${employee.name}?`
-        : `Do you want to inactivate ${employee.name}?`;
 
-    if (!window.confirm(confirmMessage)) {
-        return;
-    }
-
+    statusSubmitting.value = true;
     try {
         await axios.put(`/api/users/${employee.id}`, { is_active: makeActive });
+        showStatusConfirm.value = false;
+        statusTarget.value = null;
         await loadEmployees(pagination.value?.current_page || 1);
         toast.success(`Employee ${actionText}d successfully.`);
     } catch (error) {
@@ -425,6 +461,8 @@ const toggleStatus = async (employee, makeActive) => {
             errorMessage = error.response.data.message;
         }
         toast.error(errorMessage);
+    } finally {
+        statusSubmitting.value = false;
     }
 };
 

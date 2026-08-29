@@ -1,46 +1,20 @@
 <template>
     <div class="min-h-screen bg-slate-100 w-full min-w-0 overflow-x-hidden">
-        <!-- Top Navigation Bar -->
-        <header class="bg-white border-b border-slate-200 sticky top-0 z-20">
+        <!-- Record context bar (breadcrumbs + user menu come from AppLayout) -->
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-sticky">
             <div class="px-4 sm:px-6 py-3 sm:py-4">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 min-w-0">
-                        <router-link
-                            :to="customersListRoute"
-                            class="text-base sm:text-sm font-semibold sm:font-normal text-slate-600 hover:text-slate-900 flex items-center gap-1"
-                        >
-                            <svg class="w-4 h-4 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                            {{ customerTypeLabel === 'Customer' ? 'Back to Customers' : 'Back to Prospects' }}
-                        </router-link>
-                        <nav class="text-base sm:text-sm font-semibold sm:font-normal text-slate-600 flex items-center gap-1 flex-wrap">
-                            <router-link to="/" class="text-teal-600 hover:text-teal-700 font-medium">Dashboard</router-link>
-                            <span class="text-slate-300">/</span>
-                            <template v-if="isLeadWorkspace">
-                                <router-link to="/leads/pipeline" class="hover:text-slate-900">Leads</router-link>
-                                <span class="text-slate-300">/</span>
-                                <span class="text-slate-700">#{{ route.params.id }}</span>
-                                <span class="text-slate-300">/</span>
-                            </template>
-                            <template v-else>
-                                <router-link :to="customersListRoute" class="hover:text-slate-900">{{ customerTypeLabel === 'Customer' ? 'Customers' : 'Prospects' }}</router-link>
-                                <span class="text-slate-300">/</span>
-                            </template>
-                            <span class="text-slate-900 font-semibold sm:font-medium truncate">{{ customer?.name || 'Loading...' }}</span>
-                        </nav>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto shrink-0">
-                        <router-link
-                            :to="`/customers/${customer?.id}/edit`"
-                            class="px-3 sm:px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 touch-manipulation text-center flex-1 sm:flex-initial min-w-[8rem]"
-                        >
+                    <router-link
+                        :to="customersListRoute"
+                        class="link inline-flex items-center gap-1.5 text-sm min-w-0"
+                    >
+                        <ArrowLeftIcon class="icon-sm shrink-0" aria-hidden="true" />
+                        {{ customerTypeLabel === 'Customer' ? 'Back to Customers' : 'Back to Prospects' }}
+                    </router-link>
+                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
+                        <BaseButton variant="outline" :to="`/customers/${customer?.id}/edit`" block-mobile>
                             Edit Customer
-                        </router-link>
-                        <button
-                            @click="logout"
-                            class="px-3 sm:px-4 py-2 text-sm bg-[#7C3AED] text-white rounded-lg hover:bg-[#6d28d9] shadow-sm shadow-violet-600/25 touch-manipulation flex-1 sm:flex-initial min-w-[8rem] font-medium"
-                        >
-                            Logout
-                        </button>
+                        </BaseButton>
                     </div>
                 </div>
             </div>
@@ -49,147 +23,171 @@
         <!-- Main Content -->
         <div class="max-w-[1600px] mx-auto px-3 sm:px-5 py-4 sm:py-5 w-full min-w-0">
             <!-- Deal header (pipeline-style) -->
-            <div v-if="customer" class="bg-white rounded-lg border border-slate-200 shadow-sm mb-4 p-4 sm:p-5">
+            <BaseCard v-if="customer" class="mb-4">
                 <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                     <div class="min-w-0 flex-1">
-                        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight break-words">{{ customer.name }}</h1>
+                        <h1 class="text-page-title text-slate-900 break-words">{{ customer.name }}</h1>
                         <p v-if="customer.business_name" class="text-sm text-slate-500 mt-0.5">{{ customer.business_name }}</p>
                         <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm">
-                            <a v-if="customer.phone" :href="'tel:' + customer.phone" class="text-sky-700 hover:underline font-medium">{{ customer.phone }}</a>
-                            <a v-if="customer.email" :href="'mailto:' + customer.email" class="text-sky-700 hover:underline font-medium truncate max-w-full">{{ customer.email }}</a>
+                            <a v-if="customer.phone" :href="'tel:' + customer.phone" class="link">{{ customer.phone }}</a>
+                            <a v-if="customer.email" :href="'mailto:' + customer.email" class="link truncate max-w-full">{{ customer.email }}</a>
                             <span v-if="customer.city" class="text-slate-600">{{ customer.city }}</span>
                         </div>
                     </div>
                     <div v-if="activeLead" class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 shrink-0">
-                        <label class="sr-only" for="active-lead-select">Active lead</label>
-                        <select
-                            id="active-lead-select"
-                            v-model.number="selectedLeadId"
-                            class="px-3 py-2 text-sm border border-slate-300 rounded-md bg-white min-w-[11rem] focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                            @change="onActiveLeadSelectChange"
-                        >
-                            <option v-for="l in allLeads" :key="l.id" :value="l.id">Lead #{{ l.id }} · {{ formatStage(l.stage) }}</option>
-                        </select>
+                        <div class="sm:min-w-[11rem]">
+                            <label class="sr-only" for="active-lead-select">Active lead</label>
+                            <select
+                                id="active-lead-select"
+                                v-model.number="selectedLeadId"
+                                class="form-select"
+                                @change="onActiveLeadSelectChange"
+                            >
+                                <option v-for="l in allLeads" :key="l.id" :value="l.id">Lead #{{ l.id }} · {{ formatStage(l.stage) }}</option>
+                            </select>
+                        </div>
                         <div class="flex flex-wrap gap-2">
-                            <button type="button" class="px-4 py-2 text-sm font-semibold rounded-md bg-[#22a06b] text-white hover:bg-[#1c8a5a] disabled:opacity-50 touch-manipulation" :disabled="stageUpdating || activeLead.stage === 'won'" @click="submitMarkLeadWon">Won</button>
-                            <button type="button" class="px-4 py-2 text-sm font-semibold rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 touch-manipulation" :disabled="stageUpdating || activeLead.stage === 'lost'" @click="showLostLeadModal = true; lostReasonInput = ''">Lost</button>
-                            <button
+                            <BaseButton
+                                variant="success"
+                                :disabled="stageUpdating || activeLead.stage === 'won'"
+                                @click="submitMarkLeadWon"
+                            >
+                                Won
+                            </BaseButton>
+                            <BaseButton
+                                variant="danger"
+                                :disabled="stageUpdating || activeLead.stage === 'lost'"
+                                @click="showLostLeadModal = true; lostReasonInput = ''"
+                            >
+                                Lost
+                            </BaseButton>
+                            <BaseButton
                                 v-if="isAdminRole && activeLead.stage === 'won'"
-                                type="button"
-                                class="px-4 py-2 text-sm font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700 touch-manipulation"
+                                variant="primary"
                                 @click="openChangeSaleCreditForLead(activeLead)"
                             >
                                 Change Sale Owner
-                            </button>
+                            </BaseButton>
                         </div>
                         <div class="flex flex-wrap gap-2">
-                            <button type="button" class="px-3 py-2 text-sm font-medium rounded-md border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 touch-manipulation" @click="openScheduleModal(activeLead)">Schedule</button>
-                            <button type="button" class="px-3 py-2 text-sm font-medium rounded-md border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 touch-manipulation" @click="openActivityModal(activeLead)">Log activity</button>
+                            <BaseButton variant="outline" @click="openScheduleModal(activeLead)">
+                                <template #icon><CalendarDaysIcon class="icon-sm" aria-hidden="true" /></template>
+                                Schedule
+                            </BaseButton>
+                            <BaseButton variant="outline" @click="openActivityModal(activeLead)">
+                                <template #icon><ClipboardDocumentIcon class="icon-sm" aria-hidden="true" /></template>
+                                Log activity
+                            </BaseButton>
                         </div>
                     </div>
                     <p v-else class="text-sm text-slate-500 shrink-0">No lead yet — use <strong>Focus</strong> below to add products.</p>
                 </div>
-                <div v-if="activeLead" class="mt-4 flex rounded-md overflow-hidden border border-slate-200">
-                    <div
+                <ol v-if="activeLead" class="mt-4 flex rounded-control overflow-hidden border border-slate-200" aria-label="Lead pipeline stage">
+                    <li
                         v-for="st in pipelineStageOrder"
                         :key="st"
                         class="flex-1 min-w-0 text-center py-2.5 px-0.5 sm:px-2 text-[10px] sm:text-xs font-bold uppercase tracking-tight border-r border-white/25 last:border-r-0"
                         :class="pipelineStageVisualClass(activeLead.stage, st)"
+                        :aria-current="activeLead.stage === st ? 'step' : undefined"
                     >
                         {{ formatStagePipe(st) }}
-                    </div>
-                </div>
+                    </li>
+                </ol>
                 <p v-if="activeLead?.assignee" class="text-xs text-slate-500 mt-3">Owner: <span class="font-medium text-slate-800">{{ activeLead.assignee.name }}</span></p>
-            </div>
+            </BaseCard>
 
             <!-- Full-width on desktop: avoids 3-column grid inside a narrow sidebar -->
-            <div v-if="customer" class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 sm:p-5 mb-4 lg:mb-5 w-full min-w-0">
-                <h2 class="text-base font-semibold text-slate-800 mb-4 pb-2 border-b border-slate-200">
-                    {{ customerTypeLabel }} details
-                </h2>
+            <BaseCard v-if="customer" :title="`${customerTypeLabel} details`" class="mb-4 lg:mb-5 w-full min-w-0">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-5 [word-break:break-word]">
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.name || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Business name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.business_name || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Owner name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.owner_name || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Phone number 1</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.phone || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Contact Person 2 Name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.contact_person_2_name || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Contact Person 2 Phone</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.contact_person_2_phone || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Email</span><div class="font-medium text-slate-900 mt-0.5 break-all">{{ customer.email || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Secondary email</span><div class="font-medium text-slate-900 mt-0.5 break-all">{{ customer.email_secondary || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">WhatsApp number</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.whatsapp_number || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">SMS number</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.sms_number || '—' }}</div></div>
-                    <div class="min-w-0 sm:col-span-2 lg:col-span-2 xl:col-span-2"><span class="text-xs text-slate-500 uppercase tracking-wide block">Address</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.address || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Postcode</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.postcode || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">City</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.city || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">VAT number</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.vat_number || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Source</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.source || lead?.source || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">AnyDesk / RustDesk</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.anydesk_rustdesk || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">EPOS type</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.epos_type || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Licence days</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.lic_days ?? '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Birthday</span><div class="font-medium text-slate-900 mt-0.5">{{ formatDate(customer.birthday) || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Category</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.category || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-xs text-slate-500 uppercase tracking-wide block">Created on</span><div class="font-medium text-slate-900 mt-0.5">{{ formatDate(customer.created_at) || '—' }}</div></div>
-                    <div class="min-w-0 sm:col-span-2 lg:col-span-3 xl:col-span-4"><span class="text-xs text-slate-500 uppercase tracking-wide block">Assigned employees</span><div class="font-medium text-slate-900 mt-0.5 flex flex-wrap gap-1"><template v-if="customer.assigned_users?.length"><span v-for="u in customer.assigned_users" :key="u.id" class="inline-flex px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-sm">{{ u.name }}</span></template><span v-else>—</span></div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.name || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Business name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.business_name || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Owner name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.owner_name || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Phone number 1</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.phone || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Contact Person 2 Name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.contact_person_2_name || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Contact Person 2 Phone</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.contact_person_2_phone || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Email</span><div class="font-medium text-slate-900 mt-0.5 break-all">{{ customer.email || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Secondary email</span><div class="font-medium text-slate-900 mt-0.5 break-all">{{ customer.email_secondary || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">WhatsApp number</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.whatsapp_number || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">SMS number</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.sms_number || '—' }}</div></div>
+                    <div class="min-w-0 sm:col-span-2 lg:col-span-2 xl:col-span-2"><span class="text-eyebrow text-slate-500 uppercase block">Address</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.address || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Postcode</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.postcode || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">City</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.city || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">VAT number</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.vat_number || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Source</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.source || lead?.source || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">AnyDesk / RustDesk</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.anydesk_rustdesk || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">EPOS type</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.epos_type || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Licence days</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.lic_days ?? '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Birthday</span><div class="font-medium text-slate-900 mt-0.5">{{ formatDate(customer.birthday) || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Category</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.category || '—' }}</div></div>
+                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Created on</span><div class="font-medium text-slate-900 mt-0.5">{{ formatDate(customer.created_at) || '—' }}</div></div>
+                    <div class="min-w-0 sm:col-span-2 lg:col-span-3 xl:col-span-4"><span class="text-eyebrow text-slate-500 uppercase block">Assigned employees</span><div class="font-medium text-slate-900 mt-0.5 flex flex-wrap gap-1"><template v-if="customer.assigned_users?.length"><span v-for="u in customer.assigned_users" :key="u.id" class="chip">{{ u.name }}</span></template><span v-else>—</span></div></div>
                 </div>
                 <div v-if="customer.notes" class="mt-4 pt-4 border-t border-slate-200">
-                    <span class="text-xs text-slate-500 uppercase tracking-wide block">Notes</span>
+                    <span class="text-eyebrow text-slate-500 uppercase block">Notes</span>
                     <div class="font-medium text-slate-900 mt-0.5 whitespace-pre-wrap break-words">{{ customer.notes }}</div>
                 </div>
                 <div v-if="activeLead?.expected_closing_date" class="mt-4 pt-4 border-t border-slate-200">
-                    <span class="text-xs text-slate-500 uppercase tracking-wide block">Expected closing date</span>
+                    <span class="text-eyebrow text-slate-500 uppercase block">Expected closing date</span>
                     <div class="font-medium text-slate-900 mt-0.5">{{ formatDate(activeLead.expected_closing_date) }}</div>
                 </div>
-            </div>
+            </BaseCard>
 
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start">
                 <aside class="lg:col-span-4 xl:col-span-3 space-y-4 order-2 lg:order-1 min-w-0">
             <!-- Leads + activity filters → History for selected lead -->
-            <div v-if="customer" class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-                <button
-                    type="button"
-                    class="w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 text-left hover:bg-slate-50/80 transition-colors touch-manipulation"
-                    :aria-expanded="showLeadsPanel"
-                    @click="showLeadsPanel = !showLeadsPanel"
-                >
-                    <div class="min-w-0">
-                        <span class="text-base font-semibold text-slate-900">Leads &amp; activity</span>
-                        <p class="text-xs text-slate-500 mt-0.5 truncate">Filter by time or person — click a lead for its timeline</p>
-                    </div>
-                    <svg class="w-5 h-5 text-slate-400 shrink-0 transition-transform" :class="showLeadsPanel ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </button>
-                <div v-show="showLeadsPanel" class="px-4 sm:px-5 pb-4 border-t border-slate-100 space-y-3">
+            <div v-if="customer" class="card overflow-hidden">
+                <h2>
+                    <button
+                        type="button"
+                        class="w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 text-left hover:bg-slate-50/80 transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500/40"
+                        :aria-expanded="showLeadsPanel"
+                        aria-controls="customerleadview-leads-panel"
+                        @click="showLeadsPanel = !showLeadsPanel"
+                    >
+                        <span class="min-w-0">
+                            <span class="block text-base font-semibold text-slate-900">Leads &amp; activity</span>
+                            <span class="block text-xs font-normal text-slate-500 mt-0.5 truncate">Filter by time or person — click a lead for its timeline</span>
+                        </span>
+                        <ChevronDownIcon
+                            class="icon text-slate-500 shrink-0 transition-transform"
+                            :class="showLeadsPanel ? 'rotate-180' : ''"
+                            aria-hidden="true"
+                        />
+                    </button>
+                </h2>
+                <div id="customerleadview-leads-panel" v-show="showLeadsPanel" class="px-4 sm:px-5 pb-4 border-t border-slate-100 space-y-3">
                     <div class="flex flex-wrap gap-1.5 pt-3">
-                        <button type="button" class="px-2.5 py-1 text-xs font-semibold rounded-md border transition-colors touch-manipulation" :class="leadActivityPreset === 'all' ? 'border-sky-600 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'" @click="setActivityPreset('all')">All</button>
-                        <button type="button" class="px-2.5 py-1 text-xs font-semibold rounded-md border transition-colors touch-manipulation" :class="leadActivityPreset === 'today' ? 'border-sky-600 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'" @click="setActivityPreset('today')">Today</button>
-                        <button type="button" class="px-2.5 py-1 text-xs font-semibold rounded-md border transition-colors touch-manipulation" :class="leadActivityPreset === 'week' ? 'border-sky-600 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'" @click="setActivityPreset('week')">Week</button>
-                        <button type="button" class="px-2.5 py-1 text-xs font-semibold rounded-md border transition-colors touch-manipulation" :class="leadActivityPreset === 'month' ? 'border-sky-600 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'" @click="setActivityPreset('month')">Month</button>
+                        <BaseButton :variant="leadActivityPreset === 'all' ? 'primary' : 'outline'" :aria-pressed="leadActivityPreset === 'all'" @click="setActivityPreset('all')">All</BaseButton>
+                        <BaseButton :variant="leadActivityPreset === 'today' ? 'primary' : 'outline'" :aria-pressed="leadActivityPreset === 'today'" @click="setActivityPreset('today')">Today</BaseButton>
+                        <BaseButton :variant="leadActivityPreset === 'week' ? 'primary' : 'outline'" :aria-pressed="leadActivityPreset === 'week'" @click="setActivityPreset('week')">Week</BaseButton>
+                        <BaseButton :variant="leadActivityPreset === 'month' ? 'primary' : 'outline'" :aria-pressed="leadActivityPreset === 'month'" @click="setActivityPreset('month')">Month</BaseButton>
                     </div>
                     <div class="grid grid-cols-1 gap-2">
                         <div>
-                            <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">One day</label>
-                            <input v-model="leadFilterSingleDate" type="date" class="mt-0.5 w-full text-sm border border-slate-300 rounded-md px-2 py-1.5" @change="onSingleDayPicked" />
+                            <label class="form-label" for="customerleadview-one-day">One day</label>
+                            <input id="customerleadview-one-day" v-model="leadFilterSingleDate" type="date" class="form-input" @change="onSingleDayPicked" />
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">From</label>
-                                <input v-model="leadFilterFrom" type="date" class="mt-0.5 w-full text-sm border border-slate-300 rounded-md px-2 py-1.5" @change="onRangeChanged" />
+                                <label class="form-label" for="customerleadview-from">From</label>
+                                <input id="customerleadview-from" v-model="leadFilterFrom" type="date" class="form-input" @change="onRangeChanged" />
                             </div>
                             <div>
-                                <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">To</label>
-                                <input v-model="leadFilterTo" type="date" class="mt-0.5 w-full text-sm border border-slate-300 rounded-md px-2 py-1.5" @change="onRangeChanged" />
+                                <label class="form-label" for="customerleadview-to">To</label>
+                                <input id="customerleadview-to" v-model="leadFilterTo" type="date" class="form-input" @change="onRangeChanged" />
                             </div>
                         </div>
                         <div v-if="isAdminForFilter">
-                            <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Activity by</label>
-                            <select v-model="leadFilterUserId" class="mt-0.5 w-full text-sm border border-slate-300 rounded-md px-2 py-1.5 bg-white">
+                            <label class="form-label" for="customerleadview-activity-by">Activity by</label>
+                            <select id="customerleadview-activity-by" v-model="leadFilterUserId" class="form-select">
                                 <option value="">Anyone</option>
                                 <option v-for="emp in filterEmployees" :key="emp.id" :value="String(emp.id)">{{ emp.name }}</option>
                             </select>
                         </div>
-                        <p v-else class="text-[11px] text-slate-500">Managers and admins can filter by the person who logged an activity.</p>
-                        <button type="button" class="text-xs text-sky-700 hover:text-sky-900 font-medium text-left" @click="clearActivityFilters">Clear filters</button>
+                        <p v-else class="form-hint">Managers and admins can filter by the person who logged an activity.</p>
+                        <div>
+                            <BaseButton variant="ghost" @click="clearActivityFilters">Clear filters</BaseButton>
+                        </div>
                     </div>
                     <p v-if="allLeads.length === 0" class="text-sm text-slate-500 py-2">No leads yet for this {{ customerTypeLabel.toLowerCase() }}.</p>
                     <template v-else>
@@ -197,7 +195,7 @@
                             Showing <span class="font-semibold text-slate-700">{{ sidebarLeadsFiltered.length }}</span> of {{ allLeads.length }} leads
                             <span v-if="activityFilterActive">(with activity in the current filter)</span>
                         </p>
-                        <div v-if="sidebarLeadsFiltered.length === 0" class="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
+                        <div v-if="sidebarLeadsFiltered.length === 0" class="callout callout-warning">
                             No leads match this filter. Try <strong>All</strong> or widen the date range.
                         </div>
                         <nav aria-label="Leads for this customer" class="space-y-1 max-h-[min(420px,50vh)] overflow-y-auto -mx-1 px-1">
@@ -205,17 +203,18 @@
                                 v-for="l in sidebarLeadsFiltered"
                                 :key="l.id"
                                 type="button"
-                                class="w-full text-left rounded-lg border px-3 py-2.5 transition-colors touch-manipulation"
-                                :class="Number(selectedLeadId) === Number(l.id) ? 'border-sky-400 bg-sky-50/90 ring-1 ring-sky-200' : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/80'"
+                                class="w-full text-left rounded-card border px-3 py-2.5 transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                                :class="Number(selectedLeadId) === Number(l.id) ? 'border-primary-400 bg-primary-50/90 ring-1 ring-primary-200' : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/80'"
+                                :aria-current="Number(selectedLeadId) === Number(l.id) ? 'true' : undefined"
                                 @click="openLeadHistoryFromSidebar(l)"
                             >
-                                <div class="font-medium text-slate-900 text-sm leading-snug pr-1">{{ leadSidebarTitle(l) }}</div>
-                                <div class="flex flex-wrap items-center gap-1.5 mt-1">
-                                    <span class="font-mono text-xs text-sky-700">#{{ l.id }}</span>
-                                    <span class="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium" :class="getStageClass(l.stage)">{{ formatStage(l.stage) }}</span>
-                                </div>
-                                <div class="text-[11px] text-slate-500 mt-1">Created {{ formatDate(l.created_at) || '—' }}<template v-if="l.creator?.name"> · {{ l.creator.name }}</template></div>
-                                <div v-if="l.assignee?.name" class="text-[11px] text-slate-600">Owner: {{ l.assignee.name }}</div>
+                                <span class="block font-medium text-slate-900 text-sm leading-snug pr-1">{{ leadSidebarTitle(l) }}</span>
+                                <span class="flex flex-wrap items-center gap-1.5 mt-1">
+                                    <span class="font-mono text-xs text-primary-700">#{{ l.id }}</span>
+                                    <BaseBadge :status="l.stage">{{ formatStage(l.stage) }}</BaseBadge>
+                                </span>
+                                <span class="block text-[11px] text-slate-500 mt-1">Created {{ formatDate(l.created_at) || '—' }}<template v-if="l.creator?.name"> · {{ l.creator.name }}</template></span>
+                                <span v-if="l.assignee?.name" class="block text-[11px] text-slate-600">Owner: {{ l.assignee.name }}</span>
                             </button>
                         </nav>
                         <p class="text-[11px] text-slate-500">Click a lead for <strong>History</strong>: appointments, follow-ups, messages, notes.</p>
@@ -224,41 +223,38 @@
             </div>
 
             <!-- Prospect for / Purchased (categorization) -->
-            <div v-if="customer && (prospectProductNames.length > 0 || purchasedProductNames.length > 0)" class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 sm:p-5">
-                <h2 class="text-base font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">Products</h2>
+            <BaseCard v-if="customer && (prospectProductNames.length > 0 || purchasedProductNames.length > 0)" title="Products">
                 <div v-if="prospectProductNames.length > 0" class="mb-3">
-                    <span class="text-xs text-slate-500 uppercase tracking-wide">Prospect for</span>
-                    <div class="font-medium text-slate-900 mt-0.5 flex flex-wrap gap-2">
-                        <span v-for="name in prospectProductNames" :key="name" class="inline-flex px-2 py-1 rounded bg-amber-50 text-amber-800 text-sm">{{ name }}</span>
+                    <span class="text-eyebrow text-slate-500 uppercase block">Prospect for</span>
+                    <div class="mt-1 flex flex-wrap gap-2">
+                        <BaseBadge v-for="name in prospectProductNames" :key="name" tone="warning">{{ name }}</BaseBadge>
                     </div>
                 </div>
                 <div v-if="purchasedProductNames.length > 0">
-                    <span class="text-xs text-slate-500 uppercase tracking-wide">Purchased</span>
-                    <div class="font-medium text-slate-900 mt-0.5 flex flex-wrap gap-2">
-                        <span v-for="name in purchasedProductNames" :key="name" class="inline-flex px-2 py-1 rounded bg-emerald-50 text-emerald-800 text-sm">{{ name }}</span>
+                    <span class="text-eyebrow text-slate-500 uppercase block">Purchased</span>
+                    <div class="mt-1 flex flex-wrap gap-2">
+                        <BaseBadge v-for="name in purchasedProductNames" :key="name" tone="success">{{ name }}</BaseBadge>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- Assignment log (customer) -->
-            <div v-if="customer?.assignments?.length" class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 sm:p-5">
-                <h2 class="text-base font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">Assignment log</h2>
+            <BaseCard v-if="customer?.assignments?.length" title="Assignment log">
                 <ul class="space-y-2">
                     <li v-for="a in customer.assignments" :key="a.id" class="text-sm text-slate-700">
                         Assigned to <strong>{{ a.user?.name || '—' }}</strong> by <strong>{{ (a.assignedBy && a.assignedBy.name) || '—' }}</strong> on {{ formatDate(a.assigned_at) }}
                         <span v-if="a.notes" class="text-slate-500"> — {{ a.notes }}</span>
                     </li>
                 </ul>
-            </div>
+            </BaseCard>
 
             <!-- What Customer / Prospect Has Section -->
-            <div v-if="customerHasItems.length > 0" class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 sm:p-5">
-                <h3 class="text-lg font-semibold text-slate-900 mb-4">What {{ customerTypeLabel }} Has</h3>
+            <BaseCard v-if="customerHasItems.length > 0" :title="`What ${customerTypeLabel} Has`">
                 <div class="grid grid-cols-1 gap-3">
                     <div
                         v-for="item in customerHasItems"
                         :key="item.id"
-                        class="border border-slate-200 rounded-lg p-4"
+                        class="border border-slate-200 rounded-card p-4"
                     >
                         <div class="font-medium text-slate-900">{{ item.product?.name }}</div>
                         <div class="text-sm text-slate-600 mt-1">
@@ -270,124 +266,117 @@
                         <div v-if="item.notes" class="text-xs text-slate-500 mt-2">{{ item.notes }}</div>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- What to Sell Next Section -->
-            <div v-if="nextProducts.length > 0" class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 sm:p-5">
-                <h3 class="text-lg font-semibold text-slate-900 mb-4">What to Sell Next</h3>
+            <BaseCard v-if="nextProducts.length > 0" title="What to Sell Next">
                 <div class="grid grid-cols-1 gap-3">
                     <div
                         v-for="suggestion in nextProducts"
                         :key="suggestion.product.id"
-                        class="border border-purple-200 rounded-lg p-4 bg-purple-50"
+                        class="callout callout-info"
                     >
-                        <div class="font-medium text-purple-900">{{ suggestion.product.name }}</div>
-                        <div class="text-sm text-purple-700 mt-1">
+                        <div class="font-medium text-primary-900">{{ suggestion.product.name }}</div>
+                        <div class="text-sm text-primary-800 mt-1">
                             Suggested because customer has: {{ suggestion.suggested_by }}
                         </div>
                     </div>
                 </div>
-            </div>
+            </BaseCard>
 
             <!-- Sidebar: tickets & invoices -->
-            <div v-if="tickets.length > 0 || invoices.length > 0" class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 sm:p-5 space-y-4">
-                <div v-if="tickets.length > 0">
-                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Tickets</h3>
-                    <ul class="space-y-2">
-                        <li v-for="t in tickets" :key="t.id" class="text-sm border border-slate-100 rounded-md p-2">
-                            <div class="font-medium text-slate-900">{{ t.ticket_number }}</div>
-                            <div class="text-slate-600 truncate">{{ t.subject }}</div>
-                        </li>
-                    </ul>
+            <BaseCard v-if="tickets.length > 0 || invoices.length > 0">
+                <div class="space-y-4">
+                    <div v-if="tickets.length > 0">
+                        <h2 class="text-eyebrow text-slate-500 uppercase mb-2">Tickets</h2>
+                        <ul class="space-y-2">
+                            <li v-for="t in tickets" :key="t.id" class="text-sm border border-slate-100 rounded-control p-2">
+                                <div class="font-medium text-slate-900">{{ t.ticket_number }}</div>
+                                <div class="text-slate-600 truncate">{{ t.subject }}</div>
+                            </li>
+                        </ul>
+                    </div>
+                    <div v-if="invoices.length > 0">
+                        <h2 class="text-eyebrow text-slate-500 uppercase mb-2">Invoices</h2>
+                        <ul class="space-y-2">
+                            <li v-for="inv in invoices" :key="inv.id" class="text-sm border border-slate-100 rounded-control p-2 flex justify-between gap-2">
+                                <span class="font-medium text-slate-900">{{ inv.invoice_number }}</span>
+                                <span class="text-slate-700">£{{ formatNumber(inv.total) }}</span>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
-                <div v-if="invoices.length > 0">
-                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Invoices</h3>
-                    <ul class="space-y-2">
-                        <li v-for="inv in invoices" :key="inv.id" class="text-sm border border-slate-100 rounded-md p-2 flex justify-between gap-2">
-                            <span class="font-medium text-slate-900">{{ inv.invoice_number }}</span>
-                            <span class="text-slate-700">£{{ formatNumber(inv.total) }}</span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
+            </BaseCard>
                 </aside>
 
                 <main class="lg:col-span-8 xl:col-span-9 space-y-4 order-1 lg:order-2 min-w-0">
-                    <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-                        <nav class="flex border-b border-slate-200 text-sm font-semibold bg-slate-50/90" aria-label="Workspace">
-                            <button type="button" class="flex-1 sm:flex-none px-4 py-3 border-b-2 transition-colors touch-manipulation min-h-[44px]" :class="workspaceMainTab === 'focus' ? 'border-sky-600 text-sky-900 bg-white' : 'border-transparent text-slate-600 hover:text-slate-900'" @click="workspaceMainTab = 'focus'">Focus</button>
-                            <button type="button" class="flex-1 sm:flex-none px-4 py-3 border-b-2 transition-colors touch-manipulation min-h-[44px]" :class="workspaceMainTab === 'messages' ? 'border-sky-600 text-sky-900 bg-white' : 'border-transparent text-slate-600 hover:text-slate-900'" @click="workspaceMainTab = 'messages'">Messages</button>
-                            <button type="button" class="flex-1 sm:flex-none px-4 py-3 border-b-2 transition-colors touch-manipulation min-h-[44px]" :class="workspaceMainTab === 'history' ? 'border-sky-600 text-sky-900 bg-white' : 'border-transparent text-slate-600 hover:text-slate-900'" @click="workspaceMainTab = 'history'">History</button>
+                    <div class="card overflow-hidden">
+                        <nav class="tab-list border-b border-slate-200 bg-slate-50/90" aria-label="Workspace">
+                            <button type="button" class="tab min-h-[42px]" :class="workspaceMainTab === 'focus' ? 'tab-active' : ''" :aria-current="workspaceMainTab === 'focus' ? 'page' : undefined" @click="workspaceMainTab = 'focus'">Focus</button>
+                            <button type="button" class="tab min-h-[42px]" :class="workspaceMainTab === 'messages' ? 'tab-active' : ''" :aria-current="workspaceMainTab === 'messages' ? 'page' : undefined" @click="workspaceMainTab = 'messages'">Messages</button>
+                            <button type="button" class="tab min-h-[42px]" :class="workspaceMainTab === 'history' ? 'tab-active' : ''" :aria-current="workspaceMainTab === 'history' ? 'page' : undefined" @click="workspaceMainTab = 'history'">History</button>
                         </nav>
                         <div class="p-4 sm:p-5">
                             <div v-show="workspaceMainTab === 'focus'" class="space-y-5">
             <!-- Appointment timeline (active lead) -->
-            <div>
-                <h3 class="text-base font-semibold text-slate-900 mb-1">Appointments</h3>
+            <section>
+                <h2 class="text-base font-semibold text-slate-900 mb-1">Appointments</h2>
                 <p class="text-sm text-slate-500 mb-3">Scheduled visits for the selected lead. Use <strong>Schedule</strong> above or Log activity → Appointment.</p>
-                <div v-if="appointmentsForActiveLead.length === 0" class="rounded-lg border border-dashed border-slate-200 bg-slate-50/80 py-6 sm:py-8 px-4 text-center text-sm text-slate-500">
-                    No appointment scheduled. Click <strong>Schedule</strong> in the header to book one.
-                </div>
+                <EmptyState
+                    v-if="appointmentsForActiveLead.length === 0"
+                    heading="No appointment scheduled"
+                    description="Click Schedule in the header to book one."
+                >
+                    <template #icon><CalendarDaysIcon class="icon" aria-hidden="true" /></template>
+                </EmptyState>
                 <div v-else class="space-y-3">
                     <div
                         v-for="apt in appointmentsForActiveLead"
                         :key="apt.id"
-                        class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 p-4 rounded-lg border"
-                        :class="apt.appointment_status === 'completed' ? 'bg-green-50 border-green-100' : apt.appointment_status === 'cancelled' || apt.appointment_status === 'no_show' ? 'bg-slate-50 border-slate-200' : 'bg-amber-50 border-amber-100'"
+                        class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 p-4 rounded-card border"
+                        :class="apt.appointment_status === 'completed' ? 'bg-success-50 border-success-200' : apt.appointment_status === 'cancelled' || apt.appointment_status === 'no_show' ? 'bg-slate-50 border-slate-200' : 'bg-warning-50 border-warning-200'"
                     >
                         <div class="flex-1 min-w-0">
-                            <div class="font-medium text-slate-900">{{ apt.description || 'Appointment' }}</div>
+                            <h3 class="font-medium text-slate-900">{{ apt.description || 'Appointment' }}</h3>
                             <div class="text-sm text-slate-600 mt-0.5">
                                 {{ formatAppointmentDate(apt.appointment_date) }} at {{ apt.appointment_time || '10:00' }}
                             </div>
                             <div class="text-xs text-slate-500 mt-1">Lead #{{ apt.lead_id }}</div>
                             <div v-if="apt.assignee?.name" class="text-xs text-slate-500 mt-0.5">Assigned to: {{ apt.assignee.name }}</div>
-                            <div v-if="apt.outcome_notes" class="text-sm text-slate-700 mt-2 p-2 bg-white/60 rounded">{{ apt.outcome_notes }}</div>
+                            <div v-if="apt.outcome_notes" class="text-sm text-slate-700 mt-2 p-2 bg-white/60 rounded-control">{{ apt.outcome_notes }}</div>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
-                            <span
-                                class="px-2 py-1 rounded text-xs font-medium"
-                                :class="getAppointmentStatusClass(apt.appointment_status)"
-                            >
+                            <BaseBadge :status="apt.appointment_status">
                                 {{ getAppointmentStatusLabel(apt.appointment_status) }}
-                            </span>
-                            <router-link
-                                :to="`/appointments/${apt.id}`"
-                                class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700"
-                            >
-                                View / Update
-                            </router-link>
-                            <button
-                                @click="openCompleteForAppointment(apt)"
-                                class="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
-                            >
+                            </BaseBadge>
+                            <BaseButton variant="outline" :to="`/appointments/${apt.id}`">View / Update</BaseButton>
+                            <BaseButton variant="success" @click="openCompleteForAppointment(apt)">
+                                <template #icon><CheckIcon class="icon-sm" aria-hidden="true" /></template>
                                 Complete
-                            </button>
+                            </BaseButton>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
             <!-- Active leads & line items (all open leads) -->
-            <div v-if="activeLeads.length > 0" class="rounded-lg border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
-                <h3 class="text-base font-semibold text-slate-900 mb-3">Leads &amp; products</h3>
+            <section v-if="activeLeads.length > 0" class="rounded-card border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+                <h2 class="text-base font-semibold text-slate-900 mb-3">Leads &amp; products</h2>
                 <div class="space-y-4">
                     <div
                         v-for="leadRow in activeLeads"
                         :key="leadRow.id"
-                        class="border border-slate-200 rounded-lg p-4 bg-white"
+                        class="border border-slate-200 rounded-card p-4 bg-white"
                     >
                         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
                             <div>
-                                <div class="font-medium text-slate-900">
+                                <h3 class="font-medium text-slate-900">
                                     Lead #{{ leadRow.id }}
+                                </h3>
+                                <div class="text-sm text-slate-600 mt-1 flex flex-wrap items-center gap-1.5">
+                                    Stage: <BaseBadge :status="leadRow.stage">{{ formatStage(leadRow.stage) }}</BaseBadge>
                                 </div>
-                                <div class="text-sm text-slate-600 mt-1">
-                                    Stage: <span :class="getStageClass(leadRow.stage)" class="px-2 py-1 rounded text-xs">
-                                        {{ formatStage(leadRow.stage) }}
-                                    </span>
-                                </div>
-                                <div v-if="leadRow.next_follow_up_at" class="text-sm text-amber-700 mt-1 font-medium">
+                                <div v-if="leadRow.next_follow_up_at" class="text-sm text-warning-800 mt-1 font-medium">
                                     Next follow-up: {{ formatDate(leadRow.next_follow_up_at) }}
                                 </div>
                                 <div v-if="(leadRow.assignment_logs || leadRow.assignmentLogs)?.length" class="text-xs text-slate-500 mt-2">
@@ -396,13 +385,10 @@
                                     </span>
                                 </div>
                             </div>
-                            <button
-                                type="button"
-                                @click="openActivityModal(leadRow)"
-                                class="px-4 py-2 bg-sky-600 text-white text-sm rounded-md hover:bg-sky-700 flex items-center justify-center gap-2 w-full sm:w-auto"
-                            >
+                            <BaseButton variant="primary" block-mobile @click="openActivityModal(leadRow)">
+                                <template #icon><ClipboardDocumentIcon class="icon-sm" aria-hidden="true" /></template>
                                 Log activity
-                            </button>
+                            </BaseButton>
                         </div>
                         <div v-if="leadRow.items && leadRow.items.length > 0" class="mt-3 pt-3 border-t border-slate-100">
                             <div class="text-sm font-medium text-slate-700 mb-2">Products</div>
@@ -410,13 +396,22 @@
                                 <div
                                     v-for="item in leadRow.items"
                                     :key="item.id"
-                                    class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg min-w-0"
+                                    class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 rounded-card min-w-0"
                                     :class="getItemStatusClass(item.status)"
                                 >
                                     <div class="flex items-center gap-3 min-w-0 flex-1">
-                                        <span v-if="item.status === 'won'" class="text-green-600">✓</span>
-                                        <span v-else-if="item.status === 'lost'" class="text-red-600">✗</span>
-                                        <span v-else class="text-amber-600">○</span>
+                                        <template v-if="item.status === 'won'">
+                                            <CheckCircleIcon class="icon text-success-700 shrink-0" aria-hidden="true" />
+                                            <span class="sr-only">Won:</span>
+                                        </template>
+                                        <template v-else-if="item.status === 'lost'">
+                                            <XCircleIcon class="icon text-danger-600 shrink-0" aria-hidden="true" />
+                                            <span class="sr-only">Lost:</span>
+                                        </template>
+                                        <template v-else>
+                                            <ClockIcon class="icon text-warning-800 shrink-0" aria-hidden="true" />
+                                            <span class="sr-only">Pending:</span>
+                                        </template>
                                         <div>
                                             <div class="font-medium text-slate-900">{{ item.product?.name }}</div>
                                             <div v-if="item.status === 'won'" class="text-xs text-slate-600">
@@ -425,30 +420,30 @@
                                         </div>
                                     </div>
                                     <div v-if="item.status === 'pending'" class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
-                                        <button
-                                            type="button"
+                                        <BaseButton
+                                            variant="success"
+                                            :label="`Mark ${item.product?.name || 'product'} as won`"
                                             @click="openCloseItemModal(leadRow, item, 'won')"
-                                            class="px-3 py-1 text-xs bg-green-600 text-white rounded-md hover:bg-green-700 touch-manipulation"
                                         >
                                             Won
-                                        </button>
-                                        <button
-                                            type="button"
+                                        </BaseButton>
+                                        <BaseButton
+                                            variant="danger"
+                                            :label="`Mark ${item.product?.name || 'product'} as lost`"
                                             @click="openCloseItemModal(leadRow, item, 'lost')"
-                                            class="px-3 py-1 text-xs bg-red-600 text-white rounded-md hover:bg-red-700 touch-manipulation"
                                         >
                                             Lost
-                                        </button>
+                                        </BaseButton>
                                     </div>
-                                    <span v-else class="text-xs px-2 py-1 rounded shrink-0" :class="item.status === 'won' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+                                    <BaseBadge v-else :status="item.status" class="shrink-0">
                                         {{ formatLineItemStatus(item.status) }}
-                                    </span>
+                                    </BaseBadge>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
             <FollowUpLeadForm
                 v-if="customer"
@@ -461,7 +456,7 @@
                             </div>
 
                             <div v-show="workspaceMainTab === 'messages'" class="space-y-4">
-            <div>
+            <section>
                 <h2 class="text-base font-semibold text-slate-900 mb-1">Send messages</h2>
                 <p class="text-sm text-slate-500 mb-4">Email, SMS, and WhatsApp are logged in <strong>History</strong>. WhatsApp follows Meta’s delivery rules.</p>
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -494,11 +489,11 @@
                         @refresh-logs="loadCommunicationLogsOnly"
                     />
                 </div>
-            </div>
+            </section>
                             </div>
 
-                            <div v-show="workspaceMainTab === 'history'">
-                                <p v-if="historyTimelineLoading" class="text-sm text-slate-500 mb-2">Updating history…</p>
+                            <div v-show="workspaceMainTab === 'history'" :aria-busy="historyTimelineLoading ? 'true' : 'false'">
+                                <p v-if="historyTimelineLoading" class="text-sm text-slate-500 mb-2" role="status" aria-live="polite">Updating history…</p>
             <TimelineSection
                 :timeline="displayHistoryTimeline"
                 class="border-0 shadow-none"
@@ -512,80 +507,74 @@
         </div>
 
         <!-- Close line item (Won / Lost) -->
-        <div v-if="showCloseItemModal" class="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
-            <div class="bg-white rounded-xl shadow-xl p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-                <h3 class="text-lg font-semibold text-slate-900 mb-4">
-                    Close Product: {{ closeItemData.item?.product?.name }}
-                </h3>
-
-                <div v-if="closeItemData.status === 'won'" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Quantity *</label>
-                        <input
-                            v-model.number="closeItemData.quantity"
-                            type="number"
-                            min="1"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Unit Price (£) *</label>
-                        <input
-                            v-model.number="closeItemData.unit_price"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-                        <textarea
-                            v-model="closeItemData.notes"
-                            rows="2"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                            placeholder="Optional notes..."
-                        />
-                    </div>
+        <BaseModal
+            v-model="showCloseItemModal"
+            :title="`Close Product: ${closeItemData.item?.product?.name || ''}`"
+            size="md"
+            :close-on-backdrop="false"
+        >
+            <div v-if="closeItemData.status === 'won'" class="space-y-4">
+                <div>
+                    <label class="form-label" for="customerleadview-quantity">Quantity <span class="form-required" aria-hidden="true">*</span></label>
+                    <input id="customerleadview-quantity"
+                        v-model.number="closeItemData.quantity"
+                        type="number"
+                        min="1"
+                        required
+                        class="form-input"
+                    />
                 </div>
-
-                <div v-else class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Lost Reason *</label>
-                        <textarea
-                            v-model="closeItemData.lost_reason"
-                            rows="3"
-                            required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                            placeholder="Why was this product lost?"
-                        />
-                    </div>
+                <div>
+                    <label class="form-label" for="customerleadview-unit-price">Unit Price (£) <span class="form-required" aria-hidden="true">*</span></label>
+                    <input id="customerleadview-unit-price"
+                        v-model.number="closeItemData.unit_price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        class="form-input"
+                    />
                 </div>
-
-                <div v-if="closeItemError" class="mt-4 text-sm text-red-600 bg-red-50 p-3 rounded">
-                    {{ closeItemError }}
-                </div>
-
-                <div class="flex justify-end gap-3 mt-6">
-                    <button
-                        type="button"
-                        @click="showCloseItemModal = false"
-                        class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        @click="confirmCloseItem"
-                        :disabled="closeItemLoading"
-                        class="px-4 py-2 text-sm text-white rounded-lg"
-                        :class="closeItemData.status === 'won' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'"
-                    >
-                        {{ closeItemLoading ? 'Saving...' : (closeItemData.status === 'won' ? 'Mark as Won' : 'Mark as Lost') }}
-                    </button>
+                <div>
+                    <label class="form-label" for="customerleadview-notes">Notes</label>
+                    <textarea id="customerleadview-notes"
+                        v-model="closeItemData.notes"
+                        rows="2"
+                        class="form-textarea"
+                        placeholder="Optional notes..."
+                    />
                 </div>
             </div>
-        </div>
+
+            <div v-else class="space-y-4">
+                <div>
+                    <label class="form-label" for="customerleadview-lost-reason">Lost Reason <span class="form-required" aria-hidden="true">*</span></label>
+                    <textarea id="customerleadview-lost-reason"
+                        v-model="closeItemData.lost_reason"
+                        rows="3"
+                        required
+                        class="form-textarea"
+                        placeholder="Why was this product lost?"
+                    />
+                </div>
+            </div>
+
+            <p v-if="closeItemError" class="callout callout-danger mt-4" role="alert">
+                {{ closeItemError }}
+            </p>
+
+            <template #actions>
+                <BaseButton variant="outline" block-mobile @click="showCloseItemModal = false">Cancel</BaseButton>
+                <BaseButton
+                    :variant="closeItemData.status === 'won' ? 'success' : 'danger'"
+                    block-mobile
+                    :loading="closeItemLoading"
+                    @click="confirmCloseItem"
+                >
+                    {{ closeItemLoading ? 'Saving...' : (closeItemData.status === 'won' ? 'Mark as Won' : 'Mark as Lost') }}
+                </BaseButton>
+            </template>
+        </BaseModal>
 
         <!-- Assignment Modal -->
         <CustomerAssignmentModal
@@ -604,99 +593,121 @@
             @saved="handleActivitySaved"
         />
 
-        <div v-if="showLostLeadModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-                <h3 class="text-lg font-semibold text-slate-900 mb-2">Mark lead as Lost</h3>
-                <p class="text-sm text-slate-600 mb-4">Please provide a reason. This is required for reporting.</p>
+        <!-- Mark lead as Lost -->
+        <BaseModal
+            v-model="showLostLeadModal"
+            title="Mark lead as Lost"
+            description="Please provide a reason. This is required for reporting."
+            size="md"
+            :close-on-backdrop="false"
+        >
+            <div>
+                <label class="form-label" for="customerleadview-lead-lost-reason">
+                    Lost reason <span class="form-required" aria-hidden="true">*</span>
+                </label>
                 <textarea
+                    id="customerleadview-lead-lost-reason"
                     v-model="lostReasonInput"
                     rows="3"
-                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500"
+                    required
+                    class="form-textarea"
                     placeholder="Lost reason..."
                 />
-                <div class="flex justify-end gap-2 mt-4">
-                    <button type="button" class="px-4 py-2 text-sm border border-slate-300 rounded-lg" @click="showLostLeadModal = false">Cancel</button>
-                    <button
-                        type="button"
-                        class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg disabled:opacity-50"
-                        :disabled="stageUpdating"
-                        @click="submitMarkLeadLost"
-                    >
-                        Save
-                    </button>
-                </div>
             </div>
-        </div>
+
+            <template #actions>
+                <BaseButton variant="outline" block-mobile @click="showLostLeadModal = false">Cancel</BaseButton>
+                <BaseButton variant="danger" block-mobile :loading="stageUpdating" @click="submitMarkLeadLost">
+                    Save
+                </BaseButton>
+            </template>
+        </BaseModal>
 
         <!-- Complete Follow-up / Appointment Modal -->
-        <div v-if="showCompleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-                <div class="p-6 border-b border-slate-200">
-                    <h3 class="text-xl font-semibold text-slate-900">Complete Appointment / Follow-up</h3>
+        <BaseModal
+            v-model="showCompleteModal"
+            title="Complete Appointment / Follow-up"
+            size="md"
+            :close-on-backdrop="false"
+            @close="closeCompleteModal"
+        >
+            <form id="complete-followup-form" class="space-y-4" @submit.prevent="completeFollowUp">
+                <div>
+                    <label class="form-label" for="customerleadview-remarks-notes">
+                        Remarks / Notes <span class="form-required" aria-hidden="true">*</span>
+                    </label>
+                    <textarea id="customerleadview-remarks-notes"
+                        v-model="completeForm.remarks"
+                        rows="4"
+                        required
+                        class="form-textarea"
+                        placeholder="Enter your remarks..."
+                    />
                 </div>
-                <form @submit.prevent="completeFollowUp" class="p-6 space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-2">Remarks / Notes *</label>
-                        <textarea
-                            v-model="completeForm.remarks"
-                            rows="4"
-                            required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Enter your remarks..."
-                        />
-                    </div>
-                    <div>
-                        <label class="flex items-center gap-2">
-                            <input v-model="completeForm.saleHappened" type="checkbox" class="rounded border-slate-300 text-blue-600" />
-                            <span class="text-sm text-slate-700">Sale won (counts as sale; prospect becomes customer)</span>
-                        </label>
-                    </div>
-                    <div v-if="completeForm.saleHappened">
-                        <label class="block text-sm font-medium text-slate-700 mb-2">New Stage</label>
-                        <select v-model="completeForm.newStage" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="won">Won</option>
-                            <option value="quotation">Quotation</option>
-                            <option value="hot_lead">Hot Lead</option>
-                            <option value="lead">Lead</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-2">Next Follow-up Date (Optional)</label>
-                        <input
-                            v-model="completeForm.nextFollowUpAt"
-                            type="datetime-local"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                    <div class="flex justify-end gap-3 pt-4">
-                        <button type="button" @click="closeCompleteModal" :disabled="completingFollowUp" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
-                        <button type="submit" :disabled="completingFollowUp" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
-                            {{ completingFollowUp ? 'Saving...' : 'Complete' }}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <div v-if="showSaleCreditModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white rounded-xl shadow-xl max-w-md w-full">
-                <div class="p-6 border-b border-slate-200">
-                    <h3 class="text-lg font-semibold text-slate-900">Sale Credit</h3>
-                    <p class="text-sm text-slate-600 mt-1">{{ saleCreditContextText }}</p>
+                <div>
+                    <label class="form-choice">
+                        <input v-model="completeForm.saleHappened" type="checkbox" class="form-checkbox" />
+                        <span>Sale won (counts as sale; prospect becomes customer)</span>
+                    </label>
                 </div>
-                <div class="p-6 space-y-3">
-                    <label class="block text-sm font-medium text-slate-700">Select user for this sale</label>
-                    <select v-model="selectedSaleCreditUserId" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500">
-                        <option value="">Select user...</option>
-                        <option v-for="u in saleCreditUsers" :key="u.id" :value="String(u.id)">{{ u.name }} ({{ u.role?.name || '—' }})</option>
+                <div v-if="completeForm.saleHappened">
+                    <label class="form-label" for="customerleadview-new-stage">New Stage</label>
+                    <select id="customerleadview-new-stage" v-model="completeForm.newStage" class="form-select">
+                        <option value="won">Won</option>
+                        <option value="quotation">Quotation</option>
+                        <option value="hot_lead">Hot Lead</option>
+                        <option value="lead">Lead</option>
                     </select>
                 </div>
-                <div class="px-6 pb-6 flex justify-end gap-3">
-                    <button type="button" class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50" @click="closeSaleCreditModal">Cancel</button>
-                    <button type="button" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50" :disabled="!selectedSaleCreditUserId" @click="confirmSaleCreditSelection">Confirm</button>
+                <div>
+                    <label class="form-label" for="customerleadview-next-follow-up-date-optional">Next Follow-up Date (Optional)</label>
+                    <input id="customerleadview-next-follow-up-date-optional"
+                        v-model="completeForm.nextFollowUpAt"
+                        type="datetime-local"
+                        class="form-input"
+                    />
                 </div>
+            </form>
+
+            <template #actions>
+                <BaseButton variant="outline" block-mobile :disabled="completingFollowUp" @click="closeCompleteModal">
+                    Cancel
+                </BaseButton>
+                <BaseButton
+                    variant="success"
+                    type="submit"
+                    form="complete-followup-form"
+                    block-mobile
+                    :loading="completingFollowUp"
+                >
+                    {{ completingFollowUp ? 'Saving...' : 'Complete' }}
+                </BaseButton>
+            </template>
+        </BaseModal>
+
+        <!-- Sale credit -->
+        <BaseModal
+            v-model="showSaleCreditModal"
+            title="Sale Credit"
+            :description="saleCreditContextText"
+            size="md"
+            @close="closeSaleCreditModal"
+        >
+            <div>
+                <label class="form-label" for="customerleadview-select-user-for-this-sale">Select user for this sale</label>
+                <select id="customerleadview-select-user-for-this-sale" v-model="selectedSaleCreditUserId" class="form-select">
+                    <option value="">Select user...</option>
+                    <option v-for="u in saleCreditUsers" :key="u.id" :value="String(u.id)">{{ u.name }} ({{ u.role?.name || '—' }})</option>
+                </select>
             </div>
-        </div>
+
+            <template #actions>
+                <BaseButton variant="outline" block-mobile @click="closeSaleCreditModal">Cancel</BaseButton>
+                <BaseButton variant="primary" block-mobile :disabled="!selectedSaleCreditUserId" @click="confirmSaleCreditSelection">
+                    Confirm
+                </BaseButton>
+            </template>
+        </BaseModal>
     </div>
 </template>
 
@@ -713,6 +724,17 @@ import WhatsAppComposer from '@/components/WhatsAppComposer.vue';
 import EmailComposer from '@/components/EmailComposer.vue';
 import SMSComposer from '@/components/SMSComposer.vue';
 import CustomerAssignmentModal from '@/components/CustomerAssignmentModal.vue';
+import { BaseBadge, BaseButton, BaseCard, BaseModal, EmptyState } from '@/components/base';
+import {
+    ArrowLeftIcon,
+    CalendarDaysIcon,
+    CheckCircleIcon,
+    CheckIcon,
+    ChevronDownIcon,
+    ClipboardDocumentIcon,
+    ClockIcon,
+    XCircleIcon,
+} from '@heroicons/vue/24/outline';
 import { formatLeadStage, formatLineItemStatus } from '@/utils/displayFormat';
 
 const route = useRoute();
@@ -798,10 +820,10 @@ function pipelineStageVisualClass(currentStage, segmentStage) {
         return 'bg-slate-100 text-slate-500';
     }
     if (si < ci) {
-        return 'bg-emerald-500 text-white';
+        return 'bg-success-600 text-white';
     }
     if (si === ci) {
-        return 'bg-sky-600 text-white';
+        return 'bg-primary-600 text-white';
     }
     return 'bg-slate-200 text-slate-600';
 }
@@ -1270,11 +1292,6 @@ const getAppointmentStatusLabel = (s) => {
     const map = { pending: 'Pending', completed: 'Completed', cancelled: 'Cancelled', no_show: 'No show', rescheduled: 'Rescheduled' };
     return map[s] || s || 'Pending';
 };
-const getAppointmentStatusClass = (s) => {
-    const map = { pending: 'bg-amber-100 text-amber-800', completed: 'bg-green-100 text-green-800', cancelled: 'bg-slate-100 text-slate-600', no_show: 'bg-red-100 text-red-800', rescheduled: 'bg-blue-100 text-blue-800' };
-    return map[s] || 'bg-slate-100 text-slate-600';
-};
-
 const openCompleteForAppointment = (apt) => {
     if (!apt?.lead_id) return;
     selectedFollowUp.value = { id: apt.lead_id };
@@ -1356,33 +1373,11 @@ const formatDate = (dateString) => {
 
 const formatStage = (stage) => formatLeadStage(stage, '-');
 
-const getStageClass = (stage) => {
-    const classes = {
-        follow_up: 'bg-blue-100 text-blue-800',
-        lead: 'bg-green-100 text-green-800',
-        hot_lead: 'bg-orange-100 text-orange-800',
-        quotation: 'bg-purple-100 text-purple-800',
-        won: 'bg-emerald-100 text-emerald-800',
-        lost: 'bg-red-100 text-red-800',
-    };
-    return classes[stage] || 'bg-slate-100 text-slate-800';
-};
-
-const getStatusClass = (status) => {
-    const classes = {
-        open: 'bg-yellow-100 text-yellow-800',
-        in_progress: 'bg-blue-100 text-blue-800',
-        resolved: 'bg-green-100 text-green-800',
-        closed: 'bg-slate-100 text-slate-800',
-    };
-    return classes[status] || 'bg-slate-100 text-slate-800';
-};
-
 const getItemStatusClass = (status) => {
     const classes = {
-        pending: 'bg-amber-50 border border-amber-200',
-        won: 'bg-green-50 border border-green-200',
-        lost: 'bg-red-50 border border-red-200',
+        pending: 'bg-warning-50 border border-warning-200',
+        won: 'bg-success-50 border border-success-200',
+        lost: 'bg-danger-50 border border-danger-200',
     };
     return classes[status] || 'bg-slate-50 border border-slate-200';
 };
@@ -1577,10 +1572,6 @@ const handleMessageSent = async () => {
 
 const handleContactSaved = async () => {
     await loadData();
-};
-
-const logout = () => {
-    auth.logout();
 };
 
 function onActiveLeadSelectChange() {
