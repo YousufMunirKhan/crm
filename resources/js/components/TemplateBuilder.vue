@@ -104,7 +104,7 @@
 
                     <!-- Available Sections -->
                     <div class="flex-1 overflow-y-auto p-4">
-                        <h3 class="text-sm font-semibold text-slate-900 mb-3">Add Section</h3>
+                        <h3 class="subsection-title">Add Section</h3>
                         <p class="text-[11px] text-slate-500 mb-2 leading-snug">
                             Add <strong>Custom HTML</strong>, then use <strong>Edit with visual builder</strong> at the top (or in that block).
                         </p>
@@ -122,7 +122,7 @@
 
                         <!-- Section/line style (when section or line selected) - font, size, color -->
                         <div v-if="styleTarget" class="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                            <h3 class="text-sm font-semibold text-slate-900 mb-3">{{ styleTargetLabel }}</h3>
+                            <h3 class="subsection-title">{{ styleTargetLabel }}</h3>
                             <p class="text-xs text-slate-500 mb-3">Change font, size & color. Preview updates below.</p>
                             <div class="space-y-3">
                                 <div>
@@ -179,7 +179,7 @@
 
                         <!-- Variables -->
                         <div class="mt-6">
-                            <h3 class="text-sm font-semibold text-slate-900 mb-3">Variables</h3>
+                            <h3 class="subsection-title">Variables</h3>
                             <div class="space-y-1">
                                 <button
                                     v-for="variable in availableVariables"

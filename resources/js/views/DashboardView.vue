@@ -235,7 +235,7 @@
                     </div>
                 </div>
                 <div class="mt-5 pt-5 border-t border-warning-200">
-                    <h3 class="text-sm font-semibold text-slate-800 mb-3">Their targets (this month)</h3>
+                    <h3 class="subsection-title">Their targets (this month)</h3>
                     <div v-if="performerMonthTarget" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div class="rounded-card bg-white/80 border border-slate-200 p-3">
                             <div class="text-xs text-slate-500">Appointments</div>

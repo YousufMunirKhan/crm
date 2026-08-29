@@ -18,7 +18,7 @@ import { computed } from 'vue';
 defineOptions({ inheritAttrs: true });
 
 const props = defineProps({
-    variant: { type: String, default: 'outline' }, // primary|soft|outline|ghost|danger|success
+    variant: { type: String, default: 'outline' }, // primary|soft|outline|ghost|ghost-danger|danger|success
     size: { type: String, default: 'md' }, // sm|md|lg|icon
     type: { type: String, default: 'button' },
     to: { type: [String, Object], default: null },
@@ -51,6 +51,7 @@ const VARIANTS = {
     soft: 'btn-soft',
     outline: 'btn-outline',
     ghost: 'btn-ghost',
+    'ghost-danger': 'btn-ghost-danger',
     danger: 'btn-danger',
     success: 'btn-success',
 };

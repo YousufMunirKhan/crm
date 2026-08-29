@@ -58,7 +58,7 @@
                         <!-- Logo Upload -->
                         <div class="space-y-4">
                             <div>
-                                <h3 class="form-label">Company Logo</h3>
+                                <h3 class="subsection-title">Company Logo</h3>
                                 <p class="text-xs text-slate-500 mb-3">This logo will appear on the login screen and dashboard. Recommended size: 200x60px</p>
 
                                 <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
@@ -109,7 +109,7 @@
 
                             <!-- Favicon -->
                             <div class="pt-6 border-t border-slate-200">
-                                <h3 class="form-label">Favicon</h3>
+                                <h3 class="subsection-title">Favicon</h3>
                                 <p class="text-xs text-slate-500 mb-3">
                                     Shown in the browser tab, sidebar (if no logo), and PWA install prompt. Square PNG or ICO works best (32×32 or 64×64; max 1&nbsp;MB).
                                 </p>
@@ -264,7 +264,7 @@
 
                             <!-- Social Media URLs (shown in email templates) -->
                             <div class="sm:col-span-2 mt-4 pt-4 border-t border-slate-100">
-                                <h3 class="text-sm font-semibold text-slate-900 mb-3">Social Media Links</h3>
+                                <h3 class="subsection-title">Social Media Links</h3>
                                 <p class="text-xs text-slate-500 mb-3">These appear as icons in email template footers. Leave blank to hide.</p>
                                 <div class="form-grid-2">
                                     <div>
@@ -318,7 +318,7 @@
 
                         <!-- Payment Details Section -->
                         <div class="mt-8 pt-8 border-t border-slate-200">
-                            <h3 class="text-base font-semibold text-slate-900 mb-4">Payment Details (for Invoices)</h3>
+                            <h3 class="subsection-title">Payment Details (for Invoices)</h3>
                             <div class="form-grid-2">
                                 <div class="sm:col-span-2">
                                     <label class="form-label" for="settingsview-account-name">Account Name <span class="form-required" aria-hidden="true">*</span></label>
@@ -464,7 +464,7 @@
                         <div class="mt-6 rounded-card border border-slate-200 bg-slate-50 p-4">
                             <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
-                                    <h3 class="text-base font-semibold text-slate-900">Customer welcome email</h3>
+                                    <h3 class="subsection-title">Customer welcome email</h3>
                                     <p class="text-sm text-slate-500">
                                         Sent automatically when a new customer record is created with an email address.
                                     </p>
@@ -952,7 +952,7 @@
                                 </p>
                             </div>
                             <div class="sm:col-span-2 rounded-card border border-primary-200 bg-primary-50/50 p-4 space-y-3">
-                                <h3 class="text-sm font-semibold text-slate-900">Small cafes &amp; independent businesses</h3>
+                                <h3 class="subsection-title">Small cafes &amp; independent businesses</h3>
                                 <p class="text-xs text-slate-600">
                                     Google does not expose “company size”. <strong>Nearby Search</strong> is limited to food &amp; drink + high-street retail types (restaurants, cafés, bakeries, bars, takeaways, clothing, gifts, florists, etc.). <strong>Text search</strong> uses an indie restaurant / café / retail query by default. You can still <strong>drop</strong> huge chains via review cap, name blocklist, and excluded place types after Place Details.
                                 </p>
@@ -1013,7 +1013,7 @@
                                 </label>
                             </div>
                             <div class="sm:col-span-2 rounded-card border border-primary-200 bg-primary-50/40 p-4 space-y-3">
-                                <h3 class="text-sm font-semibold text-slate-900">Claude AI (Anthropic) — extra email / phone pass</h3>
+                                <h3 class="subsection-title">Claude AI (Anthropic) — extra email / phone pass</h3>
                                 <p class="text-xs text-slate-600">
                                     After pages are fetched, if email or phone is still missing, the CRM sends <strong>plain text from those pages</strong> to Claude and asks for JSON <code class="text-[11px] bg-white px-1 rounded">email</code> / <code class="text-[11px] bg-white px-1 rounded">phone</code> only. Put your API key in <code class="text-[11px] bg-white px-1 rounded">.env</code> as <code class="text-[11px] bg-white px-1 rounded">ANTHROPIC_API_KEY</code> or below. <strong>Never commit keys to git.</strong> Rotate any key that was pasted into chat or tickets.
                                 </p>
@@ -1081,7 +1081,7 @@
                             <!-- PWA Enable Toggle -->
                             <div class="flex items-center justify-between gap-4 p-4 bg-slate-50 rounded-card">
                                 <div>
-                                    <h3 class="font-medium text-slate-900">Enable PWA Install Prompt</h3>
+                                    <h3 class="subsection-title">Enable PWA Install Prompt</h3>
                                     <p class="text-sm text-slate-500 mt-0.5">
                                         When enabled, users will see an "Install App" button on mobile devices
                                     </p>
@@ -1108,7 +1108,7 @@
 
                             <!-- PWA Status -->
                             <div class="p-4 border border-slate-200 rounded-card space-y-3">
-                                <h3 class="font-medium text-slate-900">PWA Status</h3>
+                                <h3 class="subsection-title">PWA Status</h3>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                                     <div class="flex items-center gap-2">
                                         <span class="w-2 h-2 rounded-full" :class="pwaStatus.serviceWorker ? 'bg-success-600' : 'bg-danger-600'" aria-hidden="true"></span>

@@ -710,7 +710,7 @@
                                     <td class="table-td-num text-success-700 font-medium">{{ list.sent_count }}</td>
                                     <td class="table-td-num text-danger-700 font-medium">{{ list.failed_count }}</td>
                                     <td class="table-td-actions">
-                                        <BaseButton variant="ghost" size="sm" class="mr-1" @click="viewListRecipients(list)">
+                                        <BaseButton variant="ghost" size="sm" @click="viewListRecipients(list)">
                                             <template #icon>
                                                 <EyeIcon class="icon-sm" aria-hidden="true" />
                                             </template>

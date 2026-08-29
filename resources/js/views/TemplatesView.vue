@@ -182,7 +182,7 @@
                         </div>
                     </div>
                     <div class="p-4">
-                        <h3 class="font-semibold text-slate-900 mb-1">{{ template.name }}</h3>
+                        <h3 class="subsection-title">{{ template.name }}</h3>
                         <p class="text-sm text-slate-600 mb-3 line-clamp-2">{{ template.description || 'No description' }}</p>
                         <div class="flex items-center justify-between gap-2 text-xs text-slate-500 mb-3">
                             <span class="truncate">Subject: {{ template.subject }}</span>
@@ -256,7 +256,7 @@
                         </div>
                     </div>
                     <div class="p-4">
-                        <h3 class="font-semibold text-slate-900 mb-1">{{ template.name }}</h3>
+                        <h3 class="subsection-title">{{ template.name }}</h3>
                         <p class="text-sm text-slate-600 mb-3 line-clamp-3">{{ template.message || 'No message' }}</p>
                         <div class="flex items-center justify-between gap-2 text-xs text-slate-500 mb-3">
                             <span>{{ template.message?.length || 0 }} characters</span>
@@ -329,7 +329,7 @@
                         </div>
                     </div>
                     <div class="p-4">
-                        <h3 class="font-semibold text-slate-900 mb-1">{{ template.name }}</h3>
+                        <h3 class="subsection-title">{{ template.name }}</h3>
                         <p class="text-sm text-slate-600 mb-3 line-clamp-3">{{ template.message || 'No message' }}</p>
                         <p v-if="template.media_url" class="flex items-center gap-1.5 text-xs text-slate-500 mb-2">
                             <PhotoIcon class="icon-sm" aria-hidden="true" />

@@ -474,7 +474,7 @@
                                     :key="group.agent_id"
                                     class="rounded-control border border-slate-200 p-3"
                                 >
-                                    <h3 class="font-semibold text-slate-900">
+                                    <h3 class="subsection-title">
                                         {{ group.agent_name }} ({{ group.count }})
                                     </h3>
                                     <ul class="mt-3 space-y-2">
@@ -520,7 +520,7 @@
                                     :key="agent.agent_id"
                                     class="rounded-control border border-slate-200 p-3"
                                 >
-                                    <h3 class="font-semibold text-slate-900">
+                                    <h3 class="subsection-title">
                                         {{ agent.agent_name }} ({{ agent.activity_count }})
                                     </h3>
                                     <ul class="mt-2 space-y-1">

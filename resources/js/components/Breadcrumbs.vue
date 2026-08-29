@@ -22,6 +22,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { resolveRouteTitle } from '@/composables/usePageTitle';
 import { ChevronRightIcon } from '@heroicons/vue/24/outline';
 
 const route = useRoute();
@@ -74,7 +75,7 @@ const crumbs = computed(() => {
         }
     }
 
-    trail.push({ label: route.meta.title || 'Page', to: null });
+    trail.push({ label: resolveRouteTitle(route), to: null });
 
     return trail;
 });

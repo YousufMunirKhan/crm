@@ -70,7 +70,7 @@
         <div class="px-4 sm:px-5 pt-4">
             <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
                 <div class="flex items-center gap-3">
-                    <h3 class="text-lg font-semibold text-slate-900">Expenses</h3>
+                    <h3 class="card-title">Expenses</h3>
                     <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
                         <input
                             type="checkbox"

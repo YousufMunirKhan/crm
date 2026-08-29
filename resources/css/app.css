@@ -203,8 +203,21 @@
     .table-td-num {
         @apply px-5 py-4 text-sm text-slate-700 border-b border-slate-100 text-right tabular-nums;
     }
+    /**
+     * Row actions. Deliberately nowrap: flex-wrap dropped the delete icon onto
+     * a second line whenever the column got narrow, which is what made the
+     * actions column look broken.
+     */
+    .table-actions {
+        @apply flex items-center justify-end gap-0.5 flex-nowrap;
+    }
     .table-td-actions {
         @apply px-5 py-4 text-sm border-b border-slate-100 text-right whitespace-nowrap;
+    }
+    /* Consistent gap between row actions without each call site inventing one. */
+    .table-td-actions > * + *,
+    .table-actions > * + * {
+        @apply ms-0.5;
     }
     /** Sticky header for long tables inside a scroll container. */
     .table-thead-sticky {
@@ -349,6 +362,14 @@
         @apply text-slate-600 hover:bg-slate-100 hover:text-slate-900
             focus-visible:ring-primary-500/40;
     }
+
+    /** Destructive row action - quiet until hovered. */
+    .btn-ghost-danger {
+        @apply bg-transparent text-danger-700 border border-transparent
+            hover:bg-danger-50 hover:text-danger-800 active:bg-danger-100
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-600/40
+            transition-colors disabled:opacity-50 disabled:pointer-events-none;
+    }
     .btn-danger {
         @apply bg-danger-600 text-white shadow-card hover:bg-danger-700
             active:bg-danger-800 focus-visible:ring-danger-600/40;
@@ -408,6 +429,14 @@
     }
     .card-title {
         @apply text-base font-semibold text-slate-900 tracking-tight;
+    }
+    /**
+     * Sub-heading inside a card. This rung was missing, so views invented
+     * twelve different h3 treatments - three of them inside SettingsView
+     * alone, which is what made one page look like three.
+     */
+    .subsection-title {
+        @apply text-sm font-semibold text-slate-900 mb-3;
     }
     .card-subtitle {
         @apply text-sm text-slate-500 mt-0.5 leading-relaxed;

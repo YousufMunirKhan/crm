@@ -180,7 +180,7 @@
             </div>
 
             <div v-if="ticket" class="mt-4 space-y-3 border-t border-slate-200 pt-4">
-                <h3 class="text-sm font-semibold text-slate-900">Comments</h3>
+                <h3 class="subsection-title">Comments</h3>
                 <div v-if="comments.length" class="max-h-48 space-y-2 overflow-y-auto">
                     <div
                         v-for="msg in comments"

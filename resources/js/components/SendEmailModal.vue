@@ -91,7 +91,7 @@
 
             <!-- Email Preview -->
             <div v-if="selectedTemplate && selectedCustomer">
-                <h3 class="form-label">Preview</h3>
+                <h3 class="subsection-title">Preview</h3>
                 <div class="max-h-64 overflow-y-auto rounded-card border border-slate-200 bg-slate-50 p-4">
                     <div class="mb-2 text-sm font-semibold text-slate-900">Subject: {{ previewSubject }}</div>
                     <div class="whitespace-pre-wrap text-xs text-slate-600">{{ previewContent }}</div>

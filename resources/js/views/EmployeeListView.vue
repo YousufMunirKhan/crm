@@ -73,7 +73,7 @@
             >
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4 min-w-0">
                     <div class="flex-1 min-w-0">
-                        <h3 class="text-lg font-semibold text-slate-900 break-words">{{ employee.name }}</h3>
+                        <h3 class="card-title break-words">{{ employee.name }}</h3>
                         <p class="text-sm text-slate-500 mt-1">{{ employee.role?.name || 'No role' }}</p>
                     </div>
                     <BaseBadge :tone="getRoleTone(employee.role?.name)" class="shrink-0 self-start">

@@ -54,7 +54,7 @@
 
             <!-- Column Mapping -->
             <div v-if="preview.length > 0 && previewHeaders.length > 0" class="rounded-card border border-slate-200 p-4">
-                <h3 class="mb-3 text-sm font-semibold text-slate-800">Column Mapping</h3>
+                <h3 class="subsection-title">Column Mapping</h3>
                 <div class="space-y-2">
                     <div
                         v-for="field in requiredFields"

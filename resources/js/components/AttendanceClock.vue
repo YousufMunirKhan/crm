@@ -1,7 +1,7 @@
 <template>
     <div class="min-w-0 overflow-hidden rounded-xl bg-white p-4 shadow-sm md:p-6">
         <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h3 class="text-base font-semibold text-slate-900 sm:text-lg">Attendance</h3>
+            <h3 class="card-title">Attendance</h3>
             <div class="flex items-center gap-2">
                 <div class="text-xs text-slate-500 sm:text-sm">{{ currentDate }}</div>
                 <button

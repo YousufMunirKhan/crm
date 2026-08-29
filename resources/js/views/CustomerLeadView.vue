@@ -337,7 +337,7 @@
                         :class="apt.appointment_status === 'completed' ? 'bg-success-50 border-success-200' : apt.appointment_status === 'cancelled' || apt.appointment_status === 'no_show' ? 'bg-slate-50 border-slate-200' : 'bg-warning-50 border-warning-200'"
                     >
                         <div class="flex-1 min-w-0">
-                            <h3 class="font-medium text-slate-900">{{ apt.description || 'Appointment' }}</h3>
+                            <h3 class="subsection-title">{{ apt.description || 'Appointment' }}</h3>
                             <div class="text-sm text-slate-600 mt-0.5">
                                 {{ formatAppointmentDate(apt.appointment_date) }} at {{ apt.appointment_time || '10:00' }}
                             </div>
@@ -370,7 +370,7 @@
                     >
                         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
                             <div>
-                                <h3 class="font-medium text-slate-900">
+                                <h3 class="subsection-title">
                                     Lead #{{ leadRow.id }}
                                 </h3>
                                 <div class="text-sm text-slate-600 mt-1 flex flex-wrap items-center gap-1.5">

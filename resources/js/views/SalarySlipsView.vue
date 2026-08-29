@@ -131,7 +131,7 @@
                             <td class="table-td whitespace-nowrap">{{ salary.currency }}</td>
                             <td class="table-td-num whitespace-nowrap">{{ salary.attendance_days || '—' }} days</td>
                             <td class="table-td-actions">
-                                <div class="flex flex-wrap justify-end gap-2">
+                                <div class="table-actions">
                                     <BaseButton variant="ghost" size="sm" :to="`/salaries/${salary.id}/edit`">Edit</BaseButton>
                                     <BaseButton variant="ghost" size="sm" type="button" @click="downloadSlip(salary.id)">Download</BaseButton>
                                     <BaseButton variant="ghost" size="sm" type="button" @click="sendEmail(salary.id)">Email</BaseButton>

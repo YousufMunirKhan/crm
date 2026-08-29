@@ -360,7 +360,7 @@
                                 </BaseBadge>
                             </td>
                             <td class="table-td-actions">
-                                <div class="flex flex-wrap justify-end gap-1 sm:gap-2">
+                                <div class="table-actions">
                                     <BaseButton
                                         size="icon"
                                         variant="ghost"
@@ -386,12 +386,12 @@
                                         <PencilSquareIcon class="icon-sm" aria-hidden="true" />
                                     </BaseButton>
                                     <BaseButton
-                                        size="icon"
-                                        variant="ghost"
-                                        class="text-danger-700 hover:text-danger-800 hover:bg-danger-50"
-                                        :label="`Delete ${customer.name}`"
-                                        @click="openDeleteConfirm(customer)"
-                                    >
+                    size="icon"
+                    variant="ghost-danger"
+                    
+                    :label="`Delete ${customer.name}`"
+                    @click="openDeleteConfirm(customer)"
+                  >
                                         <TrashIcon class="icon-sm" aria-hidden="true" />
                                     </BaseButton>
                                 </div>

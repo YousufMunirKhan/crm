@@ -254,6 +254,7 @@ import {
 import SidebarNavIcon from '@/components/SidebarNavIcon.vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import CommandPalette from '@/components/CommandPalette.vue';
+import { usePageTitle } from '@/composables/usePageTitle';
 import axios from 'axios';
 
 const route = useRoute();
@@ -452,15 +453,8 @@ onMounted(async () => {
 });
 
 const user = computed(() => auth.user);
-const pageTitle = computed(() => {
-    if (route.name === 'customer-add') {
-        return route.query.type === 'prospect' ? 'Add Prospect' : 'Add Customer';
-    }
-    if (route.name === 'customer-edit') {
-        return route.query.type === 'prospect' ? 'Edit Prospect' : 'Edit Customer';
-    }
-    return route.meta.title || 'Dashboard';
-});
+// Shared with Breadcrumbs so the heading and the trail cannot disagree.
+const pageTitle = usePageTitle();
 
 function isNavItemActive(item) {
     return navItemMatchesCurrentRoute(item);

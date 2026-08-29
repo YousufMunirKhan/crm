@@ -119,7 +119,7 @@
                         class="border border-slate-200 rounded-card p-4 hover:shadow-card-hover transition-shadow"
                     >
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-lg font-semibold text-slate-900">{{ category || 'Uncategorized' }}</h3>
+                            <h3 class="card-title">{{ category || 'Uncategorized' }}</h3>
                             <div class="text-sm text-slate-500 tabular-nums">
                                 {{ Object.values(categoryData).reduce((sum, d) => sum + d.count, 0) }} expenses
                             </div>
