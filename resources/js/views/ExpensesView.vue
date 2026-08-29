@@ -107,8 +107,12 @@
                     </BaseButton>
                 </div>
             </div>
+            <div v-if="loading" class="px-5 py-12 text-center text-slate-500 text-sm" aria-busy="true">
+                <span class="spinner" role="status" aria-label="Loading" />
+                <span class="ml-2 align-middle">Loading expenses…</span>
+            </div>
             <EmptyState
-                v-if="expenses.length === 0"
+                v-else-if="expenses.length === 0"
                 heading="No expenses found"
                 description="Adjust the filters above, or add your first expense."
             >
@@ -239,6 +243,9 @@ import { BaseBadge, BaseButton, BaseModal, EmptyState } from '@/components/base'
 import { useToastStore } from '@/stores/toast';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
 
+// Distinguishes "still fetching" from "nothing to show".
+const loading = ref(true);
+
 const toast = useToastStore();
 const router = useRouter();
 
@@ -309,6 +316,7 @@ const formatDate = (date) => {
 };
 
 const loadExpenses = async (page = 1) => {
+    loading.value = true;
     try {
         const params = { per_page: 10, page };
         if (filters.value.from_date) params.from_date = filters.value.from_date;
@@ -342,6 +350,8 @@ const loadExpenses = async (page = 1) => {
     } catch (error) {
         console.error('Failed to load expenses:', error);
         toast.error('Failed to load expenses. Please try again.');
+    } finally {
+        loading.value = false;
     }
 };
 

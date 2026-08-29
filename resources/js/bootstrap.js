@@ -1,4 +1,5 @@
 import axios from 'axios';
+
 window.axios = axios;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
@@ -10,18 +11,66 @@ if (token) {
     window.axios.defaults.headers.common['X-CSRF-TOKEN'] = token.content;
 }
 
-// Add response interceptor for error handling
+/**
+ * Surfaces failures the user would otherwise never see.
+ *
+ * Roughly 169 catch blocks across the app only console.log, so a failed
+ * request looked like nothing happening: an empty report, a send that
+ * silently did not send. This handles the cases that are never expected and
+ * always worth telling someone about.
+ *
+ * Deliberately NOT handled here: 403 and 422. Those are ordinary outcomes
+ * that views already report in context, and a global toast would duplicate
+ * the message or contradict it.
+ */
+let lastMessage = '';
+let lastShownAt = 0;
+
+function notify(message) {
+    // Several parallel requests failing at once should say it once.
+    const now = Date.now();
+    if (message === lastMessage && now - lastShownAt < 4000) return;
+    lastMessage = message;
+    lastShownAt = now;
+
+    // Resolved lazily: this module is imported before Pinia is created.
+    import('@/stores/toast')
+        .then(({ useToastStore }) => useToastStore().error(message))
+        .catch(() => console.error(message));
+}
+
 axios.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
+        const status = error.response?.status;
+
+        if (status === 401) {
             // Unauthorized - clear auth and redirect to login
             localStorage.removeItem('auth_token');
             delete axios.defaults.headers.common['Authorization'];
             if (window.location.pathname !== '/login') {
                 window.location.href = '/login';
             }
+
+            return Promise.reject(error);
         }
+
+        if (!error.response) {
+            // No response at all: offline, DNS, or the server is down.
+            if (error.code !== 'ERR_CANCELED') {
+                notify('Cannot reach the server. Check your connection and try again.');
+            }
+        } else if (status === 419) {
+            notify('Your session expired. Refresh the page and try again.');
+        } else if (status === 429) {
+            notify('Too many attempts. Please wait a moment and try again.');
+        } else if (status >= 500) {
+            notify(
+                error.response?.data?.message
+                    || 'Something went wrong on our side. The error has been logged.'
+            );
+        }
+
         return Promise.reject(error);
     }
 );

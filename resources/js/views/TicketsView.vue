@@ -124,8 +124,13 @@
             </div>
         </div>
 
+        <div v-if="loading" class="px-5 py-12 text-center text-slate-500 text-sm" aria-busy="true">
+            <span class="spinner" role="status" aria-label="Loading" />
+            <span class="ml-2 align-middle">Loading tickets…</span>
+        </div>
+
         <EmptyState
-            v-if="!tickets.length"
+            v-else-if="!tickets.length"
             heading="No tickets to show"
             description="Nothing matches the current filters. Clear the status or date range, or create a new ticket."
         >
@@ -155,6 +160,9 @@ import { BaseBadge, BaseButton, EmptyState } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
 import { formatTicketStatus } from '@/utils/displayFormat';
+
+// Distinguishes "still fetching" from "nothing to show".
+const loading = ref(true);
 
 const toast = useToastStore();
 const auth = useAuthStore();
@@ -248,6 +256,7 @@ const formatAssignees = (ticket) => {
 const getStatusLabel = (status) => formatTicketStatus(status);
 
 const loadTickets = async () => {
+    loading.value = true;
     try {
         const params = {
             per_page: 15,
@@ -271,6 +280,8 @@ const loadTickets = async () => {
     } catch (error) {
         console.error('Failed to load tickets:', error);
         toast.error('Failed to load tickets');
+    } finally {
+        loading.value = false;
     }
 };
 
