@@ -259,8 +259,16 @@
                     <input id="tpl-subject" v-model="templateForm.subject" type="text" class="form-input" />
                 </div>
                 <div>
-                    <label class="form-label" for="tpl-body">Message</label>
-                    <textarea id="tpl-body" v-model="templateForm.content" rows="14" class="form-textarea font-mono text-xs" />
+                    <label class="form-label" for="tpl-preheader">Inbox preview line</label>
+                    <input id="tpl-preheader" v-model="templateForm.preheader" type="text" class="form-input" />
+                    <p class="form-hint">The grey line shown after the subject in the inbox. Say the thing the subject could not fit.</p>
+                </div>
+                <div>
+                    <label class="form-label" for="tpl-body">Message (HTML)</label>
+                    <textarea id="tpl-body" v-model="templateForm.html" rows="14" class="form-textarea font-mono text-xs" />
+                    <p class="form-hint">
+                        Merge tags like <code>{{ mergeTagExample }}</code> work here. Use Preview to see the result before saving.
+                    </p>
                 </div>
             </div>
 
@@ -355,7 +363,9 @@ const previewWidth = ref('desktop');
 
 const templateOpen = ref(false);
 const templateGroup = ref(null);
-const templateForm = ref({ subject: '', content: '' });
+const templateForm = ref({ subject: '', html: '', preheader: '' });
+/** The stored content object, kept so a save cannot drop what was not edited. */
+const templateSource = ref(null);
 const savingTemplate = ref(false);
 
 const PURPOSE_LABELS = {
@@ -539,6 +549,20 @@ async function saveEdit() {
     }
 }
 
+/**
+ * A template's `content` is a sections structure, not a string. The agent's
+ * templates hold their markup in a single raw_html section; the editor works on
+ * that section's html and puts it back where it came from, so the surrounding
+ * structure - and the preheader - survive the round trip.
+ */
+function extractHtml(content) {
+    if (typeof content === 'string') return content;
+
+    const section = (content?.sections || []).find((s) => s.type === 'raw_html');
+
+    return section?.content?.html ?? null;
+}
+
 async function openTemplate(group) {
     if (!group.templateId) {
         toast.error('This group has no template attached.');
@@ -547,8 +571,22 @@ async function openTemplate(group) {
     try {
         const { data } = await axios.get(`/api/email-templates/${group.templateId}`);
         const t = data.data || data;
+        const html = extractHtml(t.content);
+
+        // Built in the drag-and-drop builder rather than as one raw_html block.
+        // Editing it as text here would flatten it, so send them to the builder.
+        if (html === null) {
+            toast.error('This template was built in the email designer — edit it there instead.');
+            return;
+        }
+
         templateGroup.value = group;
-        templateForm.value = { subject: t.subject || '', content: t.content || '' };
+        templateSource.value = t.content;
+        templateForm.value = {
+            subject: t.subject || '',
+            html,
+            preheader: (typeof t.content === 'object' && t.content?.preview_line) || '',
+        };
         templateOpen.value = true;
     } catch (e) {
         toast.error(e?.response?.data?.message || 'Could not open the template.');
@@ -558,9 +596,27 @@ async function openTemplate(group) {
 async function saveTemplate() {
     savingTemplate.value = true;
     try {
+        // Rebuilt from the original so nothing outside the edited section is
+        // lost, and so content never goes back as a bare string - which is what
+        // the renderer cannot read.
+        const original = templateSource.value;
+        const content = typeof original === 'object' && original !== null
+            ? {
+                ...original,
+                preview_line: templateForm.value.preheader,
+                sections: (original.sections || []).map((s) =>
+                    s.type === 'raw_html'
+                        ? { ...s, content: { ...s.content, html: templateForm.value.html } }
+                        : s),
+            }
+            : {
+                preview_line: templateForm.value.preheader,
+                sections: [{ type: 'raw_html', content: { html: templateForm.value.html } }],
+            };
+
         await axios.put(`/api/email-templates/${templateGroup.value.templateId}`, {
             subject: templateForm.value.subject,
-            content: templateForm.value.content,
+            content,
         });
         templateOpen.value = false;
         toast.success('Template saved for everyone on this reason.');
