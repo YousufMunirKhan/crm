@@ -96,6 +96,7 @@ const pages = computed(() => {
         { label: 'SMS Management', to: '/sms-management', section: 'marketing_sms' },
         { label: 'WhatsApp Management', to: '/whatsapp-management', section: 'marketing_whatsapp' },
         { label: 'WhatsApp Inbox', to: '/whatsapp-inbox', section: 'marketing_whatsapp' },
+        { label: 'Marketing agent', to: '/marketing/agent', section: 'marketing_agent' },
         { label: 'Cold calling', to: '/cold-calling', section: 'marketing_cold_calling' },
         { label: 'Business Reports', to: '/reports', section: 'report' },
         { label: 'Geo map', to: '/reports/geo', section: 'report' },

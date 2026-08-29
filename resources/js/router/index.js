@@ -385,6 +385,12 @@ const routes = [
         meta: { requiresAuth: true, title: 'SMS Management' },
     },
     {
+        path: '/marketing/agent',
+        name: 'marketing-agent',
+        component: () => import('@/views/MarketingAgentView.vue'),
+        meta: { requiresAuth: true, title: 'Marketing agent', section: 'marketing_agent' },
+    },
+    {
         path: '/cold-calling',
         name: 'cold-calling',
         component: () => import('@/views/ColdCallingView.vue'),

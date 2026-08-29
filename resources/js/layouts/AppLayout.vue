@@ -313,6 +313,7 @@ const navItems = computed(() => {
             { to: '/sms-management', label: 'SMS', section: 'marketing_sms', icon: 'sms' },
             { to: '/whatsapp-management', label: 'WhatsApp', section: 'marketing_whatsapp', icon: 'message' },
             { to: '/whatsapp-inbox', label: 'WhatsApp Inbox', section: 'marketing_whatsapp', icon: 'message' },
+            { to: '/marketing/agent', label: 'Marketing agent', section: 'marketing_agent', icon: 'mail' },
             { to: '/cold-calling', label: 'Cold calling', section: 'marketing_cold_calling', icon: 'phone' },
             {
                 label: 'Templates',

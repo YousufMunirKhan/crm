@@ -33,6 +33,12 @@ Schedule::command('tickets:check-sla')
 
 // Lifecycle automations. Raises internal tasks only - outbound sending still
 // goes through the campaign console where consent is enforced.
+// Monday morning, so the week's plan is waiting when someone starts. It only
+// ever creates a draft - nothing is sent without a person approving it.
+Schedule::command('marketing:plan')
+    ->weeklyOn(1, '07:30')
+    ->withoutOverlapping();
+
 Schedule::command('marketing:automations')
     ->dailyAt('07:00')
     ->timezone(config('app.timezone'));

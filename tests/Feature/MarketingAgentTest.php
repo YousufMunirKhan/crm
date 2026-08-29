@@ -1,0 +1,268 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Campaign;
+use App\Models\ContactConsent;
+use App\Models\Role;
+use App\Models\SentCommunication;
+use App\Models\User;
+use App\Modules\CRM\Models\Customer;
+use App\Modules\Marketing\Models\MarketingPlan;
+use App\Modules\Marketing\Models\MarketingPlanItem;
+use App\Modules\Marketing\Services\MarketingGuardrails;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+/**
+ * The guardrails are the point of this feature. The planner may suggest anyone;
+ * these rules decide who can actually be written to, and they live in code
+ * rather than in the prompt because a model asked nicely to respect consent
+ * will respect it almost always - and "almost always" across five hundred
+ * contacts is a complaint to the regulator.
+ */
+class MarketingAgentTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function rails(): MarketingGuardrails
+    {
+        return app(MarketingGuardrails::class);
+    }
+
+    private function manager(): User
+    {
+        $role = Role::query()->firstOrCreate(['name' => 'Manager'], ['description' => 'Manager']);
+
+        return User::factory()->create(['role_id' => $role->id]);
+    }
+
+    private function campaign(): Campaign
+    {
+        return Campaign::create([
+            'name' => 'Earlier campaign',
+            'channel' => 'email',
+            'status' => 'sent',
+        ]);
+    }
+
+    private function plan(): MarketingPlan
+    {
+        return MarketingPlan::create([
+            'week_starting' => now()->startOfWeek(),
+            'status' => MarketingPlan::STATUS_DRAFT,
+        ]);
+    }
+
+    public function test_an_existing_customer_may_be_emailed_without_an_explicit_opt_in(): void
+    {
+        // PECR soft opt-in: an existing customer, similar products.
+        $customer = Customer::create(['phone' => '07700901001', 'name' => 'A', 'email' => 'a@example.com', 'type' => Customer::TYPE_CUSTOMER]);
+
+        $this->assertTrue($this->rails()->check($customer, 'email')['allowed']);
+    }
+
+    public function test_a_prospect_without_consent_may_not_be_emailed(): void
+    {
+        $prospect = Customer::create(['phone' => '07700901002', 'name' => 'B', 'email' => 'b@example.com', 'type' => Customer::TYPE_PROSPECT]);
+
+        $result = $this->rails()->check($prospect, 'email');
+
+        $this->assertFalse($result['allowed']);
+        $this->assertStringContainsString('consent', $result['reason']);
+    }
+
+    public function test_a_prospect_with_recorded_consent_may_be_emailed(): void
+    {
+        $prospect = Customer::create(['phone' => '07700901003', 'name' => 'C', 'email' => 'c@example.com', 'type' => Customer::TYPE_PROSPECT]);
+
+        ContactConsent::create([
+            'identifier' => 'c@example.com',
+            'channel' => 'email',
+            'status' => ContactConsent::STATUS_OPT_IN,
+            'source' => 'test',
+            'customer_id' => $prospect->id,
+        ]);
+
+        $this->assertTrue($this->rails()->check($prospect, 'email')['allowed']);
+    }
+
+    public function test_an_opt_out_beats_being_a_customer(): void
+    {
+        $customer = Customer::create(['phone' => '07700901004', 'name' => 'D', 'email' => 'd@example.com', 'type' => Customer::TYPE_CUSTOMER]);
+
+        ContactConsent::create([
+            'identifier' => 'd@example.com',
+            'channel' => 'email',
+            'status' => ContactConsent::STATUS_OPT_OUT,
+            'source' => 'test',
+            'customer_id' => $customer->id,
+        ]);
+
+        $this->assertFalse($this->rails()->check($customer, 'email')['allowed']);
+    }
+
+    /**
+     * Counted across all channels. Per-channel counting would let one contact
+     * get an email, a text and a WhatsApp in the same week, each one looking
+     * compliant on its own.
+     */
+    public function test_a_recently_messaged_contact_is_held_back(): void
+    {
+        $customer = Customer::create(['phone' => '07700901005', 'name' => 'E', 'email' => 'e@example.com', 'type' => Customer::TYPE_CUSTOMER]);
+
+        SentCommunication::create([
+            'campaign_id' => $this->campaign()->id,
+            'type' => 'email',
+            'customer_id' => $customer->id,
+            'recipient_email' => 'e@example.com',
+            'subject' => 'Earlier campaign',
+            'content' => 'Body',
+            'status' => 'sent',
+            'sent_at' => now()->subDays(3),
+        ]);
+
+        $result = $this->rails()->check($customer, 'email');
+
+        $this->assertFalse($result['allowed']);
+        $this->assertStringContainsString('recently', $result['reason']);
+    }
+
+    public function test_a_contact_becomes_eligible_again_after_the_window(): void
+    {
+        $customer = Customer::create(['phone' => '07700901006', 'name' => 'F', 'email' => 'f@example.com', 'type' => Customer::TYPE_CUSTOMER]);
+
+        SentCommunication::create([
+            'campaign_id' => $this->campaign()->id,
+            'type' => 'email',
+            'customer_id' => $customer->id,
+            'recipient_email' => 'f@example.com',
+            'subject' => 'Earlier campaign',
+            'content' => 'Body',
+            'status' => 'sent',
+            'sent_at' => now()->subDays(MarketingGuardrails::MIN_DAYS_BETWEEN_MESSAGES + 1),
+        ]);
+
+        $this->assertTrue($this->rails()->check($customer, 'email')['allowed']);
+    }
+
+    /** Email is nearly free; the others cost money per message. */
+    public function test_the_cheapest_usable_channel_is_chosen(): void
+    {
+        $customer = Customer::create([
+            'name' => 'G',
+            'email' => 'g@example.com',
+            'phone' => '07700900123',
+            'type' => Customer::TYPE_CUSTOMER,
+        ]);
+
+        $this->assertSame('email', $this->rails()->bestChannel($customer)['channel']);
+    }
+
+    public function test_a_contact_with_no_email_falls_through_to_sms(): void
+    {
+        $customer = Customer::create([
+            'name' => 'H',
+            'phone' => '07700900124',
+            'type' => Customer::TYPE_CUSTOMER,
+        ]);
+
+        $this->assertSame('sms', $this->rails()->bestChannel($customer)['channel']);
+    }
+
+    public function test_a_contact_with_no_details_at_all_is_unreachable(): void
+    {
+        // customers.phone is NOT NULL, so "no details" means empty, not absent.
+        $customer = Customer::create(['phone' => '', 'name' => 'I', 'type' => Customer::TYPE_CUSTOMER]);
+
+        $this->assertNull($this->rails()->bestChannel($customer)['channel']);
+    }
+
+    // ------------------------------------------------------------ the screen
+
+    public function test_a_sales_agent_cannot_see_marketing_plans(): void
+    {
+        $role = Role::query()->firstOrCreate(['name' => 'Sales'], ['description' => 'Sales']);
+        $agent = User::factory()->create(['role_id' => $role->id]);
+
+        $this->actingAs($agent)->getJson('/api/marketing/agent/plans')->assertForbidden();
+    }
+
+    public function test_a_blocked_row_cannot_be_approved(): void
+    {
+        $plan = $this->plan();
+        $customer = Customer::create(['phone' => '07700901008', 'name' => 'J', 'type' => Customer::TYPE_PROSPECT]);
+
+        $item = MarketingPlanItem::create([
+            'marketing_plan_id' => $plan->id,
+            'customer_id' => $customer->id,
+            'channel' => 'email',
+            'purpose' => 'check-in',
+            'status' => MarketingPlanItem::STATUS_BLOCKED,
+            'blocked_reason' => 'No consent recorded for email',
+        ]);
+
+        $this->actingAs($this->manager())
+            ->patchJson("/api/marketing/agent/plans/{$plan->id}/items/{$item->id}", ['status' => 'approved'])
+            ->assertStatus(422);
+
+        $this->assertSame(MarketingPlanItem::STATUS_BLOCKED, $item->fresh()->status);
+    }
+
+    public function test_sending_refuses_when_nothing_is_approved(): void
+    {
+        $plan = $this->plan();
+
+        $this->actingAs($this->manager())
+            ->postJson("/api/marketing/agent/plans/{$plan->id}/send")
+            ->assertStatus(422);
+    }
+
+    /**
+     * Editing one row must not change anyone else's message - that confusion is
+     * why the override lives on the row rather than on the template.
+     */
+    public function test_an_override_is_stored_against_the_row_only(): void
+    {
+        $plan = $this->plan();
+        $customer = Customer::create(['phone' => '07700901009', 'name' => 'K', 'email' => 'k@example.com', 'type' => Customer::TYPE_CUSTOMER]);
+
+        $item = MarketingPlanItem::create([
+            'marketing_plan_id' => $plan->id,
+            'customer_id' => $customer->id,
+            'channel' => 'email',
+            'purpose' => 'check-in',
+            'status' => MarketingPlanItem::STATUS_PENDING,
+        ]);
+
+        $this->actingAs($this->manager())
+            ->patchJson("/api/marketing/agent/plans/{$plan->id}/items/{$item->id}", [
+                'subject_override' => 'Just for this one',
+            ])
+            ->assertOk();
+
+        $this->assertSame('Just for this one', $item->fresh()->subject_override);
+        $this->assertTrue($item->fresh()->isEdited());
+    }
+
+    public function test_an_empty_override_clears_it_rather_than_sending_a_blank_subject(): void
+    {
+        $plan = $this->plan();
+        $customer = Customer::create(['phone' => '07700901010', 'name' => 'L', 'email' => 'l@example.com', 'type' => Customer::TYPE_CUSTOMER]);
+
+        $item = MarketingPlanItem::create([
+            'marketing_plan_id' => $plan->id,
+            'customer_id' => $customer->id,
+            'channel' => 'email',
+            'purpose' => 'check-in',
+            'status' => MarketingPlanItem::STATUS_PENDING,
+            'subject_override' => 'Something',
+        ]);
+
+        $this->actingAs($this->manager())
+            ->patchJson("/api/marketing/agent/plans/{$plan->id}/items/{$item->id}", ['subject_override' => '  '])
+            ->assertOk();
+
+        $this->assertNull($item->fresh()->subject_override);
+    }
+}

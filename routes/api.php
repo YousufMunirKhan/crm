@@ -122,6 +122,17 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     Route::get('/leads/stats', [LeadController::class, 'stats']);
     Route::get('/leads/export', [LeadController::class, 'exportCsv']);
     Route::apiResource('leads', LeadController::class);
+    // Marketing agent - the weekly plan. Generating only ever makes a draft;
+    // nothing leaves without an explicit send from a manager.
+    Route::prefix('marketing/agent')->group(function () {
+        Route::get('/plans', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'index']);
+        Route::post('/plans', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'generate']);
+        Route::get('/plans/{id}', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'show']);
+        Route::patch('/plans/{planId}/items/{itemId}', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'updateItem']);
+        Route::post('/plans/{planId}/bulk', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'bulkUpdate']);
+        Route::post('/plans/{planId}/send', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'send']);
+    });
+
     Route::get('/products/categories', [ProductController::class, 'categories']);
     Route::post('/products/categories', [ProductController::class, 'storeCategory']);
     Route::apiResource('products', ProductController::class);

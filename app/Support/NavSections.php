@@ -42,6 +42,7 @@ final class NavSections
             'marketing_whatsapp' => 'Marketing — WhatsApp',
             'marketing_templates' => 'Marketing — Templates',
             'marketing_cold_calling' => 'Marketing — Cold calling',
+            'marketing_agent' => 'Marketing — Agent',
             'employees' => 'Employees',
             'hr_records' => 'HR — Employee records',
             'hr_attendance' => 'HR — Attendance',
@@ -71,6 +72,7 @@ final class NavSections
                 'marketing_whatsapp',
                 'marketing_templates',
                 'marketing_cold_calling',
+                'marketing_agent',
             ],
             'hr' => ['hr_records', 'hr_attendance'],
         ];
