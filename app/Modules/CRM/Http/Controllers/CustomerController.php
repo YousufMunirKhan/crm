@@ -129,6 +129,8 @@ class CustomerController extends Controller
             'leads.assignmentLogs.newAssignee',
             'leads.product',
             'leads.items.product',
+            'leads.activities.user',
+            'leads.activities.assignee',
             'invoices.items',
             'tickets.assignee',
             'tickets.assignees',
@@ -147,11 +149,13 @@ class CustomerController extends Controller
             return response()->json(['message' => 'Unauthorized access to this customer'], 403);
         }
 
-        $lead = $customer->leads()->latest()->first();
-        $tickets = $customer->tickets()->latest()->get();
-        $invoices = $customer->invoices()->latest()->get();
+        // Use the relations already eager-loaded above. Re-opening them with
+        // ()-> issued five extra queries on the highest-traffic page in the app.
+        $lead = $customer->leads->sortByDesc('created_at')->first();
+        $tickets = $customer->tickets->sortByDesc('created_at')->values();
+        $invoices = $customer->invoices->sortByDesc('created_at')->values();
 
-        $leadsWithActivities = $customer->leads()->with(['items.product', 'assignee', 'activities.user', 'activities.assignee'])->get();
+        $leadsWithActivities = $customer->leads;
 
         $timeline = $this->timelineService->buildTimeline($customer, $leadsWithActivities, $tickets, null);
         $appointments = $this->timelineService->collectAppointments($leadsWithActivities);
@@ -181,7 +185,9 @@ class CustomerController extends Controller
                                 $suggestedProducts->push([
                                     'product' => $suggestion,
                                     'suggested_by' => $product->name,
-                                    'relationship_type' => 'suggest',
+                                    // Carry the real relationship type through - hardcoding 'suggest' here
+                                    // mislabelled every upsell and cross-sell.
+                                    'relationship_type' => $suggestion->pivot->relationship_type ?? 'suggest',
                                 ]);
                             }
                         }
@@ -652,9 +658,26 @@ class CustomerController extends Controller
         return response()->json($customer->fresh());
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
+        $user = $request->user();
+        if (! $user || ! ($user->isRole('Admin') || $user->isRole('System Admin'))) {
+            return response()->json(['message' => 'This action is unauthorized.'], 403);
+        }
+
         $customer = Customer::findOrFail($id);
+
+        // A customer with invoices is part of the accounting record. Retiring
+        // them would soft-delete the customer while the invoices stay live and
+        // orphaned, so refuse and let the caller deactivate instead.
+        $invoiceCount = $customer->invoices()->count();
+        if ($invoiceCount > 0) {
+            return response()->json([
+                'message' => "This customer has {$invoiceCount} invoice(s) and cannot be deleted. ".
+                    'Invoices must be retained for six years.',
+            ], 409);
+        }
+
         $customer->delete();
 
         return response()->noContent();

@@ -166,6 +166,16 @@ class ReportingController extends Controller
     /**
      * Products sold by a selected employee this month. Admin only.
      */
+    /**
+     * Company-wide product performance - units, revenue and margin.
+     */
+    public function productPerformance(Request $request)
+    {
+        $filters = $request->only(['from', 'to', 'agent_id', 'limit']);
+
+        return response()->json($this->reportingService->getProductPerformance($filters));
+    }
+
     public function productsSoldByEmployee(Request $request)
     {
         $user = auth()->user();

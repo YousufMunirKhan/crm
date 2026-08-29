@@ -1220,7 +1220,7 @@ class LeadController extends Controller
                         $suggestedProducts->push([
                             'product' => $suggestion,
                             'suggested_by' => $product->name,
-                            'relationship_type' => 'suggest',
+                            'relationship_type' => $suggestion->pivot->relationship_type ?? 'suggest',
                         ]);
                     }
                 }

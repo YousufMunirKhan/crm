@@ -38,7 +38,13 @@ class ProductController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'sku' => ['nullable', 'string', 'max:64', 'unique:products,sku'],
             'description' => ['nullable', 'string'],
+            'unit_price' => ['nullable', 'numeric', 'min:0'],
+            'cost_price' => ['nullable', 'numeric', 'min:0'],
+            'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'currency' => ['nullable', 'string', 'size:3'],
+            'unit' => ['nullable', 'string', 'max:32'],
             'category' => ['nullable', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
         ]);
@@ -51,10 +57,11 @@ class ProductController extends Controller
             return response()->json($existing, 200);
         }
 
-        // When creating from invoice/elsewhere without category, assign a default at random
+        // Products created from an invoice arrive without a category. Use one
+        // stable bucket: a random pick scattered them across target categories
+        // and corrupted target attainment reporting.
         if (empty($data['category'])) {
-            $defaultCategories = ['Uncategorized', 'General', 'Other', 'Misc'];
-            $data['category'] = $defaultCategories[array_rand($defaultCategories)];
+            $data['category'] = 'Uncategorized';
         }
 
         $product = Product::create($data);
@@ -74,7 +81,13 @@ class ProductController extends Controller
 
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
+            'sku' => ['nullable', 'string', 'max:64', 'unique:products,sku,'.$id],
             'description' => ['nullable', 'string'],
+            'unit_price' => ['nullable', 'numeric', 'min:0'],
+            'cost_price' => ['nullable', 'numeric', 'min:0'],
+            'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'currency' => ['nullable', 'string', 'size:3'],
+            'unit' => ['nullable', 'string', 'max:32'],
             'category' => ['nullable', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
         ]);
@@ -84,10 +97,72 @@ class ProductController extends Controller
         return response()->json($product);
     }
 
+    /**
+     * Retires a product. Soft delete, so line items on historic leads and
+     * invoices keep resolving - a hard delete hit the lead_items foreign key
+     * and returned a 500 for any product that had ever been sold.
+     */
     public function destroy($id)
     {
         $product = Product::findOrFail($id);
+        $product->update(['is_active' => false]);
         $product->delete();
+
+        return response()->noContent();
+    }
+
+    /**
+     * Cross-sell links for a product, in both directions.
+     *
+     * product_relationships, its model relations, the read API and the UI panel
+     * all existed - but nothing anywhere could write a row, so the cross-sell
+     * panel rendered empty in production. These are the missing write paths.
+     */
+    public function relationships($id)
+    {
+        $product = Product::with(['suggestedProducts', 'suggestedByProducts'])->findOrFail($id);
+
+        return response()->json([
+            'suggests' => $product->suggestedProducts->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'category' => $p->category,
+                'relationship_type' => $p->pivot->relationship_type,
+            ])->values(),
+            'suggested_by' => $product->suggestedByProducts->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'relationship_type' => $p->pivot->relationship_type,
+            ])->values(),
+        ]);
+    }
+
+    public function storeRelationship(Request $request, $id)
+    {
+        $product = Product::findOrFail($id);
+
+        $data = $request->validate([
+            'to_product_id' => ['required', 'integer', 'exists:products,id', 'different:'.$id],
+            'relationship_type' => ['required', 'in:suggest,upsell,cross_sell'],
+        ]);
+
+        $product->suggestedProducts()->syncWithoutDetaching([
+            $data['to_product_id'] => ['relationship_type' => $data['relationship_type']],
+        ]);
+
+        // syncWithoutDetaching does not update the pivot of an existing row.
+        $product->suggestedProducts()->updateExistingPivot(
+            $data['to_product_id'],
+            ['relationship_type' => $data['relationship_type']]
+        );
+
+        return response()->json(['message' => 'Relationship saved.'], 201);
+    }
+
+    public function destroyRelationship($id, $toProductId)
+    {
+        $product = Product::findOrFail($id);
+        $product->suggestedProducts()->detach((int) $toProductId);
 
         return response()->noContent();
     }

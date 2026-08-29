@@ -112,6 +112,19 @@ class CommissionMonthlyReportService
             ?: '—';
     }
 
+    /**
+     * Stable grouping key for a sale's product.
+     *
+     * Grouping on the product name split a product's history in two whenever
+     * it was renamed. Fall back to the name only when no product is linked.
+     */
+    public function productKeyFor(CommissionSale $sale): string
+    {
+        $id = $sale->leadItem?->product_id ?: $sale->lead?->product_id;
+
+        return $id ? 'id:'.$id : 'name:'.$this->productNameFor($sale);
+    }
+
     public function customerNameFor(CommissionSale $sale): string
     {
         return $sale->customer?->business_name ?: $sale->customer?->name ?: '—';
@@ -123,7 +136,7 @@ class CommissionMonthlyReportService
     public function productWiseTotals(Collection $salesForUser): Collection
     {
         return $salesForUser
-            ->groupBy(fn (CommissionSale $s) => $this->productNameFor($s).'|'.$s->commission_currency)
+            ->groupBy(fn (CommissionSale $s) => $this->productKeyFor($s).'|'.$s->commission_currency)
             ->map(function (Collection $group) {
                 /** @var CommissionSale $first */
                 $first = $group->first();

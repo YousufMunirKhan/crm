@@ -16,6 +16,7 @@ use App\Modules\HR\Models\EmployeeTargetLine;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class ReportingService
@@ -77,6 +78,22 @@ class ReportingService
         $invoiceQuery = Invoice::whereBetween('invoice_date', [$from, $to]);
         $ticketQuery = Ticket::whereBetween('created_at', [$from, $to]);
 
+        // The controller has always passed `source`, but it was never applied
+        // here - so the channel filter silently did nothing.
+        if (! empty($filters['source'])) {
+            $source = $filters['source'];
+            $leadQuery->where('source', $source);
+            $invoiceQuery->whereHas('customer', fn ($q) => $q->where('source', $source));
+        }
+
+        if (! empty($filters['city'])) {
+            $leadQuery->whereHas('customer', fn ($q) => $q->where('city', 'like', '%'.$filters['city'].'%'));
+        }
+
+        if (! empty($filters['postcode'])) {
+            $leadQuery->whereHas('customer', fn ($q) => $q->where('postcode', 'like', '%'.$filters['postcode'].'%'));
+        }
+
         if (isset($filters['agent_id'])) {
             $aid = (int) $filters['agent_id'];
             $leadQuery->where(function ($q) use ($aid) {
@@ -112,7 +129,22 @@ class ReportingService
 
         $pipelineValue = (clone $leadQuery)->whereNotIn('stage', ['won', 'lost'])->sum('pipeline_value');
 
-        $leadRevenue = (float) (clone $wonItemsQuery)->sum('total_price');
+        // Revenue was previously $leadRevenue + $invoiceRevenue, which counted
+        // a sale twice whenever a won deal was also invoiced. Now that invoices
+        // carry lead_id, invoiced leads are excluded from the lead-side total
+        // so each sale is counted once, from the invoice where one exists.
+        $invoicedLeadIds = (clone $invoiceQuery)
+            ->whereNotNull('lead_id')
+            ->distinct()
+            ->pluck('lead_id')
+            ->all();
+
+        $leadRevenueQuery = (clone $wonItemsQuery);
+        if ($invoicedLeadIds !== []) {
+            $leadRevenueQuery->whereNotIn('lead_id', $invoicedLeadIds);
+        }
+
+        $leadRevenue = (float) $leadRevenueQuery->sum('total_price');
         $invoiceRevenue = (float) (clone $invoiceQuery)->sum('total');
         $revenue = $leadRevenue + $invoiceRevenue;
 
@@ -166,6 +198,10 @@ class ReportingService
             $query->where('assigned_to', $filters['agent_id']);
         }
 
+        if (! empty($filters['source'])) {
+            $query->where('source', $filters['source']);
+        }
+
         $stages = ['follow_up', 'lead', 'hot_lead', 'quotation', 'won', 'lost'];
         $funnel = [];
 
@@ -207,6 +243,10 @@ class ReportingService
         $query = Customer::whereNotNull('latitude')
             ->whereNotNull('longitude');
 
+        if (! empty($filters['source'])) {
+            $query->where('source', $filters['source']);
+        }
+
         if (isset($filters['city'])) {
             $query->where('city', 'like', '%' . $filters['city'] . '%');
         }
@@ -215,22 +255,36 @@ class ReportingService
             $query->where('postcode', 'like', '%' . $filters['postcode'] . '%');
         }
 
-        $customers = $query->get()->map(function ($customer) {
-            return [
+        // Aggregate in the database. This previously issued two extra queries
+        // per customer inside a map() over an unbounded result set.
+        $limit = (int) ($filters['limit'] ?? 2000);
+
+        $customers = $query
+            ->withSum('invoices as revenue', 'total')
+            ->withCount('tickets as tickets_count')
+            ->select(['id', 'name', 'latitude', 'longitude', 'city', 'postcode'])
+            ->limit($limit)
+            ->get()
+            ->map(fn ($customer) => [
                 'id' => $customer->id,
                 'name' => $customer->name,
                 'latitude' => (float) $customer->latitude,
                 'longitude' => (float) $customer->longitude,
                 'city' => $customer->city,
                 'postcode' => $customer->postcode,
-                'revenue' => $customer->invoices()->sum('total'),
-                'tickets_count' => $customer->tickets()->count(),
-            ];
-        });
+                'revenue' => (float) ($customer->revenue ?? 0),
+                'tickets_count' => (int) ($customer->tickets_count ?? 0),
+            ]);
+
+        $total = (clone $query)->count();
 
         return [
             'customers' => $customers,
-            'total' => $customers->count(),
+            'total' => $total,
+            // Say so when the map is showing a subset, rather than implying
+            // full coverage.
+            'returned' => $customers->count(),
+            'truncated' => $total > $customers->count(),
         ];
     }
 
@@ -269,10 +323,58 @@ class ReportingService
             ->pluck('count', 'channel')
             ->toArray();
 
+        /*
+         * Bulk marketing writes to sent_communications; only 1:1 chats and
+         * inbound webhooks write to communications. Reporting read the latter
+         * only, so no marketing campaign has ever appeared in Business
+         * Reports. Fold both together, and expose the marketing-only figures
+         * (template sends, opens) that were previously invisible.
+         */
+        $marketingQuery = DB::table('sent_communications')
+            ->whereBetween('created_at', [$from, $to]);
+
+        if (isset($filters['agent_id'])) {
+            $marketingQuery->where('sent_by', (int) $filters['agent_id']);
+        }
+
+        $marketingSent = (clone $marketingQuery)
+            ->whereIn('status', ['sent', 'opened'])
+            ->count();
+
+        $marketingByChannel = (clone $marketingQuery)
+            ->whereIn('status', ['sent', 'opened'])
+            ->selectRaw('type as channel, count(*) as count')
+            ->groupBy('type')
+            ->pluck('count', 'channel')
+            ->toArray();
+
+        $marketingFailed = (clone $marketingQuery)
+            ->whereIn('status', ['failed', 'bounced'])
+            ->count();
+
+        $opened = Schema::hasColumn('sent_communications', 'opened_at')
+            ? (clone $marketingQuery)->whereNotNull('opened_at')->count()
+            : 0;
+
+        foreach ($marketingByChannel as $channel => $count) {
+            $byChannel[$channel] = ($byChannel[$channel] ?? 0) + $count;
+        }
+
         return [
-            'sent' => $sent,
+            'sent' => $sent + $marketingSent,
             'received' => $received,
             'by_channel' => $byChannel,
+            'conversations' => [
+                'sent' => $sent,
+                'received' => $received,
+            ],
+            'marketing' => [
+                'sent' => $marketingSent,
+                'failed' => $marketingFailed,
+                'opened' => $opened,
+                'open_rate' => $marketingSent > 0 ? round($opened / $marketingSent * 100, 2) : 0.0,
+                'by_channel' => $marketingByChannel,
+            ],
         ];
     }
 
@@ -693,6 +795,117 @@ class ReportingService
      * Products sold by a specific employee in a given period (product-level detail).
      * Admin only - used for "Products by Employee" report.
      */
+    /**
+     * Company-wide product performance: units, revenue and margin by product.
+     *
+     * The only product endpoint that existed required an agent_id, returned an
+     * empty result without one, and did not aggregate - it returned a flat row
+     * list. There was no way to ask "what are our top products?".
+     *
+     * Counts won lead items and invoice lines together, de-duplicating on the
+     * lead so an invoiced deal is not counted twice.
+     */
+    public function getProductPerformance(array $filters = []): array
+    {
+        $from = isset($filters['from']) ? Carbon::parse($filters['from'])->startOfDay() : now()->startOfMonth();
+        $to = isset($filters['to']) ? Carbon::parse($filters['to'])->endOfDay() : now()->endOfDay();
+        $limit = (int) ($filters['limit'] ?? 50);
+
+        // Invoiced lines, keyed by product.
+        $invoiceRows = DB::table('invoice_items')
+            ->join('invoices', 'invoices.id', '=', 'invoice_items.invoice_id')
+            ->whereNull('invoices.deleted_at')
+            ->whereNull('invoice_items.deleted_at')
+            ->whereBetween('invoices.invoice_date', [$from, $to])
+            ->whereNotNull('invoice_items.product_id')
+            ->groupBy('invoice_items.product_id')
+            ->select([
+                'invoice_items.product_id',
+                DB::raw('SUM(invoice_items.quantity) as units'),
+                DB::raw('SUM(invoice_items.line_total) as revenue'),
+            ])
+            ->get()
+            ->keyBy('product_id');
+
+        // Leads that were invoiced - excluded from the won-item side so a sale
+        // is not counted twice.
+        $invoicedLeadIds = DB::table('invoices')
+            ->whereNull('deleted_at')
+            ->whereBetween('invoice_date', [$from, $to])
+            ->whereNotNull('lead_id')
+            ->distinct()
+            ->pluck('lead_id')
+            ->all();
+
+        $leadRows = DB::table('lead_items')
+            ->join('leads', 'leads.id', '=', 'lead_items.lead_id')
+            ->whereNull('leads.deleted_at')
+            ->whereNull('lead_items.deleted_at')
+            ->where('lead_items.status', 'won')
+            ->whereBetween('lead_items.updated_at', [$from, $to])
+            ->when($invoicedLeadIds !== [], fn ($q) => $q->whereNotIn('lead_items.lead_id', $invoicedLeadIds))
+            ->when(! empty($filters['agent_id']), fn ($q) => $q->where('leads.assigned_to', (int) $filters['agent_id']))
+            ->groupBy('lead_items.product_id')
+            ->select([
+                'lead_items.product_id',
+                DB::raw('SUM(lead_items.quantity) as units'),
+                DB::raw('SUM(lead_items.total_price) as revenue'),
+            ])
+            ->get()
+            ->keyBy('product_id');
+
+        $productIds = collect($invoiceRows->keys())->merge($leadRows->keys())->unique()->filter()->values();
+
+        $products = DB::table('products')
+            ->whereIn('id', $productIds)
+            ->select(['id', 'name', 'category', 'unit_price', 'cost_price'])
+            ->get()
+            ->keyBy('id');
+
+        $rows = $productIds->map(function ($productId) use ($invoiceRows, $leadRows, $products) {
+            $product = $products->get($productId);
+            $units = (int) (($invoiceRows[$productId]->units ?? 0) + ($leadRows[$productId]->units ?? 0));
+            $revenue = round((float) (($invoiceRows[$productId]->revenue ?? 0) + ($leadRows[$productId]->revenue ?? 0)), 2);
+
+            // Margin only where a cost is recorded; null is honest, zero is not.
+            $cost = $product?->cost_price;
+            $margin = $cost === null ? null : round($revenue - ((float) $cost * $units), 2);
+
+            return [
+                'product_id' => (int) $productId,
+                'name' => $product?->name ?? 'Unknown product',
+                'category' => $product?->category,
+                'units' => $units,
+                'revenue' => $revenue,
+                'margin' => $margin,
+            ];
+        })
+            ->sortByDesc('revenue')
+            ->values();
+
+        $byCategory = $rows->groupBy(fn ($r) => $r['category'] ?: 'Uncategorized')
+            ->map(fn ($group) => [
+                'units' => $group->sum('units'),
+                'revenue' => round($group->sum('revenue'), 2),
+            ]);
+
+        return [
+            'period' => ['from' => $from->toDateString(), 'to' => $to->toDateString()],
+            'products' => $rows->take($limit)->values(),
+            'total_products' => $rows->count(),
+            'total_units' => $rows->sum('units'),
+            'total_revenue' => round($rows->sum('revenue'), 2),
+            'by_category' => $byCategory,
+            // Unattributed lines cannot be credited to any product - say so
+            // rather than let the totals imply full coverage.
+            'unattributed_invoice_lines' => DB::table('invoice_items')
+                ->join('invoices', 'invoices.id', '=', 'invoice_items.invoice_id')
+                ->whereBetween('invoices.invoice_date', [$from, $to])
+                ->whereNull('invoice_items.product_id')
+                ->count(),
+        ];
+    }
+
     public function getProductsSoldByEmployee(array $filters = []): array
     {
         $from = isset($filters['from']) ? Carbon::parse($filters['from'])->startOfDay() : now()->startOfMonth();
