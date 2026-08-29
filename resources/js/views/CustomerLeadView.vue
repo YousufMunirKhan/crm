@@ -1,39 +1,77 @@
 <template>
     <div class="min-h-screen bg-slate-100 w-full min-w-0 overflow-x-hidden">
-        <!-- Record context bar (breadcrumbs + user menu come from AppLayout) -->
-        <header class="bg-white border-b border-slate-200 sticky top-0 z-sticky">
-            <div class="px-4 sm:px-6 py-3 sm:py-4">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <router-link
-                        :to="customersListRoute"
-                        class="link inline-flex items-center gap-1.5 text-sm min-w-0"
-                    >
-                        <ArrowLeftIcon class="icon-sm shrink-0" aria-hidden="true" />
-                        {{ customerTypeLabel === 'Customer' ? 'Back to Customers' : 'Back to Prospects' }}
-                    </router-link>
-                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
-                        <BaseButton variant="outline" :to="`/customers/${customer?.id}/edit`" block-mobile>
-                            Edit Customer
-                        </BaseButton>
-                    </div>
-                </div>
-            </div>
-        </header>
-
         <!-- Main Content -->
         <div class="page">
-            <!-- Deal header (pipeline-style) -->
+            <router-link
+                :to="customersListRoute"
+                class="link inline-flex items-center gap-1.5 text-sm min-w-0"
+            >
+                <ArrowLeftIcon class="icon-sm shrink-0" aria-hidden="true" />
+                {{ customerTypeLabel === 'Customer' ? 'Back to Customers' : 'Back to Prospects' }}
+            </router-link>
+            <!--
+                Identity. This used to be a wall of same-weight text: the name,
+                then the same name again three rows down in a 22-field grid, and
+                the phone number as plain text you had to copy out by hand.
+                Everything a rep does first - call, WhatsApp, email - is a
+                button here, and the record says at a glance what it is.
+            -->
             <BaseCard v-if="customer">
-                <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                    <div class="min-w-0 flex-1">
-                        <h2 class="text-page-title text-slate-900 break-words">{{ customer.name }}</h2>
-                        <p v-if="customer.business_name" class="text-sm text-slate-500 mt-0.5">{{ customer.business_name }}</p>
-                        <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm">
-                            <a v-if="customer.phone" :href="'tel:' + customer.phone" class="link">{{ customer.phone }}</a>
-                            <a v-if="customer.email" :href="'mailto:' + customer.email" class="link truncate max-w-full">{{ customer.email }}</a>
-                            <span v-if="customer.city" class="text-slate-600">{{ customer.city }}</span>
+                <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+                    <div class="flex items-start gap-4 min-w-0 flex-1">
+                        <div
+                            class="hidden sm:flex w-14 h-14 shrink-0 rounded-2xl items-center justify-center text-white font-bold text-lg shadow-sm"
+                            :class="avatarTone"
+                            aria-hidden="true"
+                        >{{ customerInitials }}</div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h2 class="text-page-title text-slate-900 break-words">{{ customer.name || customer.business_name || 'Unnamed' }}</h2>
+                                <BaseBadge :tone="customer.type === 'customer' ? 'success' : 'primary'">{{ customerTypeLabel }}</BaseBadge>
+                                <router-link
+                                    :to="`/customers/${customer.id}/edit`"
+                                    class="btn btn-sm btn-ghost min-h-[44px] sm:min-h-0"
+                                >
+                                    <PencilSquareIcon class="icon-sm" aria-hidden="true" />
+                                    Edit
+                                </router-link>
+                            </div>
+                            <p v-if="customer.business_name && customer.business_name !== customer.name" class="text-base text-slate-600 mt-0.5 break-words">
+                                {{ customer.business_name }}
+                            </p>
+
+                            <!-- Contact actions, not contact text. -->
+                            <div class="flex flex-wrap gap-2 mt-3 [&>a]:min-h-[44px] sm:[&>a]:min-h-0 [&>span]:min-h-[44px] sm:[&>span]:min-h-0">
+                                <a v-if="customer.phone" :href="`tel:${customer.phone}`" class="btn btn-sm btn-soft flex-nowrap">
+                                    <PhoneIcon class="icon-sm shrink-0" aria-hidden="true" />
+                                    {{ customer.phone }}
+                                </a>
+                                <a
+                                    v-if="whatsappHref"
+                                    :href="whatsappHref"
+                                    target="_blank"
+                                    rel="noopener"
+                                    class="btn btn-sm btn-soft-success"
+                                >
+                                    <ChatBubbleLeftRightIcon class="icon-sm" aria-hidden="true" />
+                                    WhatsApp
+                                </a>
+                                <a
+                                    v-if="customer.email"
+                                    :href="`mailto:${customer.email}`"
+                                    class="btn btn-sm btn-soft min-w-0 max-w-full flex-nowrap"
+                                >
+                                    <EnvelopeIcon class="icon-sm shrink-0" aria-hidden="true" />
+                                    <span class="truncate">{{ customer.email }}</span>
+                                </a>
+                                <span v-if="locationLine" class="btn btn-sm btn-ghost pointer-events-none">
+                                    <MapPinIcon class="icon-sm" aria-hidden="true" />
+                                    {{ locationLine }}
+                                </span>
+                            </div>
                         </div>
                     </div>
+
                     <div v-if="activeLead" class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 shrink-0">
                         <div class="sm:min-w-[11rem]">
                             <label class="sr-only" for="active-lead-select">Active lead</label>
@@ -43,7 +81,7 @@
                                 class="form-select"
                                 @change="onActiveLeadSelectChange"
                             >
-                                <option v-for="l in allLeads" :key="l.id" :value="l.id">Lead #{{ l.id }} · {{ formatStage(l.stage) }}</option>
+                                <option v-for="l in allLeads" :key="l.id" :value="l.id">Lead #{{ l.id }} - {{ formatStage(l.stage) }}</option>
                             </select>
                         </div>
                         <div class="flex flex-wrap gap-2">
@@ -80,9 +118,10 @@
                             </BaseButton>
                         </div>
                     </div>
-                    <p v-else class="text-sm text-slate-500 shrink-0">No lead yet — use <strong>Focus</strong> below to add products.</p>
+                    <p v-else class="text-sm text-slate-500 shrink-0">No lead yet - use <strong>Focus</strong> below to add products.</p>
                 </div>
-                <ol v-if="activeLead" class="mt-4 flex rounded-control overflow-hidden border border-slate-200" aria-label="Lead pipeline stage">
+
+                <ol v-if="activeLead" class="mt-5 flex rounded-control overflow-hidden border border-slate-200" aria-label="Lead pipeline stage">
                     <li
                         v-for="st in pipelineStageOrder"
                         :key="st"
@@ -93,42 +132,106 @@
                         {{ formatStagePipe(st) }}
                     </li>
                 </ol>
-                <p v-if="activeLead?.assignee" class="text-xs text-slate-500 mt-3">Owner: <span class="font-medium text-slate-800">{{ activeLead.assignee.name }}</span></p>
+
+                <div v-if="activeLead?.assignee || activeLead?.next_follow_up_at" class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500 mt-3">
+                    <span v-if="activeLead?.assignee">Owner: <span class="font-medium text-slate-800">{{ activeLead.assignee.name }}</span></span>
+                    <span v-if="activeLead?.next_follow_up_at">
+                        Next follow-up:
+                        <span class="font-medium" :class="followUpOverdue ? 'text-danger-700' : 'text-slate-800'">
+                            {{ formatDate(activeLead.next_follow_up_at) }}{{ followUpOverdue ? ' - overdue' : '' }}
+                        </span>
+                    </span>
+                </div>
             </BaseCard>
 
-            <!-- Full-width on desktop: avoids 3-column grid inside a narrow sidebar -->
-            <BaseCard v-if="customer" :title="`${customerTypeLabel} details`" class="w-full min-w-0">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-5 [word-break:break-word]">
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.name || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Business name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.business_name || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Owner name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.owner_name || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Phone number 1</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.phone || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Contact Person 2 Name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.contact_person_2_name || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Contact Person 2 Phone</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.contact_person_2_phone || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Email</span><div class="font-medium text-slate-900 mt-0.5 break-all">{{ customer.email || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Secondary email</span><div class="font-medium text-slate-900 mt-0.5 break-all">{{ customer.email_secondary || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">WhatsApp number</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.whatsapp_number || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">SMS number</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.sms_number || '—' }}</div></div>
-                    <div class="min-w-0 sm:col-span-2 lg:col-span-2 xl:col-span-2"><span class="text-eyebrow text-slate-500 uppercase block">Address</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.address || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Postcode</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.postcode || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">City</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.city || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">VAT number</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.vat_number || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Source</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.source || lead?.source || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">AnyDesk / RustDesk</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.anydesk_rustdesk || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">EPOS type</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.epos_type || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Licence days</span><div class="font-medium text-slate-900 mt-0.5">{{ customer.lic_days ?? '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Birthday</span><div class="font-medium text-slate-900 mt-0.5">{{ formatDate(customer.birthday) || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Category</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.category || '—' }}</div></div>
-                    <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Created on</span><div class="font-medium text-slate-900 mt-0.5">{{ formatDate(customer.created_at) || '—' }}</div></div>
-                    <div class="min-w-0 sm:col-span-2 lg:col-span-3 xl:col-span-4"><span class="text-eyebrow text-slate-500 uppercase block">Assigned employees</span><div class="font-medium text-slate-900 mt-0.5 flex flex-wrap gap-1"><template v-if="customer.assigned_users?.length"><span v-for="u in customer.assigned_users" :key="u.id" class="chip">{{ u.name }}</span></template><span v-else>—</span></div></div>
+            <!--
+                The numbers a manager asks for out loud. They were reachable
+                only by scrolling past the field dump into a sidebar.
+            -->
+            <div v-if="customer" class="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+                <div class="stat-card">
+                    <p class="stat-label">Open leads</p>
+                    <p class="stat-value">{{ openLeadCount }}</p>
+                    <p class="stat-caption">{{ allLeads.length }} in total</p>
                 </div>
-                <div v-if="customer.notes" class="mt-4 pt-4 border-t border-slate-200">
-                    <span class="text-eyebrow text-slate-500 uppercase block">Notes</span>
-                    <div class="font-medium text-slate-900 mt-0.5 whitespace-pre-wrap break-words">{{ customer.notes }}</div>
+                <div class="stat-card">
+                    <p class="stat-label">Won value</p>
+                    <p class="stat-value">{{ formatMoney(wonValue) }}</p>
+                    <p class="stat-caption">{{ wonProductCount }} product line(s)</p>
                 </div>
-                <div v-if="activeLead?.expected_closing_date" class="mt-4 pt-4 border-t border-slate-200">
-                    <span class="text-eyebrow text-slate-500 uppercase block">Expected closing date</span>
-                    <div class="font-medium text-slate-900 mt-0.5">{{ formatDate(activeLead.expected_closing_date) }}</div>
+                <div class="stat-card">
+                    <p class="stat-label">Invoiced</p>
+                    <p class="stat-value">{{ formatMoney(invoicedTotal) }}</p>
+                    <p class="stat-caption">{{ invoices.length }} invoice(s)</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-label">Open tickets</p>
+                    <p class="stat-value" :class="openTicketCount > 0 ? 'text-danger-700' : ''">{{ openTicketCount }}</p>
+                    <p class="stat-caption">{{ tickets.length }} all time</p>
+                </div>
+            </div>
+
+            <!--
+                The notes are the one thing on this page a person wrote by hand,
+                and they were at the bottom of a grid of em dashes.
+            -->
+            <div v-if="customer?.notes" class="callout callout-info">
+                <div class="min-w-0">
+                    <p class="text-eyebrow uppercase text-slate-500">Notes</p>
+                    <p class="mt-1 whitespace-pre-wrap break-words text-slate-800">{{ customer.notes }}</p>
+                </div>
+            </div>
+
+            <!--
+                This was 22 fields in one flat grid, every one of them rendered
+                whether or not it had a value. On a typical record more than
+                half read "-", so the six facts that matter were buried in a
+                page of em dashes and you could not tell filled from empty at a
+                glance. Fields are grouped by what they are for, empty ones are
+                hidden by default, and the toggle is there because sometimes
+                confirming a field IS empty is the point.
+            -->
+            <BaseCard v-if="customer" class="w-full min-w-0">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
+                    <h2 class="card-title">{{ customerTypeLabel }} details</h2>
+                    <button
+                        v-if="emptyFieldCount > 0"
+                        type="button"
+                        class="btn btn-sm btn-ghost min-h-[44px] sm:min-h-0"
+                        @click="showEmptyFields = !showEmptyFields"
+                    >
+                        {{ showEmptyFields ? 'Hide' : 'Show' }} {{ emptyFieldCount }} empty field{{ emptyFieldCount === 1 ? '' : 's' }}
+                    </button>
+                </div>
+
+                <div class="space-y-6 mt-4">
+                    <section v-for="group in visibleDetailGroups" :key="group.title" class="min-w-0">
+                        <h3 class="subsection-title mb-3">{{ group.title }}</h3>
+                        <dl class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-4 [word-break:break-word]">
+                            <div v-for="field in group.fields" :key="field.label" class="min-w-0">
+                                <dt class="text-eyebrow text-slate-500 uppercase">{{ field.label }}</dt>
+                                <dd class="mt-0.5 min-w-0">
+                                    <a
+                                        v-if="field.value && field.href"
+                                        :href="field.href"
+                                        class="link font-medium break-words"
+                                    >{{ field.value }}</a>
+                                    <span
+                                        v-else
+                                        class="font-medium break-words"
+                                        :class="field.value ? 'text-slate-900' : 'text-slate-400'"
+                                    >{{ field.value || 'Not set' }}</span>
+                                </dd>
+                            </div>
+                        </dl>
+                    </section>
+
+                    <section v-if="customer.assigned_users?.length" class="min-w-0">
+                        <h3 class="subsection-title mb-3">Assigned employees</h3>
+                        <div class="flex flex-wrap gap-1.5">
+                            <span v-for="u in customer.assigned_users" :key="u.id" class="chip">{{ u.name }}</span>
+                        </div>
+                    </section>
                 </div>
             </BaseCard>
 
@@ -509,53 +612,69 @@
         <!-- Close line item (Won / Lost) -->
         <BaseModal
             v-model="showCloseItemModal"
-            :title="`Close Product: ${closeItemData.item?.product?.name || ''}`"
+            :title="closeItemData.status === 'won'
+                ? `Mark won: ${closeItemData.item?.product?.name || 'product'}`
+                : `Mark lost: ${closeItemData.item?.product?.name || 'product'}`"
+            :description="closeItemData.status === 'won'
+                ? 'The price you enter here is what this sale is worth in the revenue reports and in the commission figures, so enter what the customer actually agreed to pay.'
+                : 'The reason is what shows up when someone asks why deals are being lost, so write what actually happened rather than \'not interested\'.'"
             size="md"
             :close-on-backdrop="false"
         >
             <div v-if="closeItemData.status === 'won'" class="space-y-4">
-                <div>
-                    <label class="form-label" for="customerleadview-quantity">Quantity <span class="form-required" aria-hidden="true">*</span></label>
-                    <input id="customerleadview-quantity"
-                        v-model.number="closeItemData.quantity"
-                        type="number"
-                        min="1"
-                        required
-                        class="form-input"
-                    />
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label" for="customerleadview-quantity">Quantity <span class="form-required" aria-hidden="true">*</span></label>
+                        <input id="customerleadview-quantity"
+                            v-model.number="closeItemData.quantity"
+                            type="number"
+                            min="1"
+                            required
+                            class="form-input"
+                        />
+                        <p class="form-hint">How many units the customer is taking.</p>
+                    </div>
+                    <div>
+                        <label class="form-label" for="customerleadview-unit-price">Price per unit (£) <span class="form-required" aria-hidden="true">*</span></label>
+                        <input id="customerleadview-unit-price"
+                            v-model.number="closeItemData.unit_price"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            required
+                            class="form-input"
+                        />
+                        <p class="form-hint">Excluding VAT.</p>
+                    </div>
                 </div>
-                <div>
-                    <label class="form-label" for="customerleadview-unit-price">Unit Price (£) <span class="form-required" aria-hidden="true">*</span></label>
-                    <input id="customerleadview-unit-price"
-                        v-model.number="closeItemData.unit_price"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        required
-                        class="form-input"
-                    />
+
+                <div class="callout callout-success">
+                    <span>This sale will be recorded as <strong>{{ formatMoney(closeItemTotal) }}</strong></span>
                 </div>
+
                 <div>
                     <label class="form-label" for="customerleadview-notes">Notes</label>
                     <textarea id="customerleadview-notes"
                         v-model="closeItemData.notes"
                         rows="2"
                         class="form-textarea"
-                        placeholder="Optional notes..."
+                        placeholder="Anything the next person should know - agreed discount, install date, who signed."
                     />
+                    <p class="form-hint">Optional. Saved against this product line.</p>
                 </div>
             </div>
 
             <div v-else class="space-y-4">
                 <div>
-                    <label class="form-label" for="customerleadview-lost-reason">Lost Reason <span class="form-required" aria-hidden="true">*</span></label>
+                    <label class="form-label" for="customerleadview-lost-reason">Why was it lost? <span class="form-required" aria-hidden="true">*</span></label>
                     <textarea id="customerleadview-lost-reason"
                         v-model="closeItemData.lost_reason"
                         rows="3"
                         required
                         class="form-textarea"
-                        placeholder="Why was this product lost?"
+                        placeholder="e.g. Went with a cheaper quote from Worldpay; wants to revisit in April."
                     />
+                    <p class="form-hint">Be specific - this is the only record of why the deal did not close.</p>
                 </div>
             </div>
 
@@ -596,14 +715,14 @@
         <!-- Mark lead as Lost -->
         <BaseModal
             v-model="showLostLeadModal"
-            title="Mark lead as Lost"
-            description="Please provide a reason. This is required for reporting."
+            title="Mark this lead as lost"
+            description="The lead stops counting as open pipeline and moves to the Lost stage. Nothing is deleted - you can still see it in the history."
             size="md"
             :close-on-backdrop="false"
         >
             <div>
                 <label class="form-label" for="customerleadview-lead-lost-reason">
-                    Lost reason <span class="form-required" aria-hidden="true">*</span>
+                    Why was it lost? <span class="form-required" aria-hidden="true">*</span>
                 </label>
                 <textarea
                     id="customerleadview-lead-lost-reason"
@@ -611,14 +730,21 @@
                     rows="3"
                     required
                     class="form-textarea"
-                    placeholder="Lost reason..."
+                    placeholder="e.g. Signed a 3-year contract with their current provider last month."
                 />
+                <p class="form-hint">This is what the lost-reasons report is built from.</p>
             </div>
 
             <template #actions>
                 <BaseButton variant="outline" block-mobile @click="showLostLeadModal = false">Cancel</BaseButton>
-                <BaseButton variant="danger" block-mobile :loading="stageUpdating" @click="submitMarkLeadLost">
-                    Save
+                <BaseButton
+                    variant="danger"
+                    block-mobile
+                    :disabled="!lostReasonInput.trim()"
+                    :loading="stageUpdating"
+                    @click="submitMarkLeadLost"
+                >
+                    Mark as lost
                 </BaseButton>
             </template>
         </BaseModal>
@@ -626,7 +752,8 @@
         <!-- Complete Follow-up / Appointment Modal -->
         <BaseModal
             v-model="showCompleteModal"
-            title="Complete Appointment / Follow-up"
+            :title="`Complete this ${completeActivityNoun}`"
+            description="Record what happened, then say where the lead goes next. The current follow-up is cleared either way."
             size="md"
             :close-on-backdrop="false"
             @close="closeCompleteModal"
@@ -634,38 +761,49 @@
             <form id="complete-followup-form" class="space-y-4" @submit.prevent="completeFollowUp">
                 <div>
                     <label class="form-label" for="customerleadview-remarks-notes">
-                        Remarks / Notes <span class="form-required" aria-hidden="true">*</span>
+                        What happened? <span class="form-required" aria-hidden="true">*</span>
                     </label>
                     <textarea id="customerleadview-remarks-notes"
                         v-model="completeForm.remarks"
                         rows="4"
                         required
                         class="form-textarea"
-                        placeholder="Enter your remarks..."
+                        placeholder="e.g. Spoke to the owner, demoed the ePOS, he wants a quote for two tills by Friday."
                     />
+                    <p class="form-hint">Saved to this lead's history for whoever picks it up next.</p>
                 </div>
+
+                <!--
+                    This was a "Sale won" tick box that then revealed a stage
+                    list containing Lead and Hot Lead - so you could tick "sale
+                    won" and set the stage to Lead. It is one question, and it
+                    always was: where does this lead go now.
+                -->
                 <div>
-                    <label class="form-choice">
-                        <input v-model="completeForm.saleHappened" type="checkbox" class="form-checkbox" />
-                        <span>Sale won (counts as sale; prospect becomes customer)</span>
-                    </label>
-                </div>
-                <div v-if="completeForm.saleHappened">
-                    <label class="form-label" for="customerleadview-new-stage">New Stage</label>
+                    <label class="form-label" for="customerleadview-new-stage">Where does the lead go now?</label>
                     <select id="customerleadview-new-stage" v-model="completeForm.newStage" class="form-select">
-                        <option value="won">Won</option>
-                        <option value="quotation">Quotation</option>
-                        <option value="hot_lead">Hot Lead</option>
-                        <option value="lead">Lead</option>
+                        <option value="">Leave it where it is</option>
+                        <option value="lead">Lead - still early</option>
+                        <option value="hot_lead">Hot lead - seriously interested</option>
+                        <option value="quotation">Quotation - price is with them</option>
+                        <option value="won">Won - they have agreed to buy</option>
                     </select>
+                    <p v-if="completeForm.newStage === 'won'" class="form-hint text-success-700">
+                        This counts as a sale, turns the prospect into a customer, and asks you who gets the credit.
+                    </p>
+                    <p v-else class="form-hint">Pick the stage that describes where the conversation actually is.</p>
                 </div>
+
                 <div>
-                    <label class="form-label" for="customerleadview-next-follow-up-date-optional">Next Follow-up Date (Optional)</label>
+                    <label class="form-label" for="customerleadview-next-follow-up-date-optional">Next follow-up</label>
                     <input id="customerleadview-next-follow-up-date-optional"
                         v-model="completeForm.nextFollowUpAt"
                         type="datetime-local"
                         class="form-input"
                     />
+                    <p class="form-hint">
+                        Optional. Leave empty and this lead drops off the follow-up list entirely.
+                    </p>
                 </div>
             </form>
 
@@ -680,7 +818,7 @@
                     block-mobile
                     :loading="completingFollowUp"
                 >
-                    {{ completingFollowUp ? 'Saving...' : 'Complete' }}
+                    {{ completingFollowUp ? 'Saving...' : 'Save and complete' }}
                 </BaseButton>
             </template>
         </BaseModal>
@@ -688,17 +826,20 @@
         <!-- Sale credit -->
         <BaseModal
             v-model="showSaleCreditModal"
-            title="Sale Credit"
+            title="Who gets credit for this sale?"
             :description="saleCreditContextText"
             size="md"
             @close="closeSaleCreditModal"
         >
             <div>
-                <label class="form-label" for="customerleadview-select-user-for-this-sale">Select user for this sale</label>
+                <label class="form-label" for="customerleadview-select-user-for-this-sale">Salesperson</label>
                 <select id="customerleadview-select-user-for-this-sale" v-model="selectedSaleCreditUserId" class="form-select">
-                    <option value="">Select user...</option>
-                    <option v-for="u in saleCreditUsers" :key="u.id" :value="String(u.id)">{{ u.name }} ({{ u.role?.name || '—' }})</option>
+                    <option value="">Choose a person...</option>
+                    <option v-for="u in saleCreditUsers" :key="u.id" :value="String(u.id)">{{ u.name }} ({{ u.role?.name || 'No role' }})</option>
                 </select>
+                <p class="form-hint">
+                    This decides whose numbers the sale lands in - the employee report and the commission run both follow it.
+                </p>
             </div>
 
             <template #actions>
@@ -728,14 +869,20 @@ import { BaseBadge, BaseButton, BaseCard, BaseModal, EmptyState } from '@/compon
 import {
     ArrowLeftIcon,
     CalendarDaysIcon,
+    ChatBubbleLeftRightIcon,
     CheckCircleIcon,
     CheckIcon,
     ChevronDownIcon,
     ClipboardDocumentIcon,
     ClockIcon,
+    EnvelopeIcon,
+    MapPinIcon,
+    PencilSquareIcon,
+    PhoneIcon,
     XCircleIcon,
 } from '@heroicons/vue/24/outline';
 import { formatLeadStage, formatLineItemStatus } from '@/utils/displayFormat';
+import { formatMoney } from '@/utils/money';
 
 const route = useRoute();
 const router = useRouter();
@@ -1158,8 +1305,8 @@ const completingFollowUp = ref(false);
 const selectedFollowUp = ref(null);
 const completeForm = ref({
     remarks: '',
-    saleHappened: false,
-    newStage: 'won',
+    /** '' means "leave the stage alone"; otherwise the stage to move to. */
+    newStage: '',
     nextFollowUpAt: '',
 });
 const isAdminRole = computed(() => {
@@ -1294,8 +1441,9 @@ const getAppointmentStatusLabel = (s) => {
 };
 const openCompleteForAppointment = (apt) => {
     if (!apt?.lead_id) return;
-    selectedFollowUp.value = { id: apt.lead_id };
-    completeForm.value = { remarks: '', saleHappened: false, newStage: 'won', nextFollowUpAt: '' };
+    // Named so the dialog can say "appointment" rather than guessing.
+    selectedFollowUp.value = { id: apt.lead_id, source: 'appointment' };
+    completeForm.value = { remarks: '', newStage: '', nextFollowUpAt: '' };
     showCompleteModal.value = true;
 };
 
@@ -1308,11 +1456,15 @@ const completeFollowUp = async () => {
     if (!selectedFollowUp.value?.id || completingFollowUp.value) return;
     completingFollowUp.value = true;
     try {
-        const saleWon = completeForm.value.saleHappened && completeForm.value.newStage === 'won';
+        // `sale_happened` on the API is really "change the stage" - it gates
+        // the stage update and nothing else. One question in the form, mapped
+        // onto the two fields the endpoint expects.
+        const newStage = completeForm.value.newStage;
+        const saleWon = newStage === 'won';
         const payload = {
             remarks: completeForm.value.remarks,
-            sale_happened: completeForm.value.saleHappened,
-            new_stage: completeForm.value.saleHappened ? completeForm.value.newStage : null,
+            sale_happened: Boolean(newStage),
+            new_stage: newStage || null,
         };
         if (completeForm.value.nextFollowUpAt) payload.next_follow_up_at = completeForm.value.nextFollowUpAt;
         await axios.post(`/api/leads/${selectedFollowUp.value.id}/complete-followup`, payload);
@@ -1320,7 +1472,7 @@ const completeFollowUp = async () => {
         await loadData();
         toast.success(saleWon ? 'Appointment completed. Sale counted; prospect is now a customer.' : 'Completed.');
         if (saleWon) {
-            openSaleCreditModal('Follow-up completed as won.', selectedFollowUp.value?.id || null);
+            openSaleCreditModal('The lead was just marked won.', selectedFollowUp.value?.id || null);
         }
     } catch (e) {
         toast.error(e?.response?.data?.message || 'Failed to complete');
@@ -1346,6 +1498,170 @@ const purchasedProductNames = computed(() => {
     });
     return [...names];
 });
+
+/** Live total in the "mark won" dialog, so the figure being recorded is visible before saving. */
+const closeItemTotal = computed(() => {
+    const qty = Number(closeItemData.value?.quantity || 0);
+    const price = Number(closeItemData.value?.unit_price || 0);
+
+    return qty * price;
+});
+
+/** The complete dialog is opened from both appointments and follow-ups; it should say which. */
+const completeActivityNoun = computed(
+    () => (selectedFollowUp.value?.source === 'appointment' ? 'appointment' : 'follow-up'),
+);
+
+const showEmptyFields = ref(false);
+
+const customerInitials = computed(() => {
+    const source = customer.value?.name || customer.value?.business_name || '';
+
+    return source
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((word) => word[0].toUpperCase())
+        .join('') || '?';
+});
+
+/**
+ * The avatar colour is derived from the name, so the same record always looks
+ * the same and two records side by side never look like one.
+ */
+const avatarTone = computed(() => {
+    const tones = [
+        'bg-primary-600',
+        'bg-success-600',
+        'bg-warning-600',
+        'bg-danger-600',
+        'bg-slate-700',
+    ];
+    const source = customer.value?.name || customer.value?.business_name || '';
+    let hash = 0;
+    for (let i = 0; i < source.length; i += 1) {
+        hash = (hash + source.charCodeAt(i)) % tones.length;
+    }
+
+    return tones[hash];
+});
+
+const locationLine = computed(() => {
+    const c = customer.value || {};
+
+    return [c.city, c.postcode].map((v) => (v || '').trim()).filter(Boolean).join(' · ');
+});
+
+/**
+ * wa.me wants digits with the country code and no punctuation. Numbers here are
+ * stored however they were typed or imported, so a UK trunk prefix is swapped
+ * for 44 rather than sent as-is - "07700 900123" opens nothing.
+ */
+const whatsappHref = computed(() => {
+    const c = customer.value || {};
+    const raw = c.whatsapp_number || c.phone || '';
+    let digits = String(raw).replace(/\D+/g, '');
+
+    if (!digits) return '';
+    if (digits.startsWith('0')) digits = '44' + digits.replace(/^0+/, '');
+    if (digits.length < 8) return '';
+
+    return `https://wa.me/${digits}`;
+});
+
+const followUpOverdue = computed(() => {
+    const due = activeLead.value?.next_follow_up_at;
+    if (!due) return false;
+
+    return new Date(due) < new Date(new Date().toDateString());
+});
+
+const openLeadCount = computed(
+    () => allLeads.value.filter((l) => l.stage !== 'won' && l.stage !== 'lost').length,
+);
+
+const wonLineItems = computed(() =>
+    allLeads.value.flatMap((l) => (l.items || []).filter((i) => i.status === 'won')),
+);
+
+const wonValue = computed(() =>
+    wonLineItems.value.reduce((sum, i) => sum + Number(i.total_price || 0), 0),
+);
+
+const wonProductCount = computed(() => wonLineItems.value.length);
+
+const invoicedTotal = computed(() =>
+    invoices.value.reduce((sum, i) => sum + Number(i.total || 0), 0),
+);
+
+const openTicketCount = computed(
+    () => tickets.value.filter((t) => t.status !== 'closed').length,
+);
+
+/**
+ * The record's fields, grouped by what someone is looking for when they scroll
+ * here: how to reach them, who the business is, and how the record is filed.
+ */
+const detailGroups = computed(() => {
+    const c = customer.value || {};
+
+    return [
+        {
+            title: 'Contact',
+            fields: [
+                { label: 'Contact name', value: c.name },
+                { label: 'Owner name', value: c.owner_name },
+                { label: 'Phone', value: c.phone, href: c.phone ? `tel:${c.phone}` : '' },
+                { label: 'WhatsApp number', value: c.whatsapp_number },
+                { label: 'SMS number', value: c.sms_number },
+                { label: 'Email', value: c.email, href: c.email ? `mailto:${c.email}` : '' },
+                { label: 'Secondary email', value: c.email_secondary, href: c.email_secondary ? `mailto:${c.email_secondary}` : '' },
+                { label: 'Second contact', value: c.contact_person_2_name },
+                { label: 'Second contact phone', value: c.contact_person_2_phone, href: c.contact_person_2_phone ? `tel:${c.contact_person_2_phone}` : '' },
+            ],
+        },
+        {
+            title: 'Business',
+            fields: [
+                { label: 'Business name', value: c.business_name },
+                { label: 'Address', value: c.address },
+                { label: 'City', value: c.city },
+                { label: 'Postcode', value: c.postcode },
+                { label: 'VAT number', value: c.vat_number },
+                { label: 'EPOS type', value: c.epos_type },
+                { label: 'Licence days', value: c.lic_days == null ? '' : String(c.lic_days) },
+                { label: 'AnyDesk / RustDesk', value: c.anydesk_rustdesk },
+            ],
+        },
+        {
+            title: 'Record',
+            fields: [
+                { label: 'Source', value: c.source || lead.value?.source },
+                { label: 'Category', value: c.category },
+                { label: 'Birthday', value: formatDate(c.birthday) },
+                { label: 'Created on', value: formatDate(c.created_at) },
+                { label: 'Expected closing date', value: formatDate(activeLead.value?.expected_closing_date) },
+            ],
+        },
+    ];
+});
+
+const emptyFieldCount = computed(() =>
+    detailGroups.value.reduce(
+        (total, group) => total + group.fields.filter((f) => !f.value).length,
+        0,
+    ),
+);
+
+/** Groups with nothing filled in disappear entirely rather than leaving a heading over nothing. */
+const visibleDetailGroups = computed(() =>
+    detailGroups.value
+        .map((group) => ({
+            ...group,
+            fields: showEmptyFields.value ? group.fields : group.fields.filter((f) => f.value),
+        }))
+        .filter((group) => group.fields.length > 0),
+);
 
 const customerTypeLabel = computed(() => {
     const type = customer.value?.type;
