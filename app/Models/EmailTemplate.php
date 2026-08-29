@@ -12,6 +12,8 @@ class EmailTemplate extends Model
     protected $fillable = [
         'name',
         'category',
+        // Stable key the marketing agent maps to; NULL for hand-sent templates.
+        'purpose',
         'subject',
         'description',
         'content',
