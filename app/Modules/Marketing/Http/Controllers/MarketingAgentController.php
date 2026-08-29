@@ -236,6 +236,7 @@ class MarketingAgentController extends Controller
         return [
             'weekly_cap' => MarketingGuardrails::WEEKLY_RECIPIENT_CAP,
             'min_days_between_messages' => MarketingGuardrails::MIN_DAYS_BETWEEN_MESSAGES,
+            'enabled_channels' => MarketingGuardrails::ENABLED_CHANNELS,
         ];
     }
 }

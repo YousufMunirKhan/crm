@@ -159,7 +159,12 @@ class MarketingAgentTest extends TestCase
         $this->assertSame('email', $this->rails()->bestChannel($customer)['channel']);
     }
 
-    public function test_a_contact_with_no_email_falls_through_to_sms(): void
+    /**
+     * SMS has no provider wired up yet, so a contact reachable only by phone is
+     * refused at planning time with a reason on screen - rather than queued and
+     * failed one by one an hour later.
+     */
+    public function test_a_contact_with_only_a_phone_is_refused_while_sms_is_off(): void
     {
         $customer = Customer::create([
             'name' => 'H',
@@ -167,7 +172,27 @@ class MarketingAgentTest extends TestCase
             'type' => Customer::TYPE_CUSTOMER,
         ]);
 
-        $this->assertSame('sms', $this->rails()->bestChannel($customer)['channel']);
+        $best = $this->rails()->bestChannel($customer);
+
+        $this->assertNull($best['channel']);
+        $this->assertStringContainsString('not switched on', $best['reasons']['sms']);
+    }
+
+    /**
+     * The model may suggest a channel; it does not get to pick one. Letting it
+     * choose undid the whole reason the ordering exists - it put a contact with
+     * a perfectly good email address on SMS, which costs money per message.
+     */
+    public function test_the_models_channel_suggestion_cannot_override_the_ordering(): void
+    {
+        $customer = Customer::create([
+            'name' => 'M',
+            'email' => 'm@example.com',
+            'phone' => '07700900125',
+            'type' => Customer::TYPE_CUSTOMER,
+        ]);
+
+        $this->assertSame('email', $this->rails()->bestChannel($customer, 'sms')['channel']);
     }
 
     public function test_a_contact_with_no_details_at_all_is_unreachable(): void

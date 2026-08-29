@@ -21,6 +21,16 @@ use Illuminate\Support\Carbon;
  */
 class MarketingGuardrails
 {
+    /**
+     * Channels that can actually deliver today.
+     *
+     * SMS needs a provider wired up and WhatsApp needs a Meta-approved template
+     * plus a working access token. Until then a plan must refuse them at
+     * planning time with a reason on screen, rather than queueing rows that
+     * fail one by one an hour later.
+     */
+    public const ENABLED_CHANNELS = ['email'];
+
     /** Nobody hears from us more often than this, on any channel. */
     public const MIN_DAYS_BETWEEN_MESSAGES = 30;
 
@@ -40,6 +50,10 @@ class MarketingGuardrails
      */
     public function check(Customer $customer, string $channel): array
     {
+        if (! in_array($channel, self::ENABLED_CHANNELS, true)) {
+            return $this->deny(strtoupper($channel).' sending is not switched on yet');
+        }
+
         $identifier = $this->identifierFor($customer, $channel);
 
         if ($identifier === null) {
@@ -118,13 +132,13 @@ class MarketingGuardrails
      */
     public function bestChannel(Customer $customer, ?string $preferred = null): array
     {
-        $order = $preferred !== null
-            ? array_merge([$preferred], array_diff(self::CHANNEL_PREFERENCE, [$preferred]))
-            : self::CHANNEL_PREFERENCE;
-
+        // The model's suggestion is ignored for ordering on purpose. Letting it
+        // pick the channel undoes the whole reason this ordering exists: it
+        // chose SMS for a contact who had a perfectly good email address, and
+        // SMS costs money per message.
         $reasons = [];
 
-        foreach ($order as $channel) {
+        foreach (self::CHANNEL_PREFERENCE as $channel) {
             $result = $this->check($customer, $channel);
 
             if ($result['allowed']) {
