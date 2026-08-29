@@ -320,21 +320,71 @@ function resolveNewsletterPlugin(mod) {
 
 const newsletterPlugin = resolveNewsletterPlugin(newsletterModule);
 
+/**
+ * Pulls @media blocks out of a stylesheet, brace-matched so nested rules
+ * survive intact.
+ */
+function extractMediaQueries(css) {
+    const out = [];
+    let i = 0;
+
+    while (i < css.length) {
+        const start = css.indexOf('@media', i);
+        if (start === -1) break;
+
+        const open = css.indexOf('{', start);
+        if (open === -1) break;
+
+        let depth = 0;
+        let end = open;
+        for (; end < css.length; end++) {
+            if (css[end] === '{') depth++;
+            else if (css[end] === '}') {
+                depth--;
+                if (depth === 0) break;
+            }
+        }
+        if (depth !== 0) break;
+
+        out.push(css.slice(start, end + 1));
+        i = end + 1;
+    }
+
+    return out.join('\n');
+}
+
 function buildOutputHtml() {
     if (!editor) {
         return '';
     }
+
+    const css = String(editor.getCss({ avoidProtected: true }) || '');
+
+    /*
+     * Email clients need inline styles, so the newsletter preset's inliner is
+     * still the right base. But inline styles cannot express @media, so
+     * inlining silently discarded every responsive rule - which is why saved
+     * templates rendered broken on phones. Re-attach the media queries in a
+     * <style> block: clients that support them get the mobile layout, and the
+     * ones that do not fall back to the inline styles as before.
+     */
+    const media = extractMediaQueries(css);
+
     try {
         const inlined = editor.runCommand('gjs-get-inlined-html');
         if (typeof inlined === 'string' && inlined.trim()) {
-            return restoreEditorImageSources(inlined.trim());
+            const html = media
+                ? `<style type="text/css">${media}</style>${inlined.trim()}`
+                : inlined.trim();
+
+            return restoreEditorImageSources(html);
         }
     } catch {
         /* command may not return a string in all versions */
     }
+
     let html = editor.getHtml({ cleanId: false }) || '';
-    const css = editor.getCss({ avoidProtected: true });
-    if (css && String(css).trim()) {
+    if (css.trim()) {
         html = `<style type="text/css">${css}</style>${html}`;
     }
     return restoreEditorImageSources(html.trim());
@@ -412,6 +462,17 @@ function createEditor() {
             storageManager: false,
             plugins,
             pluginsOpts,
+            /*
+             * Desktop and mobile canvases. Without these there was no way to
+             * see what a template would look like on a phone while building
+             * it - which is where most of these emails are actually read.
+             */
+            deviceManager: {
+                devices: [
+                    { id: 'desktop', name: 'Desktop', width: '' },
+                    { id: 'mobile', name: 'Mobile', width: '375px', widthMedia: '480px' },
+                ],
+            },
             parser: {
                 optionsHtml: {
                     allowUnsafeAttr: true,

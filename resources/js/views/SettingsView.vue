@@ -1,11 +1,6 @@
 <template>
-    <div class="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
-        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div>
-                <h1 class="text-page-title text-slate-900">Settings</h1>
-                <p class="text-sm text-slate-600 mt-1">Manage application settings and integrations</p>
-            </div>
-        </div>
+    <div class="page-narrow">
+        <p class="page-lead">Manage application settings and integrations</p>
 
         <!-- Loading State -->
         <div v-if="loading" class="flex justify-center py-12" role="status" aria-live="polite">
@@ -65,12 +60,15 @@
                                     <!-- Current Logo Preview -->
                                     <div class="w-full sm:w-48 h-24 border-2 border-dashed border-slate-300 rounded-card flex items-center justify-center bg-slate-50 shrink-0">
                                         <img
-                                            v-if="settings.logo_url"
+                                            v-if="settings.logo_url && !logoPreviewFailed"
                                             :src="settings.logo_url"
-                                            alt="Company Logo"
+                                            alt="Company logo"
                                             class="max-w-full max-h-full object-contain p-2"
+                                            @error="logoPreviewFailed = true"
                                         >
-                                        <span v-else class="text-slate-500 text-sm">No logo uploaded</span>
+                                        <span v-else class="text-slate-500 text-sm px-2 text-center">
+                                            {{ settings.logo_url ? 'Uploaded file is missing' : 'No logo uploaded' }}
+                                        </span>
                                     </div>
 
                                     <!-- Upload Controls -->
@@ -82,18 +80,11 @@
                                             ref="logoInput"
                                             @change="handleLogoUpload"
                                             accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
-                                            class="block w-full text-sm text-slate-500 rounded-control
-                                                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40
-                                                file:mr-4 file:py-2 file:px-4
-                                                file:rounded-control file:border-0
-                                                file:text-sm file:font-semibold
-                                                file:bg-slate-900 file:text-white
-                                                hover:file:bg-slate-800
-                                                file:cursor-pointer"
+                                            class="form-file"
                                         >
                                         <BaseButton
                                             v-if="settings.logo_url"
-                                            variant="danger"
+                                            variant="ghost-danger"
                                             size="sm"
                                             @click="deleteLogo"
                                         >
@@ -116,12 +107,15 @@
                                 <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
                                     <div class="w-16 h-16 border-2 border-dashed border-slate-300 rounded-card flex items-center justify-center bg-slate-50 shrink-0 overflow-hidden">
                                         <img
-                                            v-if="settings.favicon_url"
+                                            v-if="settings.favicon_url && !faviconPreviewFailed"
                                             :src="settings.favicon_url"
                                             alt=""
                                             class="w-full h-full object-cover"
+                                            @error="faviconPreviewFailed = true"
                                         >
-                                        <span v-else class="text-slate-500 text-xs text-center px-1">No favicon</span>
+                                        <span v-else class="text-slate-500 text-xs text-center px-1">
+                                            {{ settings.favicon_url ? 'File missing' : 'No favicon' }}
+                                        </span>
                                     </div>
                                     <div class="space-y-3">
                                         <label class="form-label" for="settingsview-favicon-file">Choose favicon</label>
@@ -131,18 +125,11 @@
                                             ref="faviconInput"
                                             @change="handleFaviconUpload"
                                             accept=".ico,.png,.jpg,.jpeg,.gif,.svg,.webp,image/x-icon,image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
-                                            class="block w-full text-sm text-slate-500 rounded-control
-                                                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40
-                                                file:mr-4 file:py-2 file:px-4
-                                                file:rounded-control file:border-0
-                                                file:text-sm file:font-semibold
-                                                file:bg-slate-900 file:text-white
-                                                hover:file:bg-slate-800
-                                                file:cursor-pointer"
+                                            class="form-file"
                                         >
                                         <BaseButton
                                             v-if="settings.favicon_url"
-                                            variant="danger"
+                                            variant="ghost-danger"
                                             size="sm"
                                             @click="deleteFavicon"
                                         >
@@ -1203,6 +1190,8 @@ const whatsappCloudTestResultBoxClass = computed(() => {
 const savingFacebook = ref(false);
 const savingColdCalling = ref(false);
 const testingSmtp = ref(false);
+const logoPreviewFailed = ref(false);
+const faviconPreviewFailed = ref(false);
 const uploadingLogo = ref(false);
 const uploadingFavicon = ref(false);
 const testEmail = ref('');

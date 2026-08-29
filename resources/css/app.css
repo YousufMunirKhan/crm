@@ -270,6 +270,19 @@
             shadow-sm shadow-slate-900/[0.03] resize-y overflow-x-hidden
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 focus-visible:border-primary-500 transition-colors;
     }
+    /**
+     * File input. There were four different treatments across 18 inputs -
+     * slate-100, slate-200, slate-800 and slate-900 - so the same control
+     * looked black on one screen and grey on another.
+     */
+    .form-file {
+        @apply block w-full text-sm text-slate-600 rounded-control
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40
+            file:mr-4 file:py-2 file:px-4 file:rounded-control file:border-0
+            file:text-sm file:font-semibold
+            file:bg-primary-50 file:text-primary-700
+            hover:file:bg-primary-100 file:cursor-pointer file:transition-colors;
+    }
     .form-card {
         @apply bg-white rounded-card shadow-sm border border-slate-200 overflow-hidden;
     }
@@ -374,6 +387,24 @@
         @apply bg-danger-600 text-white shadow-card hover:bg-danger-700
             active:bg-danger-800 focus-visible:ring-danger-600/40;
     }
+    /* ---- Outcome buttons --------------------------------------------------
+       Recording an outcome ("Won" / "Lost") is neither the page's main action
+       nor a destructive confirmation, but the system only offered solid
+       .btn-success and .btn-danger. Won/Lost pairs therefore rendered as two
+       saturated blocks side by side, repeated once per line item - the single
+       loudest thing on the lead screen.
+
+       These keep the meaning of the colour while giving it a fraction of the
+       weight. Solid danger/success stays reserved for the button that
+       actually commits the change inside a confirm dialog. */
+    .btn-soft-success {
+        @apply bg-success-50 text-success-800 border border-success-200
+            hover:bg-success-100 active:bg-success-200 focus-visible:ring-success-600/40;
+    }
+    .btn-soft-danger {
+        @apply bg-danger-50 text-danger-800 border border-danger-200
+            hover:bg-danger-100 active:bg-danger-200 focus-visible:ring-danger-600/40;
+    }
     /** Confirms a positive/terminal state (Mark won, Mark paid). Rare. */
     .btn-success {
         @apply bg-success-700 text-white shadow-card hover:bg-success-800
@@ -412,6 +443,30 @@
     .badge-count {
         @apply inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5
             rounded-full bg-slate-900 text-white text-[10px] font-semibold tabular-nums;
+    }
+
+    /* ---- Page container ---------------------------------------------------
+       Every screen sat in its own hand-rolled wrapper: max-w-5xl/6xl/7xl and
+       p-4/p-6/px-3 in five combinations, on top of the gutters <main> already
+       applies. That double padding at five different widths is the main
+       reason two screens never lined up with each other.
+
+       .page owns width and vertical rhythm only. Horizontal gutters belong to
+       <main>, so a page never pads itself twice. Use .page everywhere;
+       .page-narrow only for single-column reading/form content. */
+    .page {
+        @apply w-full min-w-0 max-w-7xl mx-auto space-y-6;
+    }
+    .page-narrow {
+        @apply w-full min-w-0 max-w-4xl mx-auto space-y-6;
+    }
+    /** The lead-in line under a page title. One definition, one colour. */
+    .page-lead {
+        @apply text-sm text-slate-500 leading-relaxed max-w-3xl;
+    }
+    /** Section heading inside a page that is not a card (h2 rung). */
+    .section-title {
+        @apply text-base font-semibold text-slate-900 tracking-tight;
     }
 
     /* ---- Card surfaces ---------------------------------------------------- */
@@ -545,6 +600,13 @@
     /* ---- Segmented tabs --------------------------------------------------- */
     .tab-list {
         @apply flex flex-nowrap gap-2 overflow-x-auto p-1 min-w-0;
+        /* The native scrollbar under a tab strip reads as a rendering fault,
+           not a control. Tabs still scroll by drag, wheel and keyboard. */
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .tab-list::-webkit-scrollbar {
+        display: none;
     }
     .tab {
         @apply px-4 py-2 rounded-control text-sm font-medium whitespace-nowrap shrink-0

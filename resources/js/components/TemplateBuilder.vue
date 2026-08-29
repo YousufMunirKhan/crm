@@ -105,18 +105,22 @@
                     <!-- Available Sections -->
                     <div class="flex-1 overflow-y-auto p-4">
                         <h3 class="subsection-title">Add Section</h3>
-                        <p class="text-[11px] text-slate-500 mb-2 leading-snug">
-                            Add <strong>Custom HTML</strong>, then use <strong>Edit with visual builder</strong> at the top (or in that block).
+                        <p class="text-xs text-slate-500 mb-3 leading-snug">
+                            Build the email by stacking sections. Pick <strong>Custom HTML</strong> if you want
+                            to design freely with the visual builder.
                         </p>
                         <div class="space-y-2">
                             <button
                                 v-for="sectionType in availableSections"
                                 :key="sectionType.type"
                                 @click="addSection(sectionType.type)"
-                                class="w-full text-left px-3 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
+                                class="w-full text-left px-3 py-2.5 border border-slate-200 rounded-control hover:bg-primary-50 hover:border-primary-200 transition-colors flex items-start gap-2.5"
                             >
-                                <span class="text-xl">{{ sectionType.icon }}</span>
-                                <span class="text-sm font-medium text-slate-700">{{ sectionType.label }}</span>
+                                <component :is="sectionType.icon" class="icon-sm text-primary-600 shrink-0 mt-0.5" aria-hidden="true" />
+                                <span class="min-w-0">
+                                    <span class="block text-sm font-medium text-slate-800">{{ sectionType.label }}</span>
+                                    <span v-if="sectionType.hint" class="block text-[11px] text-slate-500">{{ sectionType.hint }}</span>
+                                </span>
                             </button>
                         </div>
 
@@ -179,16 +183,28 @@
 
                         <!-- Variables -->
                         <div class="mt-6">
-                            <h3 class="subsection-title">Variables</h3>
-                            <div class="space-y-1">
-                                <button
-                                    v-for="variable in availableVariables"
-                                    :key="variable"
-                                    @click="insertVariable(variable)"
-                                    class="w-full text-left px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded hover:bg-slate-100 transition-colors"
-                                >
-                                    {{ variable }}
-                                </button>
+                            <h3 class="subsection-title">Merge variables</h3>
+                            <p class="text-xs text-slate-500 mb-3">
+                                Select a text or HTML section first, then click a variable to insert it.
+                            </p>
+
+                            <div class="space-y-4">
+                                <div v-for="group in variableGroups" :key="group.label">
+                                    <p class="text-eyebrow uppercase text-slate-500 mb-1.5">{{ group.label }}</p>
+                                    <div class="space-y-1">
+                                        <button
+                                            v-for="item in group.items"
+                                            :key="item.token"
+                                            type="button"
+                                            :title="item.token"
+                                            class="w-full text-left px-3 py-2 rounded-control border border-slate-200 bg-white hover:bg-primary-50 hover:border-primary-200 transition-colors"
+                                            @click="insertVariable(item.token)"
+                                        >
+                                            <span class="block text-xs font-medium text-slate-800">{{ item.label }}</span>
+                                            <span v-if="item.hint" class="block text-[11px] text-slate-500">{{ item.hint }}</span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -723,6 +739,15 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick, defineAsyncComponent, h } from 'vue';
 import axios from 'axios';
 import { RouterLink, useRouter } from 'vue-router';
+import {
+    Bars3BottomLeftIcon,
+    CodeBracketIcon,
+    CursorArrowRaysIcon,
+    DocumentTextIcon,
+    PhotoIcon,
+    RectangleGroupIcon,
+    ViewColumnsIcon,
+} from '@heroicons/vue/24/outline';
 import { useToastStore } from '@/stores/toast';
 import { XMarkIcon } from '@heroicons/vue/24/outline';
 import { BaseButton, BaseModal } from '@/components/base';
@@ -994,38 +1019,74 @@ const companyRegNo = computed(() => '15051352');
 const companyVat = computed(() => 'GB50915794');
 
 const availableSections = [
-    { type: 'header', label: 'Header', icon: '📋' },
-    { type: 'text', label: 'Text', icon: '📝' },
-    { type: 'image', label: 'Image', icon: '🖼️' },
-    { type: 'button', label: 'Button', icon: '🔘' },
-    { type: 'two_column', label: 'Two Columns', icon: '📊' },
-    { type: 'footer', label: 'Footer', icon: '📄' },
-    { type: 'raw_html', label: 'Custom HTML', icon: '🧩' },
+    { type: 'header', label: 'Header', icon: RectangleGroupIcon, hint: 'Logo and title' },
+    { type: 'text', label: 'Text', icon: DocumentTextIcon, hint: 'A paragraph of copy' },
+    { type: 'image', label: 'Image', icon: PhotoIcon, hint: 'A picture or banner' },
+    { type: 'button', label: 'Button', icon: CursorArrowRaysIcon, hint: 'A call to action' },
+    { type: 'two_column', label: 'Two columns', icon: ViewColumnsIcon, hint: 'Side by side content' },
+    { type: 'footer', label: 'Footer', icon: Bars3BottomLeftIcon, hint: 'Contact details and unsubscribe' },
+    { type: 'raw_html', label: 'Custom HTML', icon: CodeBracketIcon, hint: 'Paste or design your own' },
 ];
 
-const availableVariables = [
-    '{{customer_name}}',
-    '{{first_name}}',
-    '{{customer_email}}',
-    '{{customer_phone}}',
-    '{{appointment_date}}',
-    '{{appointment_time}}',
-    '{{company_name}}',
-    '{{company_phone}}',
-    '{{company_address}}',
-    '{{company_website}}',
-    '{{app_url}}',
-    '{{header_logo_url}}',
-    '{{email_welcome_dir_url}}',
-    '{{logo_src}}',
-    '{{social_facebook_url}}',
-    '{{social_linkedin_url}}',
-    '{{social_instagram_url}}',
-    '{{social_tiktok_url}}',
-    '{{current_year}}',
-    '{{unsubscribe_url}}',
-    '{{lead_id}}',
-    '{{product_name}}',
+/**
+ * Merge variables, grouped and labelled.
+ *
+ * These were a flat wall of 22 raw {{tokens}} - nobody could tell what
+ * {{email_welcome_dir_url}} or {{logo_src}} actually produced.
+ */
+const variableGroups = [
+    {
+        label: 'Customer',
+        items: [
+            { token: '{{customer_name}}', label: 'Full name', hint: 'Greig Taylor' },
+            { token: '{{first_name}}', label: 'First name', hint: 'Greig' },
+            { token: '{{customer_email}}', label: 'Email address' },
+            { token: '{{customer_phone}}', label: 'Phone number' },
+        ],
+    },
+    {
+        label: 'Appointment',
+        items: [
+            { token: '{{appointment_date}}', label: 'Date' },
+            { token: '{{appointment_time}}', label: 'Time' },
+        ],
+    },
+    {
+        label: 'Your company',
+        items: [
+            { token: '{{company_name}}', label: 'Company name' },
+            { token: '{{company_phone}}', label: 'Phone' },
+            { token: '{{company_address}}', label: 'Address' },
+            { token: '{{company_website}}', label: 'Website' },
+            { token: '{{current_year}}', label: 'Current year', hint: 'for copyright lines' },
+        ],
+    },
+    {
+        label: 'Images & links',
+        items: [
+            { token: '{{logo_src}}', label: 'Company logo URL', hint: 'use inside an image src' },
+            { token: '{{header_logo_url}}', label: 'Header logo URL' },
+            { token: '{{app_url}}', label: 'CRM address' },
+            { token: '{{unsubscribe_url}}', label: 'Unsubscribe link', hint: 'required by law on marketing email' },
+            { token: '{{email_welcome_dir_url}}', label: 'Welcome assets folder' },
+        ],
+    },
+    {
+        label: 'Social',
+        items: [
+            { token: '{{social_facebook_url}}', label: 'Facebook' },
+            { token: '{{social_linkedin_url}}', label: 'LinkedIn' },
+            { token: '{{social_instagram_url}}', label: 'Instagram' },
+            { token: '{{social_tiktok_url}}', label: 'TikTok' },
+        ],
+    },
+    {
+        label: 'Other',
+        items: [
+            { token: '{{product_name}}', label: 'Product name' },
+            { token: '{{lead_id}}', label: 'Lead reference' },
+        ],
+    },
 ];
 
 const form = reactive({
@@ -1278,7 +1339,12 @@ const uploadImage = async () => {
 };
 
 const insertVariable = (variable) => {
-    if (selectedSectionIndex.value == null) return;
+    // Clicking a variable with nothing selected used to do nothing at all,
+    // with no explanation - so it read as a broken button.
+    if (selectedSectionIndex.value == null) {
+        toast.error('Select a Text or Custom HTML section first, then click the variable.');
+        return;
+    }
     const section = form.content.sections[selectedSectionIndex.value];
     if (section.type === 'text' && section.content?.blocks) {
         const idx = 0;
