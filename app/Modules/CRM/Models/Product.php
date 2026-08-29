@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\HasAuditLog;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Product extends Model
@@ -23,6 +24,7 @@ class Product extends Model
         'unit',
         'image_path',
         'category',
+        'category_id',
         'is_active',
     ];
 
@@ -37,6 +39,38 @@ class Product extends Model
      * Cost price is commercially sensitive - only managers see margin.
      */
     protected $hidden = ['cost_price'];
+
+    /**
+     * Keeps the free-text `category` column and the `category_id` relation
+     * agreeing with each other.
+     *
+     * Both write paths are still live: the Filament form and the products
+     * screen send a category name, while newer code sets category_id. Rather
+     * than change all seven readers at once on a running system - and miss one
+     * - whichever field was written wins and the other is derived from it. The
+     * string can be dropped once nothing reads it.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $product) {
+            if ($product->isDirty('category_id')) {
+                $product->category = $product->category_id
+                    ? ProductCategory::find($product->category_id)?->name
+                    : null;
+
+                return;
+            }
+
+            if ($product->isDirty('category')) {
+                $product->category_id = ProductCategory::findOrCreateByName($product->category)?->id;
+            }
+        });
+    }
+
+    public function productCategory(): BelongsTo
+    {
+        return $this->belongsTo(ProductCategory::class, 'category_id');
+    }
 
     public function leads(): HasMany
     {

@@ -29,7 +29,8 @@ class ProductsTable
                     ->searchable()
                     ->toggleable()
                     ->placeholder('—'),
-                TextColumn::make('category')
+                TextColumn::make('productCategory.name')
+                    ->label('Category')
                     ->badge()
                     ->searchable()
                     ->sortable()
@@ -59,12 +60,12 @@ class ProductsTable
             ])
             ->defaultSort('name')
             ->filters([
-                SelectFilter::make('category')
-                    ->options(fn () => \App\Modules\CRM\Models\Product::query()
-                        ->whereNotNull('category')
-                        ->distinct()
-                        ->orderBy('category')
-                        ->pluck('category', 'category')
+                SelectFilter::make('category_id')
+                    ->label('Category')
+                    ->options(fn () => \App\Modules\CRM\Models\ProductCategory::query()
+                        ->orderBy('sort_order')
+                        ->orderBy('name')
+                        ->pluck('name', 'id')
                         ->all()),
                 TernaryFilter::make('is_active')
                     ->label('Active'),

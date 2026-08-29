@@ -4,21 +4,31 @@ namespace App\Modules\CRM\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\CRM\Models\Product;
+use App\Modules\CRM\Models\ProductCategory;
+use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::query();
+        $query = Product::query()->with('productCategory');
 
         // For API calls without active_only param, default to active products only
         if (!$request->has('active_only') || $request->active_only !== 'false') {
             $query->where('is_active', true);
         }
 
-        if ($request->has('category')) {
-            $query->where('category', $request->category);
+        // Accepts an id from the new picker, and still accepts a name so the
+        // callers that were passing a category string keep working.
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        } elseif ($request->filled('category')) {
+            $category = $request->category;
+            $query->where(function ($q) use ($category) {
+                $q->where('category', $category)
+                    ->orWhereHas('productCategory', fn ($c) => $c->where('slug', Str::slug($category)));
+            });
         }
 
         if ($request->has('search')) {
@@ -46,6 +56,7 @@ class ProductController extends Controller
             'currency' => ['nullable', 'string', 'size:3'],
             'unit' => ['nullable', 'string', 'max:32'],
             'category' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'integer', 'exists:product_categories,id'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
@@ -60,18 +71,19 @@ class ProductController extends Controller
         // Products created from an invoice arrive without a category. Use one
         // stable bucket: a random pick scattered them across target categories
         // and corrupted target attainment reporting.
-        if (empty($data['category'])) {
-            $data['category'] = 'Uncategorized';
+        if (empty($data['category']) && empty($data['category_id'])) {
+            $data['category_id'] = ProductCategory::fallback()->id;
+            unset($data['category']);
         }
 
         $product = Product::create($data);
 
-        return response()->json($product, 201);
+        return response()->json($product->load('productCategory'), 201);
     }
 
     public function show($id)
     {
-        $product = Product::with(['suggestedProducts', 'suggestedByProducts'])->findOrFail($id);
+        $product = Product::with(['productCategory', 'suggestedProducts', 'suggestedByProducts'])->findOrFail($id);
         return response()->json($product);
     }
 
@@ -89,12 +101,13 @@ class ProductController extends Controller
             'currency' => ['nullable', 'string', 'size:3'],
             'unit' => ['nullable', 'string', 'max:32'],
             'category' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'integer', 'exists:product_categories,id'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
         $product->update($data);
 
-        return response()->json($product);
+        return response()->json($product->load('productCategory'));
     }
 
     /**
@@ -175,21 +188,33 @@ class ProductController extends Controller
     }
 
     /**
-     * Distinct product categories for target pickers (active products only).
+     * Product categories for pickers and filters.
+     *
+     * This used to be SELECT DISTINCT over the free-text column, so a category
+     * vanished from the list the moment its last product was deactivated, and
+     * a typo appeared in it as if it were real. It reads the table now.
+     *
+     * `data` stays a plain array of names because the target pickers and the
+     * Filament datalist consume it that way; the richer shape is under
+     * `categories` for callers that want ids and counts.
      */
     public function categories()
     {
-        $cats = Product::query()
-            ->where('is_active', true)
-            ->whereNotNull('category')
-            ->where('category', '!=', '')
-            ->orderBy('category')
-            ->pluck('category')
-            ->map(fn ($c) => trim((string) $c))
-            ->unique()
-            ->values();
+        $categories = ProductCategory::query()
+            ->active()
+            ->ordered()
+            ->withCount(['products' => fn ($q) => $q->where('is_active', true)])
+            ->get();
 
-        return response()->json(['data' => $cats]);
+        return response()->json([
+            'data' => $categories->pluck('name')->values(),
+            'categories' => $categories->map(fn (ProductCategory $c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'slug' => $c->slug,
+                'products_count' => $c->products_count,
+            ])->values(),
+        ]);
     }
 }
 

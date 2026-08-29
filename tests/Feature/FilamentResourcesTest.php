@@ -29,6 +29,7 @@ class FilamentResourcesTest extends TestCase
     {
         return [
             'products' => ['/admin/products'],
+            'product categories' => ['/admin/product-categories'],
             'customers' => ['/admin/customers'],
             'leads' => ['/admin/leads'],
             'tickets' => ['/admin/tickets'],

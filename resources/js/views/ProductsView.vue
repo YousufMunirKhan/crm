@@ -29,6 +29,15 @@
                         />
                     </div>
                 </div>
+                <div class="w-full sm:w-56">
+                    <label class="listing-label" for="productsview-category">Category</label>
+                    <select id="productsview-category" v-model="categoryFilter" class="form-select">
+                        <option value="">All categories</option>
+                        <option v-for="c in categories" :key="c.id" :value="String(c.id)">
+                            {{ c.name }} ({{ c.products_count }})
+                        </option>
+                    </select>
+                </div>
                 <BaseButton variant="soft" block-mobile class="shrink-0" @click="productListPage = 1">
                     Filter
                 </BaseButton>
@@ -45,7 +54,10 @@
             <template #cell-name="{ row }">
                 <span class="font-semibold text-slate-800">{{ row.name }}</span>
             </template>
-            <template #cell-category="{ row }">{{ row.category || '—' }}</template>
+            <template #cell-category="{ row }">
+                <BaseBadge v-if="categoryNameOf(row)" tone="neutral">{{ categoryNameOf(row) }}</BaseBadge>
+                <span v-else class="text-slate-400">—</span>
+            </template>
             <template #cell-description="{ row }">
                 <span class="block max-w-xs truncate" :title="row.description || ''">
                     {{ row.description || '—' }}
@@ -130,13 +142,17 @@
                 </div>
                 <div>
                     <label for="product-category" class="form-label">Category</label>
-                    <input
-                        id="product-category"
-                        v-model="form.category"
-                        type="text"
-                        class="form-input"
-                        placeholder="e.g., Terminal, EPOS, Software"
-                    />
+                    <!--
+                        Was a free-text box, so "ePOS" and "epos" became two
+                        categories and target reporting split between them.
+                    -->
+                    <select id="product-category" v-model="form.category_id" class="form-select">
+                        <option :value="null">Uncategorized</option>
+                        <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+                    </select>
+                    <p class="form-hint">
+                        Categories are managed in the admin panel. Products with no category are grouped under Uncategorized.
+                    </p>
                 </div>
             </div>
 
@@ -309,9 +325,27 @@ const form = ref({
     unit_price: null,
     cost_price: null,
     unit: '',
-    category: '',
+    category_id: null,
     is_active: true,
 });
+
+const categories = ref([]);
+const categoryFilter = ref('');
+
+/** The API still sends the legacy string, so fall back to it while both exist. */
+function categoryNameOf(product) {
+    return product.product_category?.name || product.category || '';
+}
+
+const loadCategories = async () => {
+    try {
+        const { data } = await axios.get('/api/products/categories');
+        categories.value = data.categories || [];
+    } catch (err) {
+        console.error('Error loading categories:', err);
+        categories.value = [];
+    }
+};
 
 const relationships = ref([]);
 const newRelation = ref({ to_product_id: null, relationship_type: 'suggest' });
@@ -374,15 +408,22 @@ async function removeRelationship(toProductId) {
 }
 
 const filteredProducts = computed(() => {
-    if (!searchQuery.value) {
-        return products.value;
+    let rows = products.value;
+
+    if (categoryFilter.value) {
+        rows = rows.filter((p) => String(p.category_id) === categoryFilter.value);
     }
+
+    if (!searchQuery.value) {
+        return rows;
+    }
+
     const query = searchQuery.value.toLowerCase();
-    return products.value.filter(
+    return rows.filter(
         (product) =>
             product.name.toLowerCase().includes(query) ||
             (product.description && product.description.toLowerCase().includes(query)) ||
-            (product.category && product.category.toLowerCase().includes(query)),
+            categoryNameOf(product).toLowerCase().includes(query),
     );
 });
 
@@ -492,7 +533,7 @@ const editProduct = (product) => {
         unit_price: product.unit_price ?? null,
         cost_price: product.cost_price ?? null,
         unit: product.unit || '',
-        category: product.category || '',
+        category_id: product.category_id ?? null,
         is_active: product.is_active,
     };
     loadRelationships(product.id);
@@ -529,7 +570,7 @@ const resetForm = () => {
         unit_price: null,
         cost_price: null,
         unit: '',
-        category: '',
+        category_id: null,
         is_active: true,
     };
     relationships.value = [];
@@ -539,5 +580,6 @@ const resetForm = () => {
 
 onMounted(() => {
     loadProducts();
+    loadCategories();
 });
 </script>

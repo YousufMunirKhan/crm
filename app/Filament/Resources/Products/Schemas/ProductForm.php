@@ -8,6 +8,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Forms\Components\Select;
 
 class ProductForm
 {
@@ -27,14 +28,21 @@ class ProductForm
                             ->maxLength(64)
                             ->unique(ignoreRecord: true)
                             ->helperText('Optional. Must be unique across the catalogue.'),
-                        TextInput::make('category')
-                            ->maxLength(255)
-                            ->datalist(fn () => \App\Modules\CRM\Models\Product::query()
-                                ->whereNotNull('category')
-                                ->distinct()
-                                ->orderBy('category')
-                                ->pluck('category')
-                                ->all())
+                        // Was a free-text box with a datalist, so a typo silently
+                        // created a new category. The list comes from the
+                        // categories table now, and a genuinely new one has to
+                        // be typed into the create form deliberately.
+                        Select::make('category_id')
+                            ->label('Category')
+                            ->relationship('productCategory', 'name', fn ($query) => $query->orderBy('sort_order')->orderBy('name'))
+                            ->searchable()
+                            ->preload()
+                            ->createOptionForm([
+                                TextInput::make('name')
+                                    ->required()
+                                    ->maxLength(255)
+                                    ->helperText('Check the list first - a near-duplicate splits your reporting.'),
+                            ])
                             ->helperText('Drives target attainment - keep these consistent.'),
                         Textarea::make('description')
                             ->rows(3)

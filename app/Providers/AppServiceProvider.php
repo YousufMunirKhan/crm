@@ -20,6 +20,7 @@ class AppServiceProvider extends ServiceProvider
      */
     private const POLICIES = [
         \App\Modules\CRM\Models\Product::class => \App\Policies\ProductPolicy::class,
+        \App\Modules\CRM\Models\ProductCategory::class => \App\Policies\ProductCategoryPolicy::class,
         \App\Modules\CRM\Models\Customer::class => \App\Policies\CustomerPolicy::class,
         \App\Modules\CRM\Models\Lead::class => \App\Policies\LeadPolicy::class,
         \App\Modules\Invoice\Models\Invoice::class => \App\Policies\InvoicePolicy::class,
