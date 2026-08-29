@@ -3,7 +3,7 @@
         <span class="block truncate" :class="nameClass" :title="fullTitle">{{ contact }}</span>
         <span
             v-if="company"
-            class="block text-xs text-slate-500 truncate"
+            class="block text-xs text-slate-600 break-words line-clamp-2"
             :title="company"
         >{{ company }}</span>
     </span>

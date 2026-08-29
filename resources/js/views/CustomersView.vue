@@ -266,13 +266,13 @@
         <!-- Customers Table (lg+); card list below lg — avoids broken table-fixed on narrow widths -->
         <div v-else class="min-w-0">
             <div class="hidden lg:block table-wrap">
-                <table class="table min-w-[860px] table-auto">
+                <table class="table min-w-[1000px] table-auto">
                     <caption class="sr-only">
                         {{ activeTab === 'prospect' ? 'Prospects' : 'Customers' }} — contact details, pipeline stage, next follow-up and actions
                     </caption>
                     <thead class="table-thead border-b border-slate-200">
                         <tr>
-                            <th scope="col" class="table-th">Customer</th>
+                            <th scope="col" class="table-th">Customer / Company</th>
                             <th scope="col" class="table-th">Contact</th>
                             <th scope="col" class="table-th">Stage</th>
                             <th scope="col" class="table-th">Next follow-up</th>
@@ -288,7 +288,7 @@
                             :key="customer.id"
                             class="table-row"
                         >
-                            <td class="table-td min-w-0 max-w-[14rem]">
+                            <td class="table-td min-w-0 w-[22rem] max-w-[22rem]">
                                 <div class="flex items-center gap-3 min-w-0">
                                     <div class="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white font-semibold text-sm" aria-hidden="true">
                                         {{ getInitials(customer.name) }}
@@ -300,7 +300,11 @@
                                         >
                                             {{ customer.name }}
                                         </router-link>
-                                        <div v-if="customer.business_name" class="text-xs text-slate-500 truncate">
+                                        <div
+                                            v-if="customer.business_name"
+                                            class="text-xs text-slate-600 break-words line-clamp-2"
+                                            :title="customer.business_name"
+                                        >
                                             {{ customer.business_name }}
                                         </div>
                                         <div v-else-if="customer.vat_number" class="text-xs text-slate-500 truncate">
