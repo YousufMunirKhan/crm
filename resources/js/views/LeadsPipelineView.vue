@@ -203,7 +203,14 @@
                                                             <div
                                                                 class="font-semibold text-slate-900 text-[0.9375rem] sm:text-base leading-snug line-clamp-2 break-words"
                                                             >
-                                                                {{ lead.customer?.name || 'Unknown' }}
+                                                                {{ lead.customer?.name || lead.customer?.business_name || 'Unknown' }}
+                                                            </div>
+                                                            <div
+                                                                v-if="lead.customer?.business_name && lead.customer?.business_name !== lead.customer?.name"
+                                                                class="text-xs text-slate-500 mt-0.5 truncate"
+                                                                :title="lead.customer.business_name"
+                                                            >
+                                                                {{ lead.customer.business_name }}
                                                             </div>
                                                             <div class="text-xs text-slate-500 mt-0.5 truncate" :title="lead.customer?.phone || ''">
                                                                 {{ lead.customer?.phone || '—' }}

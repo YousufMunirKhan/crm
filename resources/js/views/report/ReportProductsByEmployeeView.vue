@@ -95,9 +95,9 @@
                                         :to="`/customers/${p.customer_id}`"
                                         class="link"
                                     >
-                                        {{ p.customer_name }}
+                                        {{ withCompany(p) }}
                                     </router-link>
-                                    <span v-else class="text-slate-600">{{ p.customer_name }}</span>
+                                    <span v-else class="text-slate-600">{{ withCompany(p) }}</span>
                                 </td>
                                 <td class="table-td-num">{{ p.quantity }}</td>
                                 <td class="table-td-num">£{{ formatNumber(p.unit_price) }}</td>
@@ -117,6 +117,10 @@ import axios from 'axios';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { BaseButton, EmptyState } from '@/components/base';
 import { ArrowPathIcon, CubeIcon, UsersIcon } from '@heroicons/vue/24/outline';
+import { customerLabel } from '@/utils/customerLabel';
+
+/** Contact and company on one line; these digests are dense. */
+const withCompany = (row) => customerLabel(row, '');
 
 const selectedEmployeeId = ref('');
 

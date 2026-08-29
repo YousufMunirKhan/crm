@@ -246,10 +246,9 @@
                         <td class="table-td">
                             <router-link
                                 :to="`/leads/${lead.id}`"
-                                class="font-semibold text-slate-900 hover:text-primary-800 block truncate max-w-[14rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded-control"
-                                :title="lead.customer?.name || ''"
+                                class="block max-w-[16rem] hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded-control"
                             >
-                                {{ lead.customer?.name || '—' }}
+                                <CustomerName :customer="lead.customer" name-class="font-semibold text-slate-900" />
                             </router-link>
                         </td>
                         <td class="table-td">
@@ -319,6 +318,7 @@ import { useAuthStore } from '@/stores/auth';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { BaseBadge, BaseButton, EmptyState, StatCard } from '@/components/base';
+import CustomerName from '@/components/CustomerName.vue';
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -628,6 +628,7 @@ function exportPageCsv() {
         { key: 'created_at', label: 'Created' },
         { key: 'creator.name', label: 'Created by' },
         { key: 'customer.name', label: 'Customer' },
+        { key: 'customer.business_name', label: 'Company' },
         { key: 'customer.email', label: 'Customer email' },
         { key: 'next_activity_summary', label: 'Next activity' },
         { key: 'stage', label: 'Stage' },

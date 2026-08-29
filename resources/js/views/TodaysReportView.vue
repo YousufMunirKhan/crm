@@ -244,7 +244,7 @@
                                 <ul class="divide-y divide-success-100 border-t border-success-100 text-sm">
                                     <li v-for="w in user.won_sales_list" :key="w.id" class="px-3 py-2 flex flex-wrap gap-x-2 gap-y-1 text-slate-700">
                                         <span class="font-medium">{{ w.product_name || 'Product' }}</span>
-                                        <span v-if="w.customer_name" class="text-slate-500">{{ w.customer_name }}</span>
+                                        <span v-if="w.customer_name" class="text-slate-500">{{ withCompany(w) }}</span>
                                         <span v-if="w.total_price != null" class="text-success-700 font-medium">£{{ w.total_price }}</span>
                                     </li>
                                 </ul>
@@ -254,7 +254,7 @@
                                 <summary class="px-3 py-2.5 cursor-pointer text-sm font-medium text-primary-900 bg-primary-50/90 list-none [&::-webkit-details-marker]:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40">Tickets resolved ({{ user.tickets_resolved.length }})</summary>
                                 <ul class="divide-y divide-primary-100 border-t border-primary-100 text-sm">
                                     <li v-for="t in user.tickets_resolved" :key="t.id" class="px-3 py-2 break-words">
-                                        #{{ t.ticket_number }} {{ t.subject }} <span v-if="t.customer_name" class="text-slate-500">— {{ t.customer_name }}</span>
+                                        #{{ t.ticket_number }} {{ t.subject }} <span v-if="t.customer_name" class="text-slate-500">— {{ withCompany(t) }}</span>
                                     </li>
                                 </ul>
                             </details>
@@ -276,7 +276,7 @@
                             <details v-if="user.leads_added_list?.length" class="rounded-control border border-primary-200 overflow-hidden">
                                 <summary class="px-3 py-2.5 cursor-pointer text-sm font-medium text-primary-900 bg-primary-50/90 list-none [&::-webkit-details-marker]:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40">Leads added ({{ user.leads_added_list.length }})</summary>
                                 <ul class="divide-y divide-primary-100 border-t border-primary-100 text-sm">
-                                    <li v-for="l in user.leads_added_list" :key="l.id" class="px-3 py-2 break-words">{{ l.customer_name || 'Lead' }} — {{ l.stage }}</li>
+                                    <li v-for="l in user.leads_added_list" :key="l.id" class="px-3 py-2 break-words">{{ withCompany(l) || 'Lead' }} — {{ l.stage }}</li>
                                 </ul>
                             </details>
                         </div>
@@ -295,6 +295,10 @@ import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { BaseBadge, BaseButton, EmptyState } from '@/components/base';
+import { customerLabel } from '@/utils/customerLabel';
+
+/** Contact and company on one line; these digests are dense. */
+const withCompany = (row) => customerLabel(row, '');
 
 const toast = useToastStore();
 const auth = useAuthStore();

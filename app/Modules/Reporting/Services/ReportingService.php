@@ -959,6 +959,7 @@ class ReportingService
                     'total_price' => (float) $item->total_price,
                     'customer_id' => $item->lead?->customer?->id,
                     'customer_name' => $item->lead?->customer?->name ?? 'Unknown',
+                    'customer_business_name' => $item->lead?->customer?->business_name,
                     'closed_at' => $item->closed_at?->toDateTimeString(),
                 ];
             })->values()->toArray(),

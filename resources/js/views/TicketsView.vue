@@ -78,7 +78,7 @@
                                 {{ ticket.subject }}
                             </router-link>
                         </td>
-                        <td class="table-td">{{ ticket.customer?.name || '—' }}</td>
+                        <td class="table-td"><CustomerName :customer="ticket.customer" /></td>
                         <td v-if="isStaffAdmin" class="table-td whitespace-nowrap text-slate-600">{{ formatDateTime(ticket.created_at) }}</td>
                         <td class="table-td">
                             <BaseBadge :tone="getPriorityTone(ticket.priority)">{{ ticket.priority }}</BaseBadge>
@@ -118,8 +118,9 @@
                 <div class="text-sm font-medium text-slate-900">
                     {{ ticket.subject }}
                 </div>
-                <div class="text-sm text-slate-600">
-                    Customer: {{ ticket.customer?.name || '—' }}
+                <div class="text-sm text-slate-600 flex gap-1">
+                    <span class="shrink-0">Customer:</span>
+                    <CustomerName :customer="ticket.customer" name-class="text-slate-900" />
                 </div>
                 <div class="text-sm text-slate-600 flex items-center gap-1.5">
                     <span>Priority:</span>
@@ -171,6 +172,7 @@ import { BaseBadge, BaseButton, EmptyState } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
 import { formatTicketStatus } from '@/utils/displayFormat';
+import CustomerName from '@/components/CustomerName.vue';
 
 // Distinguishes "still fetching" from "nothing to show".
 const loading = ref(true);

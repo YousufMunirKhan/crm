@@ -369,13 +369,11 @@
                             <router-link
                                 v-if="followUp.customer_id"
                                 :to="`/customers/${followUp.customer_id}`"
-                                class="link break-words"
+                                class="block hover:text-primary-800"
                             >
-                                {{ followUp.customer?.name || 'Customer' }}
+                                <CustomerName :customer="followUp.customer" fallback="Customer" name-class="link break-words" />
                             </router-link>
-                            <div v-else class="font-medium text-slate-900">
-                                {{ followUp.customer?.name || 'Customer' }}
-                            </div>
+                            <CustomerName v-else :customer="followUp.customer" fallback="Customer" />
                             <div class="text-xs text-slate-500">
                                 {{ followUp.assignee?.name || 'Unassigned' }} •
                                 {{ formatTime(followUp.next_follow_up_at) }}
@@ -427,13 +425,11 @@
                             <router-link
                                 v-if="apt.customer_id"
                                 :to="`/customers/${apt.customer_id}`"
-                                class="link break-words"
+                                class="block hover:text-primary-800"
                             >
-                                {{ apt.customer?.name || 'Customer' }}
+                                <CustomerName :customer="apt.customer" fallback="Customer" name-class="link break-words" />
                             </router-link>
-                            <div v-else class="font-medium text-slate-900">
-                                {{ apt.customer?.name || 'Customer' }}
-                            </div>
+                            <CustomerName v-else :customer="apt.customer" fallback="Customer" />
                             <div class="text-sm text-slate-600 mt-0.5">{{ apt.description || 'Appointment' }}</div>
                             <div class="text-xs text-slate-500 mt-1 tabular-nums">{{ apt.appointment_time || '10:00' }}</div>
                         </div>
@@ -562,6 +558,7 @@ import {
 import AttendanceClock from '@/components/AttendanceClock.vue';
 import AttendanceWorkHoursChart from '@/components/AttendanceWorkHoursChart.vue';
 import LogActivityModal from '@/components/LogActivityModal.vue';
+import CustomerName from '@/components/CustomerName.vue';
 
 const auth = useAuthStore();
 const toast = useToastStore();

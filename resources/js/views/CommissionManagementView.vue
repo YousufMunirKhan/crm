@@ -126,7 +126,7 @@
                                     <tbody class="divide-y divide-slate-100">
                                         <tr v-for="row in sales" :key="saleKey(row)" class="hover:bg-slate-50/70">
                                             <td class="px-4 py-3">
-                                                <p class="font-medium text-slate-900">{{ row.customer_name || '-' }}</p>
+                                                <CustomerName :customer="{ name: row.customer_name, business_name: row.customer_business_name }" fallback="-" />
                                                 <p class="text-xs text-slate-500">Lead #{{ row.lead_id }}</p>
                                             </td>
                                             <td class="px-4 py-3">{{ row.product_name || '-' }}</td>
@@ -156,7 +156,7 @@
                                 <article v-for="row in sales" :key="saleKey(row)" class="p-4 space-y-3">
                                     <div class="flex items-start justify-between gap-3">
                                         <div class="min-w-0">
-                                            <p class="font-semibold text-slate-900 break-words">{{ row.customer_name || '-' }}</p>
+                                            <CustomerName :customer="{ name: row.customer_name, business_name: row.customer_business_name }" fallback="-" name-class="font-semibold text-slate-900 break-words" />
                                             <p class="text-sm text-slate-600 break-words">{{ row.product_name || '-' }}</p>
                                         </div>
                                         <BaseBadge :tone="row.commission_processed ? 'success' : 'warning'">
@@ -385,6 +385,7 @@ import { ChartBarIcon, FunnelIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { BaseBadge, BaseButton, BaseModal } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
+import CustomerName from '@/components/CustomerName.vue';
 
 const toast = useToastStore();
 const loading = ref(false);

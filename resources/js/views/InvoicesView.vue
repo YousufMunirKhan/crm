@@ -114,7 +114,7 @@
                 </div>
                 <div class="rounded-xl border border-slate-100 bg-slate-50/50 p-4 min-w-0">
                     <div class="text-xs font-medium text-slate-500 uppercase tracking-wide">Total amount</div>
-                    <div class="text-xl font-bold text-slate-900 mt-1 tabular-nums break-words">£{{ formatNumber(summary.total_amount || 0) }}</div>
+                    <div class="text-xl font-bold text-slate-900 mt-1 tabular-nums break-words">{{ formatMoney(summary.total_amount || 0) }}</div>
                 </div>
             </div>
         </template>
@@ -143,12 +143,12 @@
                     </tr>
                     <tr v-for="invoice in invoices" :key="invoice.id" class="listing-row">
                         <td class="listing-td-strong">{{ invoice.invoice_number }}</td>
-                        <td class="listing-td">{{ invoice.customer?.name || '—' }}</td>
+                        <td class="listing-td"><CustomerName :customer="invoice.customer" /></td>
                         <td class="listing-td text-slate-600">{{ formatDate(invoice.invoice_date) }}</td>
-                        <td class="listing-td font-semibold text-slate-900">£{{ formatNumber(invoice.total) }}</td>
-                        <td class="listing-td font-semibold text-success-700">GBP {{ formatNumber(invoice.amount_paid) }}</td>
+                        <td class="listing-td font-semibold text-slate-900">{{ formatMoney(invoice.total) }}</td>
+                        <td class="listing-td font-semibold text-success-700">{{ formatMoney(invoice.amount_paid) }}</td>
                         <td class="listing-td font-semibold" :class="outstanding(invoice) > 0 ? 'text-danger-700' : 'text-slate-700'">
-                            GBP {{ formatNumber(outstanding(invoice)) }}
+                            {{ formatMoney(outstanding(invoice)) }}
                         </td>
                         <td class="listing-td">
                             <BaseBadge :status="badgeStatus(invoice.status)">{{ formatStatus(invoice.status) }}</BaseBadge>
@@ -182,18 +182,21 @@
                     <div class="text-sm font-semibold text-slate-900">{{ invoice.invoice_number }}</div>
                     <BaseBadge :status="badgeStatus(invoice.status)">{{ formatStatus(invoice.status) }}</BaseBadge>
                 </div>
-                <div class="text-sm text-slate-600">Customer: {{ invoice.customer?.name || '—' }}</div>
+                <div class="text-sm text-slate-600 flex gap-1 items-baseline">
+                    <span class="shrink-0">Customer:</span>
+                    <CustomerName :customer="invoice.customer" name-class="text-slate-900 font-medium" />
+                </div>
                 <div class="text-sm text-slate-600">Date: {{ formatDate(invoice.invoice_date) }}</div>
-                <div class="text-sm font-semibold text-slate-900">Total: £{{ formatNumber(invoice.total) }}</div>
+                <div class="text-sm font-semibold text-slate-900">Total: {{ formatMoney(invoice.total) }}</div>
                 <div class="text-sm text-slate-600">Created By: {{ invoice.creator?.name || '—' }}</div>
                 <div class="grid grid-cols-2 gap-2 text-sm">
                     <div>
                         <div class="text-xs text-slate-500">Paid</div>
-                        <div class="font-semibold text-success-700">GBP {{ formatNumber(invoice.amount_paid) }}</div>
+                        <div class="font-semibold text-success-700">{{ formatMoney(invoice.amount_paid) }}</div>
                     </div>
                     <div>
                         <div class="text-xs text-slate-500">Due</div>
-                        <div class="font-semibold" :class="outstanding(invoice) > 0 ? 'text-danger-700' : 'text-slate-700'">GBP {{ formatNumber(outstanding(invoice)) }}</div>
+                        <div class="font-semibold" :class="outstanding(invoice) > 0 ? 'text-danger-700' : 'text-slate-700'">{{ formatMoney(outstanding(invoice)) }}</div>
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-3 pt-1">
@@ -302,6 +305,8 @@ import { ChevronDownIcon, FunnelIcon, PlusIcon, XMarkIcon } from '@heroicons/vue
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
 import { formatInvoiceStatus } from '@/utils/displayFormat';
+import CustomerName from '@/components/CustomerName.vue';
+import { formatMoney } from '@/utils/money';
 
 const toast = useToastStore();
 const auth = useAuthStore();
@@ -382,7 +387,7 @@ const badgeStatus = (status) => (status === 'partially_paid' ? 'partial' : statu
 
 const paymentModalDescription = computed(() =>
     paymentInvoice.value
-        ? `${paymentInvoice.value.invoice_number} - outstanding GBP ${formatNumber(outstanding(paymentInvoice.value))}`
+        ? `${paymentInvoice.value.invoice_number} - outstanding ${formatMoney(outstanding(paymentInvoice.value))}`
         : '',
 );
 

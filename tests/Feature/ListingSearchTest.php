@@ -178,6 +178,57 @@ class ListingSearchTest extends TestCase
     }
 
     /**
+     * Lists show the contact name with the company underneath, so the company
+     * has to survive the trip. Nothing in a controller forces it to - dropping
+     * it from an eager load or narrowing a select would blank the second line
+     * on every row without failing anything else.
+     */
+    public function test_the_company_name_reaches_the_listing_payloads(): void
+    {
+        Lead::create([
+            'customer_id' => $this->target->id,
+            'stage' => 'lead',
+            'created_by' => $this->admin->id,
+        ]);
+        Invoice::create([
+            'invoice_number' => 'INV/2026/00002',
+            'customer_id' => $this->target->id,
+            'invoice_date' => now(),
+            'subtotal' => 100,
+            'vat_rate' => 0,
+            'vat_amount' => 0,
+            'total' => 100,
+            'status' => 'unpaid',
+            'created_by' => $this->admin->id,
+        ]);
+        Ticket::create([
+            'ticket_number' => 'TKT-0002',
+            'source' => 'crm',
+            'customer_id' => $this->target->id,
+            'created_by' => $this->admin->id,
+            'subject' => 'Terminal offline',
+            'priority' => 'low',
+            'status' => 'open',
+        ]);
+
+        foreach (['/api/leads', '/api/invoices', '/api/tickets'] as $endpoint) {
+            $companies = $this->actingAs($this->admin)
+                ->getJson($endpoint)
+                ->assertOk()
+                ->json('data.*.customer.business_name');
+
+            $this->assertContains('Bright Star Catering Ltd', $companies, "endpoint: {$endpoint}");
+        }
+
+        $companies = $this->actingAs($this->admin)
+            ->getJson('/api/customers')
+            ->assertOk()
+            ->json('data.*.business_name');
+
+        $this->assertContains('Bright Star Catering Ltd', $companies);
+    }
+
+    /**
      * A wildcard typed into the box is a literal, not an operator - otherwise a
      * stray "%" quietly returns the whole table.
      */

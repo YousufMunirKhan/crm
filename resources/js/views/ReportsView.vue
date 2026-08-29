@@ -328,7 +328,7 @@
                                                 class="table-row"
                                             >
                                                 <td class="table-td-strong">{{ item.product_name }}</td>
-                                                <td class="table-td">{{ item.customer_name }}</td>
+                                                <td class="table-td"><CustomerName :customer="{ name: item.customer_name, business_name: item.customer_business_name }" name-class="text-slate-900" /></td>
                                                 <td class="table-td-num">{{ item.quantity }}</td>
                                                 <td class="table-td-num">{{ formatMoney(item.unit_price) }}</td>
                                                 <td class="table-td-num font-semibold">
@@ -570,6 +570,7 @@ import LogActivityModal from '@/components/LogActivityModal.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { BaseButton, BaseCard, EmptyState, StatCard } from '@/components/base';
 import { formatMoney } from '@/utils/money';
+import CustomerName from '@/components/CustomerName.vue';
 
 const dateToInput = (date) => {
     const y = date.getFullYear();

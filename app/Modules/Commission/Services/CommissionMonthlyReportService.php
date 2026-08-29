@@ -127,7 +127,17 @@ class CommissionMonthlyReportService
 
     public function customerNameFor(CommissionSale $sale): string
     {
-        return $sale->customer?->business_name ?: $sale->customer?->name ?: '—';
+        return $sale->customer?->name ?: $sale->customer?->business_name ?: '—';
+    }
+
+    /**
+     * The trading name, when it adds something the contact name does not.
+     */
+    public function customerCompanyFor(CommissionSale $sale): ?string
+    {
+        $company = $sale->customer?->business_name;
+
+        return $company && $company !== $sale->customer?->name ? $company : null;
     }
 
     /**
@@ -223,6 +233,7 @@ class CommissionMonthlyReportService
             'credited_user_id' => $s->credited_user_id,
             'credited_user_name' => $s->creditedUser?->name ?? 'User #'.$s->credited_user_id,
             'customer_name' => $this->customerNameFor($s),
+            'customer_business_name' => $this->customerCompanyFor($s),
             'product_name' => $this->productNameFor($s),
             'commission_currency' => $s->commission_currency,
             'commission_amount' => (float) $s->commission_amount,

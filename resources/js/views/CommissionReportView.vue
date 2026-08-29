@@ -251,7 +251,7 @@
                                 <tbody>
                                     <tr v-for="r in displayRows" :key="r.id" class="table-row">
                                         <td class="table-td whitespace-nowrap">{{ formatDate(r.created_at) }}</td>
-                                        <td class="table-td">{{ r.customer_name || '-' }}</td>
+                                        <td class="table-td"><CustomerName :customer="{ name: r.customer_name, business_name: r.customer_business_name }" fallback="-" name-class="text-slate-900" /></td>
                                         <td class="table-td">{{ r.product_name || '-' }}</td>
                                         <td class="table-td">{{ humanRole(r.commission_role) }}</td>
                                         <td class="table-td">{{ r.assigned_by_user_name || '-' }}</td>
@@ -266,7 +266,7 @@
                                 <div class="flex items-start justify-between gap-3">
                                     <div class="min-w-0">
                                         <p class="text-xs text-slate-500">Customer</p>
-                                        <p class="font-semibold text-slate-900 break-words">{{ r.customer_name || '-' }}</p>
+                                        <CustomerName :customer="{ name: r.customer_name, business_name: r.customer_business_name }" fallback="-" name-class="font-semibold text-slate-900 break-words" />
                                         <p class="mt-2 text-xs text-slate-500">Product</p>
                                         <p class="text-sm text-slate-600 break-words">{{ r.product_name || '-' }}</p>
                                     </div>
@@ -305,6 +305,7 @@ import ListingPageShell from '@/components/ListingPageShell.vue';
 import { useToastStore } from '@/stores/toast';
 import { BaseButton, BaseCard, EmptyState, StatCard } from '@/components/base';
 import { ArrowDownTrayIcon, BanknotesIcon, EnvelopeIcon } from '@heroicons/vue/24/outline';
+import CustomerName from '@/components/CustomerName.vue';
 
 const toast = useToastStore();
 const loading = ref(false);

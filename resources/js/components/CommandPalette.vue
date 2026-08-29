@@ -64,6 +64,7 @@ import axios from 'axios';
 import { MagnifyingGlassIcon } from '@heroicons/vue/24/outline';
 import { useAuthStore } from '@/stores/auth';
 import { useFocusTrap } from '@/composables/useFocusTrap';
+import { customerLabel } from '@/utils/customerLabel';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -142,21 +143,6 @@ function rowsOf(response) {
 }
 
 /**
- * A customer is a person at a company, and the palette used to show
- * `business_name || name` - so for anyone with a company on file the contact's
- * own name never appeared, and searching for that person looked like it had
- * failed even though the row on screen was theirs. Both are shown now.
- */
-function customerLabel(customer) {
-    const contact = customer.name?.trim();
-    const company = customer.business_name?.trim();
-
-    if (contact && company) return `${contact} - ${company}`;
-
-    return company || contact || 'Unnamed customer';
-}
-
-/**
  * Only customers were searchable from here, so a lead, an invoice or a ticket
  * could only be reached by opening its list first. Each endpoint is asked
  * independently and a slow or failing one just contributes nothing.
@@ -178,7 +164,7 @@ async function searchRecords(q) {
 
     rowsOf(customers).slice(0, 5).forEach((c) => found.push({
         key: 'customer:' + c.id,
-        label: customerLabel(c),
+        label: customerLabel(c, 'Unnamed customer'),
         detail: [c.phone, c.email].filter(Boolean).join(' · '),
         to: `/customers/${c.id}`,
         group: c.type === 'prospect' ? 'Prospect' : 'Customer',
@@ -186,7 +172,7 @@ async function searchRecords(q) {
 
     rowsOf(leads).slice(0, 5).forEach((l) => found.push({
         key: 'lead:' + l.id,
-        label: `#${l.id} ${customerLabel(l.customer || {})}`,
+        label: `#${l.id} ${customerLabel(l.customer || {}, "")}`,
         detail: [l.stage?.replace('_', ' '), l.product?.name].filter(Boolean).join(' · '),
         to: `/leads/${l.id}`,
         group: 'Lead',
@@ -195,7 +181,7 @@ async function searchRecords(q) {
     rowsOf(invoices).slice(0, 5).forEach((i) => found.push({
         key: 'invoice:' + i.id,
         label: i.invoice_number,
-        detail: [customerLabel(i.customer || {}), i.status].filter(Boolean).join(' · '),
+        detail: [customerLabel(i.customer || {}, ""), i.status].filter(Boolean).join(' · '),
         to: `/invoices/${i.id}/edit`,
         group: 'Invoice',
     }));
@@ -203,7 +189,7 @@ async function searchRecords(q) {
     rowsOf(tickets).slice(0, 5).forEach((t) => found.push({
         key: 'ticket:' + t.id,
         label: t.subject || t.ticket_number,
-        detail: [customerLabel(t.customer || {}), t.status?.replace('_', ' ')].filter(Boolean).join(' · '),
+        detail: [customerLabel(t.customer || {}, ""), t.status?.replace('_', ' ')].filter(Boolean).join(' · '),
         to: `/tickets/${t.id}`,
         group: 'Ticket',
     }));

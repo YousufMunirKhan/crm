@@ -75,13 +75,11 @@
                                     <router-link
                                         v-if="fu.customer_id"
                                         :to="`/customers/${fu.customer_id}`"
-                                        class="link font-medium"
+                                        class="block hover:text-primary-800"
                                     >
-                                        {{ fu.customer?.name || '—' }}
+                                        <CustomerName :customer="fu.customer" name-class="link font-medium" />
                                     </router-link>
-                                    <span v-else class="text-slate-900 font-medium">
-                                        {{ fu.customer?.name || '—' }}
-                                    </span>
+                                    <CustomerName v-else :customer="fu.customer" />
                                 </td>
                                 <td class="table-td">
                                     {{ fu.products || '—' }}
@@ -146,13 +144,11 @@
                     <router-link
                         v-if="fu.customer_id"
                         :to="`/customers/${fu.customer_id}`"
-                        class="link text-sm font-medium"
+                        class="block hover:text-primary-800"
                     >
-                        {{ fu.customer?.name || '—' }}
+                        <CustomerName :customer="fu.customer" name-class="link text-sm font-medium" />
                     </router-link>
-                    <span v-else class="text-sm font-medium text-slate-900">
-                        {{ fu.customer?.name || '—' }}
-                    </span>
+                    <CustomerName v-else :customer="fu.customer" name-class="text-sm font-medium text-slate-900" />
                 </div>
                 <div v-if="fu.products">
                     <div class="text-eyebrow text-slate-500 uppercase">Products</div>
@@ -185,6 +181,7 @@ import { exportToCSV as exportCSV } from '@/utils/exportCsv';
 import { formatLeadStage } from '@/utils/displayFormat';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { BaseBadge, BaseButton, EmptyState } from '@/components/base';
+import CustomerName from '@/components/CustomerName.vue';
 
 const loading = ref(true);
 const followUps = ref([]);
@@ -265,6 +262,7 @@ function exportCsv() {
         { key: 'next_follow_up_date', label: 'Date' },
         { key: 'next_follow_up_time', label: 'Time' },
         { key: 'customer.name', label: 'Customer' },
+        { key: 'customer.business_name', label: 'Company' },
         { key: 'products', label: 'Products' },
         { key: 'stage', label: 'Stage' },
         { key: 'assignee.name', label: 'Assignee' },
