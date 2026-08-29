@@ -189,7 +189,7 @@
                                         <td class="table-td-num">{{ row.won_leads }}</td>
                                         <td class="table-td-num">{{ row.conversion_rate }}%</td>
                                         <td class="table-td-num font-semibold text-slate-900">
-                                            GBP {{ formatNumber(row.revenue) }}
+                                            {{ formatMoney(row.revenue) }}
                                         </td>
                                         <td class="table-td-actions">
                                             <BaseButton
@@ -279,7 +279,7 @@
                                         />
                                         <StatCard
                                             label="Revenue"
-                                            :value="`GBP ${formatNumber(employeeOverview.last_week?.total_revenue || 0)}`"
+                                            :value="formatMoney(employeeOverview.last_week?.total_revenue || 0)"
                                         />
                                     </div>
                                 </BaseCard>
@@ -295,7 +295,7 @@
                                         />
                                         <StatCard
                                             label="Revenue"
-                                            :value="`GBP ${formatNumber(employeeOverview.selected_month?.total_revenue || 0)}`"
+                                            :value="formatMoney(employeeOverview.selected_month?.total_revenue || 0)"
                                         />
                                     </div>
                                 </BaseCard>
@@ -330,9 +330,9 @@
                                                 <td class="table-td-strong">{{ item.product_name }}</td>
                                                 <td class="table-td">{{ item.customer_name }}</td>
                                                 <td class="table-td-num">{{ item.quantity }}</td>
-                                                <td class="table-td-num">GBP {{ formatNumber(item.unit_price) }}</td>
+                                                <td class="table-td-num">{{ formatMoney(item.unit_price) }}</td>
                                                 <td class="table-td-num font-semibold">
-                                                    GBP {{ formatNumber(item.total_price) }}
+                                                    {{ formatMoney(item.total_price) }}
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -390,7 +390,7 @@
                                             {{ row.products?.pending || 0 }}
                                         </td>
                                         <td class="table-td-num font-semibold">
-                                            GBP {{ formatNumber(row.total_value || 0) }}
+                                            {{ formatMoney(row.total_value || 0) }}
                                         </td>
                                     </tr>
                                 </tbody>
@@ -429,9 +429,9 @@
                                 <tbody>
                                     <tr v-for="row in revenueByEmployee" :key="row.employee_id" class="table-row">
                                         <td class="table-td-strong">{{ row.employee_name }}</td>
-                                        <td class="table-td-num">GBP {{ formatNumber(row.lead_revenue || 0) }}</td>
-                                        <td class="table-td-num">GBP {{ formatNumber(row.invoice_revenue || 0) }}</td>
-                                        <td class="table-td-num font-semibold">GBP {{ formatNumber(row.revenue || 0) }}</td>
+                                        <td class="table-td-num">{{ formatMoney(row.lead_revenue || 0) }}</td>
+                                        <td class="table-td-num">{{ formatMoney(row.invoice_revenue || 0) }}</td>
+                                        <td class="table-td-num font-semibold">{{ formatMoney(row.revenue || 0) }}</td>
                                         <td class="table-td-num font-semibold text-success-700">
                                             {{ row.products?.won || 0 }}
                                         </td>
@@ -569,6 +569,7 @@ import {
 import LogActivityModal from '@/components/LogActivityModal.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { BaseButton, BaseCard, EmptyState, StatCard } from '@/components/base';
+import { formatMoney } from '@/utils/money';
 
 const dateToInput = (date) => {
     const y = date.getFullYear();
@@ -705,9 +706,9 @@ const billedShare = computed(() => {
 const summaryCards = computed(() => [
     {
         label: 'Revenue',
-        value: `GBP ${formatNumber(revenueTotals.value.total)}`,
+        value: formatMoney(revenueTotals.value.total),
         help: revenueTotals.value.total
-            ? `of which billed GBP ${formatNumber(revenueTotals.value.billed)} (${billedShare.value}%)`
+            ? `of which billed ${formatMoney(revenueTotals.value.billed)} (${billedShare.value}%)`
             : 'Every sale counted once - invoiced, or won deal value',
     },
     {
@@ -740,7 +741,7 @@ const operatingCards = computed(() => [
     },
     {
         label: 'Open pipeline',
-        value: `GBP ${formatNumber(executiveData.value.pipeline_value || 0)}`,
+        value: formatMoney(executiveData.value.pipeline_value || 0),
         help: 'Deals still live - not won, not lost',
     },
     {
@@ -795,10 +796,10 @@ const employeeActivityCards = computed(() => {
     const self = employeeOverview.value.targets?.self || {};
     return [
         { label: 'New leads', value: row.leads ?? self.new_leads ?? 0, help: 'Assigned in selected range' },
-        { label: 'Open pipeline', value: `GBP ${formatNumber(row.open_pipeline ?? self.open_pipeline ?? 0)}`, help: 'Follow-up, lead, hot lead, quotation' },
+        { label: 'Open pipeline', value: formatMoney(row.open_pipeline ?? self.open_pipeline ?? 0), help: 'Follow-up, lead, hot lead, quotation' },
         { label: 'Appointments', value: row.appointments ?? self.achieved_appointments ?? 0, help: 'Booked or handled' },
         { label: 'Won products', value: row.won_products ?? self.achieved_sales ?? 0, help: 'Closed line items' },
-        { label: 'Sales revenue', value: `GBP ${formatNumber(row.revenue ?? self.achieved_revenue ?? 0)}`, help: 'Won product line value' },
+        { label: 'Sales revenue', value: formatMoney(row.revenue ?? self.achieved_revenue ?? 0), help: 'Won product line value' },
     ];
 });
 
@@ -808,7 +809,7 @@ const employeeTargetCards = computed(() => {
         return [
             { label: 'Appointments', value: '0 / 0', progress: 0 },
             { label: 'Sales', value: '0 / 0', progress: 0 },
-            { label: 'Revenue', value: 'GBP 0 / GBP 0', progress: 0 },
+            { label: 'Revenue', value: `${formatMoney(0)} of ${formatMoney(0)}`, progress: 0 },
         ];
     }
     return [
@@ -824,7 +825,7 @@ const employeeTargetCards = computed(() => {
         },
         {
             label: 'Revenue',
-            value: `GBP ${formatNumber(self.achieved_revenue || 0)} / GBP ${formatNumber(self.target_revenue || 0)}`,
+            value: `${formatMoney(self.achieved_revenue || 0)} of ${formatMoney(self.target_revenue || 0)}`,
             progress: clampPct(self.revenue_progress),
         },
     ];

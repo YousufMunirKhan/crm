@@ -19,7 +19,7 @@
                         v-model="query"
                         type="text"
                         class="flex-1 py-3.5 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none"
-                        placeholder="Search pages, customers, invoices…"
+                        placeholder="Name, company, phone, email, invoice or ticket…"
                         aria-label="Search"
                         @keydown.down.prevent="move(1)"
                         @keydown.up.prevent="move(-1)"
@@ -116,7 +116,7 @@ const results = computed(() => {
 
     const matchedPages = pages.value.filter((p) => p.label.toLowerCase().includes(q));
 
-    return [...matchedPages, ...remote.value].slice(0, 20);
+    return [...matchedPages, ...remote.value].slice(0, 24);
 });
 
 watch(results, () => { cursor.value = 0; });
@@ -132,22 +132,84 @@ watch(query, (value) => {
         return;
     }
 
-    debounce = setTimeout(async () => {
-        try {
-            const { data } = await axios.get('/api/customers', { params: { search: q, per_page: 6 } });
-            const rows = data.data ?? data ?? [];
-            remote.value = rows.slice(0, 6).map((c) => ({
-                key: 'customer:' + c.id,
-                label: c.business_name || c.name,
-                detail: c.phone || c.email || '',
-                to: `/customers/${c.id}`,
-                group: 'Customer',
-            }));
-        } catch {
-            remote.value = [];
-        }
-    }, 250);
+    debounce = setTimeout(() => searchRecords(q), 250);
 });
+
+/** Rows of the list, or the list itself when the endpoint is not paginated. */
+function rowsOf(response) {
+    const data = response?.data;
+    return data?.data ?? data ?? [];
+}
+
+/**
+ * A customer is a person at a company, and the palette used to show
+ * `business_name || name` - so for anyone with a company on file the contact's
+ * own name never appeared, and searching for that person looked like it had
+ * failed even though the row on screen was theirs. Both are shown now.
+ */
+function customerLabel(customer) {
+    const contact = customer.name?.trim();
+    const company = customer.business_name?.trim();
+
+    if (contact && company) return `${contact} - ${company}`;
+
+    return company || contact || 'Unnamed customer';
+}
+
+/**
+ * Only customers were searchable from here, so a lead, an invoice or a ticket
+ * could only be reached by opening its list first. Each endpoint is asked
+ * independently and a slow or failing one just contributes nothing.
+ */
+async function searchRecords(q) {
+    const params = { search: q, per_page: 5 };
+
+    const [customers, leads, invoices, tickets] = await Promise.all([
+        axios.get('/api/customers', { params }).catch(() => null),
+        axios.get('/api/leads', { params }).catch(() => null),
+        axios.get('/api/invoices', { params }).catch(() => null),
+        axios.get('/api/tickets', { params }).catch(() => null),
+    ]);
+
+    // The query moved on while these were in flight.
+    if (query.value.trim() !== q) return;
+
+    const found = [];
+
+    rowsOf(customers).slice(0, 5).forEach((c) => found.push({
+        key: 'customer:' + c.id,
+        label: customerLabel(c),
+        detail: [c.phone, c.email].filter(Boolean).join(' · '),
+        to: `/customers/${c.id}`,
+        group: c.type === 'prospect' ? 'Prospect' : 'Customer',
+    }));
+
+    rowsOf(leads).slice(0, 5).forEach((l) => found.push({
+        key: 'lead:' + l.id,
+        label: `#${l.id} ${customerLabel(l.customer || {})}`,
+        detail: [l.stage?.replace('_', ' '), l.product?.name].filter(Boolean).join(' · '),
+        to: `/leads/${l.id}`,
+        group: 'Lead',
+    }));
+
+    rowsOf(invoices).slice(0, 5).forEach((i) => found.push({
+        key: 'invoice:' + i.id,
+        label: i.invoice_number,
+        detail: [customerLabel(i.customer || {}), i.status].filter(Boolean).join(' · '),
+        to: `/invoices/${i.id}/edit`,
+        group: 'Invoice',
+    }));
+
+    rowsOf(tickets).slice(0, 5).forEach((t) => found.push({
+        key: 'ticket:' + t.id,
+        label: t.subject || t.ticket_number,
+        detail: [customerLabel(t.customer || {}), t.status?.replace('_', ' ')].filter(Boolean).join(' · '),
+        to: `/tickets/${t.id}`,
+        group: 'Ticket',
+    }));
+
+    remote.value = found;
+}
 
 function move(delta) {
     if (!results.value.length) return;
