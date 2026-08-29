@@ -7,22 +7,19 @@
         >
             <div class="p-8 sm:p-10">
                 <div class="text-center mb-8">
-                    <div v-if="logoUrl" class="mb-3 flex justify-center">
-                        <img :src="logoUrl" alt="Company Logo" class="max-h-16 sm:max-h-20 object-contain">
+                    <!--
+                        One brand mark. The company name is the fallback, so a
+                        missing logo file no longer shows a broken image - and
+                        the name is not hardcoded to a single company.
+                    -->
+                    <div class="mb-3 flex justify-center">
+                        <BrandLogo
+                            :src="logoUrl || faviconUrl"
+                            :company-name="companyName"
+                            img-class="max-h-16 sm:max-h-20 object-contain"
+                            text-class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight text-balance"
+                        />
                     </div>
-                    <div v-else-if="faviconUrl" class="mb-3 flex justify-center">
-                        <img
-                            :src="faviconUrl"
-                            alt=""
-                            class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover shadow-md border border-slate-200/80"
-                        >
-                    </div>
-                    <p
-                        v-else
-                        class="text-lg sm:text-xl font-bold tracking-tight text-slate-900 mb-3"
-                    >
-                        SWITCH & SAVE
-                    </p>
                     <p class="text-sm sm:text-base text-slate-800 font-medium leading-snug">
                         Smart Solutions for Smart Businesses
                     </p>
@@ -147,6 +144,7 @@
 </template>
 
 <script setup>
+import BrandLogo from '@/components/BrandLogo.vue';
 import { ref, onMounted } from 'vue';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline';
 import { BaseButton, BaseModal } from '@/components/base';
@@ -176,6 +174,7 @@ function cancelForgotPassword() {
 const loading = ref(false);
 const error = ref(null);
 const logoUrl = ref('');
+const companyName = ref('');
 const faviconUrl = ref('');
 const showPassword = ref(false);
 const showForgotPasswordModal = ref(false);
@@ -188,6 +187,7 @@ const loadPublicSettings = async () => {
     try {
         const response = await axios.get('/api/settings/public');
         logoUrl.value = response.data.logo_url || '';
+        companyName.value = response.data.company_name || '';
         faviconUrl.value = response.data.favicon_url || '';
     } catch (err) {
         console.error('Failed to load public settings:', err);

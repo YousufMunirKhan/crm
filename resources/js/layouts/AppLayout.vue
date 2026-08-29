@@ -20,19 +20,12 @@
         >
             <div class="h-16 shrink-0 w-full max-w-full min-w-0 flex items-center justify-between gap-2 px-3 font-semibold text-lg border-b border-white/10 bg-primary-600/95 backdrop-blur-sm overflow-hidden">
                 <router-link to="/" class="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-                    <img
-                        v-if="branding.logoUrl"
-                        :src="branding.logoUrl"
-                        alt="Company logo"
-                        class="h-9 w-auto max-w-full object-contain object-left bg-transparent drop-shadow-sm"
+                    <BrandLogo
+                        :src="branding.logoUrl || branding.faviconUrl"
+                        :company-name="branding.companyName"
+                        img-class="h-9 w-auto max-w-full object-contain object-left bg-transparent drop-shadow-sm"
+                        text-class="text-white truncate text-sm font-bold"
                     />
-                    <img
-                        v-else-if="branding.faviconUrl"
-                        :src="branding.faviconUrl"
-                        alt=""
-                        class="h-9 w-9 shrink-0 rounded-lg object-cover bg-white/15 ring-1 ring-white/20 shadow-sm"
-                    />
-                    <span v-else class="text-white truncate text-sm font-bold">Switch & Save CRM</span>
                 </router-link>
                 <button
                     type="button"
@@ -253,6 +246,7 @@ import {
 } from '@heroicons/vue/24/outline';
 import SidebarNavIcon from '@/components/SidebarNavIcon.vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
+import BrandLogo from '@/components/BrandLogo.vue';
 import CommandPalette from '@/components/CommandPalette.vue';
 import { usePageTitle } from '@/composables/usePageTitle';
 import axios from 'axios';

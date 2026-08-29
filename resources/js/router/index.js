@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { resolveRouteTitle } from '@/composables/usePageTitle';
 import LoginView from '@/views/LoginView.vue';
 import DashboardView from '@/views/DashboardView.vue';
 import CustomerLeadView from '@/views/CustomerLeadView.vue';
@@ -479,6 +480,20 @@ router.beforeEach(async (to, from, next) => {
     }
 
     next();
+});
+
+/**
+ * Keep the browser tab title in step with the route.
+ *
+ * Every page previously showed the same static title from the Blade shell, so
+ * a user with several tabs open could not tell them apart. Uses the same
+ * resolver as the page heading and the breadcrumbs.
+ */
+router.afterEach((to) => {
+    const appName = document.querySelector('meta[name="app-name"]')?.content || 'Switch & Save CRM';
+    const title = resolveRouteTitle(to);
+
+    document.title = title && title !== appName ? `${title} — ${appName}` : appName;
 });
 
 export default router;

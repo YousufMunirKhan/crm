@@ -5,6 +5,7 @@ import { applyFavicon } from '@/utils/branding';
 export const useBrandingStore = defineStore('branding', {
     state: () => ({
         logoUrl: '',
+        companyName: '',
         faviconUrl: '',
         loaded: false,
     }),
@@ -14,6 +15,7 @@ export const useBrandingStore = defineStore('branding', {
             try {
                 const { data } = await axios.get('/api/settings/public');
                 this.logoUrl = data.logo_url || '';
+                this.companyName = data.company_name || '';
                 this.faviconUrl = data.favicon_url || '';
                 applyFavicon(this.faviconUrl || null);
             } catch (_) {
