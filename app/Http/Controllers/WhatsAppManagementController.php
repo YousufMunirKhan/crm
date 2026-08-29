@@ -10,6 +10,8 @@ use App\Modules\CRM\Models\Customer;
 use App\Modules\CRM\Models\LeadItem;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Models\ContactConsent;
+use App\Services\SuppressionService;
 
 class WhatsAppManagementController extends Controller
 {
@@ -240,17 +242,32 @@ class WhatsAppManagementController extends Controller
 
         $sent = 0;
         $failed = 0;
+        $skipped = 0;
         $failedList = [];
         $n = 0;
+        $suppression = app(SuppressionService::class);
 
-        $query->orderBy('id')->chunk(50, function ($contacts) use ($template, &$sent, &$failed, &$failedList, &$n) {
+        $query->orderBy('id')->chunk(50, function ($contacts) use ($template, $suppression, &$sent, &$failed, &$skipped, &$failedList, &$n) {
+            $suppressed = $suppression->suppressedSet(
+                $contacts->map(fn ($c) => $c->whatsapp_number ?? $c->phone)->all(),
+                ContactConsent::CHANNEL_WHATSAPP
+            );
+
             foreach ($contacts as $customer) {
+                $phone = $customer->whatsapp_number ?? $customer->phone;
+
+                // PECR reg. 22: never message somebody who has opted out.
+                $key = $suppression->normalise($phone, ContactConsent::CHANNEL_WHATSAPP);
+                if ($key !== null && isset($suppressed[$key])) {
+                    $skipped++;
+                    continue;
+                }
+
                 if ($n > 0 && $n % 10 === 0) {
                     usleep(200000);
                 }
                 $n++;
 
-                $phone = $customer->whatsapp_number ?? $customer->phone;
                 if (!$phone || trim((string) $phone) === '') {
                     $failed++;
                     $failedList[] = ['name' => $customer->name, 'phone' => '—', 'error' => 'No WhatsApp or phone number'];
@@ -259,6 +276,7 @@ class WhatsAppManagementController extends Controller
                         'template_type' => 'whatsapp_template',
                         'template_id' => $template->id,
                         'customer_id' => $customer->id,
+                        'lead_id' => $customer->leads()->latest('id')->value('id'),
                         'recipient_phone' => null,
                         'subject' => $template->name,
                         'content' => '',
@@ -283,6 +301,7 @@ class WhatsAppManagementController extends Controller
                         'template_type' => 'whatsapp_template',
                         'template_id' => $template->id,
                         'customer_id' => $customer->id,
+                        'lead_id' => $customer->leads()->latest('id')->value('id'),
                         'recipient_phone' => $phone,
                         'subject' => $template->name,
                         'content' => 'WhatsApp template message',
@@ -303,6 +322,7 @@ class WhatsAppManagementController extends Controller
                         'template_type' => 'whatsapp_template',
                         'template_id' => $template->id,
                         'customer_id' => $customer->id,
+                        'lead_id' => $customer->leads()->latest('id')->value('id'),
                         'recipient_phone' => $phone,
                         'subject' => $template->name,
                         'content' => '',

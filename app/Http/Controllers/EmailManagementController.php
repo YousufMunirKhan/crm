@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Support\MarketingMailHeaders;
+use App\Jobs\SendBulkEmailChunkJob;
 
 class EmailManagementController extends Controller
 {
@@ -222,8 +224,43 @@ class EmailManagementController extends Controller
         ]);
 
         $template = EmailTemplate::findOrFail($request->template_id);
-
         $query = $this->buildEmailFilteredQuery($request, true);
+        $sentBy = auth()->id();
+
+        /*
+         * Queued mode. Sending inline paces at ~1.2s per recipient inside the
+         * HTTP request, so anything past roughly 150 recipients hit the PHP
+         * timeout part-way through with no resume and no report. Chunked jobs
+         * survive that and can be retried.
+         */
+        if (config('communication.queue_async')) {
+            $chunkSize = max(1, (int) config('communication.bulk_chunk_size', 100));
+            $queued = 0;
+            $batches = 0;
+
+            $query->orderBy('id')->chunk($chunkSize, function ($contacts) use ($template, $sentBy, &$queued, &$batches) {
+                $ids = $contacts->pluck('id')->all();
+                if ($ids === []) {
+                    return;
+                }
+
+                SendBulkEmailChunkJob::dispatch($ids, (int) $template->id, $sentBy);
+                $queued += count($ids);
+                $batches++;
+            });
+
+            return response()->json([
+                'message' => "Queued {$queued} recipient(s) across {$batches} batch(es). Progress appears in the sent report.",
+                'queued' => true,
+                'total' => $queued,
+                'batches' => $batches,
+                'sent' => 0,
+                'failed' => 0,
+                'skipped' => 0,
+                'sent_list' => [],
+                'failed_list' => [],
+            ]);
+        }
 
         \App\Services\MailConfigFromDatabase::apply();
 
@@ -233,81 +270,23 @@ class EmailManagementController extends Controller
         $sentList = [];
         $failedList = [];
 
-        $chunkSize = 50;
-        $query->orderBy('id')->chunk($chunkSize, function ($contacts) use ($template, &$sent, &$failed, &$skipped, &$sentList, &$failedList) {
+        $query->orderBy('id')->chunk(50, function ($contacts) use ($template, $sentBy, &$sent, &$failed, &$skipped, &$sentList, &$failedList) {
             foreach ($contacts as $customer) {
-                if (\App\Models\EmailUnsubscribe::isUnsubscribed($customer->email)) {
-                    $skipped++;
-                    continue;
-                }
+                $result = $this->sendTemplateToOneRecipient($template, $customer, $sentBy);
 
-                [$valid, $missingVars] = $this->validateRecipientForTemplate($customer, $template);
-                if (!$valid) {
-                    $skipped++;
-                    $errorMsg = 'Skipped: missing data for variable(s): ' . implode(', ', $missingVars);
-                    $failedList[] = ['email' => $customer->email, 'name' => $customer->name, 'error' => $errorMsg];
-                    SentCommunication::create([
-                        'type' => 'email',
-                        'template_type' => 'email_template',
-                        'template_id' => $template->id,
-                        'customer_id' => $customer->id,
-                        'recipient_email' => $customer->email,
-                        'subject' => $template->subject ?? '',
-                        'content' => '',
-                        'status' => 'failed',
-                        'failure_category' => 'validation',
-                        'error_message' => $errorMsg,
-                        'sent_by' => auth()->id(),
-                    ]);
-                    continue;
-                }
-
-                $subject = $this->replaceVariables($template->subject, $customer);
-                $pending = SentCommunication::create([
-                    'type' => 'email',
-                    'template_type' => 'email_template',
-                    'template_id' => $template->id,
-                    'customer_id' => $customer->id,
-                    'recipient_email' => $customer->email,
-                    'subject' => $subject,
-                    'content' => '',
-                    'status' => 'pending',
-                    'sent_by' => auth()->id(),
-                ]);
-
-                try {
-                    $content = $this->renderTemplateForPreview($template, $customer);
-                    $content = MarketingEmailOpenTracker::appendPixel($content, $pending->id);
-                    \Illuminate\Support\Facades\Mail::send([], [], function ($message) use ($customer, $subject, $content) {
-                        $message->to($customer->email)
-                            ->subject($subject)
-                            ->html($content);
-                    });
-                    $pending->update([
-                        'content' => $content,
-                        'status' => 'sent',
-                        'sent_at' => now(),
-                        'error_message' => null,
-                        'failure_category' => null,
-                    ]);
+                if ($result['status'] === 'sent') {
                     $sent++;
                     $sentList[] = ['email' => $customer->email, 'name' => $customer->name];
-                } catch (\Exception $e) {
+                } elseif ($result['status'] === 'skipped') {
+                    $skipped++;
+                    if (! empty($result['error'])) {
+                        $failedList[] = ['email' => $customer->email, 'name' => $customer->name, 'error' => $result['error']];
+                    }
+                } else {
                     $failed++;
-                    $category = EmailFailureClassifier::classify($e->getMessage());
-                    $failedList[] = [
-                        'email' => $customer->email,
-                        'name' => $customer->name,
-                        'error' => EmailFailureClassifier::failedListSummary($e->getMessage()),
-                    ];
-                    $status = $category === 'bounce' ? 'bounced' : 'failed';
-                    $pending->update([
-                        'status' => $status,
-                        'failure_category' => $category,
-                        'error_message' => EmailFailureClassifier::friendlyWithTechnical($e->getMessage()),
-                        'content' => '',
-                    ]);
+                    $failedList[] = ['email' => $customer->email, 'name' => $customer->name, 'error' => $result['error'] ?? 'Unknown error'];
                 }
+
                 $this->pauseBetweenBulkMarketingEmails();
             }
         });
@@ -317,8 +296,10 @@ class EmailManagementController extends Controller
         if ($skipped > 0) {
             $msg .= ", Skipped: {$skipped}";
         }
+
         return response()->json([
             'message' => $msg,
+            'queued' => false,
             'sent' => $sent,
             'failed' => $failed,
             'skipped' => $skipped,
@@ -326,6 +307,93 @@ class EmailManagementController extends Controller
             'sent_list' => array_slice($sentList, 0, 100),
             'failed_list' => $failedList,
         ]);
+    }
+
+    /**
+     * Renders and sends one templated marketing email, logging the outcome.
+     *
+     * Shared by the inline path and the queued chunk job so both behave
+     * identically - including the suppression check, which must never be
+     * bypassed by whichever path happens to run.
+     *
+     * @return array{status: 'sent'|'failed'|'skipped', error?: string}
+     */
+    public function sendTemplateToOneRecipient(EmailTemplate $template, $customer, ?int $sentBy): array
+    {
+        if (\App\Models\EmailUnsubscribe::isUnsubscribed((string) $customer->email)) {
+            return ['status' => 'skipped'];
+        }
+
+        [$valid, $missingVars] = $this->validateRecipientForTemplate($customer, $template);
+        if (! $valid) {
+            $errorMsg = 'Skipped: missing data for variable(s): '.implode(', ', $missingVars);
+            SentCommunication::create([
+                'type' => 'email',
+                'template_type' => 'email_template',
+                'template_id' => $template->id,
+                'customer_id' => $customer->id,
+                'lead_id' => $customer->leads()->latest('id')->value('id'),
+                'recipient_email' => $customer->email,
+                'subject' => $template->subject ?? '',
+                'content' => '',
+                'status' => 'failed',
+                'failure_category' => 'validation',
+                'error_message' => $errorMsg,
+                'sent_by' => $sentBy,
+            ]);
+
+            return ['status' => 'skipped', 'error' => $errorMsg];
+        }
+
+        $subject = $this->replaceVariables($template->subject, $customer);
+        $pending = SentCommunication::create([
+            'type' => 'email',
+            'template_type' => 'email_template',
+            'template_id' => $template->id,
+            'customer_id' => $customer->id,
+            'lead_id' => $customer->leads()->latest('id')->value('id'),
+            'recipient_email' => $customer->email,
+            'subject' => $subject,
+            'content' => '',
+            'status' => 'pending',
+            'sent_by' => $sentBy,
+        ]);
+
+        try {
+            $content = $this->renderTemplateForPreview($template, $customer);
+            $content = \App\Services\MarketingEmailClickTracker::rewriteLinks($content, $pending->id);
+            $content = MarketingEmailOpenTracker::appendPixel($content, $pending->id);
+
+            \Illuminate\Support\Facades\Mail::send([], [], function ($message) use ($customer, $subject, $content) {
+                $message->to($customer->email)
+                    ->subject($subject)
+                    ->html($content);
+                MarketingMailHeaders::apply($message, $customer->email);
+            });
+
+            $pending->update([
+                'content' => $content,
+                'status' => 'sent',
+                'sent_at' => now(),
+                'error_message' => null,
+                'failure_category' => null,
+            ]);
+
+            return ['status' => 'sent'];
+        } catch (\Exception $e) {
+            $category = EmailFailureClassifier::classify($e->getMessage());
+            $pending->update([
+                'status' => $category === 'bounce' ? 'bounced' : 'failed',
+                'failure_category' => $category,
+                'error_message' => EmailFailureClassifier::friendlyWithTechnical($e->getMessage()),
+                'content' => '',
+            ]);
+
+            return [
+                'status' => 'failed',
+                'error' => EmailFailureClassifier::failedListSummary($e->getMessage()),
+            ];
+        }
     }
 
     /**
@@ -651,6 +719,7 @@ class EmailManagementController extends Controller
             $content = MarketingEmailOpenTracker::appendPixel($content, $pending->id);
             \Illuminate\Support\Facades\Mail::send([], [], function ($message) use ($email, $subject, $content) {
                 $message->to($email)->subject($subject)->html($content);
+                MarketingMailHeaders::apply($message, $email);
             });
             $pending->update([
                 'content' => $content,
@@ -949,6 +1018,7 @@ class EmailManagementController extends Controller
                     $message->to($recipient->email)
                         ->subject($subject)
                         ->html($content);
+                    MarketingMailHeaders::apply($message, $recipient->email);
                 });
                 $pending->update([
                     'content' => $content,

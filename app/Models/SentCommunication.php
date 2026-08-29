@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class SentCommunication extends Model
 {
     protected $fillable = [
+        'campaign_id',
         'type',
         'template_type',
         'template_id',
@@ -43,5 +44,15 @@ class SentCommunication extends Model
     public function sender()
     {
         return $this->belongsTo(\App\Models\User::class, 'sent_by');
+    }
+
+    public function campaign(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Campaign::class);
+    }
+
+    public function clicks(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CommunicationClick::class, 'sent_communication_id');
     }
 }

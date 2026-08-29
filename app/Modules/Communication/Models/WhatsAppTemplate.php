@@ -2,58 +2,22 @@
 
 namespace App\Modules\Communication\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\WhatsAppTemplate as BaseWhatsAppTemplate;
 
-class WhatsAppTemplate extends Model
+/**
+ * Meta-synced WhatsApp template.
+ *
+ * Kept as an alias of App\Models\WhatsAppTemplate so the many existing call
+ * sites in the Communication module keep working, while there is only one set
+ * of rules for the whatsapp_templates table.
+ *
+ * Previously these were two unrelated models on the same table with different
+ * fillable lists, and only the App\Models one applied SoftDeletes - so reads
+ * through this class returned deleted templates and deletes were permanent.
+ *
+ * @deprecated Prefer App\Models\WhatsAppTemplate directly in new code.
+ */
+class WhatsAppTemplate extends BaseWhatsAppTemplate
 {
-    protected $table = 'whatsapp_templates';
-
-    protected $fillable = [
-        'meta_template_id',
-        'name',
-        'category',
-        'language',
-        'parameter_format',
-        'components_json',
-        'status',
-        'rejection_reason',
-        // Legacy columns from existing table
-        'message',
-        'media_url',
-        'media_type',
-        'variables',
-        'is_active',
-        'created_by',
-    ];
-
-    protected $casts = [
-        'components_json' => 'array',
-        'variables' => 'array',
-        'is_active' => 'boolean',
-    ];
-
-    /**
-     * Get approved templates only
-     */
-    public function scopeApproved($query)
-    {
-        return $query->where('status', 'APPROVED');
-    }
-
-    /**
-     * Get pending templates
-     */
-    public function scopePending($query)
-    {
-        return $query->where('status', 'PENDING');
-    }
-
-    /**
-     * Check if template is approved
-     */
-    public function isApproved(): bool
-    {
-        return $this->status === 'APPROVED';
-    }
+    //
 }
-

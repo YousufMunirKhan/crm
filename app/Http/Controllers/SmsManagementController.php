@@ -8,6 +8,8 @@ use App\Modules\CRM\Models\Customer;
 use App\Modules\CRM\Models\LeadItem;
 use App\Services\SmsService;
 use Illuminate\Http\Request;
+use App\Models\ContactConsent;
+use App\Services\SuppressionService;
 
 class SmsManagementController extends Controller
 {
@@ -184,10 +186,24 @@ class SmsManagementController extends Controller
 
         $sent = 0;
         $failed = 0;
+        $skipped = 0;
         $failedList = [];
+        $suppression = app(SuppressionService::class);
 
-        $query->orderBy('id')->chunk(50, function ($contacts) use ($template, $customMessage, &$sent, &$failed, &$failedList) {
+        $query->orderBy('id')->chunk(50, function ($contacts) use ($template, $customMessage, $suppression, &$sent, &$failed, &$skipped, &$failedList) {
+            $suppressed = $suppression->suppressedSet(
+                $contacts->pluck('phone')->all(),
+                ContactConsent::CHANNEL_SMS
+            );
+
             foreach ($contacts as $customer) {
+                // PECR reg. 22: never message somebody who has opted out.
+                $key = $suppression->normalise($customer->phone, ContactConsent::CHANNEL_SMS);
+                if ($key === null || isset($suppressed[$key])) {
+                    $skipped++;
+                    continue;
+                }
+
                 $rawMessage = $template ? $template->message : trim($customMessage);
                 $message = $this->replaceVariables($rawMessage, $customer);
 
@@ -212,12 +228,17 @@ class SmsManagementController extends Controller
             }
         });
 
-        $total = $sent + $failed;
+        $total = $sent + $failed + $skipped;
         $msg = "Sent: {$sent}, Failed: {$failed}";
+        if ($skipped > 0) {
+            $msg .= ", Skipped (opted out): {$skipped}";
+        }
+
         return response()->json([
             'message' => $msg,
             'sent' => $sent,
             'failed' => $failed,
+            'skipped_opted_out' => $skipped,
             'total' => $total,
             'failed_list' => $failedList,
         ]);
@@ -297,6 +318,7 @@ class SmsManagementController extends Controller
             'template_type' => 'message_template',
             'template_id' => $template?->id,
             'customer_id' => $customer->id,
+            'lead_id' => $customer->leads()->latest('id')->value('id'),
             'recipient_phone' => $customer->phone,
             'subject' => $template?->name ?? 'SMS',
             'content' => $message,
