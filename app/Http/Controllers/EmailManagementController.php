@@ -1266,6 +1266,25 @@ class EmailManagementController extends Controller
         return $sample;
     }
 
+    /**
+     * wa.me wants digits with a country code and no punctuation. Numbers are
+     * stored however somebody typed them, so "07700 900123" would open nothing.
+     */
+    private function whatsappLink(?string $raw): string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $raw);
+
+        if ($digits === '') {
+            return '';
+        }
+
+        if (str_starts_with($digits, '0')) {
+            $digits = '44'.ltrim($digits, '0');
+        }
+
+        return strlen($digits) >= 8 ? 'https://wa.me/'.$digits : '';
+    }
+
     private function replaceVariables(string $text, Customer $customer): string
     {
         $settings = \App\Modules\Settings\Models\Setting::whereIn('key', [
@@ -1300,6 +1319,9 @@ class EmailManagementController extends Controller
         $extra = \App\Modules\Settings\Models\Setting::whereIn('key', [
             'company_website', 'logo_url',
             'social_facebook_url', 'social_linkedin_url', 'social_instagram_url', 'social_tiktok_url',
+            // Set in Settings so the booking page and WhatsApp number can change
+            // without editing eleven templates.
+            'marketing_demo_url', 'marketing_whatsapp_number',
         ])->pluck('value', 'key');
         $settings = $settings->merge($extra);
         $appUrl = rtrim((string) config('app.url'), '/');
@@ -1356,6 +1378,9 @@ class EmailManagementController extends Controller
                 '{{social_linkedin_url}}',
                 '{{social_instagram_url}}',
                 '{{social_tiktok_url}}',
+                '{{demo_url}}',
+                '{{whatsapp_number}}',
+                '{{whatsapp_link}}',
                 '{{current_year}}',
             ],
             [
@@ -1378,6 +1403,11 @@ class EmailManagementController extends Controller
                 $this->mergeTagOutboundUrl($settings['social_linkedin_url'] ?? ''),
                 $this->mergeTagOutboundUrl($settings['social_instagram_url'] ?? ''),
                 $this->mergeTagOutboundUrl($settings['social_tiktok_url'] ?? ''),
+                // Falls back to the website, so a Book-a-demo button never
+                // renders as a dead link while the setting is still empty.
+                $this->mergeTagOutboundUrl($settings['marketing_demo_url'] ?: ($settings['company_website'] ?? '')),
+                $settings['marketing_whatsapp_number'] ?? '',
+                $this->whatsappLink($settings['marketing_whatsapp_number'] ?? ''),
                 (string) now()->year,
             ],
             $text

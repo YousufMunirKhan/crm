@@ -178,11 +178,22 @@ class MarketingPlannerService
             ->pluck('customer_id')
             ->all();
 
+        // Only channels that can actually deliver are worth planning for, so a
+        // contact with no email is not a candidate at all while email is the
+        // only one switched on. They were being planned, then blocked, which
+        // filled the review screen with rows nobody could act on - 219 of 579
+        // on live - and cost tokens describing people we cannot write to.
+        $reachable = MarketingGuardrails::ENABLED_CHANNELS;
+
         return Customer::query()
             ->with(['leads.items.product', 'leads.product'])
-            ->where(function ($q) {
-                $q->whereNotNull('email')->where('email', '!=', '')
-                    ->orWhereNotNull('phone')->where('phone', '!=', '');
+            ->where(function ($q) use ($reachable) {
+                if (in_array('email', $reachable, true)) {
+                    $q->orWhere(fn ($e) => $e->whereNotNull('email')->where('email', '!=', ''));
+                }
+                if (array_intersect(['sms', 'whatsapp'], $reachable)) {
+                    $q->orWhere(fn ($e) => $e->whereNotNull('phone')->where('phone', '!=', ''));
+                }
             })
             ->when($recentlyMessaged !== [], fn ($q) => $q->whereNotIn('id', $recentlyMessaged))
             ->get()

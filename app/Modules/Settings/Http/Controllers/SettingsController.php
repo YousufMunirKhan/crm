@@ -304,6 +304,10 @@ class SettingsController extends Controller
             'cold_calling_skip_if_reviews_over' => ['nullable', 'integer', 'min:0', 'max:500000'],
             'cold_calling_discovery_exclude_names' => ['nullable', 'string', 'max:500'],
             'cold_calling_discovery_exclude_types' => ['nullable', 'string', 'max:500'],
+            // Marketing agent: the booking page its emails link to, and the
+            // WhatsApp number they show.
+            'marketing_demo_url' => ['nullable', 'url', 'max:512'],
+            'marketing_whatsapp_number' => ['nullable', 'string', 'max:32'],
             'anthropic_api_key' => ['nullable', 'string', 'max:512'],
             'anthropic_model' => ['nullable', 'string', 'max:128'],
             'cold_calling_use_claude' => ['nullable', 'boolean'],

@@ -111,7 +111,9 @@ class InstallMarketingAgentTemplates extends Command
         <div style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;">
             <tr><td style="padding:32px 28px;">
-              <img src="{{header_logo_url}}" alt="{{company_name}}" width="150" style="display:block;max-width:150px;height:auto;margin-bottom:28px;border:0;">
+              <div style="text-align:center;margin-bottom:28px;">
+                <img src="{{header_logo_url}}" alt="{{company_name}}" width="150" style="display:inline-block;width:150px;max-width:60%;height:auto;border:0;outline:none;text-decoration:none;">
+              </div>
               {$inner}
             </td></tr>
           </table>
@@ -136,14 +138,26 @@ class InstallMarketingAgentTemplates extends Command
         return '<h1 style="margin:0 0 16px;font-size:24px;line-height:32px;color:#0f172a;font-weight:700;">'.$text.'</h1>';
     }
 
+    /**
+     * Three ways to respond, in the order people actually use them.
+     *
+     * The booking page is the primary button because it is the only one that
+     * works at 11pm, which is when a takeaway owner reads email. The phone
+     * number is written out rather than hidden behind a label - a bare tel:
+     * link is a dead button in a desktop mail client. WhatsApp is there because
+     * a large share of this trade would rather message than ring.
+     *
+     * The URL and the WhatsApp number come from Settings, so they can be
+     * changed once instead of in eleven templates.
+     */
     private function cta(string $label): string
     {
-        // The number goes in the label. A bare tel: link with a text label is a
-        // dead button on a desktop mail client, and a merchant reading in the
-        // back office cannot act on it at all.
-        return '<p style="margin:24px 0 8px;"><a href="tel:{{company_phone}}" style="display:inline-block;background:#2563eb;color:#ffffff;'
-            .'font-size:16px;font-weight:600;text-decoration:none;padding:14px 28px;border-radius:8px;">'.$label.' &mdash; {{company_phone}}</a></p>'
-            .'<p style="margin:0 0 4px;font-size:14px;line-height:22px;color:#64748b;">Or just reply to this email and we will call you back.</p>';
+        return '<p style="margin:24px 0 10px;"><a href="{{demo_url}}" style="display:inline-block;background:#2563eb;color:#ffffff;'
+            .'font-size:16px;font-weight:600;text-decoration:none;padding:14px 28px;border-radius:8px;">'.$label.'</a></p>'
+            .'<p style="margin:0 0 4px;font-size:15px;line-height:24px;color:#334155;">'
+            .'Or call <a href="tel:{{company_phone}}" style="color:#2563eb;text-decoration:none;font-weight:600;">{{company_phone}}</a>'
+            .', <a href="{{whatsapp_link}}" style="color:#2563eb;text-decoration:none;font-weight:600;">message us on WhatsApp</a>'
+            .', or just reply to this email.</p>';
     }
 
     /**
@@ -163,7 +177,7 @@ class InstallMarketingAgentTemplates extends Command
                     .$this->p('Hi {{first_name}}, thanks for choosing us. Your order is with our setup team. Someone will call you to agree an install date that does not land in your busy hours.')
                     .$this->p('One thing worth saving now: <strong>{{company_phone}}</strong>. That is our support line, answered by people who know your setup — not a call centre. If a terminal stops taking payments on a Saturday night, that is the number.')
                     .$this->p('Nothing to do right now. We will call you.')
-                    .$this->cta('Save our number'),
+                    .$this->cta('Book your install slot'),
                 'sms' => '{{company_name}}: Welcome {{first_name}}! Your setup is booked in and we will call to confirm. Support: {{company_phone}}. Reply STOP to opt out.',
             ],
             [
@@ -176,7 +190,7 @@ class InstallMarketingAgentTemplates extends Command
                     .$this->p('Hi {{first_name}}, your {{company_name}} licence is due to expire in the next few weeks.')
                     .$this->p('If it lapses, the till keeps ringing but you lose updates and priority support — and the first you usually notice is when something breaks and the fix takes longer.')
                     .$this->p('A two-minute call sorts it. We can also check whether you are on the right plan, since a few customers are paying for seats they stopped using.')
-                    .$this->cta('Renew in two minutes'),
+                    .$this->cta('Book a renewal call'),
                 'sms' => '{{company_name}}: Hi {{first_name}}, your licence expires soon. Call {{company_phone}} to renew and keep support + updates. Reply STOP to opt out.',
             ],
             [
@@ -216,7 +230,7 @@ class InstallMarketingAgentTemplates extends Command
                     .$this->p('Hi {{first_name}}, you are already taking card payments with us. So at the end of a Saturday you know the total — but not which items shifted, which staff member sold them, or what you nearly ran out of.')
                     .$this->p('That is the gap an ePOS closes. Customers who add one typically stop guessing on two things: what to reorder, and which items are quietly losing money.')
                     .$this->p('It plugs into the terminal you already have, so there is no second machine on the counter and no re-training on payments.')
-                    .$this->cta('See what it would cost'),
+                    .$this->cta('Book a demo'),
                 'sms' => '{{company_name}}: {{first_name}}, add ePOS to your card machine and see what actually sells, not just the total. Call {{company_phone}}. Reply STOP to opt out.',
             ],
             [
@@ -242,7 +256,7 @@ class InstallMarketingAgentTemplates extends Command
                     .$this->p('Hi {{first_name}}, you currently have {{customer_products}} with us — bought at different times, billed separately.')
                     .$this->p('Our bundles cover the same things on one agreement: one invoice, one support number, one renewal date instead of several. Often it works out cheaper too - we will tell you straight if it does not.')
                     .$this->p('Worth two minutes to see the numbers side by side. If it is not cheaper for you, we will say so.')
-                    .$this->cta('Compare my bill'),
+                    .$this->cta('Book a bill review'),
                 'sms' => '{{company_name}}: {{first_name}}, your services are billed separately. A bundle is usually cheaper. Call {{company_phone}}. Reply STOP to opt out.',
             ],
             [
@@ -270,7 +284,7 @@ class InstallMarketingAgentTemplates extends Command
                     .$this->p('Hi {{first_name}}, we sent you a quote a little while back and have not heard anything — which usually means one of three things.')
                     .$this->p('&bull; The price was higher than you expected<br>&bull; You are mid-way through comparing us with someone else<br>&bull; It simply got buried')
                     .$this->p('All three are fine, and all three are easier to sort on a two-minute call than over email. If the answer is no, tell us that too — we will stop chasing and leave you alone.')
-                    .$this->cta('Talk it through'),
+                    .$this->cta('Book a 10-minute call'),
                 'sms' => '{{company_name}}: Hi {{first_name}}, did our quote land OK? Happy to talk it through or revise it. Call {{company_phone}}. Reply STOP to opt out.',
             ],
             [
@@ -297,7 +311,7 @@ class InstallMarketingAgentTemplates extends Command
                     .$this->p('The three places small businesses most often lose money on payments:')
                     .$this->p('<strong>1. The rate crept up.</strong> Most card processing contracts rise quietly after year one. Almost nobody re-reads the statement.<br><br><strong>2. Paying app commission on your own regulars.</strong> If someone orders from you every week, you are still paying the app a cut of every order - on a customer who found you long ago.<br><br><strong>3. Separate systems that do not talk.</strong> Till, card machine and online orders each doing their own thing means someone reconciles it by hand every night.')
                     .$this->p('If any of those sound familiar, we will do a free review of your current setup and tell you honestly whether switching is worth it.')
-                    .$this->cta('Get a free review'),
+                    .$this->cta('Book a free review'),
                 'sms' => '{{company_name}}: Hi {{first_name}}, free review of your card rates + till setup. No obligation. Call {{company_phone}}. Reply STOP to opt out.',
             ],
         ];

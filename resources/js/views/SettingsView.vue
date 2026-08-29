@@ -208,6 +208,28 @@
                                     placeholder="https://switch-and-save.uk"
                                 >
                             </div>
+                            <!-- Used by every marketing agent email, so they live
+                                 here rather than being edited in eleven templates. -->
+                            <div>
+                                <label class="form-label" for="settingsview-demo-url">Book-a-demo page</label>
+                                <input id="settingsview-demo-url"
+                                    v-model="settings.marketing_demo_url"
+                                    type="url"
+                                    class="form-input"
+                                    placeholder="https://switch-and-save.uk/book-a-demo"
+                                >
+                                <p class="form-hint">The button in every marketing email points here. Falls back to the website if empty.</p>
+                            </div>
+                            <div>
+                                <label class="form-label" for="settingsview-marketing-whatsapp">WhatsApp number (marketing emails)</label>
+                                <input id="settingsview-marketing-whatsapp"
+                                    v-model="settings.marketing_whatsapp_number"
+                                    type="text"
+                                    class="form-input"
+                                    placeholder="03330389707"
+                                >
+                                <p class="form-hint">Shown as a "message us on WhatsApp" link. Any format — the country code is added for you.</p>
+                            </div>
                             <div class="sm:col-span-2">
                                 <label class="form-label" for="settingsview-crm-url-for-ticket-emails">CRM URL (for ticket emails)</label>
                                 <input id="settingsview-crm-url-for-ticket-emails"
@@ -1231,6 +1253,8 @@ const settings = reactive({
     company_email: '',
     company_phone: '',
     company_website: '',
+    marketing_demo_url: '',
+    marketing_whatsapp_number: '',
     crm_base_url: '',
     company_registration_no: '',
     company_vat: '',
@@ -1324,6 +1348,8 @@ const loadSettings = async () => {
         settings.company_email = data.company_email || '';
         settings.company_phone = data.company_phone || '';
         settings.company_website = data.company_website || '';
+        settings.marketing_demo_url = data.marketing_demo_url || '';
+        settings.marketing_whatsapp_number = data.marketing_whatsapp_number || '';
         settings.crm_base_url = data.crm_base_url || '';
         settings.company_registration_no = data.company_registration_no || '';
         settings.company_vat = data.company_vat || '';
@@ -1532,6 +1558,8 @@ const saveCompanySettings = async () => {
                 company_email: settings.company_email,
                 company_phone: settings.company_phone,
                 company_website: settings.company_website,
+                marketing_demo_url: settings.marketing_demo_url,
+                marketing_whatsapp_number: settings.marketing_whatsapp_number,
                 crm_base_url: settings.crm_base_url,
                 company_registration_no: settings.company_registration_no,
                 company_vat: settings.company_vat,
