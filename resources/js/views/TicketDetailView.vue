@@ -1,6 +1,6 @@
 <template>
     <div class="min-h-screen bg-slate-50 w-full min-w-0 overflow-x-hidden">
-        <div class="max-w-4xl mx-auto px-3 sm:px-6 py-6 lg:py-8 w-full min-w-0">
+        <div class="page-narrow">
             <!-- Back + Header -->
             <div class="mb-6">
                 <BaseButton to="/tickets" variant="ghost" size="sm" class="mb-4">
@@ -12,9 +12,9 @@
 
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
                     <div class="min-w-0">
-                        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 break-words">
+                        <h2 class="text-page-title text-slate-900 break-words">
                             {{ ticket ? ticket.ticket_number : 'Ticket' }}
-                        </h1>
+                        </h2>
                         <p v-if="ticket" class="text-base sm:text-lg text-slate-700 mt-0.5 break-words">{{ ticket.subject }}</p>
                     </div>
                     <div v-if="ticket" class="flex flex-wrap items-center gap-2">
@@ -166,7 +166,7 @@
                                 type="file"
                                 multiple
                                 accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                                class="text-sm text-slate-600 file:mr-2 file:py-1.5 file:px-2 file:rounded file:border-0 file:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded-control"
+                                class="form-file"
                                 @change="onDetailAttachmentFilesSelected"
                             />
                             <BaseButton

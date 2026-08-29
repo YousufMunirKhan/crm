@@ -200,7 +200,7 @@
                     </div>
                 </div>
                 <div v-if="importResult.errors && importResult.errors.length > 0" class="mt-4">
-                    <h3 class="font-semibold text-slate-900 mb-2">Errors:</h3>
+                    <h3 class="subsection-title">Errors:</h3>
                     <div class="max-h-64 overflow-y-auto table-wrap border border-slate-200 rounded-card">
                         <table class="table">
                             <caption class="sr-only">Rows that could not be imported</caption>

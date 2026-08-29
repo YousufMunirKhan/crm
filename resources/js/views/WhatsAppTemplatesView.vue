@@ -1,9 +1,8 @@
 <template>
-    <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
-        <div class="flex justify-between items-center">
+    <div class="page">
+        <div class="flex flex-wrap justify-between items-start gap-4">
             <div>
-                <h1 class="text-2xl font-bold text-slate-900">WhatsApp Templates</h1>
-                <p class="text-sm text-slate-600 mt-1">
+                <p class="page-lead">
                     Create templates here (submitted to Meta for approval) or sync from Meta. Use <strong>View</strong> to see the exact JSON payload the CRM sends when messaging.
                 </p>
             </div>

@@ -1,11 +1,10 @@
 <template>
-    <div class="w-full min-w-0 mx-auto px-3 sm:px-5 py-4 sm:py-6 space-y-5">
+    <div class="page">
         <!-- Header -->
         <div class="flex flex-col gap-4">
             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div>
-                    <h1 class="text-page-title text-slate-900">Lead Pipeline</h1>
-                    <p class="text-sm text-slate-500 mt-1 max-w-xl">
+                    <p class="page-lead">
                         Drag cards between stages to update progress. On mobile, scroll sideways to see every column — use the grip to drag.
                     </p>
                 </div>

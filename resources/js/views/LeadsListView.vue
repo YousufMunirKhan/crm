@@ -27,6 +27,18 @@
 
         <template #filters>
             <div class="listing-filters-row">
+                <div class="w-full">
+                    <label class="listing-label" for="leadslistview-search">Search</label>
+                    <input
+                        id="leadslistview-search"
+                        v-model="filters.search"
+                        type="search"
+                        class="form-input-search w-full"
+                        placeholder="Customer name, company, phone, email, product or #lead number"
+                        @input="onSearchInput"
+                    />
+                </div>
+
                 <div class="w-full flex flex-wrap items-center gap-2">
                     <span class="text-eyebrow uppercase text-slate-500 mr-1">Quick range</span>
                     <BaseButton variant="outline" @click="presetRange('today')">Today</BaseButton>
@@ -197,7 +209,7 @@
         <EmptyState
             v-else-if="!leads.length"
             heading="No leads match these filters"
-            description="Try widening the date range, clearing the assignee, or resetting the filters above."
+            description="Try a shorter search term, widening the date range, or resetting the filters above."
         >
             <template #icon><FunnelIcon class="icon" aria-hidden="true" /></template>
             <template #action>
@@ -323,6 +335,7 @@ const exporting = ref(false);
 const syncingQueryFromFilters = ref(false);
 
 const filters = ref({
+    search: '',
     stage: '',
     from: '',
     to: '',
@@ -330,6 +343,17 @@ const filters = ref({
     source: '',
     assigned_by_me: false,
 });
+
+/**
+ * Typing is debounced; the other filters apply on their own button because they
+ * are set deliberately, but a search box that only responds to a button press
+ * feels broken.
+ */
+let searchTimeout = null;
+function onSearchInput() {
+    if (searchTimeout) clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => loadLeads(1), 350);
+}
 
 const isAdmin = computed(() => {
     const role = auth.user?.role?.name;
@@ -435,6 +459,7 @@ function filterParamsForApi() {
         page: undefined,
         per_page: 25,
     };
+    if (filters.value.search?.trim()) p.search = filters.value.search.trim();
     if (filters.value.stage) p.stage = filters.value.stage;
     if (filters.value.from) p.from = filters.value.from;
     if (filters.value.to) p.to = filters.value.to;
@@ -445,7 +470,7 @@ function filterParamsForApi() {
 }
 
 function normalizeLeadListQuery(q) {
-    const keys = Object.keys(q || {}).filter((k) => ['stage', 'from', 'to', 'source', 'assigned_to', 'assigned_by_me'].includes(k)).sort();
+    const keys = Object.keys(q || {}).filter((k) => ['search', 'stage', 'from', 'to', 'source', 'assigned_to', 'assigned_by_me'].includes(k)).sort();
     const o = {};
     keys.forEach((k) => {
         const v = q[k];
@@ -456,6 +481,7 @@ function normalizeLeadListQuery(q) {
 
 function syncUrlQuery() {
     const q = {};
+    if (filters.value.search?.trim()) q.search = filters.value.search.trim();
     if (filters.value.stage) q.stage = filters.value.stage;
     if (filters.value.from) q.from = filters.value.from;
     if (filters.value.to) q.to = filters.value.to;
@@ -514,6 +540,7 @@ function applyFilters() {
 
 function resetFilters() {
     filters.value = {
+        search: '',
         stage: '',
         from: '',
         to: '',
@@ -646,6 +673,7 @@ async function exportAllCsv() {
 }
 
 onMounted(async () => {
+    filters.value.search = route.query.search || '';
     filters.value.stage = route.query.stage || '';
     filters.value.from = route.query.from || '';
     filters.value.to = route.query.to || '';
@@ -661,6 +689,7 @@ watch(
     () => route.query,
     (q) => {
         if (route.name !== 'leads-list' || syncingQueryFromFilters.value) return;
+        filters.value.search = q.search || '';
         filters.value.stage = q.stage || '';
         filters.value.from = q.from || '';
         filters.value.to = q.to || '';

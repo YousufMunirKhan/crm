@@ -1,15 +1,16 @@
 <template>
-    <div class="max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden box-border px-3 pb-6 sm:px-4 md:px-6 space-y-5 sm:space-y-8">
-        <!-- Welcome -->
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-            <div class="min-w-0">
-                <h1 class="text-page-title text-slate-900 sm:text-2xl md:text-3xl break-words">
-                    Welcome back, {{ welcomeName }}
-                </h1>
-                <p class="text-xs text-slate-500 mt-1.5 sm:text-sm leading-relaxed">
-                    Here’s what’s happening with your pipeline today.
-                </p>
-            </div>
+    <div class="page overflow-x-hidden box-border">
+        <!--
+            A greeting, not a second page title - the top bar already says
+            "Dashboard". Demoted to h2 so the page keeps exactly one h1.
+        -->
+        <div class="min-w-0">
+            <h2 class="text-page-title text-slate-900 break-words">
+                Welcome back, {{ welcomeName }}
+            </h2>
+            <p class="page-lead mt-1">
+                Here’s what’s happening with your pipeline today.
+            </p>
         </div>
 
         <p v-if="isSelfDashboardScope" class="callout callout-info">
@@ -201,15 +202,21 @@
         </div>
 
         <!-- Performer of the month + their targets (always shown; calendar month from reporting API) -->
-        <section class="card min-w-0 border-warning-200 bg-gradient-to-r from-warning-50 via-white to-success-50 p-4 sm:p-5 md:p-6">
-            <template v-if="monthlyTopPerformer">
+        <!--
+            Plain card surface. This was an amber-to-green gradient with a
+            warning-toned border, which used the "needs attention" ramp to mean
+            "celebrate" and made the dashboard look unrelated to every other
+            screen. The content carries the meaning instead.
+        -->
+        <section class="card min-w-0 p-4 sm:p-5 md:p-6">
+            <template v-if="monthlyTopPerformer && performerHasActivity">
                 <div class="flex min-w-0 flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div class="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
-                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-warning-500 text-base font-bold text-white sm:h-12 sm:w-12 sm:text-lg" aria-hidden="true">
-                            1
+                        <span class="stat-icon bg-primary-50 text-primary-700" aria-hidden="true">
+                            <TrophyIcon class="icon" />
                         </span>
                         <div class="min-w-0 flex-1">
-                            <h2 class="mb-2 inline-flex max-w-full flex-wrap items-center gap-1 rounded-full bg-warning-100 px-2.5 py-1 text-[10px] font-semibold text-warning-800 sm:gap-2 sm:px-3 sm:text-xs">
+                            <h2 class="stat-label mb-1">
                                 {{ isSelfDashboardScope ? 'Your performance this month' : 'Top performer of the month' }}
                             </h2>
                             <div class="text-lg font-bold text-slate-900 break-words sm:text-xl">{{ monthlyTopPerformer.name }}</div>
@@ -275,8 +282,12 @@
             </template>
             <EmptyState
                 v-else
-                heading="No performer data for this month"
-                description="There are no active sales users with activity in the selected scope yet."
+                :heading="isSelfDashboardScope ? 'Nothing recorded yet this month' : 'No results logged yet this month'"
+                :description="
+                    isSelfDashboardScope
+                        ? 'Your leads, appointments and won sales for the month will appear here once you start logging them.'
+                        : 'Once the team logs leads, appointments or won sales this month, the leader will appear here.'
+                "
             >
                 <template #icon>
                     <TrophyIcon class="icon" aria-hidden="true" />
@@ -597,6 +608,23 @@ const completeForm = ref({
 });
 const employees = ref([]);
 const employeeTargets = ref([]);
+
+/**
+ * A performer record exists as soon as there is an active sales user, even
+ * when nothing has happened yet. Announcing a "Top performer of the month"
+ * with 0 leads, 0 won and £0 celebrates nothing and reads as broken, so the
+ * section only claims a winner once there is something to have won.
+ */
+const performerHasActivity = computed(() => {
+    const p = monthlyTopPerformer.value;
+    if (!p) return false;
+    return [
+        p.leads_count,
+        p.won_products ?? p.won_count,
+        p.revenue,
+        p.appointments_count,
+    ].some((v) => Number(v) > 0);
+});
 
 const performerMonthTarget = computed(() => {
     const p = monthlyTopPerformer.value;

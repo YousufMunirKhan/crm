@@ -81,7 +81,7 @@
                     :key="functionType"
                     class="border border-slate-200 rounded-card p-4"
                 >
-                    <h3 class="font-medium text-slate-900 mb-3 capitalize">{{ functionType.replace('_', ' ') }}</h3>
+                    <h3 class="subsection-title capitalize">{{ functionType.replace('_', ' ') }}</h3>
                     <div class="form-grid-3">
                         <!-- Email Template Assignment -->
                         <div>

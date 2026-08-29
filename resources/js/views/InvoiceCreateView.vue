@@ -1,13 +1,12 @@
 <template>
-    <div class="min-h-screen bg-slate-50 w-full min-w-0 overflow-x-hidden">
-        <div class="max-w-3xl mx-auto px-3 sm:px-6 py-6 lg:py-8 w-full min-w-0">
+    <div class="w-full min-w-0 overflow-x-hidden">
+        <div class="page-narrow">
             <!-- Back + Title -->
-            <div class="mb-6">
+            <div>
                 <BaseButton variant="ghost" size="sm" to="/invoices" class="-ml-2 mb-3">
                     <template #icon><ArrowLeftIcon class="icon-sm" aria-hidden="true" /></template>
                     Back to Invoices
                 </BaseButton>
-                <h1 class="text-page-title text-slate-900">{{ isEditMode ? 'Edit Invoice' : 'Create Invoice' }}</h1>
             </div>
 
             <div v-if="loadingInvoice" class="flex items-center justify-center py-12 text-slate-500">

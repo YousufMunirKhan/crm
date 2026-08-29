@@ -113,7 +113,7 @@
         <!-- Main content -->
         <div :class="['flex-1 flex flex-col min-h-0 min-w-0 w-full overflow-hidden', showSidebar ? 'lg:ml-64' : '']">
             <!-- Top header - Only show if sidebar is visible -->
-            <header v-if="showSidebar" class="shrink-0 min-h-14 sm:min-h-16 bg-gradient-to-r from-success-50/90 via-white to-primary-50/75 border-b border-slate-200/70 flex flex-wrap items-center justify-between gap-y-2 gap-x-2 sm:gap-x-3 px-3 sm:px-4 lg:px-6 py-2 z-30 backdrop-blur-sm">
+            <header v-if="showSidebar" class="shrink-0 min-h-14 sm:min-h-16 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-y-2 gap-x-2 sm:gap-x-3 px-3 sm:px-4 lg:px-6 py-2 z-30">
                 <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 sm:flex-initial">
                     <button
                         @click="mobileMenuOpen = !mobileMenuOpen"
@@ -123,10 +123,11 @@
                         <Bars3Icon class="w-6 h-6" aria-hidden="true" />
                     </button>
                     <div class="min-w-0">
-                        <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight truncate min-w-0">
+                        <!-- Ancestor trail sits above the name it leads to. -->
+                        <Breadcrumbs class="hidden sm:block mb-0.5" />
+                        <h1 class="text-page-title text-slate-900 truncate min-w-0">
                             {{ pageTitle }}
                         </h1>
-                        <Breadcrumbs class="hidden sm:block mt-0.5" />
                     </div>
                 </div>
                 <div class="flex items-center justify-end gap-2 sm:gap-3 flex-shrink-0 min-w-0">
@@ -219,7 +220,7 @@
 
             <!-- Content -->
             <div class="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
-                <main id="main" class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-gradient-to-br from-gray-50 to-gray-100 px-3 py-4 sm:px-4 sm:py-5 lg:px-6">
+                <main id="main" class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-surface-sunken px-3 py-4 sm:px-4 sm:py-5 lg:px-6">
                     <RouterView />
                 </main>
             </div>

@@ -50,17 +50,10 @@ class CustomerController extends Controller
             $query->forSalesAgent($user->id);
         }
 
-        // General search (searches across name, business name, phone, email, location)
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('business_name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('postcode', 'like', "%{$search}%")
-                    ->orWhere('city', 'like', "%{$search}%");
-            });
+        // Contact name, company name, both phone formats, every other text
+        // field - see Customer::scopeSearch().
+        if ($request->filled('search')) {
+            $query->search($request->search);
         }
 
         // Individual field filters
@@ -988,13 +981,8 @@ class CustomerController extends Controller
     {
         $query = Customer::query();
 
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
+        if ($request->filled('search')) {
+            $query->search($request->search);
         }
 
         $customers = $query->get();
@@ -1126,13 +1114,8 @@ class CustomerController extends Controller
             $q->where('user_id', $user->id);
         })->with(['leads', 'invoices', 'tickets']);
 
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
+        if ($request->filled('search')) {
+            $query->search($request->search);
         }
 
         $customers = $query->paginate($request->get('per_page', 15));

@@ -1,6 +1,6 @@
 <template>
-    <div class="min-h-screen bg-slate-50 w-full min-w-0 overflow-x-hidden">
-        <div class="max-w-3xl mx-auto px-3 sm:px-6 py-6 lg:py-8 w-full min-w-0">
+    <div class="w-full min-w-0 overflow-x-hidden">
+        <div class="page-narrow">
             <div v-if="loadError" class="callout callout-danger mb-6" role="alert">
                 <p>{{ loadError }}</p>
                 <div class="mt-3">
@@ -14,16 +14,15 @@
             </div>
 
             <template v-else>
-                <div class="mb-6">
+                <div>
                     <BaseButton :to="`/tickets/${ticketId}`" variant="ghost" size="sm" class="mb-4">
                         <template #icon>
                             <ArrowLeftIcon class="icon" aria-hidden="true" />
                         </template>
                         Back to ticket
                     </BaseButton>
-                    <h1 class="text-2xl font-bold text-slate-900">Edit ticket</h1>
-                    <p v-if="ticketNumber" class="text-slate-600 mt-1 text-sm font-mono">{{ ticketNumber }}</p>
-                    <p class="text-slate-500 mt-1 text-sm">Changes save to the same record. Add comments from the ticket detail page.</p>
+                    <p v-if="ticketNumber" class="text-sm font-mono text-slate-600">{{ ticketNumber }}</p>
+                    <p class="page-lead mt-1">Changes save to the same record. Add comments from the ticket detail page.</p>
                 </div>
 
                 <div v-if="pageLoading" class="form-card p-6 space-y-3" aria-busy="true">
@@ -132,7 +131,7 @@
                                 type="file"
                                 multiple
                                 accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                                class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded-control"
+                                class="form-file"
                                 @change="onFiles"
                             />
                             <ul v-if="pendingFiles.length" class="mt-2 text-xs text-slate-600 space-y-1">

@@ -13,6 +13,17 @@
 
         <template #filters>
             <div class="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
+                <div class="w-full sm:flex-1 sm:min-w-64">
+                    <label class="form-label" for="ticketsview-search">Search</label>
+                    <input
+                        id="ticketsview-search"
+                        v-model="searchQuery"
+                        type="search"
+                        class="form-input-search w-full"
+                        placeholder="Subject, customer name, company, phone or ticket #"
+                        @input="onSearchInput"
+                    />
+                </div>
                 <div class="w-full sm:w-56">
                     <label class="form-label" for="ticketsview-status">Status</label>
                     <select id="ticketsview-status" v-model="statusFilter" class="form-select" @change="onStatusFilterChange">
@@ -185,6 +196,18 @@ function formatDateTime(value) {
     });
 }
 const tickets = ref([]);
+const searchQuery = ref('');
+
+/** Debounced so the list follows typing without a request per keystroke. */
+let searchTimeout = null;
+const onSearchInput = () => {
+    if (searchTimeout) clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        pagination.value.current_page = 1;
+        loadTickets();
+    }, 350);
+};
+
 const statusFilter = ref('');
 const dateFrom = ref('');
 const dateTo = ref('');
@@ -262,6 +285,9 @@ const loadTickets = async () => {
             per_page: 15,
             page: pagination.value.current_page,
         };
+        if (searchQuery.value.trim()) {
+            params.search = searchQuery.value.trim();
+        }
         if (statusFilter.value) {
             params.status = statusFilter.value;
         }

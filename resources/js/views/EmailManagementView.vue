@@ -1,8 +1,7 @@
 <template>
-    <div class="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
+    <div class="page">
         <div>
-            <h1 class="text-page-title text-slate-900">Email Management</h1>
-            <p class="text-sm text-slate-600 mt-1">Filter contacts, export list, choose template and send bulk emails. SMTP settings from Settings → Email/SMTP.</p>
+            <p class="page-lead">Filter contacts, export list, choose template and send bulk emails. SMTP settings from Settings → Email/SMTP.</p>
             <!-- SMTP status from Settings -->
             <div
                 v-if="smtpStatus"
@@ -656,7 +655,7 @@
                             id="emailmanagementview-csv-file"
                             type="file"
                             accept=".csv,.txt"
-                            class="block text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-control file:border-0 file:bg-slate-100 file:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded-control"
+                            class="form-file"
                             @change="onUploadFileChange"
                         />
                     </div>

@@ -1,11 +1,6 @@
 <template>
-    <div class="max-w-7xl mx-auto w-full min-w-0 p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-        <div class="min-w-0">
-            <h1 class="text-page-title text-slate-900 break-words">My dashboard</h1>
-            <p class="text-xs text-slate-500 mt-1.5 sm:text-sm leading-relaxed">
-                Your follow-ups, appointments and pipeline.
-            </p>
-        </div>
+    <div class="page">
+        <p class="page-lead">Your follow-ups, appointments and pipeline.</p>
 
         <!-- Attendance & Stats Row (no Revenue) -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">

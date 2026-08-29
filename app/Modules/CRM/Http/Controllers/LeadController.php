@@ -45,6 +45,26 @@ class LeadController extends Controller
             }
         }
 
+        // The leads list had no search at all, so finding one deal meant
+        // paging. Searches the customer behind the lead (contact name, company
+        // name, phone, email, ...), the lead reference and the product.
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function (Builder $q) use ($search) {
+                $q->whereHas('customer', fn (Builder $c) => $c->search($search))
+                    ->orWhereHas('product', fn (Builder $p) => $p->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('items.product', fn (Builder $p) => $p->where('name', 'like', "%{$search}%"))
+                    ->orWhere('leads.lost_reason', 'like', "%{$search}%")
+                    ->orWhere('leads.source', 'like', "%{$search}%");
+
+                // "#412" or "412" should jump straight to that lead.
+                $reference = ltrim($search, '#');
+                if (ctype_digit($reference)) {
+                    $q->orWhere('leads.id', (int) $reference);
+                }
+            });
+        }
+
         if ($request->filled('stage')) {
             $query->where('stage', $request->stage);
         }

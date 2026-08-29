@@ -1,15 +1,14 @@
 <template>
-    <div class="min-h-screen bg-slate-50 w-full min-w-0 overflow-x-hidden">
-        <div class="max-w-3xl mx-auto px-3 sm:px-6 py-6 lg:py-8 w-full min-w-0">
-            <div class="mb-6">
+    <div class="w-full min-w-0 overflow-x-hidden">
+        <div class="page-narrow">
+            <div>
                 <BaseButton to="/tickets" variant="ghost" size="sm" class="mb-4">
                     <template #icon>
                         <ArrowLeftIcon class="icon" aria-hidden="true" />
                     </template>
                     Back to Tickets
                 </BaseButton>
-                <h1 class="text-2xl font-bold text-slate-900">Create Ticket</h1>
-                <p class="text-slate-500 mt-1 text-sm">Assign one or more team members — everyone on the list is notified by email on new comments.</p>
+                <p class="page-lead">Assign one or more team members — everyone on the list is notified by email on new comments.</p>
             </div>
 
             <form id="ticket-create-form" novalidate class="form-card !overflow-visible" @submit.prevent="handleSubmit">
@@ -108,7 +107,7 @@
                             type="file"
                             multiple
                             accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                            class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded-control"
+                            class="form-file"
                             @change="onFiles"
                         />
                         <ul v-if="pendingFiles.length" class="mt-2 text-xs text-slate-600 space-y-1">

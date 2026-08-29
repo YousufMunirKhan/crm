@@ -31,6 +31,38 @@ export function formatLeadStage(stage, whenEmpty = '—') {
     return LEAD_STAGE_LABELS[stage] || capitalizeWords(String(stage).replace(/_/g, ' '));
 }
 
+const LEAD_STAGE_SHORT_LABELS = {
+    follow_up: 'F/U',
+    lead: 'Lead',
+    hot_lead: 'Hot',
+    quotation: 'Quote',
+    won: 'Won',
+    lost: 'Lost',
+};
+
+/** Compact stage label for narrow table cells and mobile cards. */
+export function formatLeadStageShort(stage, whenEmpty = '—') {
+    if (stage == null || stage === '') return whenEmpty;
+    return LEAD_STAGE_SHORT_LABELS[stage] || formatLeadStage(stage, whenEmpty);
+}
+
+const LEAD_STAGE_TONES = {
+    follow_up: 'primary',
+    lead: 'warning',
+    hot_lead: 'warning',
+    quotation: 'primary',
+    won: 'success',
+    lost: 'danger',
+};
+
+/**
+ * BaseBadge tone for a lead stage. Shared so the same stage never renders in
+ * one colour on the Leads list and another on the Customers list.
+ */
+export function leadStageTone(stage) {
+    return LEAD_STAGE_TONES[stage] || 'neutral';
+}
+
 const LINE_ITEM_LABELS = {
     pending: 'Pending',
     won: 'Won',

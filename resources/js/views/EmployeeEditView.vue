@@ -1,6 +1,6 @@
 <template>
     <div class="min-h-screen bg-slate-50 w-full min-w-0">
-        <div class="w-full min-w-0 max-w-4xl mx-auto p-3 sm:p-4 lg:p-6 space-y-6">
+        <div class="page-narrow">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
                 <div class="flex items-center gap-2 min-w-0">
                     <BaseButton
@@ -14,9 +14,9 @@
                             <ArrowLeftIcon class="icon" aria-hidden="true" />
                         </template>
                     </BaseButton>
-                    <h1 class="text-xl lg:text-2xl font-bold text-slate-900">
+                    <h2 class="text-page-title text-slate-900">
                         {{ isSelfHrOnly ? 'Bank details & documents' : 'Edit Employee' }}
-                    </h1>
+                    </h2>
                 </div>
             </div>
 

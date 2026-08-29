@@ -1,6 +1,6 @@
 <template>
     <div class="min-h-screen bg-slate-50 w-full min-w-0 overflow-x-hidden">
-        <div class="max-w-4xl mx-auto px-3 sm:px-6 py-6 lg:py-8 w-full min-w-0">
+        <div class="page-narrow">
             <!-- Header -->
             <div class="mb-6 lg:mb-8">
                 <BaseButton :to="backRoute" variant="ghost" size="sm">
@@ -14,9 +14,9 @@
             <!-- Form Card -->
             <form id="customer-form" novalidate class="form-card" @submit.prevent="handleSubmit">
                 <div class="form-section-head-mint">
-                    <h1 class="form-section-title-mint text-2xl sm:text-3xl">
+                    <h2 class="form-section-title-mint">
                         {{ isEdit ? (form.type === 'customer' ? 'Edit Customer' : 'Edit Prospect') : (form.type === 'customer' ? 'Add Customer' : 'Add Prospect') }}
-                    </h1>
+                    </h2>
                     <p class="form-section-desc-mint">
                         {{ isEdit ? (form.type === 'customer' ? 'Update customer information' : 'Update prospect information') : (form.type === 'customer' ? 'Fill in the details to add a customer' : 'Fill in the details to add a prospect') }}
                     </p>

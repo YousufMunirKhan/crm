@@ -13,7 +13,7 @@
         <form v-else id="customer-assignment-form" class="space-y-4" @submit.prevent="handleSubmit">
             <!-- Current Assignments -->
             <div v-if="currentAssignments.length > 0" class="mb-6">
-                <h3 class="mb-3 text-sm font-medium text-slate-700">Currently Assigned To:</h3>
+                <h3 class="subsection-title">Currently assigned to</h3>
                 <ul class="space-y-2">
                     <li
                         v-for="assignment in currentAssignments"
@@ -31,7 +31,7 @@
                             </div>
                         </div>
                         <BaseButton
-                            variant="danger"
+                            variant="ghost-danger"
                             :label="`Remove ${assignment.user.name}`"
                             @click="askUnassign(assignment)"
                         >

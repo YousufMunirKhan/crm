@@ -161,6 +161,100 @@ class Customer extends Model
         });
     }
 
+    /**
+     * Every text field on a customer that someone might realistically type into
+     * a search box.
+     *
+     * Kept here rather than in the controller because leads, invoices and
+     * tickets all need to search "the customer" too, and they had each grown a
+     * different, narrower list - searching a ticket by company name silently
+     * found nothing while the same search on the customers page worked.
+     */
+    public const SEARCHABLE = [
+        'name',
+        'business_name',
+        'owner_name',
+        'contact_person_2_name',
+        'email',
+        'email_secondary',
+        'address',
+        'postcode',
+        'city',
+        'vat_number',
+        'epos_type',
+        'source',
+        'notes',
+    ];
+
+    /**
+     * Phone-ish columns. Searched separately because they are matched on digits
+     * only - see {@see scopeSearch()}.
+     */
+    public const SEARCHABLE_PHONES = [
+        'phone',
+        'whatsapp_number',
+        'sms_number',
+        'contact_person_2_phone',
+    ];
+
+    /**
+     * Free-text search across a customer.
+     *
+     * Phone numbers get their own treatment: the same mobile is stored as
+     * "07700 900123", "+44 7700 900123" and "447700900123" depending on whether
+     * it was typed, imported or captured from WhatsApp, so a plain LIKE on what
+     * the user typed misses most of them. When the term is mostly digits we
+     * strip the punctuation out of the column too and compare digits to digits,
+     * ignoring a leading 0 or 44 on either side.
+     */
+    public function scopeSearch(Builder $query, ?string $term): void
+    {
+        $term = trim((string) $term);
+        if ($term === '') {
+            return;
+        }
+
+        $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $term).'%';
+        $digits = preg_replace('/\D+/', '', $term);
+
+        $query->where(function (Builder $q) use ($like, $digits) {
+            foreach (self::SEARCHABLE as $column) {
+                $q->orWhere('customers.'.$column, 'like', $like);
+            }
+
+            foreach (self::SEARCHABLE_PHONES as $column) {
+                $q->orWhere('customers.'.$column, 'like', $like);
+            }
+
+            // Four or more digits, otherwise "07" would match half the database.
+            if (strlen((string) $digits) >= 4) {
+                $needle = self::nationalPhoneDigits($digits);
+
+                foreach (self::SEARCHABLE_PHONES as $column) {
+                    $stripped = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(customers.$column, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')";
+                    $q->orWhereRaw("$stripped LIKE ?", ['%'.$needle])
+                        ->orWhereRaw("$stripped LIKE ?", [$needle.'%']);
+                }
+            }
+        });
+    }
+
+    /**
+     * Drops a UK country code or trunk prefix so 447700900123, 07700900123 and
+     * 7700900123 all reduce to the same needle.
+     */
+    protected static function nationalPhoneDigits(string $digits): string
+    {
+        if (str_starts_with($digits, '44')) {
+            return substr($digits, 2);
+        }
+        if (str_starts_with($digits, '0')) {
+            return ltrim($digits, '0');
+        }
+
+        return $digits;
+    }
+
     public function assignTo(array $userIds, int $assignedBy, ?string $notes = null): void
     {
         $syncData = [];

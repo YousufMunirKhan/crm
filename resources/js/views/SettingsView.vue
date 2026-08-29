@@ -893,7 +893,7 @@
                         </template>
 
                         <div class="rounded-card border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 space-y-2 mb-6">
-                            <h3 class="font-medium text-slate-800">Google Cloud Console</h3>
+                            <h3 class="subsection-title">Google Cloud Console</h3>
                             <ul class="list-disc list-inside space-y-1 text-slate-600">
                                 <li>Create a project, enable billing, then enable <strong>Geocoding API</strong> and <strong>Places API (New)</strong>. The legacy <strong>Places API</strong> (old) is <em>not</em> enough — Cold calling uses <code class="text-xs bg-white px-1 rounded">places.googleapis.com</code> (SearchNearby, Text Search, Place Details).</li>
                                 <li>Credentials → your API key → <strong>API restrictions</strong> must include <strong>Places API (New)</strong> and <strong>Geocoding API</strong> (or “Don’t restrict key” while testing). If SearchNearby returns <code class="text-xs bg-white px-1 rounded">API_KEY_SERVICE_BLOCKED</code>, the new Places API is missing from that list.</li>

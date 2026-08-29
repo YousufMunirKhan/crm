@@ -84,7 +84,7 @@
                         <BaseCard
                             class="lg:col-span-2"
                             title="Where the business stands"
-                            subtitle="Sales are counted when product lines are won in the selected period."
+                            subtitle="Revenue counts each sale once. A deal that was won and then invoiced is not counted twice."
                         >
                             <template #actions>
                                 <span class="text-xs font-medium text-slate-500">{{ periodLabel }}</span>
@@ -683,20 +683,71 @@ const pipelineTotals = computed(() => allEmployeesPipeline.value.reduce((totals,
 
 const todayFollowUpCount = computed(() => todaysFollowUps.value.reduce((sum, group) => sum + Number(group.count || 0), 0));
 
+/**
+ * Headline figures.
+ *
+ * "Sales Revenue" and "Billed Revenue" used to sit here as equals, which left
+ * nobody able to say which one was the revenue. There is now one Revenue -
+ * every sale counted once, invoiced where an invoice exists and won-deal value
+ * where it does not - with the billed share as a caption underneath. A falling
+ * billed share is a real problem and was invisible when the two were siblings.
+ *
+ * "Pipeline Value" was removed outright: it summed every lead in the period
+ * including the lost ones. Open pipeline, which excludes won and lost, is the
+ * only honest pipeline number and lives in the operating cards below.
+ */
+const billedShare = computed(() => {
+    const total = revenueTotals.value.total;
+    if (!total) return 0;
+    return Math.round((revenueTotals.value.billed / total) * 100);
+});
+
 const summaryCards = computed(() => [
-    { label: 'Sales Revenue', value: `GBP ${formatNumber(revenueTotals.value.sales)}`, help: 'Won product lines' },
-    { label: 'Billed Revenue', value: `GBP ${formatNumber(revenueTotals.value.billed)}`, help: 'Invoices in period' },
-    { label: 'Won Products', value: pipelineTotals.value.won_products, help: 'Closed product lines' },
-    { label: 'Appointments', value: pipelineTotals.value.appointments, help: 'Booked activities' },
-    { label: 'Pipeline Value', value: `GBP ${formatNumber(pipelineTotals.value.value)}`, help: 'Open and closed lead value' },
-    { label: 'Due Today', value: todayFollowUpCount.value, help: 'Follow-ups to handle' },
+    {
+        label: 'Revenue',
+        value: `GBP ${formatNumber(revenueTotals.value.total)}`,
+        help: revenueTotals.value.total
+            ? `of which billed GBP ${formatNumber(revenueTotals.value.billed)} (${billedShare.value}%)`
+            : 'Every sale counted once - invoiced, or won deal value',
+    },
+    {
+        label: 'Products won',
+        value: pipelineTotals.value.won_products,
+        help: 'Product lines closed as won. Counts lines, not deals',
+    },
+    {
+        label: 'Appointments',
+        value: pipelineTotals.value.appointments,
+        help: 'Appointments booked or handled in this period',
+    },
+    {
+        label: 'Due today',
+        value: todayFollowUpCount.value,
+        help: 'Follow-ups still to handle today',
+    },
 ]);
 
 const operatingCards = computed(() => [
-    { label: 'New opportunities', value: executiveData.value.followups_count || 0, help: 'Leads created in period' },
-    { label: 'Conversion', value: `${executiveData.value.conversion_rate || 0}%`, help: 'Won deals against new leads' },
-    { label: 'Open pipeline', value: `GBP ${formatNumber(executiveData.value.pipeline_value || 0)}`, help: 'Not won or lost yet' },
-    { label: 'Tickets open', value: executiveData.value.tickets?.open || 0, help: 'Support items still active' },
+    {
+        label: 'New opportunities',
+        value: executiveData.value.followups_count || 0,
+        help: 'Leads created in this period',
+    },
+    {
+        label: 'Conversion',
+        value: `${executiveData.value.conversion_rate || 0}%`,
+        help: 'Of the leads created here, the share since won',
+    },
+    {
+        label: 'Open pipeline',
+        value: `GBP ${formatNumber(executiveData.value.pipeline_value || 0)}`,
+        help: 'Deals still live - not won, not lost',
+    },
+    {
+        label: 'Tickets open',
+        value: executiveData.value.tickets?.open || 0,
+        help: 'Support items still active',
+    },
 ]);
 
 const stageRows = computed(() => {
@@ -706,8 +757,8 @@ const stageRows = computed(() => {
         { key: 'hot_lead', label: 'Hot Lead', count: pipelineTotals.value.hot_lead },
         { key: 'appointment', label: 'Appointment', count: pipelineTotals.value.appointments },
         { key: 'quotation', label: 'Quotation', count: pipelineTotals.value.quotation },
-        { key: 'won', label: 'Won', count: pipelineTotals.value.won },
-        { key: 'lost', label: 'Lost', count: pipelineTotals.value.lost },
+        { key: 'won', label: 'Deals won', count: pipelineTotals.value.won },
+        { key: 'lost', label: 'Deals lost', count: pipelineTotals.value.lost },
     ];
     const max = Math.max(...raw.map((stage) => Number(stage.count || 0)), 1);
     return raw.map((stage) => ({

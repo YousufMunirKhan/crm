@@ -78,7 +78,7 @@
                     type="file"
                     multiple
                     accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                    class="block w-full rounded-control text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-control file:border-0 file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                    class="form-file"
                     @change="onAttachmentFilesSelected"
                 />
                 <ul v-if="pendingAttachmentFiles.length" class="mt-2 space-y-1 text-xs text-slate-600">

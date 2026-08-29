@@ -25,7 +25,7 @@
                     type="file"
                     accept=".html,.htm,.txt,text/html"
                     required
-                    class="block w-full rounded-control text-sm text-slate-600 file:mr-3 file:rounded-control file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                    class="form-file"
                     @change="onFile"
                 />
             </div>

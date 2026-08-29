@@ -1,6 +1,6 @@
 <template>
-    <div class="w-full min-w-0 max-w-7xl mx-auto p-3 sm:p-4 lg:p-6">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 min-w-0">
+    <div class="page">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
             <div class="flex items-center gap-3 lg:gap-4 min-w-0">
                 <BaseButton
                     variant="ghost"
@@ -13,7 +13,6 @@
                         <ArrowLeftIcon class="icon" aria-hidden="true" />
                     </template>
                 </BaseButton>
-                <h1 class="text-xl lg:text-2xl font-bold text-slate-900 break-words">Employee Details</h1>
             </div>
             <BaseButton
                 v-if="employee"
@@ -154,7 +153,7 @@
                             id="employeedetailview-document-file"
                             ref="fileInput"
                             type="file"
-                            class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded-control"
+                            class="form-file"
                         />
                     </div>
                     <BaseButton

@@ -45,7 +45,7 @@
             </div>
 
             <div class="callout callout-info">
-                <h3 class="mb-2 text-sm font-semibold">Expected Format:</h3>
+                <h3 class="subsection-title">Expected format</h3>
                 <ul class="list-inside list-disc space-y-1 text-xs">
                     <li>First row: headers. Name and Phone are required. Optional: contact_person_2_name, contact_person_2_phone, email, address, city, postcode, vat_number, business_name, owner_name, whatsapp_number, sms_number, notes, source, remote_1_anydesk_rustdesk, remote_1_passwords, remote_1_epos_type, remote_1_lic_days (and remote_2_*, remote_3_* for multiple Remote &amp; License entries), birthday, category.</li>
                     <li>Template includes one column per product in your DB — use numeric value for quantity purchased, or Y/Yes for prospect.</li>

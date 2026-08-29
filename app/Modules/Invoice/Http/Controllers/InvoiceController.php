@@ -58,13 +58,13 @@ class InvoiceController extends Controller
             $query->where('invoice_date', '<=', $request->to_date);
         }
 
-        if ($request->has('search')) {
-            $search = $request->search;
+        // Searched the customer's contact name only, so an invoice could not be
+        // found by the company it was actually billed to.
+        if ($request->filled('search')) {
+            $search = trim($request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('invoice_number', 'like', "%{$search}%")
-                  ->orWhereHas('customer', function ($subQuery) use ($search) {
-                      $subQuery->where('name', 'like', "%{$search}%");
-                  });
+                    ->orWhereHas('customer', fn ($c) => $c->search($search));
             });
         }
 

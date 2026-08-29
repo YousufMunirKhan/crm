@@ -1,21 +1,21 @@
 <template>
-    <div class="listing-shell-outer w-full min-w-0 max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+    <div class="listing-shell-outer w-full min-w-0 max-w-7xl mx-auto">
         <div class="rounded-panel bg-white shadow-card border border-slate-200/90 overflow-hidden">
+            <!--
+                The page title is NOT rendered here. It lives once, in the
+                AppLayout top bar, so a screen never states its own name twice.
+                This header carries only what is specific to the listing:
+                an optional count, a lead-in line, and the page actions.
+                It collapses entirely when a page supplies none of them.
+            -->
             <header
-                class="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between border-b border-slate-100"
+                v-if="subtitle || hasBadge || $slots.actions"
+                class="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
             >
-                <div class="min-w-0 flex-1 space-y-1.5">
-                    <div class="flex flex-wrap items-center gap-3 gap-y-2">
-                        <h1 class="text-page-title text-slate-900">
-                            {{ title }}
-                        </h1>
-                        <span
-                            v-if="badge !== null && badge !== undefined && badge !== ''"
-                            class="badge badge-primary"
-                        >
-                            {{ badge }}
-                        </span>
-                    </div>
+                <div class="min-w-0 flex-1 space-y-2">
+                    <span v-if="hasBadge" class="badge badge-primary">
+                        {{ badge }}
+                    </span>
                     <p
                         v-if="subtitle"
                         class="text-sm text-slate-500 leading-relaxed max-w-3xl"
@@ -33,7 +33,7 @@
 
             <div
                 v-if="$slots.filters"
-                class="px-4 sm:px-6 py-4 sm:py-5 bg-gradient-to-b from-slate-50/95 to-slate-50/70 border-b border-slate-100/90"
+                class="px-4 sm:px-6 py-4 sm:py-5 bg-surface-muted border-y border-slate-100"
             >
                 <div class="w-full min-w-0 max-w-full">
                     <slot name="filters" />
@@ -56,7 +56,14 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue';
+
+const props = defineProps({
+    /**
+     * Retained so every existing call site keeps working and so the value
+     * stays available to callers/tests, but no longer rendered - see the
+     * comment in the template above.
+     */
     title: {
         type: String,
         required: true,
@@ -71,4 +78,8 @@ defineProps({
         default: null,
     },
 });
+
+const hasBadge = computed(
+    () => props.badge !== null && props.badge !== undefined && props.badge !== '',
+);
 </script>

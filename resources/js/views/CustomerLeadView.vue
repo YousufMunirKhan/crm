@@ -21,12 +21,12 @@
         </header>
 
         <!-- Main Content -->
-        <div class="max-w-[1600px] mx-auto px-3 sm:px-5 py-4 sm:py-5 w-full min-w-0">
+        <div class="page">
             <!-- Deal header (pipeline-style) -->
-            <BaseCard v-if="customer" class="mb-4">
+            <BaseCard v-if="customer">
                 <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                     <div class="min-w-0 flex-1">
-                        <h1 class="text-page-title text-slate-900 break-words">{{ customer.name }}</h1>
+                        <h2 class="text-page-title text-slate-900 break-words">{{ customer.name }}</h2>
                         <p v-if="customer.business_name" class="text-sm text-slate-500 mt-0.5">{{ customer.business_name }}</p>
                         <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm">
                             <a v-if="customer.phone" :href="'tel:' + customer.phone" class="link">{{ customer.phone }}</a>
@@ -48,14 +48,14 @@
                         </div>
                         <div class="flex flex-wrap gap-2">
                             <BaseButton
-                                variant="success"
+                                variant="soft-success"
                                 :disabled="stageUpdating || activeLead.stage === 'won'"
                                 @click="submitMarkLeadWon"
                             >
                                 Won
                             </BaseButton>
                             <BaseButton
-                                variant="danger"
+                                variant="soft-danger"
                                 :disabled="stageUpdating || activeLead.stage === 'lost'"
                                 @click="showLostLeadModal = true; lostReasonInput = ''"
                             >
@@ -97,7 +97,7 @@
             </BaseCard>
 
             <!-- Full-width on desktop: avoids 3-column grid inside a narrow sidebar -->
-            <BaseCard v-if="customer" :title="`${customerTypeLabel} details`" class="mb-4 lg:mb-5 w-full min-w-0">
+            <BaseCard v-if="customer" :title="`${customerTypeLabel} details`" class="w-full min-w-0">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-5 [word-break:break-word]">
                     <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.name || '—' }}</div></div>
                     <div class="min-w-0"><span class="text-eyebrow text-slate-500 uppercase block">Business name</span><div class="font-medium text-slate-900 mt-0.5 break-words">{{ customer.business_name || '—' }}</div></div>
@@ -421,14 +421,14 @@
                                     </div>
                                     <div v-if="item.status === 'pending'" class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
                                         <BaseButton
-                                            variant="success"
+                                            variant="soft-success"
                                             :label="`Mark ${item.product?.name || 'product'} as won`"
                                             @click="openCloseItemModal(leadRow, item, 'won')"
                                         >
                                             Won
                                         </BaseButton>
                                         <BaseButton
-                                            variant="danger"
+                                            variant="soft-danger"
                                             :label="`Mark ${item.product?.name || 'product'} as lost`"
                                             @click="openCloseItemModal(leadRow, item, 'lost')"
                                         >

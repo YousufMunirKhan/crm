@@ -1,5 +1,5 @@
 <template>
-    <div class="max-w-3xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+    <div class="page-narrow">
         <div class="flex items-center gap-2 sm:gap-3 min-w-0">
             <BaseButton
                 size="icon"
@@ -10,7 +10,6 @@
             >
                 <ArrowLeftIcon class="icon" aria-hidden="true" />
             </BaseButton>
-            <h1 class="text-lg sm:text-xl font-bold text-slate-900 truncate">Appointment Details</h1>
         </div>
 
         <div

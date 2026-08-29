@@ -36,6 +36,21 @@ class TicketController extends Controller
             });
         }
 
+        // Tickets had no search at all.
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('tickets.subject', 'like', "%{$search}%")
+                    ->orWhere('tickets.description', 'like', "%{$search}%")
+                    ->orWhereHas('customer', fn ($c) => $c->search($search));
+
+                $reference = ltrim($search, '#');
+                if (ctype_digit($reference)) {
+                    $q->orWhere('tickets.id', (int) $reference);
+                }
+            });
+        }
+
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }

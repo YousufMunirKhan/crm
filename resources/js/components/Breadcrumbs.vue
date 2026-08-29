@@ -5,13 +5,13 @@
                 <ChevronRightIcon v-if="i > 0" class="w-3 h-3 text-slate-500 shrink-0" aria-hidden="true" />
 
                 <router-link
-                    v-if="crumb.to && i < crumbs.length - 1"
+                    v-if="crumb.to"
                     :to="crumb.to"
                     class="truncate hover:text-primary-700 hover:underline"
                 >
                     {{ crumb.label }}
                 </router-link>
-                <span v-else class="truncate text-slate-700 font-medium" aria-current="page">
+                <span v-else class="truncate">
                     {{ crumb.label }}
                 </span>
             </li>
@@ -22,7 +22,6 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { resolveRouteTitle } from '@/composables/usePageTitle';
 import { ChevronRightIcon } from '@heroicons/vue/24/outline';
 
 const route = useRoute();
@@ -75,8 +74,10 @@ const crumbs = computed(() => {
         }
     }
 
-    trail.push({ label: resolveRouteTitle(route), to: null });
-
+    // The current page is deliberately NOT appended. The <h1> immediately
+    // below this trail already names it; repeating it here was the third
+    // copy of the same words on every screen. This leaves a pure ancestor
+    // trail, which also makes the parent list a working back-link.
     return trail;
 });
 

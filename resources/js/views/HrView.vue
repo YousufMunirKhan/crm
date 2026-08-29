@@ -305,7 +305,7 @@
                             />
                         </div>
                         <BaseButton
-                            variant="danger"
+                            variant="ghost-danger"
                             size="icon"
                             :label="`Remove bonus ${index + 1}`"
                             @click="removeBonus(index)"
@@ -353,7 +353,7 @@
                             />
                         </div>
                         <BaseButton
-                            variant="danger"
+                            variant="ghost-danger"
                             size="icon"
                             :label="`Remove deduction ${index + 1}`"
                             @click="removeDeduction(index)"
