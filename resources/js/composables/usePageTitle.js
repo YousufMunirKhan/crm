@@ -21,7 +21,9 @@ export function resolveRouteTitle(route) {
         case 'customer-edit':
             return isProspect ? 'Edit prospect' : 'Edit customer';
         default:
-            return route.meta.title || 'Dashboard';
+            // Only the dashboard itself falls back to "Dashboard"; an
+            // untitled route should not borrow its name.
+            return route.meta.title || (route.name === 'dashboard' ? 'Dashboard' : '');
     }
 }
 
