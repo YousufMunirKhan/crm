@@ -22,3 +22,9 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Filament publishes these on `filament:assets`, which runs in the
+# post-autoload-dump hook. ~4MB of regenerable build output.
+/public/css/filament
+/public/js/filament
+/public/fonts/filament
