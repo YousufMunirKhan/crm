@@ -87,22 +87,27 @@ class ClaudeContactExtractionService
                     'anthropic-version' => '2023-06-01',
                     'content-type' => 'application/json',
                 ])
+                // No `temperature`: newer models reject it outright with a 400,
+                // and it was only ever set to 0 for determinism the prompt
+                // already enforces.
                 ->post('https://api.anthropic.com/v1/messages', [
                     'model' => $this->model(),
                     'max_tokens' => (int) config('anthropic.max_tokens', 512),
-                    'temperature' => 0,
                     'messages' => [
                         ['role' => 'user', 'content' => $userMessage],
                     ],
                 ]);
         } catch (\Throwable $e) {
-            Log::warning('Claude contact extraction HTTP failed', ['message' => $e->getMessage()]);
+            Log::error('Claude contact extraction HTTP failed', ['message' => $e->getMessage()]);
 
             return ['email' => null, 'phone' => null];
         }
 
         if (! $response->successful()) {
-            Log::warning('Claude API error', [
+            // Logged at error level on purpose. This failed at warning level
+            // for months - a retired model id returning 404 on every call -
+            // and nothing surfaced it because production logs at error.
+            Log::error('Claude API error', [
                 'status' => $response->status(),
                 'body' => Str::limit($response->body(), 500),
             ]);
