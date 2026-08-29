@@ -1,169 +1,74 @@
-# Switch & Save CRM - Module Implementation Status
+# Switch & Save CRM — Module Status
 
-## ✅ **COMPLETED MODULES**
+Verified against the code, not from memory. Last reviewed: 2026-08-29.
 
-### 1️⃣ Authentication & User Management Module ✅
-- ✅ Login / Logout
-- ✅ Persistent login session (Sanctum tokens)
-- ✅ Remember me functionality
-- ✅ Role-based access control (7 roles: Admin, Manager, Sales, CallAgent, Support, HR, Customer)
-- ✅ Default admin user (admin@switchsave.com / Admin@123)
-- ⚠️ Forgot/Reset password (structure ready, needs email config)
-- ⚠️ Profile management (needs UI)
+> The previous version of this file was wrong in both directions — it listed
+> shipped modules as "not implemented" and unimplemented ones as complete.
+> Anything below marked ✅ has been checked in the source or is covered by a test.
 
-### 2️⃣ Dashboard Module ✅
-- ✅ Total followups count
-- ✅ Conversion rate
-- ✅ Pipeline value
-- ✅ Revenue summary
-- ✅ Ticket summary
-- ✅ Recent leads
-- ✅ Open tickets
-- ⚠️ Filters (backend ready, needs UI enhancement)
+## Architecture
 
-### 3️⃣ CRM Lead Management Module ✅
-- ✅ Pipeline stages (Follow Up → Lead → Hot Lead → Quotation → Won → Lost)
-- ✅ Create followup
-- ✅ Convert stages
-- ✅ Assign agent
-- ✅ Lead value tracking
-- ✅ Notes (activities)
-- ✅ Reminders
-- ✅ Stage change history
-- ✅ Lost reason tracking
-- ✅ Lead source tracking (floor/callcenter/web)
-- ✅ Pipeline board view
+| Surface | Stack | Path |
+|---|---|---|
+| Field / sales | Vue 3 SPA (installable PWA) | `/` |
+| Back office | Filament 4 | `/admin` |
+| Integrations | Laravel API (Sanctum) | `/api` |
 
-### 4️⃣ Customer Management Module ✅
-- ✅ Customer profile
-- ✅ Contact details
-- ✅ Address, Postcode, City
-- ✅ VAT number
-- ✅ Notes
-- ✅ Purchase history (via invoices)
-- ✅ Communication history
-- ✅ Geo location (lat/lng)
-
-### 5️⃣ Communication Engine Module ✅
-- ✅ WhatsApp channel (Meta API ready structure)
-- ✅ Email channel (SMTP ready)
-- ✅ SMS channel (provider ready)
-- ✅ Send from customer page
-- ✅ Message timeline
-- ✅ Delivery status
-- ✅ Webhook handlers
-- ⚠️ Message templates (needs implementation)
-- ⚠️ Reply tracking (structure ready)
-
-### 6️⃣ Ticket / Support Module ✅
-- ✅ Customer ticket submission
-- ✅ POS generated tickets
-- ✅ Assign to agent
-- ✅ Priority levels
-- ✅ Status tracking
-- ✅ SLA tracking
-- ✅ Internal chat/messages
-- ✅ Ticket timeline
-
-### 7️⃣ Invoice & Sales Module ✅
-- ✅ Create invoice
-- ✅ Invoice items
-- ✅ GBP currency
-- ✅ UK VAT calculation (20%)
-- ✅ PDF generation (service ready)
-- ✅ Payment status
-- ✅ Outstanding tracking
-- ✅ Customer invoice history
-
-### 8️⃣ HR Management Module ✅
-- ✅ Check in/out
-- ✅ Work hours calculation
-- ✅ Attendance logs
-- ✅ Payroll
-- ✅ Deductions
-- ✅ Monthly salary records
-
-### 9️⃣ POS Integration Module ✅
-- ✅ POST /api/pos/customer
-- ✅ POST /api/pos/ticket
-- ✅ POST /api/pos/sale
-- ✅ Auto create tickets
-- ⚠️ API authentication (needs API key middleware)
-
-### 🔟 Reporting & Analytics Module ✅
-- ✅ Executive dashboard
-- ✅ Funnel report
-- ✅ Geo map analytics (backend ready)
-- ✅ Communication analytics
-- ✅ Agent performance
-- ✅ All filters (date, agent, city, postcode, source)
+Both surfaces share one `manifest.json` with `scope: "/"`, so a single
+home-screen install covers them.
 
 ---
 
-## ⚠️ **PARTIALLY COMPLETE MODULES**
+## ✅ Complete
 
-### 1️⃣1️⃣ Import / Export Module ⚠️
-**Status:** Structure ready, needs full implementation
+| Module | Notes |
+|---|---|
+| Authentication & roles | Sanctum tokens for the API, session auth for the panel. Password reset works end to end (the notification previously threw `RouteNotFoundException` — there was no `password.reset` route). |
+| Authorisation | 16 policies in `app/Policies`, registered explicitly and covered by `PolicyEnforcementTest`. Route middleware for roles, staff/portal separation and nav sections. |
+| CRM — leads & customers | Pipeline stages, assignment, activities, follow-ups, soft deletes with cascade to activities and line items. |
+| Product catalogue | Name, SKU, sale price, cost price, tax rate, currency, unit, image. Cross-sell/upsell links are writable (they previously had a read path only). |
+| Invoicing | Payments ledger is the single source of truth for `amount_paid`. Race-free numbering. VAT rate from Settings. **Lead → invoice conversion** carries line items and product links. |
+| Tickets & POS support | Priorities, messages, attachments, assignees. |
+| HR | Attendance, salaries, expenses, targets, documents. |
+| Commission | Allocation workspace, monthly reports, PDFs. Grouped on product id rather than name. |
+| Communications | Email / SMS / WhatsApp send, templates, WhatsApp Cloud API with required signature verification. |
+| Consent & suppression | `contact_consents` covers email, SMS and WhatsApp. STOP keyword handling, tokenised unsubscribe, `List-Unsubscribe` headers, GDPR export/erase command. |
+| Reporting | Executive, funnel, geo, communications, agents, targets. Revenue is de-duplicated across won leads and invoices. Product performance report with margin. |
+| Import / export | CSV / XLSX via maatwebsite/excel 4, covered by `ExportAndPdfTest`. |
+| Settings | Company, branding, SMTP, SMS, WhatsApp, Facebook, cold calling, PWA. |
+| Back-office panel | 15 Filament resources across 5 navigation groups, 7 relation managers. |
 
-**What's Missing:**
-- Import controller with CSV/XLSX upload
-- Column mapping UI
-- Validation preview
-- Duplicate detection logic
-- Import logs table
-- Export functionality for reports
+## ⚠️ Partial
 
-### 1️⃣2️⃣ Notification Module ⚠️
-**Status:** Events structure ready, needs WebSocket setup
+| Module | What's missing |
+|---|---|
+| Notifications | Table, endpoints and events exist; **no producers write to it**. Build or remove. |
+| Customer portal | Backend complete (`CustomerPortalController`); no frontend. |
+| Import / export UI | Backend and API complete; the SPA has no screen for it. |
+| WhatsApp inbox | Conversations are stored and retrievable by API; no UI reads them. |
+| Marketing | Bulk send, filters, templates and open tracking work. No campaign object, scheduling, click tracking or saved segments. |
+| SLA | Due dates are computed and displayed; no breach detection or escalation. |
+| Geo analytics | Backend is fast and correct; no map in the UI. |
 
-**What's Missing:**
-- Event classes (NewLeadAssigned, NewTicketCreated, etc.)
-- WebSocket broadcasting setup
-- Frontend Echo integration
-- Notification UI component
-- Notification store (Pinia)
+## ❌ Not implemented
 
-### 1️⃣3️⃣ Customer Portal Module ⚠️
-**Status:** Not implemented
-
-**What's Missing:**
-- Separate customer portal routes
-- Customer portal layout
-- Customer login (separate from admin)
-- Customer views (tickets, invoices, profile)
-- Customer-specific API endpoints
-
-### 1️⃣4️⃣ System Settings Module ❌
-**Status:** Not implemented
-
-**What's Missing:**
-- Settings model and migration
-- Settings controller
-- Settings UI
-- SMTP configuration
-- WhatsApp API configuration
-- SMS provider configuration
-- VAT rates management
-- Company settings
+- Public lead capture (no unauthenticated lead endpoint)
+- UTM / referrer attribution columns
+- A/B testing, lead scoring
+- Bounce and complaint webhook processing
+- Multi-currency on invoices (`currency` is a single-value enum)
 
 ---
 
-## 📋 **NEXT STEPS TO COMPLETE**
+## Testing
 
-1. **Import/Export Module** - Full implementation
-2. **Notification Module** - WebSocket events and frontend
-3. **Customer Portal** - Separate portal with customer login
-4. **System Settings** - Complete settings management
-5. **Profile Management** - User profile edit UI
-6. **Password Reset** - Email configuration and flow
+```bash
+php artisan test
+```
 
----
+Covers suppression and consent, revenue de-duplication, lead → invoice
+conversion, invoice overdue transitions, export/PDF rendering, Filament panel
+access, every resource page, relation managers, and policy enforcement.
 
-## 🎯 **PRIORITY ORDER**
-
-1. System Settings (needed for email/SMS/WhatsApp config)
-2. Import/Export (high business value)
-3. Customer Portal (customer-facing feature)
-4. Notifications (enhancement)
-5. Profile Management (user experience)
-
+CI runs tests, the frontend build and a PHP lint sweep on every push
+(`.github/workflows/ci.yml`).

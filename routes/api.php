@@ -21,16 +21,20 @@ use App\Modules\Ticket\Http\Controllers\TicketController;
 use Illuminate\Support\Facades\Route;
 
 // Public routes
-Route::post('/auth/login', [AuthController::class, 'login']);
-Route::post('/auth/forgot-password', [\App\Http\Controllers\Auth\PasswordResetController::class, 'forgotPassword']);
-Route::post('/auth/reset-password', [\App\Http\Controllers\Auth\PasswordResetController::class, 'resetPassword']);
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+Route::post('/auth/forgot-password', [\App\Http\Controllers\Auth\PasswordResetController::class, 'forgotPassword'])->middleware('throttle:5,10');
+Route::post('/auth/reset-password', [\App\Http\Controllers\Auth\PasswordResetController::class, 'resetPassword'])->middleware('throttle:5,10');
 
 // Customer Portal (public)
-Route::post('/portal/login', [\App\Http\Controllers\CustomerPortalController::class, 'login']);
+Route::post('/portal/login', [\App\Http\Controllers\CustomerPortalController::class, 'login'])->middleware('throttle:5,1');
 
 // Legacy WhatsApp webhook endpoint removed. Use /api/whatsapp/webhook only.
-Route::post('/webhooks/email', [WebhookController::class, 'email']);
-Route::post('/webhooks/sms', [WebhookController::class, 'sms']);
+Route::middleware('webhook.key')->group(function () {
+    // Bounces and complaints. Permanent failures auto-suppress.
+    Route::post('/webhooks/delivery', [\App\Http\Controllers\DeliveryWebhookController::class, 'handle']);
+    Route::post('/webhooks/email', [WebhookController::class, 'email']);
+    Route::post('/webhooks/sms', [WebhookController::class, 'sms']);
+});
 
 // WhatsApp Cloud API Webhook (public - Meta calls this)
 Route::get('/whatsapp/webhook', [\App\Modules\Communication\Http\Controllers\WhatsAppWebhookController::class, 'verify']);
@@ -40,15 +44,26 @@ Route::post('/whatsapp/webhook', [\App\Modules\Communication\Http\Controllers\Wh
 Route::get('/settings/pwa', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'pwa']);
 Route::get('/settings/public', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'publicSettings']);
 
+// Public lead capture for website forms and ad landing pages.
+// Throttled; the controller also carries a honeypot field.
+Route::post('/public/leads', [\App\Http\Controllers\PublicLeadCaptureController::class, 'store'])
+    ->middleware('throttle:20,1')
+    ->name('public.leads.store');
+
 // Unsubscribe from marketing emails (public - no auth required)
-Route::post('/unsubscribe', [\App\Http\Controllers\UnsubscribeController::class, 'store']);
-Route::get('/unsubscribe/check', [\App\Http\Controllers\UnsubscribeController::class, 'show']);
+Route::post('/unsubscribe', [\App\Http\Controllers\UnsubscribeController::class, 'store'])->middleware('throttle:20,1');
+Route::get('/unsubscribe/check', [\App\Http\Controllers\UnsubscribeController::class, 'show'])->middleware('throttle:60,1');
+// RFC 8058 one-click target referenced by the List-Unsubscribe-Post header.
+Route::post('/unsubscribe/one-click/{channel}/{token}', [\App\Http\Controllers\UnsubscribeController::class, 'oneClick'])
+    ->middleware('throttle:60,1')
+    ->name('unsubscribe.one-click');
 
 // Public Expense Template Download
 Route::get('/hr/expenses/template/download', [\App\Modules\HR\Http\Controllers\ExpenseController::class, 'downloadTemplate']);
 
-// POS Integration API (public, but should have API key authentication in production)
-Route::prefix('pos')->group(function () {
+// POS Integration API - shared key in X-Api-Key (see config/pos.php).
+// These endpoints create and update customers, tickets and invoices.
+Route::prefix('pos')->middleware(['pos.key', 'throttle:120,1'])->group(function () {
     Route::post('/customer', [PosController::class, 'storeCustomer']);
     Route::post('/ticket', [PosController::class, 'storeTicket']);
     Route::post('/sale', [PosController::class, 'storeSale']);
@@ -61,7 +76,7 @@ Route::middleware('pos.support.key')->group(function () {
 });
 
 // Protected routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     // Auth
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
@@ -110,9 +125,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/products/categories', [ProductController::class, 'categories']);
     Route::apiResource('products', ProductController::class);
     Route::get('/products/{id}/suggested', [ProductController::class, 'getSuggestedProducts']);
+    Route::get('/products/{id}/relationships', [ProductController::class, 'relationships']);
+    Route::post('/products/{id}/relationships', [ProductController::class, 'storeRelationship'])
+        ->middleware('role:Admin,Manager,System Admin');
+    Route::delete('/products/{id}/relationships/{toProductId}', [ProductController::class, 'destroyRelationship'])
+        ->middleware('role:Admin,Manager,System Admin');
     Route::get('/leads/pipeline/board', [LeadController::class, 'pipeline']);
     Route::get('/appointments/today-count', [\App\Modules\CRM\Http\Controllers\AppointmentController::class, 'todayCount']);
     Route::get('/appointments', [\App\Modules\CRM\Http\Controllers\AppointmentController::class, 'index']);
+    Route::post('/appointments', [\App\Modules\CRM\Http\Controllers\AppointmentController::class, 'store']);
+    Route::delete('/appointments/{id}', [\App\Modules\CRM\Http\Controllers\AppointmentController::class, 'destroy']);
     Route::get('/appointments/{id}', [\App\Modules\CRM\Http\Controllers\AppointmentController::class, 'show']);
     Route::put('/appointments/{id}', [\App\Modules\CRM\Http\Controllers\AppointmentController::class, 'update']);
     Route::post('/leads/{id}/activity', [LeadController::class, 'addActivity']);
@@ -128,7 +150,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/followups', [FollowUpController::class, 'index']);
 
     // Communications
-    Route::apiResource('communications', CommunicationController::class);
+    Route::apiResource('communications', CommunicationController::class)->only(['index', 'store', 'show']);
 
     // WhatsApp Cloud API (New Integration)
     Route::prefix('whatsapp')->group(function () {
@@ -167,9 +189,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Invoices
     Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'generatePDF'])->name('invoices.pdf');
-    Route::post('/invoices/{id}/send-email', [InvoiceController::class, 'sendEmail'])->name('invoices.send-email');
-    Route::post('/invoices/{id}/payments', [InvoiceController::class, 'storePayment'])->name('invoices.payments.store');
-    Route::delete('/invoices/{id}/payments/{paymentId}', [InvoiceController::class, 'destroyPayment'])->name('invoices.payments.destroy');
+    Route::post('/invoices/{id}/send-email', [InvoiceController::class, 'sendEmail'])->name('invoices.send-email')->middleware('role:Admin,Manager,System Admin');
+    Route::post('/invoices/{id}/payments', [InvoiceController::class, 'storePayment'])->name('invoices.payments.store')->middleware('role:Admin,Manager,System Admin');
+    Route::delete('/invoices/{id}/payments/{paymentId}', [InvoiceController::class, 'destroyPayment'])->name('invoices.payments.destroy')->middleware('role:Admin,Manager,System Admin');
+    Route::post('/leads/{leadId}/invoice', [InvoiceController::class, 'storeFromLead'])
+        ->middleware('role:Admin,Manager,System Admin')
+        ->name('leads.invoice');
     Route::apiResource('invoices', InvoiceController::class);
 
     // HR
@@ -221,15 +246,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reporting/revenue-by-employee', [ReportingController::class, 'revenueByEmployee']);
     Route::get('/reporting/team-location-status', [ReportingController::class, 'teamLocationStatus']);
     Route::get('/reporting/products-sold-by-employee', [ReportingController::class, 'productsSoldByEmployee']);
+    Route::get('/reporting/product-performance', [ReportingController::class, 'productPerformance'])
+        ->middleware('role:Admin,Manager,System Admin');
     Route::get('/reporting/employee-performance-overview', [ReportingController::class, 'employeePerformanceOverview']);
     Route::get('/reporting/target-vs-achievement', [ReportingController::class, 'targetVsAchievement']);
     Route::get('/reporting/employee-self-report', [ReportingController::class, 'employeeSelfReport']);
 
-    // Import/Export
-    Route::post('/import-export/preview', [ImportExportController::class, 'preview']);
-    Route::post('/import-export/import', [ImportExportController::class, 'import']);
-    Route::get('/import-export/export', [ImportExportController::class, 'export']);
-    Route::get('/import-export/logs', [ImportExportController::class, 'importLogs']);
+    // Import/Export - reads and writes the whole customer/lead database.
+    Route::middleware('role:Admin,Manager,System Admin')->group(function () {
+        Route::post('/import-export/preview', [ImportExportController::class, 'preview']);
+        Route::post('/import-export/import', [ImportExportController::class, 'import']);
+        Route::get('/import-export/export', [ImportExportController::class, 'export']);
+        Route::get('/import-export/logs', [ImportExportController::class, 'importLogs']);
+    });
 
     // Profile
     Route::get('/profile', [\App\Http\Controllers\ProfileController::class, 'show']);
@@ -238,23 +267,27 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Settings
     Route::get('/settings', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'index']);
-    Route::put('/settings', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'update']);
+    Route::put('/settings', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'update'])->middleware('role:Admin,System Admin');
     Route::get('/settings/{key}', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'get']);
-    Route::put('/settings/pwa', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updatePwa']);
+    Route::put('/settings/pwa', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updatePwa'])->middleware('role:Admin,System Admin');
 
     // Logo upload
-    Route::post('/settings/logo', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'uploadLogo']);
-    Route::delete('/settings/logo', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'deleteLogo']);
-    Route::post('/settings/favicon', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'uploadFavicon']);
-    Route::delete('/settings/favicon', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'deleteFavicon']);
+    Route::post('/settings/logo', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'uploadLogo'])->middleware('role:Admin,System Admin');
+    Route::delete('/settings/logo', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'deleteLogo'])->middleware('role:Admin,System Admin');
+    Route::post('/settings/favicon', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'uploadFavicon'])->middleware('role:Admin,System Admin');
+    Route::delete('/settings/favicon', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'deleteFavicon'])->middleware('role:Admin,System Admin');
 
     // Integration settings
-    Route::put('/settings/smtp', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateSmtp']);
-    Route::post('/settings/smtp/test', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'testSmtp']);
-    Route::put('/settings/sms', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateSms']);
-    Route::post('/settings/sms/test', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'testSms']);
-    Route::put('/settings/facebook', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateFacebook']);
-    Route::put('/settings/cold-calling', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateColdCalling']);
+    Route::put('/settings/smtp', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateSmtp'])->middleware('role:Admin,System Admin');
+    Route::post('/settings/smtp/test', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'testSmtp'])->middleware('role:Admin,System Admin');
+    Route::put('/settings/sms', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateSms'])->middleware('role:Admin,System Admin');
+    Route::post('/settings/sms/test', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'testSms'])->middleware('role:Admin,System Admin');
+    Route::put('/settings/facebook', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateFacebook'])->middleware('role:Admin,System Admin');
+    Route::put('/settings/cold-calling', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateColdCalling'])->middleware('role:Admin,System Admin');
+
+    // Saved audiences for campaign sends
+    Route::apiResource('audience-segments', \App\Http\Controllers\AudienceSegmentController::class)
+        ->middleware('role:Admin,Manager,System Admin,Marketing');
 
     // Email Management (filter, export, preview, send bulk, report)
     Route::prefix('email-management')->group(function () {
@@ -375,11 +408,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead']);
     Route::put('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
 
-    // Customer Portal (protected - uses customer tokens)
-    Route::prefix('portal')->middleware('auth:sanctum')->group(function () {
-        Route::get('/dashboard', [\App\Http\Controllers\CustomerPortalController::class, 'dashboard']);
-        Route::get('/tickets', [\App\Http\Controllers\CustomerPortalController::class, 'tickets']);
-        Route::get('/invoices', [\App\Http\Controllers\CustomerPortalController::class, 'invoices']);
-        Route::post('/tickets', [\App\Http\Controllers\CustomerPortalController::class, 'createTicket']);
-    });
+});
+
+// Customer Portal (customer tokens only - never staff tokens).
+Route::prefix('portal')->middleware(['auth:sanctum', 'portal.customer'])->group(function () {
+    Route::get('/dashboard', [\App\Http\Controllers\CustomerPortalController::class, 'dashboard']);
+    Route::get('/tickets', [\App\Http\Controllers\CustomerPortalController::class, 'tickets']);
+    Route::get('/invoices', [\App\Http\Controllers\CustomerPortalController::class, 'invoices']);
+    Route::post('/tickets', [\App\Http\Controllers\CustomerPortalController::class, 'createTicket']);
 });

@@ -50,8 +50,9 @@ class LeadDeleteAuthorizationTest extends TestCase
         Sanctum::actingAs($admin);
         $this->deleteJson("/api/leads/{$lead->id}")->assertNoContent();
 
-        $this->assertDatabaseMissing('leads', ['id' => $lead->id]);
-        $this->assertDatabaseMissing('lead_activities', ['lead_id' => $lead->id]);
+        // Leads are soft-deleted so commercial history survives; the row remains with deleted_at set.
+        $this->assertSoftDeleted('leads', ['id' => $lead->id]);
+        $this->assertSoftDeleted('lead_activities', ['lead_id' => $lead->id]);
     }
 
     public function test_system_admin_can_delete_lead(): void
@@ -61,7 +62,8 @@ class LeadDeleteAuthorizationTest extends TestCase
 
         Sanctum::actingAs($sys);
         $this->deleteJson("/api/leads/{$lead->id}")->assertNoContent();
-        $this->assertDatabaseMissing('leads', ['id' => $lead->id]);
+        // Leads are soft-deleted so commercial history survives; the row remains with deleted_at set.
+        $this->assertSoftDeleted('leads', ['id' => $lead->id]);
     }
 
     private function makeUser(string $roleName): User

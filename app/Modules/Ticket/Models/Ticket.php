@@ -39,6 +39,7 @@ class Ticket extends Model
 
     protected $casts = [
         'sla_due_at' => 'datetime',
+        'sla_breached_at' => 'datetime',
         'resolved_at' => 'datetime',
         'pos_submitted_at' => 'datetime',
         'pos_sent_at' => 'datetime',

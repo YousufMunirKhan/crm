@@ -65,8 +65,7 @@
         }
         .page {
             position: relative;
-            min-height: 297mm;
-            padding: 34px 34px 68px;
+            padding: 30px 34px 34px;
             overflow: hidden;
         }
         .top-shape {
@@ -131,7 +130,7 @@
         .customer-invoice-row {
             display: table;
             width: 100%;
-            margin-top: 72px;
+            margin-top: 54px;
         }
         .customer-block {
             display: table-cell;
@@ -220,7 +219,7 @@
         .totals-wrap {
             width: 42%;
             margin-left: auto;
-            margin-top: 38px;
+            margin-top: 24px;
         }
         .totals {
             width: 100%;
@@ -256,12 +255,12 @@
             font-weight: 700;
         }
         .payment-info {
-            margin-top: 42px;
+            margin-top: 26px;
             font-size: 13px;
         }
         .payment-communication {
             font-weight: 700;
-            margin-bottom: 24px;
+            margin-bottom: 18px;
         }
         .muted {
             color: #5f6472;
@@ -270,15 +269,13 @@
             margin-top: 5px;
         }
         .vat-block {
-            margin-top: 26px;
+            margin-top: 18px;
             font-weight: 700;
             color: #5f6472;
         }
         .footer {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 22px;
+            position: relative;
+            margin-top: 28px;
             text-align: center;
             z-index: 1;
             font-size: 13px;

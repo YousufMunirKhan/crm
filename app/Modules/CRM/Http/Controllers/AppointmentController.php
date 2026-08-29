@@ -127,6 +127,91 @@ class AppointmentController extends Controller
     /**
      * Update appointment: time (meta), status, outcome_notes; optionally set lead to won/lost.
      */
+    /**
+     * Books an appointment against a lead.
+     *
+     * Appointments could previously be listed, viewed and updated but never
+     * created or cancelled through the API - the only way one came into
+     * existence was as a side effect elsewhere.
+     */
+    public function store(Request $request)
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'lead_id' => ['required', 'integer', 'exists:leads,id'],
+            'appointment_date' => ['required', 'date'],
+            'appointment_time' => ['nullable', 'string', 'max:20'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'assigned_user_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $lead = Lead::with('customer')->findOrFail($data['lead_id']);
+
+        if (! $this->userCanTouchLead($user, $lead)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $activity = LeadActivity::create([
+            'lead_id' => $lead->id,
+            'user_id' => $user->id,
+            'assigned_user_id' => $data['assigned_user_id'] ?? $user->id,
+            'type' => 'appointment',
+            'description' => $data['description'] ?? 'Appointment',
+            'appointment_date' => $data['appointment_date'],
+            'appointment_time' => $data['appointment_time'] ?? null,
+            'appointment_status' => LeadActivity::APPOINTMENT_STATUS_PENDING,
+            // The list view still reads dates out of meta for legacy rows.
+            'meta' => [
+                'appointment_date' => $data['appointment_date'],
+                'appointment_time' => $data['appointment_time'] ?? null,
+            ],
+        ]);
+
+        return response()->json(
+            $activity->load(['lead.customer', 'user', 'assignee']),
+            201
+        );
+    }
+
+    /**
+     * Cancels an appointment.
+     *
+     * Soft-deletes rather than erasing: an appointment is part of the activity
+     * history on the lead.
+     */
+    public function destroy(Request $request, $id)
+    {
+        $user = $request->user();
+        $activity = LeadActivity::with('lead.customer')->where('type', 'appointment')->findOrFail($id);
+
+        if (! $this->userCanTouchAppointment($user, $activity)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $activity->update(['appointment_status' => LeadActivity::APPOINTMENT_STATUS_CANCELLED]);
+        $activity->delete();
+
+        return response()->noContent();
+    }
+
+    private function userCanTouchLead($user, Lead $lead): bool
+    {
+        return $lead->assigned_to === $user->id
+            || $lead->created_by === $user->id
+            || (bool) $lead->customer?->salesAgentHasAccess($user->id)
+            || $user->isRole('Admin')
+            || $user->isRole('System Admin')
+            || $user->isRole('Manager');
+    }
+
+    private function userCanTouchAppointment($user, LeadActivity $activity): bool
+    {
+        return $activity->assigned_user_id === $user->id
+            || $activity->user_id === $user->id
+            || ($activity->lead && $this->userCanTouchLead($user, $activity->lead));
+    }
+
     public function update(Request $request, $id)
     {
         $user = auth()->user();

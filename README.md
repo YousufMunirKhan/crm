@@ -1,16 +1,24 @@
 # Switch & Save CRM
 
-A complete production-grade enterprise CRM platform built with Laravel 11 and Vue 3.
+An enterprise CRM platform built with Laravel 12, Vue 3 and Filament.
+
+Two surfaces share one database and one installed PWA:
+
+- **Vue 3 SPA at `/`** - the field and sales surface. Pipeline, customer workspace,
+  appointments, attendance, campaign consoles. Installable to the home screen.
+- **Filament panel at `/admin`** - the back office. Catalogue, payroll, expenses,
+  templates, roles and settings, with policies enforced automatically.
 
 ## Tech Stack
 
 ### Backend
-- Laravel 11
+- Laravel 12
 - PHP 8.3+
-- PostgreSQL
+- MySQL
 - Redis (cache + queues)
-- Laravel Sanctum (authentication)
+- Laravel Sanctum (API tokens) + session auth for the Filament panel
 - Laravel Queues
+- Filament 4 (back-office panel)
 
 ### Frontend
 - Vue 3 (Composition API)
@@ -28,9 +36,11 @@ A complete production-grade enterprise CRM platform built with Laravel 11 and Vu
 - Password reset flow
 - Profile management
 
-**Default Admin Credentials:**
-- Email: `admin@switchsave.com`
-- Password: `Admin@123`
+**Default Admin Account**
+
+The seeder creates an admin user and prints a randomly generated password **once**.
+Set `ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD` in `.env` to choose them yourself.
+Credentials are deliberately not published here.
 
 ### 2. CRM Lead Pipeline
 - Pipeline stages: Follow Up → Lead → Hot Lead → Quotation → Won → Lost
@@ -161,7 +171,7 @@ php artisan migrate --seed
 This will create:
 - All database tables
 - Default roles
-- Admin user (admin@switchsave.com / Admin@123)
+- Admin user (password generated and printed once by the seeder)
 
 5. **Build frontend:**
 ```bash
@@ -361,13 +371,28 @@ chmod -R 775 storage bootstrap/cache
 
 ## Security
 
-- Role-based permissions
-- Audit logging for all model changes
-- Rate limiting on API routes
-- Webhook signature verification (implement in production)
-- CSRF protection
-- SQL injection protection (Eloquent ORM)
-- XSS protection
+- Role-based access control, plus **policies** in `app/Policies` registered in
+  `AppServiceProvider` (module models are outside Laravel's auto-discovery, so
+  the registration is explicit and covered by a test).
+- Route middleware: `role:`, `staff`, `portal.customer`, `nav.section`,
+  `pos.key`, `pos.support.key`, `webhook.key`.
+- Rate limiting on all credential endpoints; Sanctum tokens expire.
+- Soft deletes on customers, leads, invoices, payments and commissions.
+- Consent and suppression enforced on every bulk send (`SuppressionService`).
+- Audit logging on models including roles, settings, commissions and consent.
+
+### Required before deployment
+
+These endpoints return **503** until their keys are set, by design - an unset
+key must never mean "accept anonymous writes":
+
+| Variable | Guards |
+|---|---|
+| `POS_API_KEY` | `/api/pos/*` - the desktop POS must send it as `X-Api-Key` |
+| `POS_SUPPORT_API_KEY` | `/api/pos-support-messages` |
+| `WEBHOOK_API_KEY` | `/api/webhooks/*` |
+
+Also set `APP_DEBUG=false` and run `composer audit` as part of deployment.
 
 ## License
 

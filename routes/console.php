@@ -18,3 +18,25 @@ Schedule::command('commission:send-monthly-reports')
         (string) config('commission.monthly_report_time', '08:00'),
     )
     ->timezone(config('app.timezone'));
+
+// Accounts-receivable ageing: nothing else ever set the "overdue" status, so
+// it was a valid but unreachable state.
+Schedule::command('invoices:mark-overdue')
+    ->dailyAt('01:00')
+    ->timezone(config('app.timezone'));
+
+// SLA breaches: sla_due_at was computed and displayed but never read again,
+// so a breach was only noticed if somebody happened to be looking.
+Schedule::command('tickets:check-sla')
+    ->hourly()
+    ->timezone(config('app.timezone'));
+
+// Lifecycle automations. Raises internal tasks only - outbound sending still
+// goes through the campaign console where consent is enforced.
+Schedule::command('marketing:automations')
+    ->dailyAt('07:00')
+    ->timezone(config('app.timezone'));
+
+// Start campaigns whose scheduled send time has arrived.
+Schedule::command('campaigns:dispatch-due')
+    ->everyFiveMinutes();
