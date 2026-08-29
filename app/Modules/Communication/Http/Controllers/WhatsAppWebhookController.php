@@ -74,16 +74,31 @@ class WhatsAppWebhookController extends Controller
             $settings = WhatsAppSetting::first();
             $appSecret = config('services.whatsapp.app_secret');
             
+            /*
+             * Signature verification. Previously this only ran when the header
+             * happened to be present, so omitting X-Hub-Signature-256 skipped
+             * the check entirely and anyone could post to the endpoint.
+             * When a secret is configured, the signature is now required.
+             */
             if ($appSecret) {
                 $signature = $request->header('X-Hub-Signature-256');
-                if ($signature) {
-                    $expectedSignature = 'sha256=' . hash_hmac('sha256', $request->getContent(), $appSecret);
-                    if (!hash_equals($expectedSignature, $signature)) {
-                        Log::warning('WhatsApp webhook signature verification failed', [
-                            'correlation_id' => $correlationId,
-                        ]);
-                        return response('Invalid signature', 403);
-                    }
+
+                if (! $signature) {
+                    Log::warning('WhatsApp webhook rejected: signature header missing', [
+                        'correlation_id' => $correlationId,
+                    ]);
+
+                    return response('Missing signature', 403);
+                }
+
+                $expectedSignature = 'sha256='.hash_hmac('sha256', $request->getContent(), $appSecret);
+
+                if (! hash_equals($expectedSignature, $signature)) {
+                    Log::warning('WhatsApp webhook signature verification failed', [
+                        'correlation_id' => $correlationId,
+                    ]);
+
+                    return response('Invalid signature', 403);
                 }
             }
 
@@ -130,8 +145,14 @@ class WhatsAppWebhookController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
-            // Still return 200 to Meta to prevent retries
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 200);
+            /*
+             * Return 500 so Meta retries. Returning 200 here meant a failed
+             * webhook was never resent and the inbound message was lost with
+             * no way to recover it.
+             */
+            report($e);
+
+            return response()->json(['status' => 'error'], 500);
         }
     }
 }

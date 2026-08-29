@@ -2,6 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\NavSections;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
+
 use App\Traits\HasAuditLog;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +14,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     use HasApiTokens, HasAuditLog, HasFactory, Notifiable;
 
@@ -58,6 +62,24 @@ class User extends Authenticatable
      * User nav_permissions (if set) overrides role nav_permissions (if set); otherwise full menu.
      * Whitelist: only keys with true are shown. Dashboard always allowed. Admin/System Admin: all sections.
      */
+    /**
+     * Gates access to the Filament back-office panel.
+     *
+     * Deliberately narrow: the panel exposes catalogue, payroll and settings,
+     * so only management roles get in. Sales and field staff keep using the
+     * SPA, which is where their work lives.
+     */
+    public function canAccessPanel(Panel $panel): bool
+    {
+        if (property_exists($this, 'attributes') && array_key_exists('is_active', $this->attributes) && ! $this->is_active) {
+            return false;
+        }
+
+        return $this->isRole('Admin')
+            || $this->isRole('System Admin')
+            || $this->isRole('Manager');
+    }
+
     public function allowsNavSection(string $key): bool
     {
         if ($key === 'dashboard') {
@@ -83,18 +105,16 @@ class User extends Authenticatable
     }
 
     /**
-     * Whitelist entry is allowed if the key is true, or legacy leads_pipeline covers All Leads / Pipeline.
+     * Whitelist entry is allowed if the key is true, or a legacy key (leads_pipeline,
+     * marketing, hr) covers the finer-grained key it was split into.
      */
     private function navWhitelistAllows(array $permissions, string $key): bool
     {
         if (! empty($permissions[$key])) {
             return true;
         }
-        if (($key === 'all_leads' || $key === 'lead_pipeline') && ! empty($permissions['leads_pipeline'])) {
-            return true;
-        }
 
-        return false;
+        return NavSections::legacyGrants($permissions, $key);
     }
 
     /**

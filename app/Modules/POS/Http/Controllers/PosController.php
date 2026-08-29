@@ -4,13 +4,21 @@ namespace App\Modules\POS\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\CRM\Models\Customer;
-use App\Modules\Ticket\Models\Ticket;
-use App\Modules\Ticket\Services\TicketService;
+use App\Modules\Invoice\Models\Invoice;
+use App\Modules\Invoice\Models\InvoicePayment;
 use App\Modules\Invoice\Services\InvoiceService;
 use App\Modules\POS\Models\PosEvent;
+use App\Modules\Ticket\Models\Ticket;
+use App\Modules\Ticket\Services\TicketService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
+/**
+ * POS integration endpoints. Guarded by the `pos.key` middleware.
+ *
+ * Every endpoint is idempotent on (event_type, external_id): the POS may retry
+ * a request after a timeout without duplicating customers, tickets or invoices.
+ */
 class PosController extends Controller
 {
     public function __construct(
@@ -30,18 +38,23 @@ class PosController extends Controller
             'city' => ['nullable', 'string'],
         ]);
 
-        $customer = Customer::updateOrCreate(
-            ['phone' => $data['phone']],
-            $data
-        );
+        if ($replay = $this->replayOf('customer', $data['external_id'])) {
+            $customer = Customer::find($replay->payload['_result_id'] ?? null);
+            if ($customer) {
+                return response()->json($customer, 200);
+            }
+        }
 
-        PosEvent::create([
-            'event_type' => 'customer',
-            'payload' => $data,
-            'external_id' => $data['external_id'],
-        ]);
+        return DB::transaction(function () use ($data) {
+            $customer = Customer::updateOrCreate(
+                ['phone' => $data['phone']],
+                $data
+            );
 
-        return response()->json($customer, 201);
+            $this->recordEvent('customer', $data, $customer->id);
+
+            return response()->json($customer, 201);
+        });
     }
 
     public function storeTicket(Request $request)
@@ -54,18 +67,20 @@ class PosController extends Controller
             'priority' => ['nullable', 'in:low,medium,high,urgent'],
         ]);
 
-        $ticket = $this->ticketService->create($data);
+        if ($replay = $this->replayOf('ticket', $data['external_id'])) {
+            $ticket = Ticket::with('customer')->find($replay->payload['_result_id'] ?? null);
+            if ($ticket) {
+                return response()->json($ticket, 200);
+            }
+        }
 
-        PosEvent::create([
-            'event_type' => 'ticket',
-            'payload' => $data,
-            'external_id' => $data['external_id'],
-        ]);
+        return DB::transaction(function () use ($data) {
+            $ticket = $this->ticketService->create($data);
 
-        // Broadcast notification
-        // event(new \App\Events\NewTicketCreated($ticket));
+            $this->recordEvent('ticket', $data, $ticket->id);
 
-        return response()->json($ticket->load('customer'), 201);
+            return response()->json($ticket->load('customer'), 201);
+        });
     }
 
     public function storeSale(Request $request)
@@ -79,30 +94,67 @@ class PosController extends Controller
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
 
-        $customer = Customer::firstOrCreate(
-            ['phone' => $data['customer_phone']],
-            ['name' => $data['customer_phone']]
-        );
+        if ($replay = $this->replayOf('sale', $data['external_id'])) {
+            $invoice = Invoice::with(['customer', 'items'])->find($replay->payload['_result_id'] ?? null);
+            if ($invoice) {
+                return response()->json($invoice, 200);
+            }
+        }
 
-        $invoice = $this->invoiceService->create([
-            'customer_id' => $customer->id,
-            'items' => $data['items'],
-            'status' => 'paid',
-        ]);
+        return DB::transaction(function () use ($data) {
+            $customer = Customer::firstOrCreate(
+                ['phone' => $data['customer_phone']],
+                ['name' => $data['customer_phone']]
+            );
 
-        // Mark as paid
-        $invoice->update([
-            'amount_paid' => $invoice->total,
-        ]);
+            $invoice = $this->invoiceService->create([
+                'customer_id' => $customer->id,
+                'items' => $data['items'],
+                'status' => 'sent',
+            ]);
 
+            // A POS sale is paid in full at the till. Record it in the payments
+            // ledger - writing amount_paid directly would be undone the next
+            // time the invoice totals are recomputed from that ledger.
+            InvoicePayment::create([
+                'invoice_id' => $invoice->id,
+                'received_by_user_id' => null,
+                'payment_date' => now()->toDateString(),
+                'amount' => $invoice->total,
+                'method' => 'pos',
+                'reference' => 'POS sale '.$data['external_id'],
+            ]);
+
+            $this->invoiceService->syncPaymentTotals($invoice);
+
+            $this->recordEvent('sale', $data, $invoice->id);
+
+            return response()->json($invoice->fresh(['customer', 'items']), 201);
+        });
+    }
+
+    /**
+     * A prior successfully-processed event with this external id, if any.
+     */
+    private function replayOf(string $type, string $externalId): ?PosEvent
+    {
+        return PosEvent::query()
+            ->where('event_type', $type)
+            ->where('external_id', $externalId)
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * Stores the event and the id of what it produced, so a retry can return
+     * the original resource instead of creating a second one.
+     */
+    private function recordEvent(string $type, array $payload, int $resultId): void
+    {
         PosEvent::create([
-            'event_type' => 'sale',
-            'payload' => $data,
-            'external_id' => $data['external_id'],
+            'event_type' => $type,
+            'payload' => $payload + ['_result_id' => $resultId],
+            'external_id' => $payload['external_id'],
         ]);
-
-        return response()->json($invoice->load(['customer', 'items']), 201);
     }
 }
-
-

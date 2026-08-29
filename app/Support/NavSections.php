@@ -37,9 +37,15 @@ final class NavSections
             'today_activity' => "Today's Activity",
             'report' => 'Report',
             'todays_report' => "Today's Report",
-            'marketing' => 'Marketing',
+            'marketing_email' => 'Marketing — Email',
+            'marketing_sms' => 'Marketing — SMS',
+            'marketing_whatsapp' => 'Marketing — WhatsApp',
+            'marketing_templates' => 'Marketing — Templates',
+            'marketing_cold_calling' => 'Marketing — Cold calling',
             'employees' => 'Employees',
-            'hr' => 'HR',
+            'hr_records' => 'HR — Employee records',
+            'hr_attendance' => 'HR — Attendance',
+            'bank_documents' => 'My bank & documents',
             'expenses' => 'Expenses',
             'salary_slips' => 'Salary Slips',
             'salary_reports' => 'Salary Reports',
@@ -47,6 +53,43 @@ final class NavSections
             'settings' => 'Settings',
             'access_manager' => 'Access Manager',
         ];
+    }
+
+    /**
+     * Legacy whitelist keys that still grant access to the finer-grained keys
+     * they were split into. Keeps existing users.nav_permissions rows working.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function legacyAliases(): array
+    {
+        return [
+            'leads_pipeline' => ['all_leads', 'lead_pipeline'],
+            'marketing' => [
+                'marketing_email',
+                'marketing_sms',
+                'marketing_whatsapp',
+                'marketing_templates',
+                'marketing_cold_calling',
+            ],
+            'hr' => ['hr_records', 'hr_attendance'],
+        ];
+    }
+
+    /**
+     * True when a legacy key present in the whitelist covers $key.
+     *
+     * @param  array<string, mixed>  $permissions
+     */
+    public static function legacyGrants(array $permissions, string $key): bool
+    {
+        foreach (self::legacyAliases() as $legacy => $covers) {
+            if (in_array($key, $covers, true) && ! empty($permissions[$legacy])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
