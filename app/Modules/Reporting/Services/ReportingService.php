@@ -683,10 +683,29 @@ class ReportingService
             ->whereBetween('invoice_date', [$from, $to])
             ->sum('total');
 
+            /*
+             * Same de-duplication as the executive dashboard: a deal that was
+             * both marked won and invoiced must count once. Without this the
+             * per-employee rows summed to more than the company total, because
+             * only the dashboard was fixed.
+             *
+             * lead_revenue stays the FULL won value - targets and commission
+             * are settled on what the person closed, invoiced or not.
+             */
+            $invoicedLeadIds = Invoice::whereBetween('invoice_date', [$from, $to])
+                ->whereNotNull('lead_id')
+                ->distinct()
+                ->pluck('lead_id')
+                ->all();
+
+            $uninvoicedLeadRevenue = (float) $this->baseWonLeadItemsForAgentInPeriod($aid, $from, $to)
+                ->when($invoicedLeadIds !== [], fn ($q) => $q->whereNotIn('lead_id', $invoicedLeadIds))
+                ->sum('total_price');
+
             $revenue[] = [
                 'employee_id' => $agent->id,
                 'employee_name' => $agent->name,
-                'revenue' => $leadRevenue + $invoiceRevenue,
+                'revenue' => $uninvoicedLeadRevenue + $invoiceRevenue,
                 'lead_revenue' => $leadRevenue,
                 'invoice_revenue' => $invoiceRevenue,
                 'products' => [
