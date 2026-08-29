@@ -11,9 +11,9 @@
                 aria-modal="true"
                 :aria-labelledby="title ? headingId : undefined"
                 tabindex="-1"
-                :class="['form-card w-full max-h-[90vh] overflow-y-auto shadow-xl shadow-slate-900/10 focus-visible:outline-none', sizeClass]"
+                :class="['form-card flex w-full max-h-[90vh] flex-col shadow-xl shadow-slate-900/10 focus-visible:outline-none', sizeClass]"
             >
-                <header v-if="title || $slots.header" class="form-section-head flex items-start justify-between gap-4">
+                <header v-if="title || $slots.header" class="form-section-head flex shrink-0 items-start justify-between gap-4">
                     <div class="min-w-0">
                         <slot name="header">
                             <h2 :id="headingId" class="form-section-title">{{ title }}</h2>
@@ -31,11 +31,11 @@
                     </button>
                 </header>
 
-                <div class="form-body">
+                <div class="form-body min-h-0 flex-1 overflow-y-auto">
                     <slot />
                 </div>
 
-                <footer v-if="$slots.actions" class="form-actions">
+                <footer v-if="$slots.actions" class="form-actions shrink-0">
                     <slot name="actions" />
                 </footer>
             </div>

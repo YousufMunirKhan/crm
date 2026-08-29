@@ -707,6 +707,7 @@
         <LogActivityModal
             v-if="showActivityModal && activityLead"
             :lead="activityLead"
+            :customer="customer"
             :initial-activity-type="activityModalInitialType"
             @close="closeActivityModal"
             @saved="handleActivitySaved"
