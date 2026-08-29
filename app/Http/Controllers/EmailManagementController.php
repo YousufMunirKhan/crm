@@ -1452,7 +1452,7 @@ class EmailManagementController extends Controller
         return $html;
     }
 
-    private function renderTemplateForPreview(EmailTemplate $template, Customer $customer): string
+    public function renderTemplateForPreview(EmailTemplate $template, Customer $customer): string
     {
         $unsubscribeUrl = config('app.url') . '/unsubscribe?email=' . urlencode($customer->email ?? '');
         $responsiveStyles = '

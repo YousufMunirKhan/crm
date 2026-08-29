@@ -122,6 +122,10 @@
                         </button>
 
                         <div class="flex flex-wrap items-center gap-2 shrink-0">
+                            <BaseButton size="sm" variant="ghost" @click="openPreview(group.items[0])">
+                                <template #icon><EyeIcon class="icon-sm" aria-hidden="true" /></template>
+                                Preview
+                            </BaseButton>
                             <BaseButton size="sm" variant="ghost" @click="openTemplate(group)">
                                 <template #icon><PencilSquareIcon class="icon-sm" aria-hidden="true" /></template>
                                 Edit template
@@ -163,9 +167,12 @@
                                         <span v-if="item.blocked_reason" class="mt-1 block text-xs font-medium text-danger-700">
                                             {{ item.blocked_reason }}
                                         </span>
-                                        <button type="button" class="mt-1 block link text-xs" @click="openEditor(item)">
-                                            {{ isEdited(item) ? 'Edited for this person — change' : 'Edit for this person only' }}
-                                        </button>
+                                        <span class="mt-1 flex flex-wrap gap-3">
+                                            <button type="button" class="link text-xs" @click="openPreview(item)">Preview</button>
+                                            <button type="button" class="link text-xs" @click="openEditor(item)">
+                                                {{ isEdited(item) ? 'Edited for this person — change' : 'Edit for this person only' }}
+                                            </button>
+                                        </span>
                                     </td>
                                     <td class="table-td text-right whitespace-nowrap">
                                         <template v-if="item.status === 'blocked'">
@@ -265,6 +272,46 @@
             </template>
         </BaseModal>
 
+        <!-- Rendered by the same code the real send uses, with this person's own
+             data merged in - a preview built any other way is a drawing of the
+             email rather than the email. -->
+        <BaseModal v-model="previewOpen" title="Preview" size="xl">
+            <div v-if="previewLoading" class="skeleton skeleton-text w-1/2" />
+            <div v-else-if="preview" class="space-y-3">
+                <div class="rounded-card border border-slate-200 bg-slate-50 p-3 text-sm space-y-1">
+                    <p><span class="text-slate-500">To:</span> <span class="font-medium text-slate-900">{{ preview.to_name }}</span> &lt;{{ preview.to }}&gt;</p>
+                    <p><span class="text-slate-500">Subject:</span> <span class="font-medium text-slate-900">{{ preview.subject }}</span></p>
+                    <p v-if="preview.edited" class="text-primary-700">This copy was edited for this person only.</p>
+                </div>
+
+                <div v-if="preview.unresolved_tags?.length" class="callout callout-warning">
+                    <span>
+                        This contact has no value for {{ preview.unresolved_tags.join(', ') }} — the email would go out with a
+                        gap where that should be. Fix the record or edit this one message.
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <BaseButton size="sm" :variant="previewWidth === 'desktop' ? 'soft' : 'outline'" @click="previewWidth = 'desktop'">Desktop</BaseButton>
+                    <BaseButton size="sm" :variant="previewWidth === 'mobile' ? 'soft' : 'outline'" @click="previewWidth = 'mobile'">Mobile</BaseButton>
+                </div>
+
+                <div class="rounded-card border border-slate-200 bg-slate-100 p-3 overflow-x-auto">
+                    <iframe
+                        :srcdoc="preview.html"
+                        class="block mx-auto bg-white border-0 rounded"
+                        :style="{ width: previewWidth === 'mobile' ? '375px' : '100%', height: '640px' }"
+                        title="Email preview"
+                        sandbox=""
+                    />
+                </div>
+            </div>
+
+            <template #actions>
+                <BaseButton variant="outline" block-mobile @click="previewOpen = false">Close</BaseButton>
+            </template>
+        </BaseModal>
+
         <ConfirmDialog
             v-model="confirmSendOpen"
             title="Send these messages?"
@@ -279,7 +326,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
-import { ChevronRightIcon, PencilSquareIcon, SparklesIcon } from '@heroicons/vue/24/outline';
+import { ChevronRightIcon, EyeIcon, PencilSquareIcon, SparklesIcon } from '@heroicons/vue/24/outline';
 import { useToastStore } from '@/stores/toast';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import CustomerName from '@/components/CustomerName.vue';
@@ -300,6 +347,11 @@ const editorOpen = ref(false);
 const editing = ref(null);
 const editorForm = ref({ subject: '', body: '' });
 const savingEdit = ref(false);
+
+const previewOpen = ref(false);
+const preview = ref(null);
+const previewLoading = ref(false);
+const previewWidth = ref('desktop');
 
 const templateOpen = ref(false);
 const templateGroup = ref(null);
@@ -443,6 +495,24 @@ async function approveGroup(group, approve) {
         await load();
     } catch (e) {
         toast.error(e?.response?.data?.message || 'Could not update the group.');
+    }
+}
+
+async function openPreview(item) {
+    if (!item) return;
+
+    preview.value = null;
+    previewLoading.value = true;
+    previewOpen.value = true;
+
+    try {
+        const { data } = await axios.get(`/api/marketing/agent/plans/${plan.value.id}/items/${item.id}/preview`);
+        preview.value = data;
+    } catch (e) {
+        previewOpen.value = false;
+        toast.error(e?.response?.data?.message || 'Could not build the preview.');
+    } finally {
+        previewLoading.value = false;
     }
 }
 

@@ -39,7 +39,7 @@ class InstallMarketingAgentTemplates extends Command
                     'category' => 'marketing-agent',
                     'subject' => $t['subject'],
                     'description' => $t['when'],
-                    'content' => $this->wrap($t['body']),
+                    'content' => $this->wrap($t['body'], $t['preheader'] ?? ''),
                     'is_active' => true,
                 ]);
                 $created++;
@@ -47,7 +47,7 @@ class InstallMarketingAgentTemplates extends Command
                 $email->update([
                     'subject' => $t['subject'],
                     'description' => $t['when'],
-                    'content' => $this->wrap($t['body']),
+                    'content' => $this->wrap($t['body'], $t['preheader'] ?? ''),
                 ]);
                 $updated++;
             } else {
@@ -90,9 +90,16 @@ class InstallMarketingAgentTemplates extends Command
      * One column, inline styles, no floats - this has to survive Outlook and a
      * phone screen, which is where the old templates fell apart.
      */
-    private function wrap(string $inner): string
+    private function wrap(string $inner, string $preheader = ''): string
     {
+        // Hidden preheader. Without it the inbox preview scrapes the <h1>, so
+        // every email previews as its own subject line said twice.
+        $pre = $preheader === '' ? '' :
+            '<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">'.$preheader
+            .str_repeat('&#847;&zwnj;&nbsp;', 40).'</div>';
+
         return <<<HTML
+        {$pre}
         <div style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;">
             <tr><td style="padding:32px 28px;">
@@ -120,8 +127,11 @@ class InstallMarketingAgentTemplates extends Command
 
     private function cta(string $label): string
     {
+        // The number goes in the label. A bare tel: link with a text label is a
+        // dead button on a desktop mail client, and a merchant reading in the
+        // back office cannot act on it at all.
         return '<p style="margin:24px 0 8px;"><a href="tel:{{company_phone}}" style="display:inline-block;background:#2563eb;color:#ffffff;'
-            .'font-size:16px;font-weight:600;text-decoration:none;padding:14px 28px;border-radius:8px;">'.$label.'</a></p>'
+            .'font-size:16px;font-weight:600;text-decoration:none;padding:14px 28px;border-radius:8px;">'.$label.' &mdash; {{company_phone}}</a></p>'
             .'<p style="margin:0 0 4px;font-size:14px;line-height:22px;color:#64748b;">Or just reply to this email and we will call you back.</p>';
     }
 
@@ -136,9 +146,9 @@ class InstallMarketingAgentTemplates extends Command
                 'purpose' => 'welcome-onboarding',
                 'name' => 'Agent · Welcome (new customer)',
                 'when' => 'Sent once, shortly after a customer\'s first order is marked won.',
-                'subject' => 'You\'re set up, {{first_name}} — here\'s who to call',
+                'subject' => 'Save this number before you need it',
                 'body' => $this->h('Welcome to {{company_name}}')
-                    .$this->p('Hi {{first_name}}, thanks for choosing us. Your order is with our setup team and we will be in touch to book your install.')
+                    .$this->p('Hi {{first_name}}, thanks for choosing us. Your order is with our setup team. Someone will call you to agree an install date that does not land in your busy hours.')
                     .$this->p('One thing worth saving now: <strong>{{company_phone}}</strong>. That is our support line, answered by people who know your setup — not a call centre. If a terminal stops taking payments on a Saturday night, that is the number.')
                     .$this->p('Nothing to do right now. We will call you.')
                     .$this->cta('Save our number'),
@@ -170,7 +180,7 @@ class InstallMarketingAgentTemplates extends Command
                 'purpose' => 'check-in',
                 'name' => 'Agent · Quiet customer check-in',
                 'when' => 'Sent to a customer with no contact for roughly six months.',
-                'subject' => 'Is everything still running as it should, {{first_name}}?',
+                'subject' => 'All still running OK?',
                 'body' => $this->h('Quick check-in')
                     .$this->p('Hi {{first_name}}, it has been a while since we spoke, which usually means everything is working. Worth checking though.')
                     .$this->p('Two things customers often do not realise they can ask us for:')
@@ -185,8 +195,8 @@ class InstallMarketingAgentTemplates extends Command
                 'purpose' => 'epos-upsell',
                 'name' => 'Agent · ePOS upsell (has card machine, no ePOS)',
                 'when' => 'Customer takes card payments through us but has no ePOS system.',
-                'subject' => '{{first_name}}, you\'re taking the payments — but not the data',
-                'body' => $this->h('Your card machine knows what you sold. It doesn\'t know what.')
+                'subject' => 'You know the total. Not the items.',
+                'body' => $this->h('Your card machine knows how much. It does not know what.')
                     .$this->p('Hi {{first_name}}, you are already taking card payments with us. So at the end of a Saturday you know the total — but not which items shifted, which staff member sold them, or what you nearly ran out of.')
                     .$this->p('That is the gap an ePOS closes. Customers who add one typically stop guessing on two things: what to reorder, and which items are quietly losing money.')
                     .$this->p('It plugs into the terminal you already have, so there is no second machine on the counter and no re-training on payments.')
@@ -197,7 +207,7 @@ class InstallMarketingAgentTemplates extends Command
                 'purpose' => 'website-upsell',
                 'name' => 'Agent · Website / online ordering upsell',
                 'when' => 'Customer has an ePOS with us but no online ordering site.',
-                'subject' => 'Your competitors are taking orders while you\'re closed',
+                'subject' => 'Stop paying commission on your regulars',
                 'body' => $this->h('Orders do not stop when the door shuts')
                     .$this->p('Hi {{first_name}}, you have the till sorted. The orders coming in at 11pm, or from people who will never phone you, are the ones you are not seeing.')
                     .$this->p('An online ordering site takes those — and unlike the delivery apps, the commission stays in your pocket and the customer is <em>yours</em>, not theirs.')
@@ -209,10 +219,10 @@ class InstallMarketingAgentTemplates extends Command
                 'purpose' => 'bundle-upsell',
                 'name' => 'Agent · Bundle consolidation',
                 'when' => 'Customer has pieces bought separately that a bundle would cover.',
-                'subject' => '{{first_name}}, you\'re paying for these separately',
+                'subject' => 'Your services, on one bill',
                 'body' => $this->h('Same kit, one bill')
                     .$this->p('Hi {{first_name}}, you currently have {{customer_products}} with us — bought at different times, billed separately.')
-                    .$this->p('Our bundles cover the same things on one agreement, and in most cases the total comes down. One invoice, one support number, one renewal date to remember instead of three.')
+                    .$this->p('Our bundles cover the same things on one agreement: one invoice, one support number, one renewal date instead of several. Often it works out cheaper too - we will tell you straight if it does not.')
                     .$this->p('Worth two minutes to see the numbers side by side. If it is not cheaper for you, we will say so.')
                     .$this->cta('Compare my bill'),
                 'sms' => '{{company_name}}: {{first_name}}, your services are billed separately. A bundle is usually cheaper. Call {{company_phone}}. Reply STOP to opt out.',
@@ -221,11 +231,11 @@ class InstallMarketingAgentTemplates extends Command
                 'purpose' => 'funding-offer',
                 'name' => 'Agent · Business funding',
                 'when' => 'Sent to established customers who may need working capital.',
-                'subject' => 'Funding based on your card takings, {{first_name}}',
+                'subject' => 'Funding that repays as you trade',
                 'body' => $this->h('Funding that repays itself as you trade')
                     .$this->p('Hi {{first_name}}, if you have been putting off a refit, a second site, or just need to smooth out a quiet month — this is worth knowing about.')
-                    .$this->p('Because we can see your card takings, funding is assessed on what your business actually turns over, not on a form and a credit score. Repayments come out as a small percentage of daily takings, so a slow week costs you less.')
-                    .$this->p('No obligation to take it, and checking does not affect your credit file.')
+                    .$this->p('Because we can see your card takings, funding is assessed on what your business actually turns over, not on a form and a credit score. Repayments come out as an agreed percentage of your daily card takings, so a slow week costs you less than a busy one.')
+                    .$this->p('No obligation, and we will tell you what the total cost would be before you commit to anything.')
                     .$this->cta('Check my eligibility'),
                 'sms' => '{{company_name}}: {{first_name}}, business funding based on your card takings. Repay as you trade. Call {{company_phone}}. Reply STOP to opt out.',
             ],
@@ -235,7 +245,7 @@ class InstallMarketingAgentTemplates extends Command
                 'purpose' => 'quote-followup',
                 'name' => 'Agent · Quotation follow-up',
                 'when' => 'A quote was sent and there has been no reply for a couple of weeks.',
-                'subject' => 'Still thinking it over, {{first_name}}?',
+                'subject' => 'Shall I close this one off?',
                 'body' => $this->h('About that quote')
                     .$this->p('Hi {{first_name}}, we sent you a quote a little while back and have not heard anything — which usually means one of three things.')
                     .$this->p('&bull; The price was higher than you expected<br>&bull; You are mid-way through comparing us with someone else<br>&bull; It simply got buried')
@@ -247,10 +257,10 @@ class InstallMarketingAgentTemplates extends Command
                 'purpose' => 'winback',
                 'name' => 'Agent · Win-back (lost lead)',
                 'when' => 'A lead was marked lost some months ago.',
-                'subject' => 'Has anything changed, {{first_name}}?',
+                'subject' => 'Is your contract up yet?',
                 'body' => $this->h('It has been a few months')
                     .$this->p('Hi {{first_name}}, we spoke a while ago and it was not the right time. Fair enough.')
-                    .$this->p('Two things have usually changed since: your current contract is closer to its end date, and our pricing has moved. Customers who came back to us after saying no once are often the ones who saved the most, because they had a real quote to compare against.')
+                    .$this->p('One thing has definitely changed since: your current contract is a few months closer to its end date. Most agreements roll over automatically unless you give notice, so it is worth knowing your date even if you do nothing with it.')
                     .$this->p('If it is still a no, no hard feelings — reply and we will close the file properly.')
                     .$this->cta('Get an updated price'),
                 'sms' => '{{company_name}}: Hi {{first_name}}, we spoke a while back. Contract nearly up? Worth a fresh price. Call {{company_phone}}. Reply STOP to opt out.',
@@ -259,11 +269,11 @@ class InstallMarketingAgentTemplates extends Command
                 'purpose' => 'prospect-nurture',
                 'name' => 'Agent · New prospect nurture',
                 'when' => 'A prospect is on file but no lead has been created yet.',
-                'subject' => 'What most {{first_name}}-sized businesses overpay on',
+                'subject' => 'Worth re-reading your card statement',
                 'body' => $this->h('Three things worth checking')
                     .$this->p('Hi {{first_name}}, you are on our list but we have never properly spoken, so here is something useful rather than a sales pitch.')
                     .$this->p('The three places small businesses most often lose money on payments:')
-                    .$this->p('<strong>1. The rate crept up.</strong> Most card processing contracts rise quietly after year one. Almost nobody re-reads the statement.<br><br><strong>2. Paying app commission on your own regulars.</strong> If someone orders from you every week, you should not be paying 30% to an app for them.<br><br><strong>3. Separate systems that do not talk.</strong> Till, card machine and online orders each doing their own thing means someone reconciles it by hand every night.')
+                    .$this->p('<strong>1. The rate crept up.</strong> Most card processing contracts rise quietly after year one. Almost nobody re-reads the statement.<br><br><strong>2. Paying app commission on your own regulars.</strong> If someone orders from you every week, you are still paying the app a cut of every order - on a customer who found you long ago.<br><br><strong>3. Separate systems that do not talk.</strong> Till, card machine and online orders each doing their own thing means someone reconciles it by hand every night.')
                     .$this->p('If any of those sound familiar, we will do a free review of your current setup and tell you honestly whether switching is worth it.')
                     .$this->cta('Get a free review'),
                 'sms' => '{{company_name}}: Hi {{first_name}}, free review of your card rates + till setup. No obligation. Call {{company_phone}}. Reply STOP to opt out.',

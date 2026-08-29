@@ -3,6 +3,7 @@
 namespace App\Modules\Marketing\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\EmailManagementController;
 use App\Models\Campaign;
 use App\Modules\Marketing\Jobs\SendMarketingPlanItemJob;
 use App\Modules\Marketing\Models\MarketingPlan;
@@ -135,6 +136,93 @@ class MarketingAgentController extends Controller
         $item->update($data);
 
         return response()->json(['item' => $item->fresh(['customer', 'emailTemplate'])]);
+    }
+
+    /**
+     * Exactly what this one person will receive.
+     *
+     * Rendered through the same method the real send uses, with this
+     * recipient's own data and this row's override applied - a preview built
+     * any other way is a drawing of the email rather than the email.
+     */
+    public function preview(Request $request, int $planId, int $itemId, EmailManagementController $emailManagement)
+    {
+        $this->assertManager($request);
+
+        $item = MarketingPlan::findOrFail($planId)
+            ->items()
+            ->with(['customer', 'emailTemplate'])
+            ->findOrFail($itemId);
+
+        $customer = $item->customer;
+        $template = $item->emailTemplate;
+
+        if ($customer === null || $template === null) {
+            return response()->json(['message' => 'This row has no template or customer attached.'], 422);
+        }
+
+        // Not saved: the override belongs to the row, not the template.
+        $rendered = $template->replicate();
+        $rendered->id = $template->id;
+        $rendered->exists = true;
+
+        if ($item->subject_override !== null) {
+            $rendered->subject = $item->subject_override;
+        }
+        if ($item->body_override !== null) {
+            $rendered->content = $item->body_override;
+        }
+
+        $missing = $this->unresolvedTags($rendered, $customer);
+
+        return response()->json([
+            'to' => $customer->email,
+            'to_name' => trim(($customer->name ?? '').' '.($customer->business_name ? '· '.$customer->business_name : '')),
+            'subject' => $this->mergeSubject((string) $rendered->subject, $customer),
+            'html' => $emailManagement->renderTemplateForPreview($rendered, $customer),
+            'edited' => $item->isEdited(),
+            /**
+             * A tag with nothing behind it renders as "Hello ," and you only
+             * ever notice after it has gone out. Surfaced here instead.
+             */
+            'unresolved_tags' => $missing,
+        ]);
+    }
+
+    /** Subject lines go through the same substitutions as the body. */
+    private function mergeSubject(string $subject, $customer): string
+    {
+        $first = trim((string) ($customer->name ?? ''));
+        $first = $first === '' ? '' : explode(' ', $first)[0];
+
+        return str_replace(
+            ['{{first_name}}', '{{customer_name}}', '{{company_name}}'],
+            [$first, (string) ($customer->name ?? ''), (string) config('app.name')],
+            $subject,
+        );
+    }
+
+    /** @return array<int, string> */
+    private function unresolvedTags($template, $customer): array
+    {
+        $needs = [
+            '{{first_name}}' => $customer->name,
+            '{{customer_name}}' => $customer->name,
+            '{{customer_email}}' => $customer->email,
+            '{{customer_phone}}' => $customer->phone,
+            '{{customer_products}}' => null,
+        ];
+
+        $haystack = (string) $template->subject.' '.(is_string($template->content) ? $template->content : json_encode($template->content));
+        $missing = [];
+
+        foreach ($needs as $tag => $value) {
+            if (str_contains($haystack, $tag) && trim((string) $value) === '' && $tag !== '{{customer_products}}') {
+                $missing[] = $tag;
+            }
+        }
+
+        return $missing;
     }
 
     public function bulkUpdate(Request $request, int $planId)
