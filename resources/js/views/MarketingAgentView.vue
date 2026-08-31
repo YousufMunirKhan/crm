@@ -185,6 +185,7 @@
                                     <th scope="col" class="table-th-num">Opens</th>
                                     <th scope="col" class="table-th-num">Clicks</th>
                                     <th scope="col" class="table-th">When</th>
+                                    <th scope="col" class="table-th text-right">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -201,6 +202,16 @@
                                     <td class="table-td-num" :class="r.open_count ? 'font-semibold' : 'text-slate-400'">{{ r.open_count || '—' }}</td>
                                     <td class="table-td-num" :class="r.clicks ? 'font-semibold text-success-700' : 'text-slate-400'">{{ r.clicks || '—' }}</td>
                                     <td class="table-td text-xs text-slate-500 whitespace-nowrap">{{ formatWhen(r.sent_at) }}</td>
+                                    <td class="table-td text-right whitespace-nowrap">
+                                        <BaseButton
+                                            v-if="r.status === 'failed'"
+                                            size="sm"
+                                            variant="outline"
+                                            :loading="retryingId === r.id"
+                                            @click="retryFailed([r.id])"
+                                        >Send again</BaseButton>
+                                        <span v-else class="text-xs text-slate-400">—</span>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -535,19 +546,30 @@ const recipients = ref([]);
 const showBlocked = ref(false);
 const showRecipients = ref(false);
 const retrying = ref(false);
+/** Which single row is being retried, so only its own button spins. */
+const retryingId = ref(null);
 
 const failedCount = computed(() => recipients.value.filter((r) => r.status === 'failed').length);
 
-async function retryFailed() {
-    retrying.value = true;
+async function retryFailed(itemIds = null) {
+    if (itemIds) {
+        retryingId.value = itemIds[0];
+    } else {
+        retrying.value = true;
+    }
+
     try {
-        const { data } = await axios.post(`/api/marketing/agent/plans/${plan.value.id}/retry`);
+        const { data } = await axios.post(
+            `/api/marketing/agent/plans/${plan.value.id}/retry`,
+            itemIds ? { item_ids: itemIds } : {},
+        );
         toast.success(data.message);
         await load();
     } catch (e) {
-        toast.error(e?.response?.data?.message || 'Could not retry.');
+        toast.error(e?.response?.data?.message || 'Could not send again.');
     } finally {
         retrying.value = false;
+        retryingId.value = null;
     }
 }
 const eventLimit = ref(50);

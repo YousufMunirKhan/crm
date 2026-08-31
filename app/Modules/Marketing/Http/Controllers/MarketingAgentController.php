@@ -479,12 +479,20 @@ class MarketingAgentController extends Controller
 
         $plan = MarketingPlan::findOrFail($planId);
 
+        $data = $request->validate([
+            // Omitted means everything that failed; given means just these, so
+            // one stubborn address can be retried without resending the batch.
+            'item_ids' => ['nullable', 'array'],
+            'item_ids.*' => ['integer'],
+        ]);
+
         $failed = $plan->items()
             ->where('status', MarketingPlanItem::STATUS_FAILED)
+            ->when(! empty($data['item_ids']), fn ($q) => $q->whereIn('id', $data['item_ids']))
             ->get();
 
         if ($failed->isEmpty()) {
-            return response()->json(['message' => 'Nothing failed on this plan.'], 422);
+            return response()->json(['message' => 'There is nothing to send again.'], 422);
         }
 
         $campaign = Campaign::create([
@@ -513,7 +521,9 @@ class MarketingAgentController extends Controller
         MarketingPlanEvent::record(
             $plan->id,
             MarketingPlanEvent::QUEUED,
-            'Retried '.$failed->count().' message(s) that did not arrive.',
+            $failed->count() === 1
+                ? 'Sent again to '.($failed->first()->customer?->name ?? 'one contact').'.'
+                : 'Retried '.$failed->count().' message(s) that did not arrive.',
             null,
             $request->user()->id,
             ['count' => $failed->count()],
@@ -521,7 +531,9 @@ class MarketingAgentController extends Controller
 
         return response()->json([
             'queued' => $failed->count(),
-            'message' => $failed->count().' message(s) queued again.',
+            'message' => $failed->count() === 1
+                ? 'Queued again. It will go out within a minute.'
+                : $failed->count().' message(s) queued again.',
         ]);
     }
 

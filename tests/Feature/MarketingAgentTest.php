@@ -429,6 +429,73 @@ class MarketingAgentTest extends TestCase
         $this->assertSame(100.0, $results['totals']['open_rate']);
     }
 
+    /**
+     * A failure is almost always the mail server rather than the message - the
+     * first real batch bounced entirely against a placeholder SMTP host - so
+     * one address must be retryable without resending the batch, and without
+     * losing the approvals and skips already decided.
+     */
+    public function test_one_failed_message_can_be_sent_again_on_its_own(): void
+    {
+        $plan = $this->plan();
+        $plan->update(['status' => MarketingPlan::STATUS_SENDING]);
+
+        $rows = [];
+
+        foreach (['one', 'two'] as $i => $name) {
+            $customer = Customer::create([
+                'phone' => '0770090300'.$i,
+                'name' => $name,
+                'email' => $name.'@example.com',
+                'type' => Customer::TYPE_CUSTOMER,
+            ]);
+
+            $rows[$name] = MarketingPlanItem::create([
+                'marketing_plan_id' => $plan->id,
+                'customer_id' => $customer->id,
+                'channel' => 'email',
+                'purpose' => 'check-in',
+                'status' => MarketingPlanItem::STATUS_FAILED,
+                'blocked_reason' => 'Connection refused',
+            ]);
+        }
+
+        // Faked, otherwise the sync queue runs the job inside the request and
+        // the row has already moved on before the assertions look at it.
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $this->actingAs($this->manager())
+            ->postJson("/api/marketing/agent/plans/{$plan->id}/retry", ['item_ids' => [$rows['one']->id]])
+            ->assertOk()
+            ->assertJsonPath('queued', 1);
+
+        // Exactly one job, and it is for the row that was chosen.
+        \Illuminate\Support\Facades\Queue::assertPushed(
+            \App\Modules\Marketing\Jobs\SendMarketingPlanItemJob::class,
+            fn ($job) => $job->itemId === $rows['one']->id,
+        );
+        \Illuminate\Support\Facades\Queue::assertPushed(
+            \App\Modules\Marketing\Jobs\SendMarketingPlanItemJob::class,
+            1,
+        );
+
+        // The chosen one is back in the queue with its stale error cleared.
+        $this->assertSame(MarketingPlanItem::STATUS_APPROVED, $rows['one']->fresh()->status);
+        $this->assertNull($rows['one']->fresh()->blocked_reason);
+
+        // The other is untouched.
+        $this->assertSame(MarketingPlanItem::STATUS_FAILED, $rows['two']->fresh()->status);
+    }
+
+    public function test_retrying_with_nothing_failed_is_refused(): void
+    {
+        $plan = $this->plan();
+
+        $this->actingAs($this->manager())
+            ->postJson("/api/marketing/agent/plans/{$plan->id}/retry")
+            ->assertStatus(422);
+    }
+
     public function test_an_empty_override_clears_it_rather_than_sending_a_blank_subject(): void
     {
         $plan = $this->plan();
