@@ -465,6 +465,66 @@ class MarketingAgentController extends Controller
         ]);
     }
 
+    /**
+     * Re-queues the rows that did not arrive.
+     *
+     * A failure is usually the mail server, not the message - the agent's first
+     * batch bounced entirely because the send was configured against a
+     * placeholder host - so the useful thing is to try again rather than
+     * rebuild the plan and lose every decision already made.
+     */
+    public function retryFailed(Request $request, int $planId)
+    {
+        $this->assertManager($request);
+
+        $plan = MarketingPlan::findOrFail($planId);
+
+        $failed = $plan->items()
+            ->where('status', MarketingPlanItem::STATUS_FAILED)
+            ->get();
+
+        if ($failed->isEmpty()) {
+            return response()->json(['message' => 'Nothing failed on this plan.'], 422);
+        }
+
+        $campaign = Campaign::create([
+            'name' => 'Agent retry - w/c '.$plan->week_starting->toDateString(),
+            'channel' => 'email',
+            'status' => 'sending',
+            'recipient_count' => $failed->count(),
+            'started_at' => now(),
+            'created_by' => $request->user()->id,
+        ]);
+
+        foreach ($failed as $item) {
+            // Back to approved so the job will pick it up, and the previous
+            // error is cleared rather than left to confuse the next reader.
+            $item->update([
+                'status' => MarketingPlanItem::STATUS_APPROVED,
+                'blocked_reason' => null,
+                'sent_communication_id' => null,
+            ]);
+
+            SendMarketingPlanItemJob::dispatch($item->id, $request->user()->id, $campaign->id);
+        }
+
+        $plan->update(['status' => MarketingPlan::STATUS_SENDING]);
+
+        MarketingPlanEvent::record(
+            $plan->id,
+            MarketingPlanEvent::QUEUED,
+            'Retried '.$failed->count().' message(s) that did not arrive.',
+            null,
+            $request->user()->id,
+            ['count' => $failed->count()],
+        );
+
+        return response()->json([
+            'queued' => $failed->count(),
+            'message' => $failed->count().' message(s) queued again.',
+        ]);
+    }
+
     /** @return array<string, int|string> */
     private function limits(): array
     {

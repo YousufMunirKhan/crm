@@ -320,6 +320,12 @@ class EmailManagementController extends Controller
      */
     public function sendTemplateToOneRecipient(EmailTemplate $template, $customer, ?int $sentBy): array
     {
+        // Every caller used to have to remember this, and the marketing agent's
+        // job did not - so its whole first batch went to the .env placeholder
+        // host and bounced. It is cheap to call twice, so it happens here where
+        // it cannot be forgotten.
+        \App\Services\MailConfigFromDatabase::apply();
+
         if (\App\Models\EmailUnsubscribe::isUnsubscribed((string) $customer->email)) {
             return ['status' => 'skipped'];
         }

@@ -113,11 +113,31 @@
 
             <!-- Results only exist once something has gone out. -->
             <div v-if="results?.has_results" class="card">
-                <div class="p-4 border-b border-slate-200">
-                    <h2 class="card-title">What happened</h2>
-                    <p class="card-subtitle">
-                        Counted against delivered, not attempted — a bounce is not someone ignoring you.
-                    </p>
+                <div class="flex flex-wrap items-start justify-between gap-3 p-4 border-b border-slate-200">
+                    <div class="min-w-0">
+                        <h2 class="card-title">What happened</h2>
+                        <p class="card-subtitle">
+                            Counted against delivered, not attempted — a bounce is not someone ignoring you.
+                        </p>
+                    </div>
+                    <BaseButton
+                        v-if="failedCount"
+                        variant="outline"
+                        :loading="retrying"
+                        @click="retryFailed"
+                    >
+                        Try {{ failedCount }} again
+                    </BaseButton>
+                </div>
+
+                <div v-if="failedCount" class="callout callout-danger m-4">
+                    <div class="min-w-0">
+                        <p class="font-medium">{{ failedCount }} did not arrive</p>
+                        <p class="text-sm mt-0.5">
+                            A failure here is almost always the mail server rather than the message, so the
+                            decisions you already made are kept — “Try again” re-sends only these.
+                        </p>
+                    </div>
                 </div>
                 <div class="table-wrap">
                     <table class="table min-w-[760px]">
@@ -514,6 +534,22 @@ const events = ref([]);
 const recipients = ref([]);
 const showBlocked = ref(false);
 const showRecipients = ref(false);
+const retrying = ref(false);
+
+const failedCount = computed(() => recipients.value.filter((r) => r.status === 'failed').length);
+
+async function retryFailed() {
+    retrying.value = true;
+    try {
+        const { data } = await axios.post(`/api/marketing/agent/plans/${plan.value.id}/retry`);
+        toast.success(data.message);
+        await load();
+    } catch (e) {
+        toast.error(e?.response?.data?.message || 'Could not retry.');
+    } finally {
+        retrying.value = false;
+    }
+}
 const eventLimit = ref(50);
 const limits = ref({ weekly_cap: 50, min_days_between_messages: 30, enabled_channels: ['email'] });
 const loading = ref(true);

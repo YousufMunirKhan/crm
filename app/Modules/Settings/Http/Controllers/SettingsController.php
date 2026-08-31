@@ -196,6 +196,7 @@ class SettingsController extends Controller
         }
 
         try {
+            \App\Services\MailConfigFromDatabase::reset();
             \App\Services\MailConfigFromDatabase::apply();
 
             Mail::raw('This is a test email from your CRM system to verify SMTP settings.', function ($message) use ($request) {

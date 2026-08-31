@@ -11,8 +11,27 @@ class MailConfigFromDatabase
      * Call this before sending any email so that Mail::send() uses DB settings.
      * If no SMTP settings are stored in DB, config is left unchanged (uses .env/default).
      */
-    public static function apply(): void
+    /**
+     * Applied already in this process. The settings do not change mid-request,
+     * and re-purging the mail manager per recipient would slow a bulk send for
+     * no benefit.
+     */
+    private static bool $applied = false;
+
+    /** Call after saving settings, and in tests. */
+    public static function reset(): void
     {
+        self::$applied = false;
+    }
+
+    public static function apply(bool $force = false): void
+    {
+        if (self::$applied && ! $force) {
+            return;
+        }
+
+        self::$applied = true;
+
         $keys = [
             'smtp_host',
             'smtp_port',

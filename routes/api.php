@@ -131,6 +131,7 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
         Route::get('/plans/{planId}/items/{itemId}/preview', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'preview']);
         Route::patch('/plans/{planId}/items/{itemId}', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'updateItem']);
         Route::post('/plans/{planId}/bulk', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'bulkUpdate']);
+        Route::post('/plans/{planId}/retry', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'retryFailed']);
         Route::post('/plans/{planId}/send', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'send']);
     });
 
