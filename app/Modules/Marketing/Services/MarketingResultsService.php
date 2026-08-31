@@ -148,6 +148,60 @@ class MarketingResultsService
     }
 
     /**
+     * One row per person: what was decided, what happened, and when.
+     *
+     * The per-purpose table answers "which reason is working". This answers the
+     * question actually asked after a send - "did Grace get it, and did she
+     * open it" - which a percentage cannot.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function recipients(MarketingPlan $plan): array
+    {
+        $items = $plan->items()->with(['customer:id,name,business_name,email,type'])->get();
+        $commIds = $items->pluck('sent_communication_id')->filter()->all();
+
+        $comms = $commIds === []
+            ? collect()
+            : SentCommunication::whereIn('id', $commIds)
+                ->get(['id', 'status', 'opened_at', 'open_count', 'sent_at', 'error_message'])
+                ->keyBy('id');
+
+        $clicks = $commIds === []
+            ? collect()
+            : CommunicationClick::whereIn('sent_communication_id', $commIds)
+                ->selectRaw('sent_communication_id, SUM(click_count) as total, MAX(last_clicked_at) as last_at')
+                ->groupBy('sent_communication_id')
+                ->get()
+                ->keyBy('sent_communication_id');
+
+        return $items->map(function (MarketingPlanItem $item) use ($comms, $clicks) {
+            $comm = $item->sent_communication_id ? $comms->get($item->sent_communication_id) : null;
+            $click = $item->sent_communication_id ? $clicks->get($item->sent_communication_id) : null;
+
+            return [
+                'id' => $item->id,
+                'name' => $item->customer?->name,
+                'business_name' => $item->customer?->business_name,
+                'email' => $item->customer?->email,
+                'type' => $item->customer?->type,
+                'purpose' => $item->purpose,
+                'status' => $item->status,
+                // Why it was refused, or why the send failed. Already stored
+                // per row - it was only ever hidden inside a collapsed group.
+                'reason' => $item->blocked_reason,
+                'edited' => $item->isEdited(),
+                'sent_at' => $comm?->sent_at,
+                'opened_at' => $comm?->opened_at,
+                'open_count' => (int) ($comm->open_count ?? 0),
+                'clicks' => (int) ($click->total ?? 0),
+                'last_clicked_at' => $click->last_at ?? null,
+                'error' => $comm?->error_message,
+            ];
+        })->all();
+    }
+
+    /**
      * Every plan that has sent anything, newest first, so purposes can be
      * compared across weeks rather than judged on one send.
      *

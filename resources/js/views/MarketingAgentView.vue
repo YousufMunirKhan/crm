@@ -69,12 +69,45 @@
                 </div>
             </div>
 
-            <div v-if="blockedReasons.length" class="callout callout-warning">
-                <div class="min-w-0">
-                    <p class="font-medium">Why some were left out</p>
-                    <ul class="mt-1 text-sm space-y-0.5">
-                        <li v-for="r in blockedReasons" :key="r.reason">{{ r.count }} — {{ r.reason }}</li>
-                    </ul>
+            <div v-if="blockedRecipients.length" class="card">
+                <button
+                    type="button"
+                    class="flex w-full items-start justify-between gap-3 p-4 text-left"
+                    @click="showBlocked = !showBlocked"
+                >
+                    <span class="min-w-0">
+                        <span class="block font-semibold text-slate-900">
+                            {{ blockedRecipients.length }} left out
+                        </span>
+                        <span class="block text-sm text-slate-500 mt-0.5">
+                            <template v-for="(r, i) in blockedReasons" :key="r.reason">
+                                <template v-if="i">, </template>{{ r.count }} {{ r.reason.toLowerCase() }}
+                            </template>
+                        </span>
+                    </span>
+                    <span class="link text-sm shrink-0">{{ showBlocked ? 'Hide' : 'Show who' }}</span>
+                </button>
+
+                <div v-if="showBlocked" class="table-wrap border-t border-slate-200">
+                    <table class="table min-w-[680px]">
+                        <caption class="sr-only">Contacts the rules refused</caption>
+                        <thead class="table-thead">
+                            <tr>
+                                <th scope="col" class="table-th">Customer / Company</th>
+                                <th scope="col" class="table-th">Would have been</th>
+                                <th scope="col" class="table-th">Why not</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="r in blockedRecipients" :key="r.id" class="table-row">
+                                <td class="table-td">
+                                    <CustomerName :customer="r" />
+                                </td>
+                                <td class="table-td text-slate-600">{{ purposeLabel(r.purpose) }}</td>
+                                <td class="table-td font-medium text-danger-700">{{ r.reason || 'No reason recorded' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -111,6 +144,49 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="border-t border-slate-200">
+                    <button
+                        type="button"
+                        class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                        @click="showRecipients = !showRecipients"
+                    >
+                        <span class="font-medium text-slate-900">Person by person</span>
+                        <span class="link text-sm">{{ showRecipients ? 'Hide' : `Show all ${sentRecipients.length}` }}</span>
+                    </button>
+
+                    <div v-if="showRecipients" class="table-wrap border-t border-slate-200">
+                        <table class="table min-w-[860px]">
+                            <caption class="sr-only">What happened to each message</caption>
+                            <thead class="table-thead">
+                                <tr>
+                                    <th scope="col" class="table-th">Customer / Company</th>
+                                    <th scope="col" class="table-th">Reason</th>
+                                    <th scope="col" class="table-th">Outcome</th>
+                                    <th scope="col" class="table-th-num">Opens</th>
+                                    <th scope="col" class="table-th-num">Clicks</th>
+                                    <th scope="col" class="table-th">When</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="r in sentRecipients" :key="r.id" class="table-row">
+                                    <td class="table-td">
+                                        <CustomerName :customer="r" />
+                                        <span v-if="r.edited" class="text-xs text-primary-700">Rewritten for this person</span>
+                                    </td>
+                                    <td class="table-td text-slate-600">{{ purposeLabel(r.purpose) }}</td>
+                                    <td class="table-td">
+                                        <BaseBadge :tone="outcomeTone(r)">{{ outcomeLabel(r) }}</BaseBadge>
+                                        <span v-if="r.error" class="mt-0.5 block text-xs text-danger-700">{{ r.error }}</span>
+                                    </td>
+                                    <td class="table-td-num" :class="r.open_count ? 'font-semibold' : 'text-slate-400'">{{ r.open_count || '—' }}</td>
+                                    <td class="table-td-num" :class="r.clicks ? 'font-semibold text-success-700' : 'text-slate-400'">{{ r.clicks || '—' }}</td>
+                                    <td class="table-td text-xs text-slate-500 whitespace-nowrap">{{ formatWhen(r.sent_at) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <p class="px-4 py-3 text-xs text-slate-500 border-t border-slate-200">
                     Open rates read high everywhere now — Apple Mail opens messages on the recipient's behalf.
                     Clicks are the number to trust. Replies are not counted at all; a quote follow-up that gets
@@ -435,6 +511,9 @@ const plans = ref([]);
 const selectedPlanId = ref(null);
 const results = ref(null);
 const events = ref([]);
+const recipients = ref([]);
+const showBlocked = ref(false);
+const showRecipients = ref(false);
 const eventLimit = ref(50);
 const limits = ref({ weekly_cap: 50, min_days_between_messages: 30, enabled_channels: ['email'] });
 const loading = ref(true);
@@ -530,6 +609,30 @@ const counts = computed(() => ({
     blocked: items.value.filter((i) => i.status === 'blocked').length,
 }));
 
+/** Blocked rows with the person's name, not just a count. */
+const blockedRecipients = computed(() => recipients.value.filter((r) => r.status === 'blocked'));
+
+/** Anything that actually left, or tried to. */
+const sentRecipients = computed(() =>
+    recipients.value
+        .filter((r) => ['sent', 'failed'].includes(r.status))
+        .sort((a, b) => (b.clicks - a.clicks) || (b.open_count - a.open_count)),
+);
+
+function outcomeLabel(r) {
+    if (r.status === 'failed') return 'Did not arrive';
+    if (r.clicks) return 'Clicked';
+    if (r.opened_at) return 'Opened';
+    return 'Delivered';
+}
+
+function outcomeTone(r) {
+    if (r.status === 'failed') return 'danger';
+    if (r.clicks) return 'success';
+    if (r.opened_at) return 'primary';
+    return 'neutral';
+}
+
 const blockedReasons = computed(() =>
     Object.entries(plan.value?.rail_summary?.blocked_reasons || {})
         .map(([reason, count]) => ({ reason, count }))
@@ -575,6 +678,7 @@ async function loadPlan(id) {
         const { data } = await axios.get(`/api/marketing/agent/plans/${id}`);
         plan.value = data.plan;
         results.value = data.results;
+        recipients.value = data.recipients || [];
         events.value = data.events || [];
         selectedPlanId.value = data.plan.id;
         eventLimit.value = 50;

@@ -78,6 +78,10 @@ class MarketingAgentController extends Controller
         return response()->json([
             'plan' => $plan,
             'results' => app(MarketingResultsService::class)->forPlan($plan),
+            // Per person, so "did Grace get it and did she open it" has an
+            // answer - and so a blocked row's reason is readable without
+            // hunting through a collapsed group.
+            'recipients' => app(MarketingResultsService::class)->recipients($plan),
             'events' => $plan->events()->with('user:id,name')->limit(200)->get(),
             'limits' => $this->limits(),
         ]);
