@@ -562,6 +562,11 @@
         @apply inline-flex items-center gap-2 cursor-pointer text-sm font-medium
             text-slate-700 min-h-[38px];
     }
+    /* The box must not shrink when the label is long, or it deforms in a grid. */
+    .form-choice > input[type="checkbox"],
+    .form-choice > input[type="radio"] {
+        @apply shrink-0;
+    }
     /** Applied to <fieldset>; pair with .form-legend on the <legend>. */
     .form-fieldset {
         @apply border-0 p-0 m-0 min-w-0;

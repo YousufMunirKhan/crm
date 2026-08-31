@@ -166,11 +166,11 @@
 
                 <fieldset class="form-fieldset sm:col-span-2">
                     <legend class="form-legend">Assign to (one or more)</legend>
-                    <div class="max-h-40 space-y-2 overflow-y-auto rounded-control border border-slate-200 bg-slate-50/50 p-2">
+                    <div class="max-h-48 overflow-y-auto rounded-control border border-slate-200 bg-slate-50/50 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
                         <label
                             v-for="user in users"
                             :key="user.id"
-                            class="form-choice flex"
+                            class="form-choice !flex min-w-0"
                         >
                             <input v-model="form.assigned_user_ids" type="checkbox" :value="user.id" class="form-checkbox" />
                             {{ user.name }}

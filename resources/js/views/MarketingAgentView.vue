@@ -5,6 +5,19 @@
         :badge="plan ? `${counts.approved} approved` : null"
     >
         <template #actions>
+            <!-- Rebuilding no longer deletes the old plan, so there is history
+                 to move between. -->
+            <select
+                v-if="plans.length > 1"
+                v-model="selectedPlanId"
+                class="form-select w-auto"
+                aria-label="Which plan"
+                @change="loadPlan(selectedPlanId)"
+            >
+                <option v-for="p in plans" :key="p.id" :value="p.id">
+                    {{ formatDate(p.week_starting) }} — {{ planLabel(p) }}
+                </option>
+            </select>
             <BaseButton variant="outline" :loading="generating" @click="generate">
                 <template #icon><SparklesIcon class="icon-sm" aria-hidden="true" /></template>
                 {{ plan ? 'Rebuild this week' : 'Build this week' }}
@@ -20,6 +33,19 @@
         />
 
         <div v-else class="space-y-4">
+            <!-- A failed build used to disappear into a log file. -->
+            <div v-if="plan.generation_error" class="callout callout-danger">
+                <div class="min-w-0">
+                    <p class="font-medium">This plan could not be built</p>
+                    <p class="text-sm mt-0.5 break-words">{{ plan.generation_error }}</p>
+                    <p class="text-sm mt-1">Nothing was sent. Press “Rebuild this week” to try again.</p>
+                </div>
+            </div>
+
+            <div v-if="plan.status === 'superseded'" class="callout callout-warning">
+                <span>This plan was replaced by a later rebuild. It is kept for the record and cannot be edited or sent.</span>
+            </div>
+
             <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
                 <div class="stat-card">
                     <p class="stat-label">Considered</p>
@@ -50,6 +76,46 @@
                         <li v-for="r in blockedReasons" :key="r.reason">{{ r.count }} — {{ r.reason }}</li>
                     </ul>
                 </div>
+            </div>
+
+            <!-- Results only exist once something has gone out. -->
+            <div v-if="results?.has_results" class="card">
+                <div class="p-4 border-b border-slate-200">
+                    <h2 class="card-title">What happened</h2>
+                    <p class="card-subtitle">
+                        Counted against delivered, not attempted — a bounce is not someone ignoring you.
+                    </p>
+                </div>
+                <div class="table-wrap">
+                    <table class="table min-w-[760px]">
+                        <caption class="sr-only">Results by reason</caption>
+                        <thead class="table-thead">
+                            <tr>
+                                <th scope="col" class="table-th">Reason</th>
+                                <th scope="col" class="table-th-num">Delivered</th>
+                                <th scope="col" class="table-th-num">Opened</th>
+                                <th scope="col" class="table-th-num">Clicked</th>
+                                <th scope="col" class="table-th-num">Bounced</th>
+                                <th scope="col" class="table-th-num">Unsub.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(r, purpose) in results.purposes" :key="purpose" class="table-row">
+                                <td class="table-td font-medium text-slate-900">{{ purposeLabel(purpose) }}</td>
+                                <td class="table-td-num">{{ r.delivered }}</td>
+                                <td class="table-td-num">{{ r.opened }}<span v-if="r.open_rate !== null" class="text-slate-500 text-xs"> · {{ r.open_rate }}%</span></td>
+                                <td class="table-td-num font-semibold">{{ r.clicked }}<span v-if="r.click_rate !== null" class="text-slate-500 text-xs font-normal"> · {{ r.click_rate }}%</span></td>
+                                <td class="table-td-num" :class="r.bounced ? 'text-danger-700' : ''">{{ r.bounced }}</td>
+                                <td class="table-td-num" :class="r.unsubscribed ? 'text-danger-700' : ''">{{ r.unsubscribed }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="px-4 py-3 text-xs text-slate-500 border-t border-slate-200">
+                    Open rates read high everywhere now — Apple Mail opens messages on the recipient's behalf.
+                    Clicks are the number to trust. Replies are not counted at all; a quote follow-up that gets
+                    answered by email will show zero clicks and still be the best thing you sent.
+                </p>
             </div>
 
             <div class="card overflow-hidden">
@@ -280,6 +346,28 @@
             </template>
         </BaseModal>
 
+        <div v-if="plan && events.length" class="card">
+            <div class="p-4 border-b border-slate-200">
+                <h2 class="card-title">Activity</h2>
+                <p class="card-subtitle">Who decided what, and when.</p>
+            </div>
+            <ul class="divide-y divide-slate-100">
+                <li v-for="e in shownEvents" :key="e.id" class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-4 py-2.5 text-sm">
+                    <BaseBadge :tone="eventTone(e.action)">{{ e.action.replace('_', ' ') }}</BaseBadge>
+                    <span class="text-slate-800 min-w-0">{{ e.summary }}</span>
+                    <span class="ml-auto shrink-0 text-xs text-slate-500">
+                        {{ e.user?.name || 'System' }} · {{ formatWhen(e.created_at) }}
+                    </span>
+                </li>
+            </ul>
+            <button
+                v-if="events.length > eventLimit"
+                type="button"
+                class="link text-xs px-4 py-3"
+                @click="eventLimit += 50"
+            >Show older activity</button>
+        </div>
+
         <!-- Rendered by the same code the real send uses, with this person's own
              data merged in - a preview built any other way is a drawing of the
              email rather than the email. -->
@@ -343,6 +431,11 @@ import { BaseBadge, BaseButton, BaseModal, ConfirmDialog, EmptyState } from '@/c
 const toast = useToastStore();
 
 const plan = ref(null);
+const plans = ref([]);
+const selectedPlanId = ref(null);
+const results = ref(null);
+const events = ref([]);
+const eventLimit = ref(50);
 const limits = ref({ weekly_cap: 50, min_days_between_messages: 30, enabled_channels: ['email'] });
 const loading = ref(true);
 const generating = ref(false);
@@ -389,7 +482,7 @@ const mergeTagExample = '{' + '{first_name}' + '}';
 
 const purposeLabel = (p) => PURPOSE_LABELS[p] || p;
 const isEdited = (item) => Boolean(item.subject_override || item.body_override);
-const editable = computed(() => ['draft', 'approved'].includes(plan.value?.status));
+const editable = computed(() => ['draft', 'approved'].includes(plan.value?.status) && !plan.value?.generation_error);
 const items = computed(() => plan.value?.items || []);
 
 const channelTabs = computed(() =>
@@ -456,13 +549,57 @@ function toggle(purpose) {
 const formatDate = (d) =>
     d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
+const shownEvents = computed(() => events.value.slice(0, eventLimit.value));
+
+function planLabel(p) {
+    if (p.status === 'superseded') return 'replaced';
+    if (p.generation_error) return 'failed';
+    if (['sending', 'sent'].includes(p.status)) return `${p.sent_items_count || 0} sent`;
+    return `${p.approved_count || 0} approved`;
+}
+
+function eventTone(action) {
+    if (['sent', 'approved'].includes(action)) return 'success';
+    if (['failed', 'generation_failed', 'blocked'].includes(action)) return 'danger';
+    if (['skipped', 'superseded'].includes(action)) return 'warning';
+    return 'neutral';
+}
+
+const formatWhen = (iso) => (iso ? new Date(iso).toLocaleString('en-GB', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+}) : '');
+
+async function loadPlan(id) {
+    if (!id) return;
+    try {
+        const { data } = await axios.get(`/api/marketing/agent/plans/${id}`);
+        plan.value = data.plan;
+        results.value = data.results;
+        events.value = data.events || [];
+        selectedPlanId.value = data.plan.id;
+        eventLimit.value = 50;
+    } catch (e) {
+        toast.error(e?.response?.data?.message || 'Could not load that plan.');
+    }
+}
+
 async function load() {
     loading.value = true;
     try {
         const { data } = await axios.get('/api/marketing/agent/plans');
         limits.value = data.limits || limits.value;
-        const latest = (data.data || [])[0];
-        plan.value = latest ? (await axios.get(`/api/marketing/agent/plans/${latest.id}`)).data.plan : null;
+        plans.value = data.data || [];
+
+        // Opens on the newest plan that is still live rather than on history.
+        const openId = selectedPlanId.value && plans.value.some((p) => p.id === selectedPlanId.value)
+            ? selectedPlanId.value
+            : data.current_id;
+
+        if (openId) {
+            await loadPlan(openId);
+        } else {
+            plan.value = null;
+        }
     } catch (e) {
         toast.error(e?.response?.data?.message || 'Could not load the plan.');
     } finally {
@@ -474,9 +611,17 @@ async function generate() {
     generating.value = true;
     try {
         const { data } = await axios.post('/api/marketing/agent/plans');
-        plan.value = (await axios.get(`/api/marketing/agent/plans/${data.plan.id}`)).data.plan;
+        selectedPlanId.value = data.plan.id;
+        await load();
         toast.success('Plan built. Nothing has been sent.');
     } catch (e) {
+        // A failed build still creates a record, so show it rather than
+        // leaving the screen on the previous plan with a toast that fades.
+        const failed = e?.response?.data?.plan;
+        if (failed?.id) {
+            selectedPlanId.value = failed.id;
+            await load();
+        }
         toast.error(e?.response?.data?.message || 'Could not build the plan.');
     } finally {
         generating.value = false;

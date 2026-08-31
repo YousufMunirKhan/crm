@@ -24,11 +24,14 @@ class MarketingPlan extends Model
     public const STATUS_SENDING = 'sending';
     public const STATUS_SENT = 'sent';
     public const STATUS_CANCELLED = 'cancelled';
+    /** Replaced by a rebuild. Kept so the week's history survives. */
+    public const STATUS_SUPERSEDED = 'superseded';
 
     protected $fillable = [
         'week_starting', 'status', 'model', 'generated_at', 'generated_by',
         'approved_by', 'approved_at', 'item_count', 'sent_count', 'failed_count',
-        'rail_summary', 'notes',
+        'rail_summary', 'notes', 'generation_error',
+        'superseded_by_id', 'superseded_at',
     ];
 
     protected $casts = [
@@ -36,7 +39,13 @@ class MarketingPlan extends Model
         'generated_at' => 'datetime',
         'approved_at' => 'datetime',
         'rail_summary' => 'array',
+        'superseded_at' => 'datetime',
     ];
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(MarketingPlanEvent::class)->latest('id');
+    }
 
     public function items(): HasMany
     {

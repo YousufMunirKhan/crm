@@ -6,6 +6,7 @@ use App\Http\Controllers\EmailManagementController;
 use App\Models\EmailTemplate;
 use App\Models\SentCommunication;
 use App\Modules\Marketing\Models\MarketingPlan;
+use App\Modules\Marketing\Models\MarketingPlanEvent;
 use App\Modules\Marketing\Models\MarketingPlanItem;
 use App\Modules\Marketing\Services\MarketingGuardrails;
 use Illuminate\Bus\Queueable;
@@ -62,6 +63,17 @@ class SendMarketingPlanItemJob implements ShouldQueue
                 'status' => MarketingPlanItem::STATUS_BLOCKED,
                 'blocked_reason' => $check['reason'],
             ]);
+
+            // Consent can change between approval and sending, and a row that
+            // silently vanishes at that point is the worst kind of missing.
+            MarketingPlanEvent::record(
+                $item->marketing_plan_id,
+                MarketingPlanEvent::BLOCKED,
+                'Not sent to '.($customer->name ?: $customer->email).' - '.$check['reason'],
+                $item->id,
+                $this->sentByUserId,
+            );
+
             $this->tally($item->marketing_plan_id);
 
             return;
@@ -105,6 +117,15 @@ class SendMarketingPlanItemJob implements ShouldQueue
                 'blocked_reason' => $sent ? null : ($result['message'] ?? 'Send was skipped'),
                 'sent_communication_id' => $record?->id,
             ]);
+
+            MarketingPlanEvent::record(
+                $item->marketing_plan_id,
+                $sent ? MarketingPlanEvent::SENT : MarketingPlanEvent::FAILED,
+                ($sent ? 'Sent to ' : 'Failed to send to ').($customer->name ?: $customer->email),
+                $item->id,
+                $this->sentByUserId,
+                ['email' => $customer->email],
+            );
         } catch (\Throwable $e) {
             Log::error('Marketing plan item failed to send', [
                 'item_id' => $item->id,
@@ -149,6 +170,14 @@ class SendMarketingPlanItemJob implements ShouldQueue
             'status' => MarketingPlanItem::STATUS_FAILED,
             'blocked_reason' => $reason,
         ]);
+
+        MarketingPlanEvent::record(
+            $item->marketing_plan_id,
+            MarketingPlanEvent::FAILED,
+            'Failed: '.$reason,
+            $item->id,
+            $this->sentByUserId,
+        );
         $this->tally($item->marketing_plan_id);
     }
 

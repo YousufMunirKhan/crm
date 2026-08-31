@@ -199,16 +199,16 @@
 
                         <fieldset class="form-fieldset">
                             <legend class="form-legend">Assign to (one or more)</legend>
-                            <div class="rounded-card border border-slate-200 bg-white p-3 max-h-48 overflow-y-auto space-y-2">
+                            <div class="rounded-card border border-slate-200 bg-white p-3 max-h-56 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
                                 <label
                                     v-for="u in users"
                                     :key="u.id"
-                                    class="form-choice text-slate-800"
+                                    class="form-choice !flex min-w-0 text-slate-800"
                                 >
                                     <input v-model="form.assigned_user_ids" type="checkbox" :value="Number(u.id)" class="form-checkbox" />
                                     {{ u.name }}
                                 </label>
-                                <p v-if="!users.length" class="text-sm text-slate-500">No users loaded.</p>
+                                <p v-if="!users.length" class="text-sm text-slate-500 sm:col-span-2 lg:col-span-3">No users loaded.</p>
                             </div>
                             <div
                                 v-if="editCommentRecipientRows.length > 0"

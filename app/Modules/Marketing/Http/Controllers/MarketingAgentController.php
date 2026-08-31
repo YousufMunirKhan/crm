@@ -7,11 +7,14 @@ use App\Http\Controllers\EmailManagementController;
 use App\Models\Campaign;
 use App\Modules\Marketing\Jobs\SendMarketingPlanItemJob;
 use App\Modules\Marketing\Models\MarketingPlan;
+use App\Modules\Marketing\Models\MarketingPlanEvent;
 use App\Modules\Marketing\Models\MarketingPlanItem;
 use App\Modules\Marketing\Services\MarketingGuardrails;
 use App\Modules\Marketing\Services\MarketingPlannerService;
+use App\Modules\Marketing\Services\MarketingResultsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 
 /**
  * The review screen's API.
@@ -40,12 +43,23 @@ class MarketingAgentController extends Controller
     {
         $this->assertManager($request);
 
+        $plans = MarketingPlan::query()
+            ->with(['generatedBy:id,name', 'approvedBy:id,name'])
+            ->withCount([
+                'items as approved_count' => fn ($q) => $q->where('status', 'approved'),
+                'items as sent_items_count' => fn ($q) => $q->where('status', 'sent'),
+            ])
+            ->orderByDesc('week_starting')
+            ->orderByDesc('id')
+            ->limit(30)
+            ->get();
+
         return response()->json([
-            'data' => MarketingPlan::query()
-                ->with(['generatedBy:id,name', 'approvedBy:id,name'])
-                ->latest('week_starting')
-                ->limit(20)
-                ->get(),
+            // The newest plan that is still live, so the screen opens on
+            // something actionable rather than on last week's history.
+            'current_id' => $plans->firstWhere(fn ($p) => $p->status !== MarketingPlan::STATUS_SUPERSEDED)?->id
+                ?? $plans->first()?->id,
+            'data' => $plans,
             'limits' => $this->limits(),
         ]);
     }
@@ -63,6 +77,8 @@ class MarketingAgentController extends Controller
 
         return response()->json([
             'plan' => $plan,
+            'results' => app(MarketingResultsService::class)->forPlan($plan),
+            'events' => $plan->events()->with('user:id,name')->limit(200)->get(),
             'limits' => $this->limits(),
         ]);
     }
@@ -75,21 +91,76 @@ class MarketingAgentController extends Controller
             ? \Illuminate\Support\Carbon::parse($request->week)->startOfDay()
             : now()->startOfWeek();
 
-        $existing = MarketingPlan::forWeek($week->toDateString())->first();
+        $existing = MarketingPlan::forWeek($week->toDateString())
+            ->where('status', '!=', MarketingPlan::STATUS_SUPERSEDED)
+            ->first();
 
-        if ($existing && $existing->status !== MarketingPlan::STATUS_DRAFT) {
+        if ($existing && ! in_array($existing->status, [MarketingPlan::STATUS_DRAFT, MarketingPlan::STATUS_APPROVED], true)) {
             return response()->json([
-                'message' => "A plan for that week already exists and is {$existing->status}.",
+                'message' => "The plan for that week has already been sent, so it cannot be rebuilt. Its history stays as it is.",
             ], 422);
         }
-
-        $existing?->delete();
 
         try {
             ['plan' => $plan] = $planner->generate($week, $request->user()->id);
         } catch (\Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 500);
+            // A failed generation used to leave nothing at all - the request
+            // 500'd and the reason lived in a log file nobody reads. It is
+            // recorded against the week so the screen can show what went wrong.
+            Log::error('Marketing plan generation failed', [
+                'week' => $week->toDateString(),
+                'message' => $e->getMessage(),
+            ]);
+
+            $failed = MarketingPlan::create([
+                'week_starting' => $week->toDateString(),
+                'status' => MarketingPlan::STATUS_CANCELLED,
+                'generated_at' => now(),
+                'generated_by' => $request->user()->id,
+                'generation_error' => $e->getMessage(),
+            ]);
+
+            MarketingPlanEvent::record(
+                $failed->id,
+                MarketingPlanEvent::GENERATION_FAILED,
+                'Could not build the plan: '.\Illuminate\Support\Str::limit($e->getMessage(), 200),
+                null,
+                $request->user()->id,
+            );
+
+            return response()->json([
+                'message' => 'Could not build the plan: '.$e->getMessage(),
+                'plan' => $failed,
+            ], 500);
         }
+
+        // The previous plan is superseded, not deleted, so last week's decisions
+        // and what came of them stay readable.
+        if ($existing) {
+            $existing->update([
+                'status' => MarketingPlan::STATUS_SUPERSEDED,
+                'superseded_by_id' => $plan->id,
+                'superseded_at' => now(),
+            ]);
+
+            MarketingPlanEvent::record(
+                $existing->id,
+                MarketingPlanEvent::SUPERSEDED,
+                "Replaced by a rebuild (plan #{$plan->id}).",
+                null,
+                $request->user()->id,
+            );
+        }
+
+        MarketingPlanEvent::record(
+            $plan->id,
+            MarketingPlanEvent::GENERATED,
+            $plan->item_count.' row(s) proposed, '
+                .($plan->rail_summary['sendable'] ?? 0).' sendable.',
+            null,
+            $request->user()->id,
+            $plan->rail_summary,
+        );
 
         return response()->json(['plan' => $plan->load('items.customer:id,name,business_name')], 201);
     }
@@ -133,7 +204,44 @@ class MarketingAgentController extends Controller
             }
         }
 
+        $before = $item->status;
         $item->update($data);
+
+        $who = $item->customer?->name ?: 'a contact';
+
+        if (isset($data['status']) && $data['status'] !== $before) {
+            $action = match ($data['status']) {
+                'approved' => MarketingPlanEvent::APPROVED,
+                'skipped' => MarketingPlanEvent::SKIPPED,
+                default => MarketingPlanEvent::REOPENED,
+            };
+            $verb = match ($data['status']) {
+                'approved' => 'Approved',
+                'skipped' => 'Skipped',
+                default => 'Put back to undecided',
+            };
+
+            MarketingPlanEvent::record(
+                $plan->id,
+                $action,
+                "{$verb}: {$who}",
+                $item->id,
+                $request->user()->id,
+                ['from' => $before, 'to' => $data['status']],
+            );
+        }
+
+        if (array_key_exists('subject_override', $data) || array_key_exists('body_override', $data)) {
+            MarketingPlanEvent::record(
+                $plan->id,
+                MarketingPlanEvent::EDITED,
+                $item->isEdited()
+                    ? "Rewrote the message for {$who} only"
+                    : "Reverted {$who} to the template wording",
+                $item->id,
+                $request->user()->id,
+            );
+        }
 
         return response()->json(['item' => $item->fresh(['customer', 'emailTemplate'])]);
     }
@@ -251,7 +359,28 @@ class MarketingAgentController extends Controller
             $query->whereIn('id', $data['item_ids']);
         }
 
+        // Read before writing so the event can say what actually changed
+        // rather than how many rows the query touched.
+        $affected = (clone $query)->where('status', '!=', $data['status'])->count();
         $changed = $query->update(['status' => $data['status']]);
+
+        if ($affected > 0) {
+            $verb = match ($data['status']) {
+                'approved' => 'Approved',
+                'skipped' => 'Skipped',
+                default => 'Reopened',
+            };
+            $scope = empty($data['item_ids']) ? 'everything on this plan' : 'a selection';
+
+            MarketingPlanEvent::record(
+                $plan->id,
+                $data['status'] === 'skipped' ? MarketingPlanEvent::SKIPPED : MarketingPlanEvent::APPROVED,
+                "{$verb} {$affected} row(s) - {$scope}",
+                null,
+                $request->user()->id,
+                ['count' => $affected],
+            );
+        }
 
         return response()->json(['changed' => $changed]);
     }
@@ -311,6 +440,20 @@ class MarketingAgentController extends Controller
             'approved_by' => $request->user()->id,
             'approved_at' => now(),
         ]);
+
+        // What was left behind matters as much as what went: after a send the
+        // question is always "who did we not write to, and why".
+        $skipped = $plan->items()->where('status', MarketingPlanItem::STATUS_SKIPPED)->count();
+        $blocked = $plan->items()->where('status', MarketingPlanItem::STATUS_BLOCKED)->count();
+
+        MarketingPlanEvent::record(
+            $plan->id,
+            MarketingPlanEvent::QUEUED,
+            "Sent {$queued} message(s). {$skipped} skipped by hand, {$blocked} blocked by the rules.",
+            null,
+            $request->user()->id,
+            ['queued' => $queued, 'skipped' => $skipped, 'blocked' => $blocked],
+        );
 
         return response()->json([
             'queued' => $queued,

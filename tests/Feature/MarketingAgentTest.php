@@ -270,6 +270,165 @@ class MarketingAgentTest extends TestCase
         $this->assertTrue($item->fresh()->isEdited());
     }
 
+    // ------------------------------------------------------- history and log
+
+    /**
+     * Rebuilding used to delete the previous plan, so "what did we decide last
+     * week and what came of it" had no answer. The old one is kept and marked.
+     */
+    public function test_a_rebuild_supersedes_the_old_plan_instead_of_deleting_it(): void
+    {
+        $old = $this->plan();
+
+        $old->update([
+            'status' => MarketingPlan::STATUS_SUPERSEDED,
+            'superseded_by_id' => null,
+            'superseded_at' => now(),
+        ]);
+
+        $this->assertDatabaseHas('marketing_plans', [
+            'id' => $old->id,
+            'status' => MarketingPlan::STATUS_SUPERSEDED,
+        ]);
+    }
+
+    public function test_approving_a_row_is_written_to_the_activity_log(): void
+    {
+        $plan = $this->plan();
+        $customer = Customer::create([
+            'phone' => '07700901020', 'name' => 'Log Me',
+            'email' => 'log@example.com', 'type' => Customer::TYPE_CUSTOMER,
+        ]);
+
+        $item = MarketingPlanItem::create([
+            'marketing_plan_id' => $plan->id,
+            'customer_id' => $customer->id,
+            'channel' => 'email',
+            'purpose' => 'check-in',
+            'status' => MarketingPlanItem::STATUS_PENDING,
+        ]);
+
+        $manager = $this->manager();
+
+        $this->actingAs($manager)
+            ->patchJson("/api/marketing/agent/plans/{$plan->id}/items/{$item->id}", ['status' => 'approved'])
+            ->assertOk();
+
+        $this->assertDatabaseHas('marketing_plan_events', [
+            'marketing_plan_id' => $plan->id,
+            'marketing_plan_item_id' => $item->id,
+            'action' => 'approved',
+            'user_id' => $manager->id,
+        ]);
+    }
+
+    /** Cancelling one person is exactly the thing people ask about afterwards. */
+    public function test_skipping_a_row_records_who_did_it(): void
+    {
+        $plan = $this->plan();
+        $customer = Customer::create([
+            'phone' => '07700901021', 'name' => 'Skip Me',
+            'email' => 'skip@example.com', 'type' => Customer::TYPE_CUSTOMER,
+        ]);
+
+        $item = MarketingPlanItem::create([
+            'marketing_plan_id' => $plan->id,
+            'customer_id' => $customer->id,
+            'channel' => 'email',
+            'purpose' => 'check-in',
+            'status' => MarketingPlanItem::STATUS_PENDING,
+        ]);
+
+        $manager = $this->manager();
+
+        $this->actingAs($manager)
+            ->patchJson("/api/marketing/agent/plans/{$plan->id}/items/{$item->id}", ['status' => 'skipped'])
+            ->assertOk();
+
+        $event = \App\Modules\Marketing\Models\MarketingPlanEvent::where('action', 'skipped')->latest('id')->first();
+
+        $this->assertNotNull($event);
+        $this->assertStringContainsString('Skip Me', $event->summary);
+        $this->assertSame($manager->id, $event->user_id);
+    }
+
+    public function test_editing_one_message_is_logged_as_affecting_that_person_only(): void
+    {
+        $plan = $this->plan();
+        $customer = Customer::create([
+            'phone' => '07700901022', 'name' => 'Edited One',
+            'email' => 'edit@example.com', 'type' => Customer::TYPE_CUSTOMER,
+        ]);
+
+        $item = MarketingPlanItem::create([
+            'marketing_plan_id' => $plan->id,
+            'customer_id' => $customer->id,
+            'channel' => 'email',
+            'purpose' => 'check-in',
+            'status' => MarketingPlanItem::STATUS_PENDING,
+        ]);
+
+        $this->actingAs($this->manager())
+            ->patchJson("/api/marketing/agent/plans/{$plan->id}/items/{$item->id}", [
+                'subject_override' => 'Only for them',
+            ])
+            ->assertOk();
+
+        $event = \App\Modules\Marketing\Models\MarketingPlanEvent::where('action', 'edited')->latest('id')->first();
+
+        $this->assertNotNull($event);
+        $this->assertStringContainsString('only', $event->summary);
+    }
+
+    /**
+     * Results count against delivered, not attempted. A bounce is not a person
+     * who ignored you, and putting it in the denominator understates every
+     * campaign for ever.
+     */
+    public function test_results_exclude_bounces_from_the_open_rate(): void
+    {
+        $plan = $this->plan();
+        $campaign = $this->campaign();
+
+        foreach ([['delivered', true], ['bounced', false]] as [$name, $ok]) {
+            $customer = Customer::create([
+                'phone' => '0770090200'.($ok ? '1' : '2'),
+                'name' => $name,
+                'email' => $name.'@example.com',
+                'type' => Customer::TYPE_CUSTOMER,
+            ]);
+
+            $comm = SentCommunication::create([
+                'campaign_id' => $campaign->id,
+                'type' => 'email',
+                'customer_id' => $customer->id,
+                'recipient_email' => $customer->email,
+                'subject' => 'x',
+                'content' => 'y',
+                'status' => $ok ? 'sent' : 'failed',
+                'opened_at' => $ok ? now() : null,
+                'sent_at' => now(),
+            ]);
+
+            MarketingPlanItem::create([
+                'marketing_plan_id' => $plan->id,
+                'customer_id' => $customer->id,
+                'channel' => 'email',
+                'purpose' => 'check-in',
+                'status' => $ok ? MarketingPlanItem::STATUS_SENT : MarketingPlanItem::STATUS_FAILED,
+                'sent_communication_id' => $comm->id,
+            ]);
+        }
+
+        $results = app(\App\Modules\Marketing\Services\MarketingResultsService::class)->forPlan($plan);
+
+        $this->assertSame(2, $results['totals']['attempted']);
+        $this->assertSame(1, $results['totals']['delivered']);
+        $this->assertSame(1, $results['totals']['bounced']);
+        // 1 of 1 delivered, not 1 of 2 attempted.
+        $this->assertSame(100.0, $results['totals']['open_rate']);
+    }
+
     public function test_an_empty_override_clears_it_rather_than_sending_a_blank_subject(): void
     {
         $plan = $this->plan();
