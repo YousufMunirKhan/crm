@@ -62,10 +62,25 @@ class MarketingPlan extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
-    /** A draft can still be edited and sent; anything else is history. */
+    /**
+     * A week stays workable until it is replaced or cancelled.
+     *
+     * Sending part of a plan used to lock the rest of it, which made the sane
+     * way to run this - send a small group, look at the results, then decide
+     * about the others - impossible. Rows that have already gone are protected
+     * by their own status; the ones still waiting are nobody's history yet.
+     */
     public function isEditable(): bool
     {
-        return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_APPROVED], true);
+        return ! in_array($this->status, [self::STATUS_SUPERSEDED, self::STATUS_CANCELLED], true);
+    }
+
+    /** Nothing left to decide. */
+    public function isFinished(): bool
+    {
+        return $this->items()
+            ->whereIn('status', [MarketingPlanItem::STATUS_PENDING, MarketingPlanItem::STATUS_APPROVED])
+            ->doesntExist();
     }
 
     public function scopeForWeek(Builder $query, string $weekStarting): void

@@ -487,6 +487,82 @@ class MarketingAgentTest extends TestCase
         $this->assertSame(MarketingPlanItem::STATUS_FAILED, $rows['two']->fresh()->status);
     }
 
+    /**
+     * Sending part of a plan used to lock the rest of it, which made the sane
+     * way to run this - send a few, look at the results, then decide about the
+     * others - impossible.
+     */
+    public function test_a_plan_can_still_be_worked_on_after_a_partial_send(): void
+    {
+        $plan = $this->plan();
+        $plan->update(['status' => MarketingPlan::STATUS_SENDING]);
+
+        $customer = Customer::create([
+            'phone' => '07700904001', 'name' => 'Still waiting',
+            'email' => 'waiting@example.com', 'type' => Customer::TYPE_CUSTOMER,
+        ]);
+
+        $item = MarketingPlanItem::create([
+            'marketing_plan_id' => $plan->id,
+            'customer_id' => $customer->id,
+            'channel' => 'email',
+            'purpose' => 'check-in',
+            'status' => MarketingPlanItem::STATUS_PENDING,
+        ]);
+
+        $this->actingAs($this->manager())
+            ->patchJson("/api/marketing/agent/plans/{$plan->id}/items/{$item->id}", ['status' => 'approved'])
+            ->assertOk();
+
+        $this->assertSame(MarketingPlanItem::STATUS_APPROVED, $item->fresh()->status);
+    }
+
+    /**
+     * The cap has to span batches, or sending fifty and then approving fifty
+     * more walks straight past it.
+     */
+    public function test_the_weekly_cap_counts_what_has_already_gone(): void
+    {
+        $plan = $this->plan();
+        $cap = MarketingGuardrails::WEEKLY_RECIPIENT_CAP;
+
+        // Fill the week's allowance with rows that already went.
+        for ($i = 0; $i < $cap; $i++) {
+            $c = Customer::create([
+                'phone' => '079000'.str_pad((string) $i, 5, '0', STR_PAD_LEFT),
+                'name' => 'Sent '.$i,
+                'email' => "sent{$i}@example.com",
+                'type' => Customer::TYPE_CUSTOMER,
+            ]);
+
+            MarketingPlanItem::create([
+                'marketing_plan_id' => $plan->id,
+                'customer_id' => $c->id,
+                'channel' => 'email',
+                'purpose' => 'check-in',
+                'status' => MarketingPlanItem::STATUS_SENT,
+            ]);
+        }
+
+        $extra = Customer::create([
+            'phone' => '07700904999', 'name' => 'One too many',
+            'email' => 'toomany@example.com', 'type' => Customer::TYPE_CUSTOMER,
+        ]);
+
+        MarketingPlanItem::create([
+            'marketing_plan_id' => $plan->id,
+            'customer_id' => $extra->id,
+            'channel' => 'email',
+            'purpose' => 'check-in',
+            'status' => MarketingPlanItem::STATUS_APPROVED,
+        ]);
+
+        $this->actingAs($this->manager())
+            ->postJson("/api/marketing/agent/plans/{$plan->id}/send")
+            ->assertStatus(422)
+            ->assertJsonPath('message', "This week's cap is {$cap}. {$cap} have gone already, so there is room for 0 more.");
+    }
+
     public function test_retrying_with_nothing_failed_is_refused(): void
     {
         $plan = $this->plan();

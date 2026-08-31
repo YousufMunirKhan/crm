@@ -60,7 +60,10 @@
                 <div class="stat-card">
                     <p class="stat-label">Ready to send</p>
                     <p class="stat-value text-success-700">{{ counts.approved }}</p>
-                    <p class="stat-caption">Cap is {{ limits.weekly_cap }} a week</p>
+                    <p class="stat-caption">
+                        <template v-if="sentCount">{{ sentCount }} gone, room for {{ roomLeft }} more</template>
+                        <template v-else>Cap is {{ limits.weekly_cap }} a week</template>
+                    </p>
                 </div>
                 <div class="stat-card">
                     <p class="stat-label">Blocked</p>
@@ -250,7 +253,7 @@
                         :loading="sending"
                         @click="confirmSendOpen = true"
                     >
-                        Send {{ counts.approved }} message{{ counts.approved === 1 ? '' : 's' }}
+                        {{ sentCount ? 'Send' : 'Send' }} {{ counts.approved }} message{{ counts.approved === 1 ? '' : 's' }}{{ sentCount ? ' more' : '' }}
                     </BaseButton>
                 </div>
 
@@ -619,7 +622,17 @@ const mergeTagExample = '{' + '{first_name}' + '}';
 
 const purposeLabel = (p) => PURPOSE_LABELS[p] || p;
 const isEdited = (item) => Boolean(item.subject_override || item.body_override);
-const editable = computed(() => ['draft', 'approved'].includes(plan.value?.status) && !plan.value?.generation_error);
+/**
+ * A week stays workable until it is replaced or cancelled. Rows already sent
+ * are protected by their own status; the ones still waiting are not history.
+ */
+const editable = computed(() =>
+    !['superseded', 'cancelled'].includes(plan.value?.status) && !plan.value?.generation_error,
+);
+
+/** Sent already on this plan, so the remaining allowance is honest. */
+const sentCount = computed(() => recipients.value.filter((r) => r.status === 'sent').length);
+const roomLeft = computed(() => Math.max(0, (limits.value.weekly_cap || 50) - sentCount.value));
 const items = computed(() => plan.value?.items || []);
 
 const channelTabs = computed(() =>

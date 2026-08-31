@@ -413,9 +413,17 @@ class MarketingAgentController extends Controller
             return response()->json(['message' => 'Nothing is approved yet.'], 422);
         }
 
-        if ($approved->count() > MarketingGuardrails::WEEKLY_RECIPIENT_CAP) {
+        // Counted with what this plan has already sent, otherwise sending 50
+        // and then approving 50 more walks straight past the weekly cap.
+        $alreadySent = $plan->items()->where('status', MarketingPlanItem::STATUS_SENT)->count();
+        $wouldTotal = $alreadySent + $approved->count();
+
+        if ($wouldTotal > MarketingGuardrails::WEEKLY_RECIPIENT_CAP) {
+            $room = max(0, MarketingGuardrails::WEEKLY_RECIPIENT_CAP - $alreadySent);
+
             return response()->json([
-                'message' => 'That is more than the weekly cap of '.MarketingGuardrails::WEEKLY_RECIPIENT_CAP.'.',
+                'message' => "This week's cap is ".MarketingGuardrails::WEEKLY_RECIPIENT_CAP
+                    .". {$alreadySent} have gone already, so there is room for {$room} more.",
             ], 422);
         }
 
@@ -442,7 +450,9 @@ class MarketingAgentController extends Controller
         $plan->update([
             'status' => MarketingPlan::STATUS_SENDING,
             'approved_by' => $request->user()->id,
-            'approved_at' => now(),
+            // Kept as the first approval, so the plan still knows when it
+            // started going out across several batches.
+            'approved_at' => $plan->approved_at ?? now(),
         ]);
 
         // What was left behind matters as much as what went: after a send the

@@ -197,7 +197,9 @@ class SendMarketingPlanItemJob implements ShouldQueue
         $plan->update([
             'sent_count' => $sent,
             'failed_count' => $failed,
-            'status' => $outstanding === 0 && $plan->status === MarketingPlan::STATUS_SENDING
+            // Only "sent" once there is nothing left waiting either - a plan
+            // with rows still pending is a plan still in progress.
+            'status' => $plan->status === MarketingPlan::STATUS_SENDING && $outstanding === 0 && $plan->isFinished()
                 ? MarketingPlan::STATUS_SENT
                 : $plan->status,
         ]);
