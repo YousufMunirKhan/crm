@@ -177,15 +177,20 @@ async function load() {
 
     try {
         const [agentsRes, targetsRes] = await Promise.all([
-            axios.get('/api/reporting/agents', { params }),
+            // Ask for this person by name. Without agent_id the endpoint
+            // returns every Sales, CallAgent and Support user - and nobody
+            // else - so an Admin or Manager opening their own report was not in
+            // the list at all.
+            axios.get('/api/reporting/agents', { params: { ...params, agent_id: auth.user?.id } }),
             axios.get('/api/hr/employee-targets', { params: { month } }).catch(() => ({ data: { data: [] } })),
         ]);
 
         const rows = Array.isArray(agentsRes.data) ? agentsRes.data : (agentsRes.data?.data ?? []);
 
-        // The endpoint already narrows a non-manager to their own row; the find
-        // is for managers opening their own report.
-        agent.value = rows.find((r) => String(r.id) === String(auth.user?.id)) ?? rows[0] ?? {};
+        // Only ever this person. The previous fallback to rows[0] meant that
+        // when they were missing from the list, somebody else's numbers were
+        // shown under "what you have recorded" - worse than showing nothing.
+        agent.value = rows.find((r) => String(r.id) === String(auth.user?.id)) ?? {};
 
         const targets = targetsRes.data?.data ?? [];
         const mine = targets.find((t) => String(t.user_id) === String(auth.user?.id));

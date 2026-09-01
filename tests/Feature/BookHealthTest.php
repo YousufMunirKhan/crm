@@ -231,6 +231,31 @@ class BookHealthTest extends TestCase
         $this->assertSame($mine, $company['quiet']);
     }
 
+    public function test_an_admin_asking_for_their_own_figures_gets_their_own(): void
+    {
+        $adminRole = Role::firstOrCreate(['name' => 'Admin'], ['nav_permissions' => null]);
+        $admin = User::factory()->create(['role_id' => $adminRole->id, 'is_active' => true]);
+
+        $rep = $this->rep();
+
+        $this->lead($rep);
+        $this->lead($rep);
+        $this->lead($admin);
+
+        // Without agent_id this endpoint returns Sales, CallAgent and Support
+        // users and nobody else, so an Admin or Manager opening their own
+        // report was simply not in the list - and the page fell back to the
+        // first row it found, showing somebody else's numbers as theirs.
+        $rows = $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/reporting/agents?agent_id='.$admin->id)
+            ->assertOk()
+            ->json();
+
+        $this->assertCount(1, $rows);
+        $this->assertSame($admin->id, $rows[0]['id']);
+        $this->assertSame(1, $rows[0]['leads_count']);
+    }
+
     public function test_only_management_can_see_the_whole_company(): void
     {
         $rep = $this->rep();
