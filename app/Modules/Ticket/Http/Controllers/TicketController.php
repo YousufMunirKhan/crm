@@ -80,10 +80,49 @@ class TicketController extends Controller
             $query->where('created_at', '<=', Carbon::parse($request->to)->endOfDay());
         }
 
+        // The state of the queue, before any status filter is applied - so
+        // the header can say what needs attention rather than only counting
+        // whatever the current view happens to show.
+        $summary = $this->queueSummary($user, $isAdmin);
+
         $tickets = $query->orderBy('created_at', 'desc')
             ->paginate($request->get('per_page', 15));
 
-        return response()->json($tickets);
+        return response()->json($tickets->toArray() + ['summary' => $summary]);
+    }
+
+    /**
+     * What is outstanding in this person's queue.
+     *
+     * "Open" here means open or in progress. Counting everything that is not
+     * `closed` sweeps in the resolved pile - 108 of them on this system - and
+     * reports four times the real number.
+     *
+     * @return array<string, int>
+     */
+    private function queueSummary($user, bool $isAdmin): array
+    {
+        $base = fn () => Ticket::where('source', 'crm')
+            ->when(! $isAdmin, fn ($q) => $q->where(function ($inner) use ($user) {
+                $inner->where('created_by', $user->id)
+                    ->orWhere('assigned_to', $user->id)
+                    ->orWhereHas('assignees', fn ($a) => $a->where('users.id', $user->id));
+            }));
+
+        $open = fn () => $base()->whereIn('status', ['open', 'in_progress']);
+
+        return [
+            'open' => (int) $open()->count(),
+            'unassigned' => (int) $open()->whereNull('assigned_to')
+                ->whereDoesntHave('assignees')->count(),
+            'over_a_week' => (int) $open()->where('created_at', '<', now()->subDays(7))->count(),
+            'breaching' => (int) $open()->whereNotNull('sla_due_at')
+                ->where('sla_due_at', '<', now())->count(),
+            // Fixed and then never closed off. Nothing in the product closes
+            // them, and until now the status filter did not even offer the
+            // state, so they were invisible unless you asked for "all".
+            'resolved_not_closed' => (int) $base()->where('status', 'resolved')->count(),
+        ];
     }
 
     public function show($id)

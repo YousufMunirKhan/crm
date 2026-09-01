@@ -30,6 +30,10 @@
                         <option value="">All status</option>
                         <option value="open">Open</option>
                         <option value="in_progress">Working</option>
+                        <!-- 108 tickets sit here. Nothing in the product closes
+                             them off, and the filter did not offer the state,
+                             so they were unreachable except through "all". -->
+                        <option value="resolved">Resolved</option>
                         <option value="closed">Closed</option>
                     </select>
                 </div>
@@ -48,50 +52,86 @@
             </div>
         </template>
 
+        <!--
+            What is outstanding, before the list. The header only ever said
+            "116 Total", which counts the resolved pile and the closed ones
+            along with the 28 that are actually open.
+        -->
+        <div v-if="summary" class="flex flex-wrap gap-2 px-3 pb-3 sm:px-5">
+            <button
+                v-for="chip in queueChips"
+                :key="chip.key"
+                type="button"
+                class="inline-flex min-h-[44px] items-center gap-2 rounded-control border px-3 text-sm
+                       touch-manipulation transition-colors focus-visible:outline-none
+                       focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                :class="[
+                    chip.value > 0 && chip.urgent
+                        ? 'border-danger-200 bg-danger-50 text-danger-800 hover:bg-danger-100'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                    statusFilter === chip.status ? 'ring-2 ring-primary-500/40' : '',
+                ]"
+                @click="applyChip(chip)"
+            >
+                <span class="font-semibold tabular-nums">{{ chip.value }}</span>
+                {{ chip.label }}
+            </button>
+        </div>
+
         <div v-if="tickets.length" class="hidden md:block table-wrap">
-            <table class="table min-w-[1040px]">
+            <table class="table">
                 <caption class="sr-only">Support tickets matching the current filters</caption>
                 <thead class="table-thead">
                     <tr>
-                        <th scope="col" class="table-th">Ticket #</th>
-                        <th scope="col" class="table-th">Subject</th>
-                        <th scope="col" class="table-th">Customer</th>
-                        <th v-if="isStaffAdmin" scope="col" class="table-th">Created</th>
-                        <th scope="col" class="table-th">Priority</th>
-                        <th scope="col" class="table-th">Status</th>
-                        <th v-if="isStaffAdmin" scope="col" class="table-th">Resolved</th>
-                        <th v-if="isStaffAdmin" scope="col" class="table-th text-center">Comments</th>
-                        <th v-if="isStaffAdmin" scope="col" class="table-th text-center">Files</th>
-                        <th scope="col" class="table-th">Assigned</th>
-                        <th scope="col" class="table-th">Actions</th>
+                        <th scope="col" class="table-th">Ticket</th>
+                        <th scope="col" class="table-th w-32">Status</th>
+                        <th scope="col" class="table-th w-28">Priority</th>
+                        <th scope="col" class="table-th w-36">Age</th>
+                        <th scope="col" class="table-th w-40">Assigned</th>
+                        <th scope="col" class="table-th w-24">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="ticket in tickets" :key="ticket.id" class="table-row">
-                        <td class="table-td-strong">
-                            <router-link :to="`/tickets/${ticket.id}`" class="link">
-                                {{ ticket.ticket_number }}
-                            </router-link>
-                        </td>
+                        <!-- The subject is what tells one ticket from another,
+                             so it gets the room. The reference, the customer
+                             where there is one, and any replies or files sit
+                             underneath it rather than taking columns of their
+                             own that are empty on almost every row. -->
                         <td class="table-td">
-                            <router-link :to="`/tickets/${ticket.id}`" class="text-slate-800 hover:text-primary-700 font-medium">
+                            <router-link :to="`/tickets/${ticket.id}`" class="font-medium text-slate-800 hover:text-primary-700">
                                 {{ ticket.subject }}
                             </router-link>
-                        </td>
-                        <td class="table-td"><CustomerName :customer="ticket.customer" /></td>
-                        <td v-if="isStaffAdmin" class="table-td whitespace-nowrap text-slate-600">{{ formatDateTime(ticket.created_at) }}</td>
-                        <td class="table-td">
-                            <BaseBadge :tone="getPriorityTone(ticket.priority)">{{ ticket.priority }}</BaseBadge>
+                            <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
+                                <span class="tabular-nums">{{ ticket.ticket_number }}</span>
+                                <template v-if="ticket.customer">
+                                    <span class="text-slate-300">·</span>
+                                    <CustomerName :customer="ticket.customer" name-class="text-slate-600" />
+                                </template>
+                                <template v-if="ticket.messages_count">
+                                    <span class="text-slate-300">·</span>
+                                    <span>{{ ticket.messages_count }} {{ ticket.messages_count === 1 ? 'reply' : 'replies' }}</span>
+                                </template>
+                                <template v-if="ticket.attachments_count">
+                                    <span class="text-slate-300">·</span>
+                                    <span>{{ ticket.attachments_count }} {{ ticket.attachments_count === 1 ? 'file' : 'files' }}</span>
+                                </template>
+                            </div>
                         </td>
                         <td class="table-td">
                             <BaseBadge :tone="getStatusTone(ticket.status)">{{ getStatusLabel(ticket.status) }}</BaseBadge>
                         </td>
-                        <td v-if="isStaffAdmin" class="table-td whitespace-nowrap text-slate-600">
-                            {{ ticket.resolved_at ? formatDateTime(ticket.resolved_at) : '—' }}
+                        <td class="table-td">
+                            <BaseBadge :tone="getPriorityTone(ticket.priority)">{{ ticket.priority }}</BaseBadge>
                         </td>
-                        <td v-if="isStaffAdmin" class="table-td text-center text-slate-600">{{ ticket.messages_count ?? '—' }}</td>
-                        <td v-if="isStaffAdmin" class="table-td text-center text-slate-600">{{ ticket.attachments_count ?? '—' }}</td>
-                        <td class="table-td">{{ formatAssignees(ticket) }}</td>
+                        <td class="table-td whitespace-nowrap">
+                            <span :class="ageTone(ticket)">{{ ageLabel(ticket) }}</span>
+                        </td>
+                        <td class="table-td">
+                            <span :class="isUnassigned(ticket) ? 'font-medium text-danger-700' : ''">
+                                {{ formatAssignees(ticket) }}
+                            </span>
+                        </td>
                         <td class="table-td">
                             <div class="flex flex-wrap gap-x-3 gap-y-1">
                                 <router-link :to="`/tickets/${ticket.id}`" class="link text-sm">View</router-link>
@@ -111,23 +151,25 @@
             >
                 <div class="flex items-start justify-between gap-2">
                     <router-link :to="`/tickets/${ticket.id}`" class="link text-sm font-semibold">
-                        #{{ ticket.ticket_number }}
+                        {{ ticket.subject }}
                     </router-link>
-                    <BaseBadge :tone="getStatusTone(ticket.status)">{{ getStatusLabel(ticket.status) }}</BaseBadge>
+                    <BaseBadge :tone="getStatusTone(ticket.status)" class="shrink-0">
+                        {{ getStatusLabel(ticket.status) }}
+                    </BaseBadge>
                 </div>
-                <div class="text-sm font-medium text-slate-900">
-                    {{ ticket.subject }}
+                <div class="flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
+                    <span class="tabular-nums">{{ ticket.ticket_number }}</span>
+                    <template v-if="ticket.customer">
+                        <span class="text-slate-300">·</span>
+                        <CustomerName :customer="ticket.customer" name-class="text-slate-600" />
+                    </template>
                 </div>
-                <div class="text-sm text-slate-600 flex gap-1">
-                    <span class="shrink-0">Customer:</span>
-                    <CustomerName :customer="ticket.customer" name-class="text-slate-900" />
-                </div>
-                <div class="text-sm text-slate-600 flex items-center gap-1.5">
-                    <span>Priority:</span>
+                <div class="flex flex-wrap items-center gap-2 text-sm">
                     <BaseBadge :tone="getPriorityTone(ticket.priority)">{{ ticket.priority }}</BaseBadge>
-                </div>
-                <div class="text-sm text-slate-600">
-                    Assigned: {{ formatAssignees(ticket) }}
+                    <span :class="ageTone(ticket)">{{ ageLabel(ticket) }}</span>
+                    <span :class="isUnassigned(ticket) ? 'font-medium text-danger-700' : 'text-slate-600'">
+                        {{ formatAssignees(ticket) }}
+                    </span>
                 </div>
                 <div class="flex flex-wrap gap-3 pt-1">
                     <router-link :to="`/tickets/${ticket.id}`" class="link text-sm">View</router-link>
@@ -180,6 +222,33 @@ const loading = ref(true);
 const toast = useToastStore();
 const auth = useAuthStore();
 const route = useRoute();
+
+/**
+ * The state of the queue, from the server, independent of the status filter.
+ *
+ * The badge in the header said "116 Total", which counts 108 resolved and the
+ * closed ones alongside the handful that are genuinely open - so the one number
+ * on the page answered a question nobody asks.
+ */
+const summary = ref(null);
+
+const queueChips = computed(() => {
+    if (! summary.value) return [];
+
+    const s = summary.value;
+
+    return [
+        { key: 'open', label: 'open', value: s.open, status: 'open', urgent: false },
+        { key: 'unassigned', label: 'with nobody on them', value: s.unassigned, status: 'open', urgent: true },
+        { key: 'week', label: 'open over a week', value: s.over_a_week, status: 'open', urgent: true },
+        { key: 'resolved', label: 'resolved, never closed', value: s.resolved_not_closed, status: 'resolved', urgent: false },
+    ].filter((c) => c.value > 0);
+});
+
+function applyChip(chip) {
+    statusFilter.value = statusFilter.value === chip.status ? '' : chip.status;
+    onStatusFilterChange();
+}
 
 const isStaffAdmin = computed(() => {
     const n = auth.user?.role?.name;
@@ -275,8 +344,48 @@ const formatAssignees = (ticket) => {
     if (Array.isArray(list) && list.length) {
         return list.map((a) => a.name).filter(Boolean).join(', ');
     }
-    return ticket.assignee?.name || '—';
+    // 34 of 150 tickets have nobody on them. "—" hid that; saying it does not.
+    return ticket.assignee?.name || 'Nobody';
 };
+
+function isUnassigned(ticket) {
+    return formatAssignees(ticket) === 'Nobody';
+}
+
+/**
+ * How long this has been going on.
+ *
+ * The list showed Created and Resolved as two timestamp columns. On half the
+ * resolved tickets those are the same minute - they are written up after the
+ * fact - so as a measure of how long anything took, the pair said nothing. What
+ * does matter is how long the open ones have been open.
+ */
+function ageLabel(ticket) {
+    const done = ['resolved', 'closed'].includes(ticket.status);
+    const from = new Date(ticket.created_at);
+    const to = done && ticket.resolved_at ? new Date(ticket.resolved_at) : new Date();
+    const days = Math.floor((to - from) / 86400000);
+
+    if (done) {
+        return days <= 0 ? 'Same day' : `Took ${days}d`;
+    }
+
+    if (days <= 0) return 'Today';
+
+    return `${days} ${days === 1 ? 'day' : 'days'} open`;
+}
+
+/** Red once an open ticket is past a week, amber over a day. */
+function ageTone(ticket) {
+    if (['resolved', 'closed'].includes(ticket.status)) return 'text-slate-500';
+
+    const days = Math.floor((Date.now() - new Date(ticket.created_at)) / 86400000);
+
+    if (days > 7) return 'font-medium text-danger-700';
+    if (days > 1) return 'text-warning-800';
+
+    return 'text-slate-600';
+}
 
 const getStatusLabel = (status) => formatTicketStatus(status);
 
@@ -299,6 +408,9 @@ const loadTickets = async () => {
 
         const { data } = await axios.get('/api/tickets', { params });
         tickets.value = data.data || data;
+        // Independent of the status filter, so the chips keep saying what is
+        // outstanding even while you are looking at one slice of it.
+        summary.value = data.summary || null;
         pagination.value = {
             current_page: data.current_page || 1,
             last_page: data.last_page || 1,
