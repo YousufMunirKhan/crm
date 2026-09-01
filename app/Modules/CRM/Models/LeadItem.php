@@ -19,6 +19,8 @@ class LeadItem extends Model
         'total_price',
         'notes',
         'status',
+        'lost_reason',
+        'lost_reason_code',
         'closed_at',
     ];
 

@@ -97,7 +97,7 @@
                             <BaseButton
                                 variant="soft-danger"
                                 :disabled="stageUpdating || activeLead.stage === 'lost'"
-                                @click="showLostLeadModal = true; lostReasonInput = ''"
+                                @click="showLostLeadModal = true; lostReasonInput = ''; lostReasonCode = ''"
                             >
                                 Lost
                             </BaseButton>
@@ -666,17 +666,11 @@
             </div>
 
             <div v-else class="space-y-4">
-                <div>
-                    <label class="form-label" for="customerleadview-lost-reason">Why was it lost? <span class="form-required" aria-hidden="true">*</span></label>
-                    <textarea id="customerleadview-lost-reason"
-                        v-model="closeItemData.lost_reason"
-                        rows="3"
-                        required
-                        class="form-textarea"
-                        placeholder="e.g. Went with a cheaper quote from Worldpay; wants to revisit in April."
-                    />
-                    <p class="form-hint">Be specific - this is the only record of why the deal did not close.</p>
-                </div>
+                <LostReasonPicker
+                    v-model:code="closeItemData.lost_reason_code"
+                    v-model:detail="closeItemData.lost_reason"
+                    id-prefix="customerleadview-item-lost"
+                />
             </div>
 
             <p v-if="closeItemError" class="callout callout-danger mt-4" role="alert">
@@ -722,27 +716,18 @@
             size="md"
             :close-on-backdrop="false"
         >
-            <div>
-                <label class="form-label" for="customerleadview-lead-lost-reason">
-                    Why was it lost? <span class="form-required" aria-hidden="true">*</span>
-                </label>
-                <textarea
-                    id="customerleadview-lead-lost-reason"
-                    v-model="lostReasonInput"
-                    rows="3"
-                    required
-                    class="form-textarea"
-                    placeholder="e.g. Signed a 3-year contract with their current provider last month."
-                />
-                <p class="form-hint">This is what the lost-reasons report is built from.</p>
-            </div>
+            <LostReasonPicker
+                v-model:code="lostReasonCode"
+                v-model:detail="lostReasonInput"
+                id-prefix="customerleadview-lead-lost"
+            />
 
             <template #actions>
                 <BaseButton variant="outline" block-mobile @click="showLostLeadModal = false">Cancel</BaseButton>
                 <BaseButton
                     variant="danger"
                     block-mobile
-                    :disabled="!lostReasonInput.trim()"
+                    :disabled="!leadLostReady"
                     :loading="stageUpdating"
                     @click="submitMarkLeadLost"
                 >
@@ -856,6 +841,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import LostReasonPicker from '@/components/LostReasonPicker.vue';
+import { isLostReasonComplete } from '@/constants/lostReasons';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { useAuthStore } from '@/stores/auth';
@@ -899,6 +886,8 @@ const selectedLeadId = ref(null);
 const activityModalInitialType = ref('call');
 const showLostLeadModal = ref(false);
 const lostReasonInput = ref('');
+const lostReasonCode = ref('');
+const leadLostReady = computed(() => isLostReasonComplete(lostReasonCode.value, lostReasonInput.value));
 const stageUpdating = ref(false);
 
 const effectiveCustomerId = computed(() => {
@@ -1364,6 +1353,7 @@ const closeItemData = ref({
     unit_price: 0,
     notes: '',
     lost_reason: '',
+    lost_reason_code: '',
 });
 
 // Log Activity Modal
@@ -1415,16 +1405,21 @@ const submitMarkLeadLost = async () => {
     if (!l || stageUpdating.value) {
         return;
     }
-    if (!lostReasonInput.value.trim()) {
-        toast.error('Please enter a lost reason.');
+    if (!leadLostReady.value) {
+        toast.error('Please choose a reason.');
         return;
     }
     stageUpdating.value = true;
     try {
-        await axios.put(`/api/leads/${l.id}`, { stage: 'lost', lost_reason: lostReasonInput.value.trim() });
+        await axios.put(`/api/leads/${l.id}`, {
+            stage: 'lost',
+            lost_reason_code: lostReasonCode.value,
+            lost_reason: lostReasonInput.value.trim(),
+        });
         toast.success('Lead marked as Lost.');
         showLostLeadModal.value = false;
         lostReasonInput.value = '';
+        lostReasonCode.value = '';
         await loadData();
     } catch (e) {
         toast.error(e?.response?.data?.message || 'Failed to update lead.');
@@ -1710,6 +1705,7 @@ const openCloseItemModal = (leadItem, item, status) => {
         unit_price: item.unit_price || 0,
         notes: item.notes || '',
         lost_reason: '',
+    lost_reason_code: '',
     };
     closeItemError.value = null;
     showCloseItemModal.value = true;
@@ -1741,11 +1737,12 @@ const confirmCloseItem = async () => {
             payload.unit_price = closeItemData.value.unit_price;
             payload.notes = closeItemData.value.notes;
         } else {
-            if (!closeItemData.value.lost_reason) {
-                closeItemError.value = 'Lost reason is required';
+            if (! isLostReasonComplete(closeItemData.value.lost_reason_code, closeItemData.value.lost_reason)) {
+                closeItemError.value = 'Please choose a reason.';
                 closeItemLoading.value = false;
                 return;
             }
+            payload.lost_reason_code = closeItemData.value.lost_reason_code;
             payload.lost_reason = closeItemData.value.lost_reason;
         }
 

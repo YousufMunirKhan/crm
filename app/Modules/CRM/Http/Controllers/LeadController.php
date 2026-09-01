@@ -11,10 +11,12 @@ use App\Modules\CRM\Models\LeadActivity;
 use App\Modules\CRM\Models\LeadAssignmentLog;
 use App\Modules\CRM\Models\LeadItem;
 use App\Modules\CRM\Models\Product;
+use App\Modules\CRM\Support\LostReasons;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class LeadController extends Controller
 {
@@ -443,7 +445,8 @@ class LeadController extends Controller
             'source' => ['nullable', 'string'],
             'assigned_to' => ['nullable', 'exists:users,id'],
             'pipeline_value' => ['nullable', 'numeric', 'min:0'],
-            'lost_reason' => ['required_if:stage,lost', 'string'],
+            'lost_reason' => ['nullable', 'string'],
+            'lost_reason_code' => ['required_if:stage,lost', 'nullable', Rule::in(LostReasons::codes())],
             'next_follow_up_at' => ['nullable', 'date'],
             'expected_closing_date' => ['nullable', 'date'],
         ]);
@@ -459,12 +462,28 @@ class LeadController extends Controller
             }
         }
 
-        // If changing to "lost", require lost_reason
-        if (isset($data['stage']) && $data['stage'] === 'lost' && empty($data['lost_reason'])) {
-            return response()->json([
-                'message' => 'Lost reason is required when marking a lead as lost.',
-                'errors' => ['lost_reason' => ['Lost reason is required.']],
-            ], 422);
+        // Marking lost asks for one tap, not a sentence. The picker is the only
+        // way the frontend sends this, but the API is public enough to be
+        // called without it, so the rule lives here as well.
+        if (isset($data['stage']) && $data['stage'] === 'lost') {
+            if (! LostReasons::isValid($data['lost_reason_code'] ?? null)) {
+                return response()->json([
+                    'message' => 'Choose a reason when marking a lead as lost.',
+                    'errors' => ['lost_reason_code' => ['A reason is required.']],
+                ], 422);
+            }
+
+            if (in_array($data['lost_reason_code'], LostReasons::DETAIL_REQUIRED, true)
+                && trim((string) ($data['lost_reason'] ?? '')) === '') {
+                return response()->json([
+                    'message' => 'That reason needs a line of detail.',
+                    'errors' => ['lost_reason' => ['Please say what happened.']],
+                ], 422);
+            }
+
+            // The free-text column keeps holding something a person can read,
+            // so every screen and export that already shows it still works.
+            $data['lost_reason'] = LostReasons::compose($data['lost_reason_code'], $data['lost_reason'] ?? null);
         }
 
         $previousAssignedTo = $lead->assigned_to;
@@ -1081,8 +1100,26 @@ class LeadController extends Controller
             'quantity' => ['required_if:status,won', 'integer', 'min:1'],
             'unit_price' => ['required_if:status,won', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
-            'lost_reason' => ['required_if:status,lost', 'string'],
+            'lost_reason' => ['nullable', 'string'],
+            'lost_reason_code' => ['required_if:status,lost', 'nullable', Rule::in(LostReasons::codes())],
         ]);
+
+        if ($data['status'] === 'lost') {
+            if (in_array($data['lost_reason_code'], LostReasons::DETAIL_REQUIRED, true)
+                && trim((string) ($data['lost_reason'] ?? '')) === '') {
+                return response()->json([
+                    'message' => 'That reason needs a line of detail.',
+                    'errors' => ['lost_reason' => ['Please say what happened.']],
+                ], 422);
+            }
+
+            // Until now a line-level loss was written into an activity
+            // description and nowhere else - readable by a person, invisible to
+            // any query, so line losses have never been countable.
+            $item->lost_reason_code = $data['lost_reason_code'];
+            $item->lost_reason = LostReasons::compose($data['lost_reason_code'], $data['lost_reason'] ?? null);
+            $data['lost_reason'] = $item->lost_reason;
+        }
 
         $item->status = $data['status'];
         $item->closed_at = now();
@@ -1115,6 +1152,7 @@ class LeadController extends Controller
                 'item_id' => $item->id,
                 'product_id' => $item->product_id,
                 'status' => $data['status'],
+                'lost_reason_code' => $data['lost_reason_code'] ?? null,
             ],
         ]);
 

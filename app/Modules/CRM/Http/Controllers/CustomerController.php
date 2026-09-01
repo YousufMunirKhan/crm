@@ -979,13 +979,51 @@ class CustomerController extends Controller
      */
     public function export(Request $request)
     {
+        $user = auth()->user();
+
+        // The list this returns - every name, phone, email and address the
+        // company holds - is exactly what a departing salesperson would want on
+        // the way out, and until now any signed-in account could take all 580 of
+        // them, including accounts whose sidebar does not even show Customers.
+        // The rules here are the same ones index() has always applied; the
+        // export simply never asked.
+        $type = $request->get('type');
+
+        if ($type === 'prospect' && ! $user->allowsNavSection('prospects')) {
+            abort(403, 'You do not have access to Prospects.');
+        }
+
+        if ($type === 'customer' && ! $user->allowsNavSection('customers')) {
+            abort(403, 'You do not have access to Customers.');
+        }
+
+        if (! $type && ! $user->allowsNavSection('customers') && ! $user->allowsNavSection('prospects')) {
+            abort(403, 'You do not have access to the customer book.');
+        }
+
         $query = Customer::query();
+
+        if ($user->isRole('Sales') || $user->isRole('CallAgent')) {
+            $query->forSalesAgent($user->id);
+        }
+
+        if (in_array($type, ['prospect', 'customer'], true)) {
+            $query->where('type', $type);
+        }
 
         if ($request->filled('search')) {
             $query->search($request->search);
         }
 
         $customers = $query->get();
+
+        // A bulk download of the book is worth being able to look up later,
+        // whatever the outcome of a dispute.
+        app(\App\Services\AuditLogService::class)->log('customers.exported', null, [], [
+            'rows' => $customers->count(),
+            'type' => $type ?: 'all',
+            'search' => $request->get('search'),
+        ]);
 
         $filename = 'customers_export_'.date('Y-m-d_His').'.csv';
         $headers = [

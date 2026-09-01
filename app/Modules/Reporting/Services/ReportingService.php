@@ -221,20 +221,33 @@ class ReportingService
             }
         }
 
-        // Lost reasons
+        // Lost reasons. Grouped on the code, not the free text - grouping on a
+        // sentence somebody typed gives you one bucket per lead, which is a list
+        // rather than a report.
         $lostReasons = (clone $query)
             ->where('stage', 'lost')
-            ->whereNotNull('lost_reason')
-            ->selectRaw('lost_reason, count(*) as count')
-            ->groupBy('lost_reason')
+            ->whereNotNull('lost_reason_code')
+            ->selectRaw('lost_reason_code, count(*) as count')
+            ->groupBy('lost_reason_code')
+            ->orderByDesc('count')
             ->get()
-            ->pluck('count', 'lost_reason')
+            ->mapWithKeys(fn ($row) => [
+                \App\Modules\CRM\Support\LostReasons::label($row->lost_reason_code) ?? $row->lost_reason_code => $row->count,
+            ])
             ->toArray();
+
+        // Losses recorded before the picker existed, so the total is honest
+        // about what it cannot break down rather than quietly dropping them.
+        $uncodedLosses = (clone $query)
+            ->where('stage', 'lost')
+            ->whereNull('lost_reason_code')
+            ->count();
 
         return [
             'funnel' => $funnel,
             'conversions' => $conversions,
             'lost_reasons' => $lostReasons,
+            'lost_reasons_uncoded' => $uncodedLosses,
         ];
     }
 
@@ -730,14 +743,18 @@ class ReportingService
             ->with(['lead.customer', 'lead.assignee', 'user'])
             ->latest()
             ->get()
-            ->groupBy('lead.assignee_id')
+            // The column is `assigned_to`; `assignee_id` has never existed, so
+            // every row grouped under one null key and the whole report showed a
+            // single line labelled "Unknown". It is the only place calls,
+            // meetings and visits are reported at all.
+            ->groupBy(fn ($activity) => $activity->lead?->assigned_to)
             ->map(function ($activities, $agentId) {
-                $agent = User::find($agentId);
-                $customers = $activities->pluck('lead.customer')->unique('id');
+                $agent = $agentId ? User::find($agentId) : null;
+                $customers = $activities->pluck('lead.customer')->filter()->unique('id');
                 
                 return [
                     'agent_id' => $agentId,
-                    'agent_name' => $agent ? $agent->name : 'Unknown',
+                    'agent_name' => $agent?->name ?? 'Unassigned',
                     'customers' => $customers->map(function ($customer) {
                         return [
                             'id' => $customer->id,

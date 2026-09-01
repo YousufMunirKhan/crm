@@ -430,6 +430,8 @@ import {
     EmptyState,
 } from '@/components/base';
 import LeadForm from '@/components/LeadForm.vue';
+import LostReasonPicker from '@/components/LostReasonPicker.vue';
+import { isLostReasonComplete } from '@/constants/lostReasons';
 import DeleteConfirm from '@/components/DeleteConfirm.vue';
 import LogActivityModal from '@/components/LogActivityModal.vue';
 import ScheduleFollowUpModal from '@/components/ScheduleFollowUpModal.vue';
@@ -668,12 +670,13 @@ function cancelLostModal() {
     showLostModal.value = false;
     lostModalLead.value = null;
     lostReasonInput.value = '';
+    lostReasonCode.value = '';
 }
 
 async function confirmLostModal() {
     const lead = lostModalLead.value;
-    if (!lead || !lostReasonInput.value.trim()) {
-        toast.error('Please enter a lost reason');
+    if (!lead || !lostReasonReady.value) {
+        toast.error('Please choose a reason.');
         return;
     }
     lostSaving.value = true;
@@ -681,6 +684,7 @@ async function confirmLostModal() {
     try {
         await axios.put(`/api/leads/${lead.id}`, {
             stage: 'lost',
+            lost_reason_code: lostReasonCode.value,
             lost_reason: lostReasonInput.value.trim(),
         });
         toast.success('Lead marked as lost');

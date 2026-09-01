@@ -23,6 +23,7 @@ class Lead extends Model
         'assigned_to',
         'pipeline_value',
         'lost_reason',
+        'lost_reason_code',
         'next_follow_up_at',
         'expected_closing_date',
     ];
