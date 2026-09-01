@@ -21,8 +21,16 @@
                     <label class="form-label" for="followupsview-to">To</label>
                     <input id="followupsview-to" v-model="toDate" type="date" class="form-input w-full sm:w-40" />
                 </div>
-                <BaseButton variant="outline" @click="setToday">Today</BaseButton>
-                <BaseButton variant="outline" @click="setThisWeek">This week</BaseButton>
+                <BaseButton
+                    :variant="mode === 'due' ? 'soft' : 'outline'"
+                    @click="setDueNow"
+                >Due now</BaseButton>
+                <BaseButton
+                    :variant="mode === 'overdue' ? 'soft-danger' : 'outline'"
+                    @click="setOverdue"
+                >Overdue only</BaseButton>
+                <BaseButton :variant="mode === 'today' ? 'soft' : 'outline'" @click="setToday">Today</BaseButton>
+                <BaseButton :variant="mode === 'week' ? 'soft' : 'outline'" @click="setThisWeek">Next 7 days</BaseButton>
                 <BaseButton variant="primary" @click="loadFollowUps">
                     <template #icon><FunnelIcon class="icon" aria-hidden="true" /></template>
                     Filter
@@ -194,17 +202,54 @@ const todayStr = computed(() => {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 });
 
-const followUpsBadge = computed(() =>
-    !loading.value && followUps.value.length ? `${followUps.value.length} Total` : null,
-);
+/** Which quick range is active; drives both the request and the button state. */
+const mode = ref('due');
+
+/** Anything whose date has passed, so the count can be said out loud. */
+const overdueCount = computed(() => followUps.value.filter(isOverdue).length);
+
+function isOverdue(row) {
+    const due = row.next_follow_up_at || row.next_follow_up_date;
+
+    return due ? new Date(due) < new Date(new Date().toDateString()) : false;
+}
+
+const followUpsBadge = computed(() => {
+    if (loading.value || !followUps.value.length) return null;
+
+    return overdueCount.value
+        ? `${overdueCount.value} overdue of ${followUps.value.length}`
+        : `${followUps.value.length} due`;
+});
+
+/**
+ * Everything outstanding: overdue first, then the week ahead. This is the
+ * default, because a follow-up that was due last Tuesday is more urgent than
+ * one due tomorrow - and the previous default, today..+7, hid it completely.
+ */
+function setDueNow() {
+    mode.value = 'due';
+    fromDate.value = '';
+    toDate.value = '';
+    loadFollowUps();
+}
+
+function setOverdue() {
+    mode.value = 'overdue';
+    fromDate.value = '';
+    toDate.value = '';
+    loadFollowUps();
+}
 
 function setToday() {
+    mode.value = 'today';
     fromDate.value = todayStr.value;
     toDate.value = todayStr.value;
     loadFollowUps();
 }
 
 function setThisWeek() {
+    mode.value = 'week';
     const today = new Date();
     const end = new Date();
     end.setDate(today.getDate() + 7);
@@ -238,7 +283,14 @@ async function loadFollowUps() {
     loading.value = true;
     try {
         const params = {};
-        if (fromDate.value && toDate.value && fromDate.value !== toDate.value) {
+
+        if (mode.value === 'overdue') {
+            params.overdue = 1;
+        } else if (mode.value === 'due') {
+            const horizon = new Date();
+            horizon.setDate(horizon.getDate() + 7);
+            params.due_by = horizon.toISOString().slice(0, 10);
+        } else if (fromDate.value && toDate.value && fromDate.value !== toDate.value) {
             params.from = fromDate.value;
             params.to = toDate.value;
         } else if (fromDate.value) {
@@ -276,7 +328,7 @@ function toggleExpanded(id) {
 }
 
 onMounted(() => {
-    setThisWeek();
+    setDueNow();
 });
 </script>
 

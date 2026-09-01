@@ -44,7 +44,14 @@ class FollowUpController extends Controller
         $to = $request->get('to');
         $date = $request->get('date');
 
-        if ($from && $to) {
+        // Everything still outstanding up to a date, with no lower bound - the
+        // screen's whole job is surfacing what is due, and a follow-up that was
+        // due last week is more urgent than one due tomorrow, not less.
+        if ($request->filled('due_by')) {
+            $leadQuery->where('next_follow_up_at', '<=', Carbon::parse($request->due_by)->endOfDay());
+        } elseif ($request->boolean('overdue')) {
+            $leadQuery->where('next_follow_up_at', '<', now());
+        } elseif ($from && $to) {
             $fromDate = Carbon::parse($from)->startOfDay();
             $toDate = Carbon::parse($to)->endOfDay();
             $leadQuery->whereBetween('next_follow_up_at', [$fromDate, $toDate]);

@@ -542,6 +542,11 @@ class LeadController extends Controller
         }
         $activity = LeadActivity::create($activityData);
 
+        // The stale-lead views read leads.updated_at, so without this a rep can
+        // ring somebody, record it, and the lead still reads "no contact in 60
+        // days" - which makes the whole measure a lie and the logging pointless.
+        $lead->touch();
+
         // Assign lead to current user if unassigned - so it shows on their dashboard
         if (empty($lead->assigned_to)) {
             $lead->update(['assigned_to' => auth()->id()]);

@@ -234,6 +234,7 @@
                         <th scope="col" class="table-th">Source</th>
                         <th scope="col" class="table-th-num">Value (£)</th>
                         <th scope="col" class="table-th w-36">Follow-up</th>
+                        <th scope="col" class="table-th w-56">Log</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -281,6 +282,9 @@
                         <td class="table-td">{{ lead.source || '—' }}</td>
                         <td class="table-td-num table-td-strong">£{{ formatNumber(getLeadValue(lead)) }}</td>
                         <td class="table-td whitespace-nowrap">{{ formatDateTime(lead.next_follow_up_at) || '—' }}</td>
+                        <td class="table-td">
+                            <QuickLogActivity :lead-id="lead.id" compact @logged="onQuickLogged" />
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -349,6 +353,11 @@
                         <CopyButton :value="lead.customer.email" label="email address" />
                     </div>
                 </div>
+
+                <!-- Calling and recording the call belong next to each other. -->
+                <div class="border-t border-slate-100 pt-3">
+                    <QuickLogActivity :lead-id="lead.id" @logged="onQuickLogged" />
+                </div>
             </router-link>
         </div>
 
@@ -384,6 +393,7 @@ import { useAuthStore } from '@/stores/auth';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import CustomerName from '@/components/CustomerName.vue';
+import QuickLogActivity from '@/components/QuickLogActivity.vue';
 import { BaseBadge, BaseButton, EmptyState, StatCard } from '@/components/base';
 import CopyButton from '@/components/CopyButton.vue';
 
@@ -564,6 +574,20 @@ function syncUrlQuery() {
             syncingQueryFromFilters.value = false;
         });
     });
+}
+
+/**
+ * A quick log changes the lead's "last touched" date, which is what the stale
+ * filters read - so the row is refreshed rather than left showing a figure the
+ * click has just made wrong.
+ */
+function onQuickLogged({ leadId }) {
+    const lead = leads.value.find((l) => l.id === leadId);
+
+    if (lead) {
+        lead.updated_at = new Date().toISOString();
+        lead.next_activity_summary = 'Just logged';
+    }
 }
 
 async function loadLeads(page = 1) {
