@@ -9,6 +9,12 @@ use Illuminate\Support\Str;
 class PosSupportIngestService
 {
     /**
+     * POS tickets are ingested at `high` priority, and high is 8 hours
+     * everywhere else in this product - see TicketService::calculateSLADueDate.
+     */
+    private const SLA_HOURS = 8;
+
+    /**
      * @param  array<int, array<string, mixed>>  $items
      * @return array{created: int, updated: int, items: array<int, array<string, mixed>>}
      */
@@ -72,6 +78,12 @@ class PosSupportIngestService
             ];
 
             if (!$ticket) {
+                // All 34 POS tickets had a null sla_due_at, so the nightly
+                // breach check walked past every one of them: they could not be
+                // late, whatever happened. The clock starts when the shop hit
+                // the problem, not when we happened to sync - otherwise an
+                // eight-hour-old fault arrives looking brand new.
+                $payload['sla_due_at'] = ($posSubmitted ?? now())->copy()->addHours(self::SLA_HOURS);
                 $payload['ticket_number'] = $this->generateTicketNumber();
                 $payload['source'] = 'pos_support';
                 $payload['pos_external_id'] = $externalId;
@@ -158,10 +170,13 @@ class PosSupportIngestService
         $idHead = Str::limit($posRowId, 48, '');
         $msg = (string) ($row['message'] ?? '');
         $created = (string) ($row['createdAt'] ?? '');
-        $sent = (string) ($row['sentAt'] ?? '');
         $computer = (string) ($row['computerName'] ?? '');
 
-        $fingerprint = substr(hash('sha256', $posRowId . "\0" . $msg . "\0" . $created . "\0" . $sent . "\0" . $computer), 0, 12);
+        // Deliberately not `sentAt`. That is when the desktop client managed to
+        // transmit, not part of what happened - and the client retries, so
+        // including it turned one crash into a new ticket per attempt. Six rows
+        // in the live queue are the same Gurkha Corner fault sent six times.
+        $fingerprint = substr(hash('sha256', $posRowId . "\0" . $msg . "\0" . $created . "\0" . $computer), 0, 12);
 
         return Str::limit($idHead . '-' . $fingerprint, 64, '');
     }
