@@ -25,7 +25,7 @@
                     <p class="page-lead mt-1">Changes save to the same record. Add comments from the ticket detail page.</p>
                 </div>
 
-                <div v-if="pageLoading" class="form-card p-6 space-y-3" aria-busy="true">
+                <div v-if="pageLoading" class="card p-6 space-y-3" aria-busy="true">
                     <span class="sr-only">Loading ticket…</span>
                     <div class="skeleton-text w-1/3"></div>
                     <div class="skeleton-text w-full"></div>
@@ -34,14 +34,7 @@
                     <div class="skeleton-text w-1/2"></div>
                 </div>
 
-                <form v-else id="ticket-edit-form" novalidate class="form-card !overflow-visible" @submit.prevent="handleSubmit">
-                    <div class="form-section-head-mint">
-                        <h2 class="form-section-title-mint text-xl">Update ticket</h2>
-                        <p class="form-section-desc-mint">Assignees and creator receive email when someone posts a comment on the ticket detail page.</p>
-                    </div>
-
-                    <div class="form-body space-y-4">
-                        <!-- Validation summary: focused on a failed submit -->
+            <form v-else id="ticket-edit-form" novalidate class="space-y-6" @submit.prevent="handleSubmit">
                         <div
                             v-if="error || errorFields.length"
                             ref="errorSummaryRef"
@@ -60,16 +53,8 @@
                             <p v-else class="mt-1">{{ error }}</p>
                         </div>
 
-                        <div>
-                            <label class="form-label" for="ticketeditview-customer">Customer</label>
-                            <select id="ticketeditview-customer" v-model="form.customer_id" class="form-select">
-                                <option value="">No customer</option>
-                                <option v-for="c in customers" :key="c.id" :value="c.id">
-                                    {{ c.name }} — {{ c.phone }}
-                                </option>
-                            </select>
-                        </div>
-
+            <BaseCard title="What is wrong" subtitle="The subject is what everyone will see in the list.">
+                <div class="space-y-4">
                         <div>
                             <label class="form-label" for="ticketeditview-subject">
                                 Subject<span class="form-required" aria-hidden="true">*</span>
@@ -99,7 +84,107 @@
                             />
                             <p class="form-hint">Drag the corner to resize. The field expands as you type or paste.</p>
                         </div>
+                </div>
+            </BaseCard>
 
+            <BaseCard title="Who it is for" subtitle="Optional - leave blank for an internal job.">
+                <div class="space-y-4">
+                        <div>
+                            <label class="form-label" for="ticketeditview-customer">Customer</label>
+                            <select id="ticketeditview-customer" v-model="form.customer_id" class="form-select">
+                                <option value="">No customer</option>
+                                <option v-for="c in customers" :key="c.id" :value="c.id">
+                                    {{ c.name }} — {{ c.phone }}
+                                </option>
+                            </select>
+                        </div>
+                </div>
+            </BaseCard>
+
+            <BaseCard title="Who works on it" subtitle="Everyone assigned is emailed when a comment is added.">
+                <div class="space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="form-label" for="ticketeditview-priority">Priority</label>
+                                <select id="ticketeditview-priority" v-model="form.priority" class="form-select">
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                    <option value="urgent">Urgent</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" for="ticketeditview-status">Status</label>
+                                <select id="ticketeditview-status" v-model="form.status" class="form-select">
+                                    <option value="open">Open</option>
+                                    <option value="in_progress">Working</option>
+                                    <option value="on_hold">On hold</option>
+                                    <option value="resolved">Resolved</option>
+                                    <option value="closed">Closed</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="form-label" for="ticketeditview-estimated-resolve-hours">Expected resolution (hours)</label>
+                            <input
+                                id="ticketeditview-estimated-resolve-hours"
+                                v-model.number="form.estimated_resolve_hours"
+                                type="number"
+                                min="1"
+                                max="8760"
+                                class="form-input"
+                                placeholder="Empty = use priority SLA"
+                                :aria-invalid="fieldErrors.estimated_resolve_hours ? 'true' : undefined"
+                                :aria-describedby="fieldErrors.estimated_resolve_hours ? 'ticketeditview-estimated-resolve-hours-error' : undefined"
+                            />
+                            <p
+                                v-if="fieldErrors.estimated_resolve_hours"
+                                id="ticketeditview-estimated-resolve-hours-error"
+                                class="form-error"
+                            >
+                                {{ fieldErrors.estimated_resolve_hours }}
+                            </p>
+                        </div>
+
+                        <fieldset class="form-fieldset">
+                            <legend class="form-legend">Assign to (one or more)</legend>
+                            <div class="rounded-card border border-slate-200 bg-white p-3 max-h-56 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
+                                <label
+                                    v-for="u in users"
+                                    :key="u.id"
+                                    class="form-choice !flex min-w-0 text-slate-800"
+                                >
+                                    <input v-model="form.assigned_user_ids" type="checkbox" :value="Number(u.id)" class="form-checkbox" />
+                                    {{ u.name }}
+                                </label>
+                                <p v-if="!users.length" class="text-sm text-slate-500 sm:col-span-2 lg:col-span-3">No users loaded.</p>
+                            </div>
+                            <div
+                                v-if="editCommentRecipientRows.length > 0"
+                                class="mt-3 callout callout-info text-xs"
+                            >
+                                <div class="font-semibold mb-1">After save, comment emails will go to:</div>
+                                <ul class="space-y-1 list-none">
+                                    <li v-for="row in editCommentRecipientRows" :key="row.email" class="break-all">
+                                        <span class="font-medium">{{ row.name }}</span>
+                                        <span> — {{ row.email }}</span>
+                                    </li>
+                                </ul>
+                                <p class="mt-2">The person who posts a comment does not receive email for their own comment.</p>
+                            </div>
+                            <div
+                                v-else-if="(form.assigned_user_ids || []).length > 0 || ticketCreator"
+                                class="mt-3 callout callout-warning text-xs"
+                            >
+                                No valid recipient emails found for the current assignees or creator. Check user profiles or Settings → admin notification email.
+                            </div>
+                        </fieldset>
+                </div>
+            </BaseCard>
+
+            <BaseCard title="Files and links">
+                <div class="space-y-4">
                         <div>
                             <label class="form-label" for="ticketeditview-reference-link">Reference link</label>
                             <input id="ticketeditview-reference-link" v-model="form.reference_url" type="url" class="form-input" placeholder="https://..." />
@@ -153,86 +238,14 @@
                             </ul>
                         </div>
 
-                        <div>
-                            <label class="form-label" for="ticketeditview-estimated-resolve-hours">Expected resolution (hours)</label>
-                            <input
-                                id="ticketeditview-estimated-resolve-hours"
-                                v-model.number="form.estimated_resolve_hours"
-                                type="number"
-                                min="1"
-                                max="8760"
-                                class="form-input"
-                                placeholder="Empty = use priority SLA"
-                                :aria-invalid="fieldErrors.estimated_resolve_hours ? 'true' : undefined"
-                                :aria-describedby="fieldErrors.estimated_resolve_hours ? 'ticketeditview-estimated-resolve-hours-error' : undefined"
-                            />
-                            <p
-                                v-if="fieldErrors.estimated_resolve_hours"
-                                id="ticketeditview-estimated-resolve-hours-error"
-                                class="form-error"
-                            >
-                                {{ fieldErrors.estimated_resolve_hours }}
-                            </p>
-                        </div>
+                <p class="form-hint">
+                    For anything large, put it on Google Drive and paste the link above
+                    rather than attaching it.
+                </p>
+                </div>
+            </BaseCard>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="form-label" for="ticketeditview-priority">Priority</label>
-                                <select id="ticketeditview-priority" v-model="form.priority" class="form-select">
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                    <option value="urgent">Urgent</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="form-label" for="ticketeditview-status">Status</label>
-                                <select id="ticketeditview-status" v-model="form.status" class="form-select">
-                                    <option value="open">Open</option>
-                                    <option value="in_progress">Working</option>
-                                    <option value="on_hold">On hold</option>
-                                    <option value="resolved">Resolved</option>
-                                    <option value="closed">Closed</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <fieldset class="form-fieldset">
-                            <legend class="form-legend">Assign to (one or more)</legend>
-                            <div class="rounded-card border border-slate-200 bg-white p-3 max-h-56 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
-                                <label
-                                    v-for="u in users"
-                                    :key="u.id"
-                                    class="form-choice !flex min-w-0 text-slate-800"
-                                >
-                                    <input v-model="form.assigned_user_ids" type="checkbox" :value="Number(u.id)" class="form-checkbox" />
-                                    {{ u.name }}
-                                </label>
-                                <p v-if="!users.length" class="text-sm text-slate-500 sm:col-span-2 lg:col-span-3">No users loaded.</p>
-                            </div>
-                            <div
-                                v-if="editCommentRecipientRows.length > 0"
-                                class="mt-3 callout callout-info text-xs"
-                            >
-                                <div class="font-semibold mb-1">After save, comment emails will go to:</div>
-                                <ul class="space-y-1 list-none">
-                                    <li v-for="row in editCommentRecipientRows" :key="row.email" class="break-all">
-                                        <span class="font-medium">{{ row.name }}</span>
-                                        <span> — {{ row.email }}</span>
-                                    </li>
-                                </ul>
-                                <p class="mt-2">The person who posts a comment does not receive email for their own comment.</p>
-                            </div>
-                            <div
-                                v-else-if="(form.assigned_user_ids || []).length > 0 || ticketCreator"
-                                class="mt-3 callout callout-warning text-xs"
-                            >
-                                No valid recipient emails found for the current assignees or creator. Check user profiles or Settings → admin notification email.
-                            </div>
-                        </fieldset>
-                    </div>
-
-                    <div class="form-actions">
+                <div class="flex flex-col-reverse justify-end gap-3 sm:flex-row">
                         <BaseButton :to="`/tickets/${ticketId}`" variant="outline" block-mobile>Cancel</BaseButton>
                         <BaseButton
                             type="submit"
@@ -245,7 +258,7 @@
                             {{ saving ? 'Saving…' : 'Save changes' }}
                         </BaseButton>
                     </div>
-                </form>
+            </form>
             </template>
         </div>
 
@@ -269,7 +282,7 @@ import { useAutosizeTextarea } from '@/composables/useAutosizeTextarea';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { ArrowLeftIcon, TrashIcon } from '@heroicons/vue/24/outline';
-import { BaseButton, ConfirmDialog } from '@/components/base';
+import { BaseButton, BaseCard, ConfirmDialog } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 
 const route = useRoute();

@@ -8,17 +8,9 @@
                     </template>
                     Back to Tickets
                 </BaseButton>
-                <p class="page-lead">Assign one or more team members — everyone on the list is notified by email on new comments.</p>
             </div>
 
-            <form id="ticket-create-form" novalidate class="form-card !overflow-visible" @submit.prevent="handleSubmit">
-                <div class="form-section-head-mint">
-                    <h2 class="form-section-title-mint text-xl">New support ticket</h2>
-                    <p class="form-section-desc-mint">Describe the issue and choose who should work on it.</p>
-                </div>
-
-                <div class="form-body space-y-4">
-                    <!-- Validation summary: focused on a failed submit -->
+            <form id="ticket-create-form" novalidate class="space-y-6" @submit.prevent="handleSubmit">
                     <div
                         v-if="error || errorFields.length"
                         ref="errorSummaryRef"
@@ -37,28 +29,8 @@
                         <p v-else class="mt-1">{{ error }}</p>
                     </div>
 
-                    <div>
-                        <label class="form-label" for="ticketcreateview-customer">Customer</label>
-                        <select id="ticketcreateview-customer" v-model="form.customer_id" class="form-select">
-                            <option value="">Select customer (optional)</option>
-                            <option v-for="c in customers" :key="c.id" :value="c.id">
-                                {{ c.name }} — {{ c.phone }}
-                            </option>
-                        </select>
-                        <p class="form-hint">Or enter a phone number below if not in the list.</p>
-                    </div>
-
-                    <div v-if="!form.customer_id">
-                        <label class="form-label" for="ticketcreateview-customer-phone">Customer phone</label>
-                        <input
-                            id="ticketcreateview-customer-phone"
-                            v-model="form.customer_phone"
-                            type="text"
-                            class="form-input"
-                            placeholder="e.g. 07700900123"
-                        />
-                    </div>
-
+            <BaseCard title="What is wrong" subtitle="The subject is what everyone will see in the list.">
+                <div class="space-y-4">
                     <div>
                         <label class="form-label" for="ticketcreateview-subject">
                             Subject<span class="form-required" aria-hidden="true">*</span>
@@ -87,46 +59,47 @@
                         />
                         <p class="form-hint">Drag the corner to resize. The field expands as you type or paste.</p>
                     </div>
+                </div>
+            </BaseCard>
 
-                    <div class="callout callout-warning">
-                        <p class="font-semibold">Large files</p>
-                        <p class="mt-1">
-                            Prefer uploading to Google Drive or Sheets and paste the link in <strong>Reference link</strong> below.
-                        </p>
+            <BaseCard title="Who it is for" subtitle="Optional - leave blank for an internal job.">
+                <div class="space-y-4">
+                    <div>
+                        <label class="form-label" for="ticketcreateview-customer">Customer</label>
+                        <select id="ticketcreateview-customer" v-model="form.customer_id" class="form-select">
+                            <option value="">Select customer (optional)</option>
+                            <option v-for="c in customers" :key="c.id" :value="c.id">
+                                {{ c.name }} — {{ c.phone }}
+                            </option>
+                        </select>
+                        <p class="form-hint">Or enter a phone number below if not in the list.</p>
                     </div>
 
-                    <div>
-                        <label class="form-label" for="ticketcreateview-reference-link-drive-sheet">Reference link (Drive / Sheet)</label>
-                        <input id="ticketcreateview-reference-link-drive-sheet" v-model="form.reference_url" type="url" class="form-input" placeholder="https://..." />
-                    </div>
-
-                    <div>
-                        <label class="form-label" for="ticketcreateview-attachments">Attachments</label>
-                        <input id="ticketcreateview-attachments"
-                            ref="attachmentInputRef"
-                            type="file"
-                            multiple
-                            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                            class="form-file"
-                            @change="onFiles"
+                    <div v-if="!form.customer_id">
+                        <label class="form-label" for="ticketcreateview-customer-phone">Customer phone</label>
+                        <input
+                            id="ticketcreateview-customer-phone"
+                            v-model="form.customer_phone"
+                            type="text"
+                            class="form-input"
+                            placeholder="e.g. 07700900123"
                         />
-                        <ul v-if="pendingFiles.length" class="mt-2 text-xs text-slate-600 space-y-1">
-                            <li v-for="(f, i) in pendingFiles" :key="i" class="flex items-center justify-between gap-2">
-                                <span class="truncate">{{ f.name }}</span>
-                                <BaseButton
-                                    variant="ghost"
-                                    size="sm"
-                                    class="shrink-0"
-                                    :label="`Remove ${f.name}`"
-                                    @click="pendingFiles.splice(i, 1)"
-                                >
-                                    <template #icon>
-                                        <TrashIcon class="icon-sm" aria-hidden="true" />
-                                    </template>
-                                    Remove
-                                </BaseButton>
-                            </li>
-                        </ul>
+                    </div>
+                </div>
+            </BaseCard>
+
+            <BaseCard title="Who works on it" subtitle="Everyone assigned is emailed when a comment is added.">
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="form-label" for="ticketcreateview-priority">Priority</label>
+                            <select id="ticketcreateview-priority" v-model="form.priority" class="form-select">
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div>
@@ -149,18 +122,6 @@
                         >
                             {{ fieldErrors.estimated_resolve_hours }}
                         </p>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="form-label" for="ticketcreateview-priority">Priority</label>
-                            <select id="ticketcreateview-priority" v-model="form.priority" class="form-select">
-                                <option value="low">Low</option>
-                                <option value="medium">Medium</option>
-                                <option value="high">High</option>
-                                <option value="urgent">Urgent</option>
-                            </select>
-                        </div>
                     </div>
 
                     <fieldset class="form-fieldset">
@@ -198,8 +159,52 @@
                         </div>
                     </fieldset>
                 </div>
+            </BaseCard>
 
-                <div class="form-actions">
+            <BaseCard title="Files and links">
+                <div class="space-y-4">
+                    <div>
+                        <label class="form-label" for="ticketcreateview-reference-link-drive-sheet">Reference link (Drive / Sheet)</label>
+                        <input id="ticketcreateview-reference-link-drive-sheet" v-model="form.reference_url" type="url" class="form-input" placeholder="https://..." />
+                    </div>
+
+                    <div>
+                        <label class="form-label" for="ticketcreateview-attachments">Attachments</label>
+                        <input id="ticketcreateview-attachments"
+                            ref="attachmentInputRef"
+                            type="file"
+                            multiple
+                            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                            class="form-file"
+                            @change="onFiles"
+                        />
+                        <ul v-if="pendingFiles.length" class="mt-2 text-xs text-slate-600 space-y-1">
+                            <li v-for="(f, i) in pendingFiles" :key="i" class="flex items-center justify-between gap-2">
+                                <span class="truncate">{{ f.name }}</span>
+                                <BaseButton
+                                    variant="ghost"
+                                    size="sm"
+                                    class="shrink-0"
+                                    :label="`Remove ${f.name}`"
+                                    @click="pendingFiles.splice(i, 1)"
+                                >
+                                    <template #icon>
+                                        <TrashIcon class="icon-sm" aria-hidden="true" />
+                                    </template>
+                                    Remove
+                                </BaseButton>
+                            </li>
+                        </ul>
+                    </div>
+
+                <p class="form-hint">
+                    For anything large, put it on Google Drive and paste the link above
+                    rather than attaching it.
+                </p>
+                </div>
+            </BaseCard>
+
+                <div class="flex flex-col-reverse justify-end gap-3 sm:flex-row">
                     <BaseButton to="/tickets" variant="outline" block-mobile>Cancel</BaseButton>
                     <BaseButton
                         type="submit"
@@ -223,7 +228,7 @@ import { useAutosizeTextarea } from '@/composables/useAutosizeTextarea';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { ArrowLeftIcon, TrashIcon } from '@heroicons/vue/24/outline';
-import { BaseButton } from '@/components/base';
+import { BaseButton, BaseCard } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
 
