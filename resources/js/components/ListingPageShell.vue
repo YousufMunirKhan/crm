@@ -10,9 +10,9 @@
             -->
             <header
                 v-if="subtitle || hasBadge || $slots.actions"
-                class="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                class="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between"
             >
-                <div class="min-w-0 flex-1 space-y-2">
+                <div class="min-w-0 flex-1 basis-72 space-y-2">
                     <span v-if="hasBadge" class="badge badge-primary">
                         {{ badge }}
                     </span>
