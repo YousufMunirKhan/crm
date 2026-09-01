@@ -192,14 +192,44 @@ class WhatsAppTemplateService
                 'errors' => $errors,
             ];
         } catch (\Exception $e) {
-            Log::error('Failed to sync templates from Meta', [
-                'error' => $e->getMessage(),
-            ]);
+            $this->logSyncFailure($e->getMessage());
+
             return [
                 'synced' => 0,
                 'errors' => [$e->getMessage()],
             ];
         }
+    }
+
+    /**
+     * Logs a sync failure at most once an hour while the cause does not change.
+     *
+     * This sync runs every fifteen minutes. The access token expired on 2 April
+     * and has been rejected every run since, so by September the log held five
+     * months of the same OAuthException 190 - roughly fifteen thousand lines
+     * saying one thing. That is not a log, it is cover: a dead Claude model sat
+     * unnoticed in this same file for months because nobody could face reading
+     * it, and anything genuinely new arriving today would be buried the same
+     * way.
+     *
+     * An expired credential is a real failure and still gets logged - just once
+     * per hour per distinct message, so a second, different failure is visible
+     * beside it rather than underneath it.
+     */
+    private function logSyncFailure(string $message): void
+    {
+        $key = 'whatsapp:sync-failure:'.md5($message);
+
+        if (\Illuminate\Support\Facades\Cache::get($key)) {
+            return;
+        }
+
+        \Illuminate\Support\Facades\Cache::put($key, true, now()->addHour());
+
+        Log::error('Failed to sync templates from Meta', [
+            'error' => $message,
+            'note' => 'Repeats of this exact error are suppressed for an hour.',
+        ]);
     }
 
     /**
