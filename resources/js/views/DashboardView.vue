@@ -13,6 +13,14 @@
             </p>
         </div>
 
+        <!--
+            Above the date range on purpose. Everything below this point answers
+            "what happened in a window", which on a quiet week is a screen of
+            zeroes; this answers "what is rotting right now", which is the
+            question an owner actually opens the app with.
+        -->
+        <NeedsAttention v-if="canUseOrgDashboardFilters" />
+
         <p v-if="isSelfDashboardScope" class="callout callout-info">
             You’re viewing <strong>your</strong> opportunities, customers, and activity. Admins and managers see the full organization on this screen.
         </p>
@@ -549,6 +557,7 @@ import {
     StatCard,
 } from '@/components/base';
 import AttendanceClock from '@/components/AttendanceClock.vue';
+import NeedsAttention from '@/components/NeedsAttention.vue';
 import AttendanceWorkHoursChart from '@/components/AttendanceWorkHoursChart.vue';
 import LogActivityModal from '@/components/LogActivityModal.vue';
 import CustomerName from '@/components/CustomerName.vue';

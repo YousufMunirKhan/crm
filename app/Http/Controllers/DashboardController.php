@@ -301,6 +301,19 @@ class DashboardController extends Controller
     /**
      * Get sales agent dashboard data
      */
+    /**
+     * What is rotting, and who owns it.
+     *
+     * Deliberately not date-filtered, unlike everything else on this dashboard.
+     * A lead nobody has rung for six months is not less true on a Monday, and a
+     * screen built entirely out of date ranges renders zeroes on a quiet week
+     * and teaches nobody anything.
+     */
+    public function attention(\App\Modules\Reporting\Services\BookHealthService $health)
+    {
+        return response()->json($health->snapshot());
+    }
+
     public function salesAgent(Request $request)
     {
         $user = auth()->user();

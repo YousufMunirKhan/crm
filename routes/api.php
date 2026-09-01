@@ -85,6 +85,11 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index']);
     Route::get('/dashboard/sales-agent', [\App\Http\Controllers\DashboardController::class, 'salesAgent']);
 
+    // The state of the business now, as opposed to what happened in a window.
+    // Company-wide, so it is management only.
+    Route::get('/dashboard/attention', [\App\Http\Controllers\DashboardController::class, 'attention'])
+        ->middleware('role:Admin,Manager,System Admin');
+
     // Templates for sending (any authenticated user - used on customer page)
     Route::get('/email-templates-for-sending', [\App\Http\Controllers\EmailTemplateController::class, 'listForSending']);
     Route::get('/message-templates-for-sending', [\App\Http\Controllers\MessageTemplateController::class, 'listForSending']);
