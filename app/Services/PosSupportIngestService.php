@@ -50,7 +50,7 @@ class PosSupportIngestService
 
             $shopName = (string) ($row['shopName'] ?? 'POS Shop');
             $message = (string) ($row['message'] ?? '');
-            $subject = '[POS] ' . Str::limit($shopName . ': ' . ($message !== '' ? $message : 'Support request'), 120, '…');
+            $subject = '[POS] ' . Str::limit($shopName . ': ' . self::summarise($message), 120, '…');
 
             $description = $this->buildDescription($row);
 
@@ -186,6 +186,56 @@ class PosSupportIngestService
             })
             ->orderByDesc('updated_at')
             ->first(['id', 'pos_external_id', 'pos_support_status', 'pos_resolution_notes', 'updated_at']);
+    }
+
+    /**
+     * One readable line out of a desktop crash report.
+     *
+     * The POS client posts its whole report in `message`, and that report opens
+     * with a literal "=== Context ===" header. Taking the message verbatim gave
+     * every ticket the same subject and the same preview - a support queue where
+     * thirty-four rows read "=== Context ===" and nothing tells them apart until
+     * you open each one.
+     *
+     * The two lines that actually identify a crash are the context line the user
+     * or the code wrote ("Error saving product:") and the exception's own
+     * message ("Product with ProductID 0 not found."). A message that is not in
+     * this format - somebody typing a real sentence - is passed through
+     * untouched.
+     */
+    public static function summarise(string $message): string
+    {
+        $message = trim($message);
+
+        if ($message === '') {
+            return 'Support request';
+        }
+
+        if (! str_contains($message, '=== Context ===')) {
+            return Str::limit($message, 139, '…');
+        }
+
+        $parts = [];
+
+        // The context block: everything between its header and the next one.
+        if (preg_match('/=== Context ===\s*(.*?)(?:\n===|\z)/s', $message, $m)) {
+            $context = trim(preg_replace('/\s+/', ' ', $m[1]));
+
+            if ($context !== '') {
+                $parts[] = rtrim($context, ': ');
+            }
+        }
+
+        // The exception's own one-line message, which is the actual fault.
+        if (preg_match('/=== Exception ===[\s\S]*?\n\s*Message:[ \t]*([^\n]+)/', $message, $m)) {
+            $parts[] = trim($m[1]);
+        }
+
+        if ($parts === []) {
+            return Str::limit($message, 139, '…');
+        }
+
+        return Str::limit(implode(' - ', $parts), 139, '…');
     }
 
     private function buildDescription(array $row): string

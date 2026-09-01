@@ -18,7 +18,7 @@
 
         <div v-if="loading" class="px-5 py-14 text-center text-slate-500 text-sm" role="status" aria-live="polite">Loading…</div>
         <template v-else>
-            <div class="overflow-x-auto min-w-0">
+            <div class="hidden overflow-x-auto min-w-0 md:block">
                 <table class="w-full min-w-[900px]">
                     <thead class="listing-thead">
                         <tr>
@@ -59,6 +59,40 @@
                     </tbody>
                 </table>
             </div>
+            <!-- Same rows as cards on a phone. Shop name leads because that is
+                 what a support person is looking for; the number is one tap to
+                 ring and one to copy, since the next thing they do is call. -->
+            <div v-if="items.length" class="space-y-3 px-3 pb-3 md:hidden">
+                <div v-for="row in items" :key="`mobile-${row.id}`" class="table-card">
+                    <div class="flex items-start justify-between gap-2">
+                        <router-link :to="`/tickets/${row.id}`" class="link text-sm font-semibold break-words">
+                            {{ row.pos_shop_name || 'Unknown shop' }}
+                        </router-link>
+                        <BaseBadge :tone="statusTone(row.pos_support_status)" class="shrink-0">
+                            {{ statusLabel(row.pos_support_status) }}
+                        </BaseBadge>
+                    </div>
+
+                    <p class="text-sm text-slate-700">{{ messagePreview(row) }}</p>
+
+                    <div v-if="row.pos_telephone" class="flex items-center gap-1">
+                        <a :href="`tel:${row.pos_telephone}`" class="text-sm tabular-nums text-primary-700 hover:underline">
+                            {{ row.pos_telephone }}
+                        </a>
+                        <CopyButton :value="row.pos_telephone" label="phone number" size="compact" />
+                    </div>
+
+                    <div class="text-xs text-slate-500 tabular-nums">
+                        {{ formatDt(row.pos_submitted_at || row.created_at) }}
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        <BaseButton variant="outline" :to="`/tickets/${row.id}`">View</BaseButton>
+                        <BaseButton variant="soft" @click="openStatusModal(row)">Update status</BaseButton>
+                    </div>
+                </div>
+            </div>
+
             <p v-if="items.length === 0" class="text-center py-8 text-slate-500 text-sm px-5">No POS support tickets.</p>
         </template>
 
@@ -127,6 +161,7 @@ import { useToastStore } from '@/stores/toast';
 import { BaseBadge, BaseButton, BaseModal } from '@/components/base';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import Pagination from '@/components/Pagination.vue';
+import CopyButton from '@/components/CopyButton.vue';
 
 const toast = useToastStore();
 
@@ -159,10 +194,39 @@ const modalDescription = computed(() => {
     return `${editing.value.pos_shop_name ?? ''} — POS ID ${editing.value.pos_external_id ?? ''}`;
 });
 
+/**
+ * One readable line out of a desktop crash report.
+ *
+ * The POS client posts its whole report, and that report opens with a literal
+ * "=== Context ===" header - so taking the Message: line gave every row in this
+ * queue the same preview. Thirty-four tickets all reading "=== Context ===",
+ * with nothing to tell them apart until you opened each one.
+ *
+ * Mirrors PosSupportIngestService::summarise(), which now writes the subject
+ * the same way. Kept here too so tickets ingested before that change still read
+ * properly in the list.
+ */
 function messagePreview(row) {
-    const m = row.description?.split('\n').find((l) => l.startsWith('Message: '));
-    if (m) return m.replace(/^Message:\s*/, '').slice(0, 140) || '—';
-    return (row.subject || '').slice(0, 140) || '—';
+    const body = row.description ?? '';
+    const raw = body.split('\n').find((l) => l.startsWith('Message: '))?.replace(/^Message:\s*/, '');
+    const message = (raw ?? row.subject ?? '').trim();
+
+    if (!message) return '—';
+    if (!message.includes('=== Context ===')) return message.slice(0, 140);
+
+    const source = body || message;
+    const parts = [];
+
+    const context = source.match(/=== Context ===\s*([\s\S]*?)(?:\n===|$)/);
+    if (context) {
+        const text = context[1].replace(/\s+/g, ' ').trim().replace(/:\s*$/, '');
+        if (text) parts.push(text);
+    }
+
+    const fault = source.match(/=== Exception ===[\s\S]*?\nMessage:\s*(.+)/);
+    if (fault) parts.push(fault[1].trim());
+
+    return (parts.length ? parts.join(' - ') : message).slice(0, 140);
 }
 
 function statusLabel(s) {
