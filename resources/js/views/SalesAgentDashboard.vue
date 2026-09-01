@@ -4,6 +4,8 @@
 
         <AttendanceClock />
 
+        <MyWork />
+
         <!--
             The day in one line. This used to be three cards sharing a grid row
             with the attendance panel, so each stretched to its height and put a
@@ -11,17 +13,7 @@
             anything a rep actually has to do.
         -->
         <div class="flex flex-wrap gap-2">
-            <button
-                v-if="overdueFollowUps.length"
-                type="button"
-                class="inline-flex min-h-[44px] items-center gap-2 rounded-control border border-danger-200
-                       bg-danger-50 px-3 text-sm font-medium text-danger-800 touch-manipulation
-                       hover:bg-danger-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-500/40"
-                @click="scrollToWork"
-            >
-                <ExclamationTriangleIcon class="icon-sm shrink-0" aria-hidden="true" />
-                {{ overdueFollowUps.length }} overdue
-            </button>
+            <!-- Only what the band above does not already say. -->
             <span class="inline-flex min-h-[44px] items-center gap-2 rounded-control border border-slate-200 bg-white px-3 text-sm text-slate-700">
                 <CalendarDaysIcon class="icon-sm shrink-0 text-slate-400" aria-hidden="true" />
                 {{ displayFollowUpsToday.length }} due today
@@ -29,7 +21,7 @@
             <span class="inline-flex min-h-[44px] items-center gap-2 rounded-control border border-slate-200 bg-white px-3 text-sm text-slate-700">
                 <ClockIcon class="icon-sm shrink-0 text-slate-400" aria-hidden="true" />
                 {{ todayAppointments.length }}
-                {{ todayAppointments.length === 1 ? 'appointment' : 'appointments' }}
+                {{ todayAppointments.length === 1 ? 'appointment' : 'appointments' }} today
             </span>
             <span class="inline-flex min-h-[44px] items-center gap-2 rounded-control border border-slate-200 bg-white px-3 text-sm text-slate-700">
                 <ArrowTrendingUpIcon class="icon-sm shrink-0 text-slate-400" aria-hidden="true" />
@@ -625,6 +617,7 @@ import {
 } from '@/components/base';
 import AttendanceClock from '@/components/AttendanceClock.vue';
 import CopyButton from '@/components/CopyButton.vue';
+import MyWork from '@/components/MyWork.vue';
 import LogActivityModal from '@/components/LogActivityModal.vue';
 import { formatLeadStage } from '@/utils/displayFormat';
 
@@ -769,10 +762,6 @@ function sinceLabel(when) {
     if (days < 30) return `${days}d ago`;
 
     return `${Math.floor(days / 30)}mo ago`;
-}
-
-function scrollToWork() {
-    workSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function loadOverdue() {

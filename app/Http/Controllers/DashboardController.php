@@ -314,6 +314,19 @@ class DashboardController extends Controller
         return response()->json($health->snapshot());
     }
 
+    /**
+     * The same questions, about your own book.
+     *
+     * Everybody gets this, not only management: what have I let go quiet, what
+     * did I promise and then miss, which appointments never got closed out. It
+     * is the same service with a scope rather than a second set of definitions,
+     * so a rep and their manager cannot be looking at two different answers.
+     */
+    public function myWork(Request $request, \App\Modules\Reporting\Services\BookHealthService $health)
+    {
+        return response()->json($health->forUser($request->user()->id)->snapshot());
+    }
+
     public function salesAgent(Request $request)
     {
         $user = auth()->user();

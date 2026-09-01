@@ -87,6 +87,9 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
 
     // The state of the business now, as opposed to what happened in a window.
     // Company-wide, so it is management only.
+    // Your own book. Open to every member of staff - it is about them.
+    Route::get('/dashboard/my-work', [\App\Http\Controllers\DashboardController::class, 'myWork']);
+
     Route::get('/dashboard/attention', [\App\Http\Controllers\DashboardController::class, 'attention'])
         ->middleware('role:Admin,Manager,System Admin');
 

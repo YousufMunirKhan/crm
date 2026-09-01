@@ -188,6 +188,49 @@ class BookHealthTest extends TestCase
         $this->assertCount(0, $snapshot['stalest']);
     }
 
+    public function test_a_salesperson_sees_only_their_own_book(): void
+    {
+        $mine = $this->rep();
+        $theirs = $this->rep();
+
+        $this->lead($mine, ['created_at' => now()->subDays(60)]);
+        $this->lead($mine, ['created_at' => now()->subDays(60)]);
+        $this->lead($theirs, ['created_at' => now()->subDays(60)]);
+
+        $response = $this->actingAs($mine, 'sanctum')->getJson('/api/dashboard/my-work')->assertOk();
+
+        // Being told the company has 169 neglected leads is a complaint. Being
+        // told which two of them are yours is a morning's work.
+        $this->assertSame(2, $response->json('leads.open'));
+        $this->assertSame(2, $response->json('leads.quiet_30'));
+        $this->assertCount(2, $response->json('stalest'));
+
+        // A per-person view of "who owns the neglect" is a list of one.
+        $this->assertSame([], $response->json('by_owner'));
+    }
+
+    public function test_the_rep_and_their_manager_see_the_same_numbers(): void
+    {
+        $rep = $this->rep();
+
+        foreach (range(1, 3) as $i) {
+            $this->lead($rep, ['created_at' => now()->subDays(60)]);
+        }
+
+        $mine = $this->actingAs($rep, 'sanctum')->getJson('/api/dashboard/my-work')->json('leads.quiet_30');
+
+        $adminRole = Role::firstOrCreate(['name' => 'Admin'], ['nav_permissions' => null]);
+        $admin = User::factory()->create(['role_id' => $adminRole->id, 'is_active' => true]);
+
+        $company = collect(
+            $this->actingAs($admin, 'sanctum')->getJson('/api/dashboard/attention')->json('by_owner')
+        )->firstWhere('name', $rep->name);
+
+        // One set of definitions with a scope, not two implementations that
+        // drift into giving different answers to the same question.
+        $this->assertSame($mine, $company['quiet']);
+    }
+
     public function test_only_management_can_see_the_whole_company(): void
     {
         $rep = $this->rep();

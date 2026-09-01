@@ -44,6 +44,24 @@ class BookHealthService
         'call', 'meeting', 'visit', 'email', 'whatsapp', 'sms', 'quote_sent', 'appointment',
     ];
 
+    /**
+     * Whose book this is about. Null means the whole company.
+     *
+     * The same questions matter to a salesperson as to the owner - what have I
+     * let go quiet, what did I promise and miss - so this is one set of
+     * definitions with a scope, rather than a second implementation that would
+     * drift and give two different answers to the same question.
+     */
+    private ?int $userId = null;
+
+    public function forUser(?int $userId): self
+    {
+        $clone = clone $this;
+        $clone->userId = $userId;
+
+        return $clone;
+    }
+
     public function snapshot(): array
     {
         return [
@@ -53,7 +71,8 @@ class BookHealthService
             'tickets' => $this->tickets(),
             'data_quality' => $this->dataQuality(),
             'stalest' => $this->stalest(),
-            'by_owner' => $this->byOwner(),
+            // A per-person view of "who owns the neglect" is a list of one.
+            'by_owner' => $this->userId ? [] : $this->byOwner(),
         ];
     }
 
@@ -68,7 +87,9 @@ class BookHealthService
 
     private function openLeads()
     {
-        return Lead::query()->whereNotIn('stage', ['won', 'lost']);
+        return Lead::query()
+            ->whereNotIn('stage', ['won', 'lost'])
+            ->when($this->userId, fn ($q) => $q->where('assigned_to', $this->userId));
     }
 
     private function leads(): array
@@ -118,12 +139,12 @@ class BookHealthService
     private function appointments(): array
     {
         return [
-            'today' => (int) LeadActivity::where('type', 'appointment')
+            'today' => (int) $this->appointmentsOwned()
                 ->whereDate('appointment_date', now()->toDateString())
                 ->count(),
             // Past their date with nobody having said whether they happened,
             // which is why held rate and no-show rate cannot be measured.
-            'awaiting_outcome' => (int) LeadActivity::where('type', 'appointment')
+            'awaiting_outcome' => (int) $this->appointmentsOwned()
                 ->whereNotNull('appointment_date')
                 ->whereDate('appointment_date', '<', now()->toDateString())
                 ->where(fn ($q) => $q->whereNull('appointment_status')->orWhere('appointment_status', 'pending'))
@@ -131,9 +152,20 @@ class BookHealthService
         ];
     }
 
+    /** Appointments this person owns, or all of them for the company view. */
+    private function appointmentsOwned()
+    {
+        return LeadActivity::where('type', 'appointment')
+            ->when($this->userId, fn ($q) => $q->where(
+                fn ($inner) => $inner->where('assigned_user_id', $this->userId)
+                    ->orWhere('user_id', $this->userId)
+            ));
+    }
+
     private function tickets(): array
     {
-        $open = Ticket::whereIn('status', ['open', 'in_progress']);
+        $open = Ticket::whereIn('status', ['open', 'in_progress'])
+            ->when($this->userId, fn ($q) => $q->where('assigned_to', $this->userId));
 
         return [
             // Genuinely open. Counting anything not `closed` sweeps in the
@@ -147,25 +179,41 @@ class BookHealthService
                 ->whereNotNull('sla_due_at')->where('sla_due_at', '<', now())->count(),
             // Fixed and then never closed, because nothing in the product closes
             // them and the status filter does not even offer `resolved`.
-            'resolved_not_closed' => (int) Ticket::where('status', 'resolved')->count(),
+            'resolved_not_closed' => (int) Ticket::where('status', 'resolved')
+                ->when($this->userId, fn ($q) => $q->where('assigned_to', $this->userId))
+                ->count(),
         ];
     }
 
     private function dataQuality(): array
     {
         return [
-            'customers_without_email' => (int) Customer::where(
-                fn ($q) => $q->whereNull('email')->orWhere('email', '')
-            )->count(),
-            'customers_total' => (int) Customer::count(),
+            'customers_without_email' => (int) $this->customersInScope()
+                ->where(fn ($q) => $q->whereNull('email')->orWhere('email', ''))
+                ->count(),
+            'customers_total' => (int) $this->customersInScope()->count(),
             'leads_without_source' => (int) $this->openLeads()
                 ->where(fn ($q) => $q->whereNull('source')->orWhere('source', ''))
                 ->count(),
             // Losses recorded before the reason picker existed, so the loss
             // report is honest about what it cannot break down.
             'losses_without_reason' => (int) Lead::where('stage', 'lost')
+                ->when($this->userId, fn ($q) => $q->where('assigned_to', $this->userId))
                 ->whereNull('lost_reason_code')->count(),
         ];
+    }
+
+    /**
+     * For one person, the customers behind their own open leads - telling a
+     * salesperson that 219 customers company-wide have no email is not
+     * something they can do anything about.
+     */
+    private function customersInScope()
+    {
+        return Customer::query()->when(
+            $this->userId,
+            fn ($q) => $q->whereHas('leads', fn ($l) => $l->where('assigned_to', $this->userId))
+        );
     }
 
     /**
