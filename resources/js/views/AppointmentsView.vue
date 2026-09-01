@@ -1,7 +1,9 @@
 <template>
     <ListingPageShell
-        title="My appointments"
-        subtitle="Visits and meetings for the day you pick — open a card for full detail and status."
+        :title="scopeIsEveryone ? 'Appointments' : 'My appointments'"
+        :subtitle="scopeIsEveryone
+            ? 'Visits and meetings across the team for the day you pick.'
+            : 'Visits and meetings for the day you pick — open a card for full detail and status.'"
         :badge="appointmentsBadge"
     >
         <template #filters>
@@ -18,6 +20,13 @@
                 <BaseButton v-if="selectedDate !== todayStr" variant="outline" @click="resetDate">
                     Today
                 </BaseButton>
+                <div v-if="canSeeEveryone" class="w-full sm:w-auto">
+                    <label class="listing-label" for="appointmentsview-scope">Whose</label>
+                    <select id="appointmentsview-scope" v-model="scope" class="form-select w-full sm:w-44" @change="reload">
+                        <option value="all">Everyone</option>
+                        <option value="mine">Just mine</option>
+                    </select>
+                </div>
             </div>
         </template>
 
@@ -52,6 +61,9 @@
                                 <p class="text-xs text-slate-600 mt-0.5">
                                     {{ formatDate(apt.appointment_date) }} at {{ apt.appointment_time || '10:00' }}
                                     <span class="text-slate-400">·</span> {{ daysAgo(apt.appointment_date) }}
+                                    <template v-if="scopeIsEveryone && apt.owner">
+                                        <span class="text-slate-400">·</span> {{ apt.owner }}
+                                    </template>
                                 </p>
                             </div>
 
@@ -151,6 +163,7 @@ import { CalendarDaysIcon, ChevronRightIcon } from '@heroicons/vue/24/outline';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { BaseBadge, BaseButton, EmptyState } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
+import { useAuthStore } from '@/stores/auth';
 
 const toast = useToastStore();
 
@@ -168,6 +181,20 @@ const selectedDate = ref('');
  */
 const awaiting = ref([]);
 const saving = ref(null);
+
+const auth = useAuthStore();
+
+/** Admins and managers run the diary for the team, not only for themselves. */
+const canSeeEveryone = computed(() =>
+    ['Admin', 'Manager', 'System Admin'].includes(auth.user?.role?.name));
+
+const scope = ref('all');
+const scopeIsEveryone = computed(() => canSeeEveryone.value && scope.value === 'all');
+
+function reload() {
+    loadAppointments();
+    loadAwaiting();
+}
 
 const outcomeChoices = [
     { value: 'completed', label: 'It happened', class: 'border-success-200 bg-success-50 text-success-800 hover:bg-success-100' },
@@ -227,7 +254,9 @@ function daysAgo(ymd) {
 
 async function loadAwaiting() {
     try {
-        const res = await axios.get('/api/appointments', { params: { needs_outcome: 1 } });
+        const res = await axios.get('/api/appointments', {
+            params: { needs_outcome: 1, ...(scopeIsEveryone.value ? {} : { mine: 1 }) },
+        });
         awaiting.value = res.data ?? [];
     } catch {
         awaiting.value = [];
@@ -254,7 +283,9 @@ async function loadAppointments() {
     const date = selectedDate.value || todayStr.value;
     loading.value = true;
     try {
-        const res = await axios.get('/api/appointments', { params: { date } });
+        const res = await axios.get('/api/appointments', {
+            params: { date, ...(scopeIsEveryone.value ? {} : { mine: 1 }) },
+        });
         appointments.value = res.data ?? [];
     } catch (e) {
         console.error(e);

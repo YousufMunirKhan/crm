@@ -107,6 +107,50 @@ class AppointmentOutcomeTest extends TestCase
         $this->assertSame('/appointments', $raised->data['route']);
     }
 
+    public function test_a_manager_sees_the_teams_unclosed_appointments_not_only_their_own(): void
+    {
+        $colleague = User::factory()->create([
+            'role_id' => Role::firstOrCreate(['name' => 'Sales'], ['nav_permissions' => null])->id,
+            'is_active' => true,
+        ]);
+
+        $theirs = $this->appointment(now()->subDays(6)->toDateString());
+        $theirs->forceFill(['assigned_user_id' => $colleague->id, 'user_id' => $colleague->id])->saveQuietly();
+        $theirs->lead->update(['assigned_to' => $colleague->id]);
+
+        $manager = User::factory()->create([
+            'role_id' => Role::firstOrCreate(['name' => 'Manager'], ['nav_permissions' => null])->id,
+            'is_active' => true,
+        ]);
+
+        // The owner's dashboard counts the whole company. Landing here and
+        // seeing nothing, because the screen was strictly personal, is the tile
+        // promising a number it cannot show.
+        $this->actingAs($manager, 'sanctum')
+            ->getJson('/api/appointments?needs_outcome=1')
+            ->assertOk()
+            ->assertJsonCount(1);
+
+        $this->actingAs($manager, 'sanctum')
+            ->getJson('/api/appointments?needs_outcome=1&mine=1')
+            ->assertOk()
+            ->assertJsonCount(0);
+    }
+
+    public function test_a_salesperson_still_only_sees_their_own(): void
+    {
+        $colleague = User::factory()->create([
+            'role_id' => Role::firstOrCreate(['name' => 'Sales'], ['nav_permissions' => null])->id,
+            'is_active' => true,
+        ]);
+
+        $theirs = $this->appointment(now()->subDays(6)->toDateString());
+        $theirs->forceFill(['assigned_user_id' => $colleague->id, 'user_id' => $colleague->id])->saveQuietly();
+        $theirs->lead->update(['assigned_to' => $colleague->id]);
+
+        $this->getJson('/api/appointments?needs_outcome=1')->assertOk()->assertJsonCount(0);
+    }
+
     public function test_closing_a_lead_lost_from_an_appointment_still_needs_a_reason(): void
     {
         $appointment = $this->appointment(now()->subDay());

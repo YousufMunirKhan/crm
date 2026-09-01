@@ -17,14 +17,27 @@ class AppointmentController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
+
+        // Management sees the company; everybody else sees their own.
+        //
+        // This screen was strictly personal, so the owner's dashboard could
+        // report 35 appointments left unclosed, link straight here, and land on
+        // "no appointments for this date" - because all 35 belonged to other
+        // people. A tile that promises a number and then delivers an empty page
+        // is worse than no tile at all.
+        $seesEveryone = ($user->isRole('Admin') || $user->isRole('Manager') || $user->isRole('System Admin'))
+            && ! $request->boolean('mine');
+
         $query = LeadActivity::where('type', 'appointment')
-            ->where(function ($q) use ($user) {
-                $q->where('assigned_user_id', $user->id)
-                    ->orWhere('user_id', $user->id)
-                    ->orWhereHas('lead', function ($lq) use ($user) {
-                        $lq->where('assigned_to', $user->id)
-                            ->orWhereHas('customer', fn ($cq) => $cq->forSalesAgent($user->id));
-                    });
+            ->when(! $seesEveryone, function ($q) use ($user) {
+                $q->where(function ($inner) use ($user) {
+                    $inner->where('assigned_user_id', $user->id)
+                        ->orWhere('user_id', $user->id)
+                        ->orWhereHas('lead', function ($lq) use ($user) {
+                            $lq->where('assigned_to', $user->id)
+                                ->orWhereHas('customer', fn ($cq) => $cq->forSalesAgent($user->id));
+                        });
+                });
             })
             ->with(['lead.customer', 'lead.assignee', 'lead.items.product', 'user', 'assignee']);
 
@@ -69,6 +82,8 @@ class AppointmentController extends Controller
                 'appointment_time' => $this->appointmentTimeFrom($a),
                 'appointment_status' => $a->appointment_status ?? 'pending',
                 'outcome_notes' => $a->outcome_notes,
+                // Named so a manager looking at everybody's can tell them apart.
+                'owner' => $a->assignee?->name ?? $a->lead?->assignee?->name ?? $a->user?->name,
                 'user' => $a->user,
                 'assignee' => $a->assignee,
                 'created_at' => $a->created_at?->toIso8601String(),

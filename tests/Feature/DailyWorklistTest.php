@@ -90,7 +90,7 @@ class DailyWorklistTest extends TestCase
         $this->assertNotNull($mine);
         $this->assertStringContainsString('2 follow-ups are overdue', $mine->title);
         $this->assertStringContainsString('9 days', $mine->message);
-        $this->assertSame('/follow-ups?overdue=1', $mine->data['route']);
+        $this->assertSame('/followups?overdue=1', $mine->data['route']);
 
         // Somebody else's overdue work is not this rep's problem.
         $this->assertSame(

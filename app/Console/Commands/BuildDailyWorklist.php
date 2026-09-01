@@ -67,7 +67,7 @@ class BuildDailyWorklist extends Command
                 'follow_ups.overdue',
                 $rows->count().' '.$this->plural($rows->count(), 'follow-up is', 'follow-ups are').' overdue',
                 $this->overdueMessage($rows),
-                ['route' => '/follow-ups?overdue=1', 'count' => $rows->count()],
+                ['route' => '/followups?overdue=1', 'count' => $rows->count()],
                 $dryRun
             );
         }

@@ -224,7 +224,7 @@
                             v-if="overdueFollowUps.length > OVERDUE_ON_DASHBOARD"
                             variant="outline"
                             block-mobile
-                            to="/follow-ups?overdue=1"
+                            to="/followups?overdue=1"
                         >
                             See all {{ overdueFollowUps.length }} overdue
                         </BaseButton>

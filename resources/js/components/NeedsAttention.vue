@@ -174,7 +174,7 @@ const tiles = computed(() => {
             caption: followUps.overdue
                 ? `Dates our own people set. The oldest passed ${followUps.oldest_days} days ago.`
                 : 'Every promised date is still ahead of us.',
-            to: '/follow-ups?overdue=1',
+            to: '/followups?overdue=1',
         },
         {
             key: 'unowned',
