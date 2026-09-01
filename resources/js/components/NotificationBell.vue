@@ -136,11 +136,30 @@ async function open(item) {
         axios.put(`/api/notifications/${item.id}/read`).catch(() => refreshCount());
     }
 
-    const data = typeof item.data === 'string' ? safeParse(item.data) : item.data;
+    const to = destination(typeof item.data === 'string' ? safeParse(item.data) : item.data);
 
-    if (data?.route) {
-        router.push(data.route);
+    if (to) {
+        router.push(to);
     }
+}
+
+/**
+ * Where a notification takes you.
+ *
+ * The SLA check and the marketing automations have been writing `ticket_id` and
+ * `customer_id` since long before anything read them - 38 unread rows are
+ * sitting there now - so those are understood as well as the `route` newer
+ * ones carry. A notification that does not take you to the thing it is about
+ * is only a reminder to go looking.
+ */
+function destination(data) {
+    if (! data) return null;
+    if (data.route) return data.route;
+    if (data.ticket_id) return `/tickets/${data.ticket_id}`;
+    if (data.lead_id) return `/leads/${data.lead_id}`;
+    if (data.customer_id) return `/customers/${data.customer_id}`;
+
+    return null;
 }
 
 function safeParse(value) {
