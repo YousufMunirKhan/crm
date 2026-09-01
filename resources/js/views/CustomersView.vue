@@ -276,7 +276,7 @@
                             <th scope="col" class="table-th">Contact</th>
                             <th scope="col" class="table-th">Stage</th>
                             <th scope="col" class="table-th">Next follow-up</th>
-                            <th scope="col" class="hidden 2xl:table-cell table-th-num">Value (£)</th>
+                            <th v-if="anyValue" scope="col" class="hidden 2xl:table-cell table-th-num">Value (£)</th>
                             <th scope="col" class="hidden xl:table-cell table-th">Assigned</th>
                             <th scope="col" class="hidden 2xl:table-cell table-th">Added by</th>
                             <th scope="col" class="table-th text-right">Actions</th>
@@ -349,7 +349,7 @@
                                 </span>
                                 <span v-else class="text-slate-400 text-xs">Not scheduled</span>
                             </td>
-                            <td class="hidden 2xl:table-cell table-td-num">
+                            <td v-if="anyValue" class="hidden 2xl:table-cell table-td-num">
                                 <span v-if="valueOf(customer) > 0" class="font-semibold text-slate-800">
                                     {{ formatNumber(valueOf(customer)) }}
                                 </span>
@@ -607,6 +607,9 @@ const filters = ref({
     sort_by: 'created_at',
     sort_order: 'desc',
 });
+
+/** Only worth a column when something on the page actually has one. */
+const anyValue = computed(() => customers.value.some((c) => valueOf(c) > 0));
 
 const hasActiveFilters = computed(() => {
     return filters.value.search ||

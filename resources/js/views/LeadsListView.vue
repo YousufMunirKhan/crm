@@ -217,7 +217,7 @@
             </template>
         </EmptyState>
 
-        <div v-else class="table-wrap">
+        <div v-else class="hidden lg:block table-wrap">
             <table class="table" style="min-width: 1320px">
                 <caption class="sr-only">Leads matching the current filters</caption>
                 <thead class="table-thead">
@@ -286,6 +286,62 @@
             </table>
         </div>
 
+        <!--
+            Small screens get a card instead. Twelve columns cannot be read
+            sideways, so this keeps the four things a rep acts on - who it is,
+            what stage, what is next, and how to reach them - and drops the
+            rest, which are available on the lead itself.
+        -->
+        <div v-if="leads.length" class="lg:hidden space-y-3 px-3 pb-4 min-w-0">
+            <router-link
+                v-for="lead in leads"
+                :key="`m-${lead.id}`"
+                :to="`/leads/${lead.id}`"
+                class="table-card block space-y-3 min-w-0 hover:border-primary-300"
+            >
+                <div class="flex items-start justify-between gap-3 min-w-0">
+                    <div class="min-w-0 flex-1">
+                        <CustomerName :customer="lead.customer" name-class="font-semibold text-slate-900" />
+                        <span class="mt-1 block text-xs text-slate-500 font-mono">#{{ lead.id }}</span>
+                    </div>
+                    <BaseBadge :tone="stageTone(lead.stage)" class="shrink-0">
+                        {{ formatLeadStage(lead.stage) }}
+                    </BaseBadge>
+                </div>
+
+                <div class="text-sm text-slate-700 break-words">
+                    {{ productNames(lead) || 'No products yet' }}
+                </div>
+
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                    <span class="text-slate-600">{{ lead.next_activity_summary || 'No activity' }}</span>
+                    <span v-if="lead.next_follow_up_at" class="text-slate-600">
+                        Follow up {{ formatDate(lead.next_follow_up_at) }}
+                    </span>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-slate-500">
+                    <span>{{ lead.assignee?.name || 'Unassigned' }}</span>
+                    <span>{{ formatDate(lead.created_at) }}</span>
+                </div>
+
+                <div v-if="lead.customer?.email || lead.customer?.phone" class="flex flex-wrap gap-2 pt-1">
+                    <a
+                        v-if="lead.customer?.phone"
+                        :href="`tel:${lead.customer.phone}`"
+                        class="btn btn-sm btn-soft min-h-[44px]"
+                        @click.stop
+                    >{{ lead.customer.phone }}</a>
+                    <a
+                        v-if="lead.customer?.email"
+                        :href="`mailto:${lead.customer.email}`"
+                        class="btn btn-sm btn-soft min-h-[44px] min-w-0 max-w-full flex-nowrap"
+                        @click.stop
+                    ><span class="truncate">{{ lead.customer.email }}</span></a>
+                </div>
+            </router-link>
+        </div>
+
         <template #pagination>
             <Pagination
                 v-if="pagination && leads.length"
@@ -317,8 +373,8 @@ import { formatLeadStage } from '@/utils/displayFormat';
 import { useAuthStore } from '@/stores/auth';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
-import { BaseBadge, BaseButton, EmptyState, StatCard } from '@/components/base';
 import CustomerName from '@/components/CustomerName.vue';
+import { BaseBadge, BaseButton, EmptyState, StatCard } from '@/components/base';
 
 const auth = useAuthStore();
 const route = useRoute();
