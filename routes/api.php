@@ -262,7 +262,8 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     Route::post('/hr/employees/{id}/documents', [HrController::class, 'storeEmployeeDocument']);
     Route::delete('/hr/employees/{id}/documents/{docId}', [HrController::class, 'destroyEmployeeDocument']);
     Route::get('/hr/employee-targets', [HrController::class, 'employeeTargets']);
-    Route::put('/hr/employee-targets/{userId}', [HrController::class, 'upsertEmployeeTarget']);
+    Route::put('/hr/employee-targets/{userId}', [HrController::class, 'upsertEmployeeTarget'])
+        ->middleware('role:Admin,Manager,System Admin');
 
     // Expenses. The comment here read "Admin only" and nothing enforced it.
     Route::middleware('nav.section:expenses')->group(function () {

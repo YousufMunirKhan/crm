@@ -525,6 +525,17 @@ class HrController extends Controller
 
     public function upsertEmployeeTarget(Request $request, $userId)
     {
+        // Setting somebody's target is a management act, and this had no check
+        // of any kind - any signed-in member of staff could rewrite anyone
+        // else's numbers, including their own, on any month. The sibling GET a
+        // few methods up has always narrowed non-managers to their own row;
+        // only the write was open.
+        $actor = $request->user();
+
+        if (! $actor->isRole('Admin') && ! $actor->isRole('System Admin') && ! $actor->isRole('Manager')) {
+            abort(403, 'Only a manager can set targets.');
+        }
+
         $data = $request->validate([
             'month' => ['required', 'string', 'regex:/^\d{4}-\d{2}$/'],
             'target_appointments' => ['nullable', 'integer', 'min:0'],
