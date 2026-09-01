@@ -120,9 +120,10 @@ async function copy() {
     }
 
     if (! ok) {
-        // Nothing worked, so hand over something the person can actually use
-        // rather than telling them to long-press and hope.
-        window.prompt(`Copy the ${props.label}:`, text);
+        // Deliberately not window.prompt: it blocks the renderer, and inside an
+        // embedded frame it can hang the page outright rather than asking
+        // anything. A toast carrying the value is readable and costs nothing.
+        toast.error(`Could not copy automatically. The ${props.label} is: ${text}`);
 
         return;
     }
