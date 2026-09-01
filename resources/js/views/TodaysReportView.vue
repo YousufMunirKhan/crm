@@ -1,7 +1,7 @@
 <template>
     <ListingPageShell
         title="Today's report"
-        subtitle="Team summary for the selected day: CRM activities, entries from Today's Activity (manual logs), appointments, prospects, leads, won sales, tickets, and attendance. Export to CSV anytime."
+        subtitle="Who did what on a given day, and who recorded nothing."
         :badge="reportBadge"
     >
         <template #actions>
@@ -92,35 +92,7 @@
                 </div>
             </div>
 
-            <!-- The people who did something, and what they did. -->
-            <div v-if="activePeople.length" class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <div
-                    v-for="user in activePeople"
-                    :key="`active-${user.user_id}`"
-                    class="rounded-card border border-slate-200 bg-white p-4"
-                >
-                    <div class="flex flex-wrap items-baseline justify-between gap-2">
-                        <div>
-                            <span class="text-sm font-semibold text-slate-900">{{ user.user_name }}</span>
-                            <span class="ml-2 text-xs text-slate-500">{{ user.role }}</span>
-                        </div>
-                        <span class="text-xs tabular-nums text-slate-500">{{ attendanceLabel(user) }}</span>
-                    </div>
-
-                    <div class="mt-2.5 flex flex-wrap gap-1.5">
-                        <span
-                            v-for="item in whatTheyDid(user)"
-                            :key="item.label"
-                            class="rounded-control px-2 py-1 text-xs font-medium"
-                            :class="item.tone"
-                        >
-                            {{ item.value }} {{ item.label }}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <p v-else class="callout callout-warning">
+            <p v-if="!activePeople.length" class="callout callout-warning">
                 Nobody recorded anything on this day. That is either a quiet day or a day nobody
                 wrote down - and with three calls logged in the company's whole history, it is
                 worth knowing which.
@@ -141,7 +113,7 @@
             </details>
                 <!-- Per-user detail: timeline + lists -->
                 <div class="space-y-3">
-                    <h2 class="text-base font-semibold text-slate-800 pt-2">Details by person</h2>
+
                     <!-- Only people with something in their day. Eleven empty
                          timelines are eleven cards to scroll past. -->
                     <div
@@ -149,15 +121,29 @@
                         :key="'d-' + user.user_id"
                         class="card overflow-hidden min-w-0"
                     >
-                        <div class="px-3 sm:px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <span class="font-semibold text-slate-900">{{ user.user_name }}</span>
-                                <span class="text-slate-500 mx-1.5 hidden sm:inline" aria-hidden="true">·</span>
-                                <span class="text-sm text-slate-500">{{ user.role }}</span>
+                        <div class="border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4">
+                            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                                <div>
+                                    <span class="font-semibold text-slate-900">{{ user.user_name }}</span>
+                                    <span class="mx-1.5 hidden text-slate-500 sm:inline" aria-hidden="true">·</span>
+                                    <span class="text-sm text-slate-500">{{ user.role }}</span>
+                                </div>
+                                <span class="text-xs tabular-nums text-slate-500">{{ attendanceLabel(user) }}</span>
                             </div>
-                            <div class="text-xs text-slate-500 lg:hidden">
-                                <span v-if="user.attendance">In {{ user.attendance.check_in || '—' }} · Out {{ user.attendance.check_out || '—' }}</span>
-                                <span v-else>No attendance</span>
+
+                            <!-- What they did, on the card that names them. The
+                                 same name and role used to be printed twice on
+                                 this page - once on a summary card and again
+                                 here, a few hundred pixels apart. -->
+                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                <span
+                                    v-for="item in whatTheyDid(user)"
+                                    :key="item.label"
+                                    class="rounded-control px-2 py-1 text-xs font-medium"
+                                    :class="item.tone"
+                                >
+                                    {{ item.value }} {{ item.label }}
+                                </span>
                             </div>
                         </div>
 
@@ -372,12 +358,20 @@ const dayTotals = computed(() => {
     const rows = report.value?.report ?? [];
     const sum = (key, legacy = null) => rows.reduce((t, u) => t + Number(countVal(u, key, legacy) || 0), 0);
 
+    const say = (n, one, many) => (n === 1 ? one : many);
+
+    const won = sum('won_sales', 'won_sales_count');
+    const appts = sum('appointments_logged');
+    const crm = sum('crm_activities');
+    const resolved = sum('tickets_resolved');
+    const clockedIn = rows.filter((u) => u.attendance?.check_in).length;
+
     return [
-        { label: 'won', value: sum('won_sales', 'won_sales_count') },
-        { label: 'appointments', value: sum('appointments_logged') },
-        { label: 'CRM activities', value: sum('crm_activities') },
-        { label: 'tickets resolved', value: sum('tickets_resolved') },
-        { label: 'clocked in', value: rows.filter((u) => u.attendance?.check_in).length },
+        { label: say(won, 'sale won', 'sales won'), value: won },
+        { label: say(appts, 'appointment', 'appointments'), value: appts },
+        { label: say(crm, 'CRM activity', 'CRM activities'), value: crm },
+        { label: say(resolved, 'ticket resolved', 'tickets resolved'), value: resolved },
+        { label: 'clocked in', value: clockedIn },
     ];
 });
 
