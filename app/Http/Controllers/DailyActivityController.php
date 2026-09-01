@@ -485,7 +485,12 @@ class DailyActivityController extends Controller
                 'at' => ($item->closed_at ?? $item->created_at)?->toIso8601String(),
                 'category' => 'sale_won',
                 'title' => 'Sale / product won',
-                'detail' => $this->clip($p . ($cust ? " — {$cust}" : '') . ' — £' . $item->total_price),
+                // Was "— £0.00" on every line, prices being deliberately
+                // absent. The quantity is the part that was ever true.
+                'detail' => $this->clip(
+                    $p.($cust ? " — {$cust}" : '')
+                    .' — '.$item->quantity.' '.($item->quantity == 1 ? 'unit' : 'units')
+                ),
             ];
         }
 
