@@ -1,7 +1,7 @@
 <template>
     <ListingPageShell
         title="Expense management"
-        subtitle="Import CSV, filter by period and category, and bulk-close open items — totals reflect the current page filter."
+        subtitle="What the company has spent, and what is still open."
         :badge="expensesBadge"
     >
         <template #actions>
@@ -67,6 +67,55 @@
             </div>
         </template>
 
+        <!--
+            What an owner opens this page to find out, before any list.
+
+            There was none of this: the page opened straight onto ten rows, and
+            the only figure was "Total (PKR)" summed from those ten rows with
+            nothing to say so. On live data it read Rs118,600 against a real
+            total of Rs639,896 - under a fifth of the spend, labelled as the
+            spend.
+        -->
+        <div v-if="summary" class="grid grid-cols-2 gap-3 px-4 pt-4 sm:px-5 lg:grid-cols-4">
+            <div
+                v-for="card in summaryCards"
+                :key="card.label"
+                class="rounded-card border p-3 sm:p-4"
+                :class="card.tone ?? 'border-slate-200 bg-white'"
+            >
+                <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">{{ card.label }}</p>
+                <p class="mt-1 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">{{ card.value }}</p>
+                <p class="mt-1 text-[11px] leading-snug text-slate-600">{{ card.help }}</p>
+            </div>
+        </div>
+
+        <!-- Where the money goes, biggest first. -->
+        <div v-if="summary?.by_category?.length" class="px-4 pt-3 sm:px-5">
+            <div class="rounded-card border border-slate-200 bg-white px-4 py-3">
+                <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    By category, across everything matching your filter
+                </p>
+                <ul class="space-y-1.5">
+                    <li
+                        v-for="row in summary.by_category"
+                        :key="`${row.category}-${row.currency}`"
+                        class="flex items-center gap-3"
+                    >
+                        <span class="w-28 shrink-0 truncate text-sm text-slate-700">{{ row.category }}</span>
+                        <span class="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                            <span class="block h-full rounded-full bg-primary-500" :style="{ width: `${categoryShare(row)}%` }" />
+                        </span>
+                        <span class="w-32 shrink-0 text-right text-sm tabular-nums text-slate-900">
+                            {{ money(row.total, row.currency) }}
+                        </span>
+                        <span class="w-16 shrink-0 text-right text-xs tabular-nums text-slate-500">
+                            {{ row.count }}
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
         <div class="px-4 sm:px-5 pt-4">
             <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
                 <div class="flex items-center gap-3">
@@ -93,13 +142,14 @@
                     </BaseButton>
                 </div>
                 <div class="flex items-center gap-4">
-                    <div class="flex gap-4 text-sm text-slate-600">
-                        <div v-if="totalByCurrency.GBP > 0">
-                            Total (GBP): <span class="font-bold text-slate-900">£{{ formatNumber(totalByCurrency.GBP) }}</span>
-                        </div>
-                        <div v-if="totalByCurrency.PKR > 0">
-                            Total (PKR): <span class="font-bold text-slate-900">₨{{ formatNumber(totalByCurrency.PKR) }}</span>
-                        </div>
+                    <!-- Named for what it covers. It used to sum the ten rows
+                         on screen and call itself the total. -->
+                    <div v-if="summary?.by_currency?.length" class="text-sm text-slate-600">
+                        <span v-for="(cur, i) in summary.by_currency" :key="cur.currency">
+                            <span v-if="i" class="mx-1 text-slate-300">·</span>
+                            All {{ cur.count }} matching:
+                            <span class="font-bold text-slate-900">{{ money(cur.total, cur.currency) }}</span>
+                        </span>
                     </div>
                     <BaseButton variant="outline" size="sm" @click="exportExpenses">
                         <template #icon><ArrowDownTrayIcon class="icon-sm" aria-hidden="true" /></template>
@@ -154,11 +204,15 @@
                                 {{ expense.category }}
                             </span>
                         </div>
-                        <div v-if="expense.description" class="text-sm text-slate-600 mt-1">
+                        <div v-if="expense.description && expense.description !== expense.reason"
+                             class="mt-1 text-sm text-slate-600">
                             {{ expense.description }}
                         </div>
-                        <div class="text-xs text-slate-500 mt-1">
-                            Added by: {{ expense.creator?.name }}
+                        <!-- Only worth saying when more than one person books
+                             expenses. All 43 of these were entered by the same
+                             person, so it was 43 identical lines of noise. -->
+                        <div v-if="manyCreators" class="mt-1 text-xs text-slate-500">
+                            Added by {{ expense.creator?.name }}
                         </div>
                     </div>
                     <div class="text-right">
@@ -250,6 +304,16 @@ const toast = useToastStore();
 const router = useRouter();
 
 const expenses = ref([]);
+
+/**
+ * Totals for everything the filter matches, worked out by the server.
+ *
+ * The page used to add up the ten rows it was showing and print the result as
+ * "Total (PKR)". On live data that read Rs118,600 against a real total of
+ * Rs639,896 - under a fifth of the spend, with nothing on screen to say it was
+ * only page one.
+ */
+const summary = ref(null);
 const pagination = ref(null);
 const fileInput = ref(null);
 const showImportModal = ref(false);
@@ -294,17 +358,72 @@ const allOnPageSelected = computed(() => {
     return expenses.value.every((e) => selectedExpenseIds.value.includes(e.id));
 });
 
-const totalByCurrency = computed(() => {
-    const totals = { GBP: 0, PKR: 0 };
-    expenses.value.forEach(exp => {
-        if (exp.currency === 'GBP' || !exp.currency) {
-            totals.GBP += parseFloat(exp.amount || 0);
-        } else if (exp.currency === 'PKR') {
-            totals.PKR += parseFloat(exp.amount || 0);
-        }
-    });
-    return totals;
+/** Money, in the currency it was actually booked in. */
+function money(amount, currency) {
+    const symbol = currency === 'PKR' ? '₨' : '£';
+
+    return symbol + formatNumber(amount);
+}
+
+/**
+ * The four figures worth having before the list.
+ *
+ * Currencies are never added together: office costs are booked in rupees and
+ * everything else in pounds, and there is no exchange rate anywhere in this
+ * product that could combine them honestly.
+ */
+const summaryCards = computed(() => {
+    if (! summary.value) return [];
+
+    const line = (rows) => (rows?.length
+        ? rows.map((r) => money(r.total, r.currency)).join(' · ')
+        : '—');
+
+    const open = summary.value.by_currency?.filter((c) => c.open_count > 0) ?? [];
+    const openCount = open.reduce((n, c) => n + c.open_count, 0);
+
+    return [
+        {
+            label: 'This month',
+            value: line(summary.value.this_month),
+            help: countOf(summary.value.this_month) + ' recorded so far',
+        },
+        {
+            label: 'Last month',
+            value: line(summary.value.last_month),
+            help: countOf(summary.value.last_month) + ' in total',
+        },
+        {
+            label: 'Still open',
+            value: open.length ? open.map((c) => money(c.open_total, c.currency)).join(' · ') : '—',
+            help: openCount ? `${openCount} not closed off yet` : 'everything is closed off',
+            tone: openCount ? 'border-warning-200 bg-warning-50/60' : 'border-success-200 bg-success-50/50',
+        },
+        {
+            label: 'Matching your filter',
+            value: line(summary.value.by_currency),
+            help: countOf(summary.value.by_currency) + ' in the current view',
+        },
+    ];
 });
+
+function countOf(rows) {
+    const n = (rows ?? []).reduce((t, r) => t + Number(r.count || 0), 0);
+
+    return `${n} ${n === 1 ? 'expense' : 'expenses'}`;
+}
+
+/** Bar width for the category breakdown, relative to the biggest line. */
+function categoryShare(row) {
+    const rows = (summary.value?.by_category ?? []).filter((r) => r.currency === row.currency);
+    const top = Math.max(...rows.map((r) => Number(r.total || 0)), 0);
+
+    return top > 0 ? Math.max(2, Math.round((Number(row.total || 0) / top) * 100)) : 0;
+}
+
+/** "Added by" only earns its line when more than one person books expenses. */
+const manyCreators = computed(() =>
+    new Set(expenses.value.map((e) => e.creator?.id).filter(Boolean)).size > 1);
 
 const formatNumber = (num) => {
     return new Intl.NumberFormat('en-GB').format(num || 0);
@@ -327,6 +446,7 @@ const loadExpenses = async (page = 1) => {
 
         const { data } = await axios.get('/api/hr/expenses', { params });
         expenses.value = data.data || [];
+        summary.value = data.summary || null;
         
         // Ensure pagination is set correctly - Laravel paginate() returns these fields directly
         // Check if data has pagination properties (Laravel paginator response)

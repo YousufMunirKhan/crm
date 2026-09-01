@@ -44,9 +44,82 @@ class ExpenseController extends Controller
                   ->whereMonth('date', substr($request->month, 5, 2));
         }
 
+        // The summary has to be the whole filter, not the page. The screen
+        // printed "Total (PKR): 118,600" from the ten rows it happened to be
+        // showing, with nothing to say so - on a money screen that reads as the
+        // spend, and it was the spend of page one.
+        $summary = $this->summarise(clone $query);
+
         $expenses = $query->paginate($request->get('per_page', 10));
 
-        return response()->json($expenses);
+        return response()->json($expenses->toArray() + ['summary' => $summary]);
+    }
+
+    /**
+     * Totals for everything the current filter matches.
+     *
+     * Kept per currency and never added together: this business books office
+     * costs in rupees and everything else in pounds, and there is no exchange
+     * rate anywhere in the product to convert them honestly.
+     *
+     * @return array<string, mixed>
+     */
+    private function summarise($query): array
+    {
+        $rows = (clone $query)->reorder()
+            ->selectRaw("COALESCE(NULLIF(currency, ''), 'GBP') AS cur, status, COUNT(*) AS n, SUM(amount) AS total")
+            ->groupBy('cur', 'status')
+            ->get();
+
+        $totals = [];
+
+        foreach ($rows as $row) {
+            $cur = $row->cur;
+            $totals[$cur] ??= ['currency' => $cur, 'total' => 0.0, 'count' => 0, 'open_total' => 0.0, 'open_count' => 0];
+            $totals[$cur]['total'] += (float) $row->total;
+            $totals[$cur]['count'] += (int) $row->n;
+
+            if (($row->status ?? 'open') !== 'closed') {
+                $totals[$cur]['open_total'] += (float) $row->total;
+                $totals[$cur]['open_count'] += (int) $row->n;
+            }
+        }
+
+        $byCategory = (clone $query)->reorder()
+            ->selectRaw("COALESCE(NULLIF(category, ''), 'Uncategorised') AS cat, COALESCE(NULLIF(currency, ''), 'GBP') AS cur, SUM(amount) AS total, COUNT(*) AS n")
+            ->groupBy('cat', 'cur')
+            ->orderByDesc('total')
+            ->limit(6)
+            ->get()
+            ->map(fn ($r) => [
+                'category' => $r->cat,
+                'currency' => $r->cur,
+                'total' => (float) $r->total,
+                'count' => (int) $r->n,
+            ]);
+
+        return [
+            'by_currency' => array_values($totals),
+            'by_category' => $byCategory,
+            // Two fixed windows, so the header means something before anybody
+            // touches a filter.
+            'this_month' => $this->periodTotals(now()->startOfMonth(), now()->endOfMonth()),
+            'last_month' => $this->periodTotals(
+                now()->subMonthNoOverflow()->startOfMonth(),
+                now()->subMonthNoOverflow()->endOfMonth()
+            ),
+        ];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function periodTotals($from, $to): array
+    {
+        return Expense::whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->selectRaw("COALESCE(NULLIF(currency, ''), 'GBP') AS cur, SUM(amount) AS total, COUNT(*) AS n")
+            ->groupBy('cur')
+            ->get()
+            ->map(fn ($r) => ['currency' => $r->cur, 'total' => (float) $r->total, 'count' => (int) $r->n])
+            ->all();
     }
 
     public function store(Request $request)
