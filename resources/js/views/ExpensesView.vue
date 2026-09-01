@@ -27,14 +27,10 @@
         </template>
 
         <template #filters>
-            <div class="flex flex-col xl:flex-row xl:flex-wrap gap-3 xl:items-end">
+            <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
                 <div>
-                    <label class="listing-label" for="expensesview-from">From</label>
-                    <input id="expensesview-from" v-model="filters.from_date" type="date" class="form-input w-full sm:w-40" />
-                </div>
-                <div>
-                    <label class="listing-label" for="expensesview-to">To</label>
-                    <input id="expensesview-to" v-model="filters.to_date" type="date" class="form-input w-full sm:w-40" />
+                    <label class="listing-label" for="expensesview-month">Month</label>
+                    <input id="expensesview-month" v-model="filters.month" type="month" class="form-input w-full sm:w-44" />
                 </div>
                 <div>
                     <label class="listing-label" for="expensesview-category">Category</label>
@@ -42,10 +38,6 @@
                         <option value="">All categories</option>
                         <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
                     </select>
-                </div>
-                <div>
-                    <label class="listing-label" for="expensesview-month">Month</label>
-                    <input id="expensesview-month" v-model="filters.month" type="month" class="form-input w-full sm:w-44" />
                 </div>
                 <div>
                     <label class="listing-label" for="expensesview-status">Status</label>
@@ -59,11 +51,27 @@
                 <BaseButton variant="outline" @click="resetFilters">Reset</BaseButton>
                 <BaseButton
                     variant="outline"
-                    class="w-full xl:w-auto"
                     :to="{ name: 'expenses-monthly-report', query: { month: filters.month || new Date().toISOString().slice(0, 7) } }"
                 >
                     Monthly report
                 </BaseButton>
+
+                <!-- A month covers almost every question anybody asks of this
+                     page, so the two date fields stay out of the way until
+                     somebody wants a range that is not a month. -->
+                <details class="w-full">
+                    <summary class="cursor-pointer text-xs text-slate-600 touch-manipulation">Custom date range</summary>
+                    <div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <div>
+                            <label class="listing-label" for="expensesview-from">From</label>
+                            <input id="expensesview-from" v-model="filters.from_date" type="date" class="form-input w-full sm:w-40" />
+                        </div>
+                        <div>
+                            <label class="listing-label" for="expensesview-to">To</label>
+                            <input id="expensesview-to" v-model="filters.to_date" type="date" class="form-input w-full sm:w-40" />
+                        </div>
+                    </div>
+                </details>
             </div>
         </template>
 
