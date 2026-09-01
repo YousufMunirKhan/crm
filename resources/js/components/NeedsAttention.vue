@@ -9,7 +9,7 @@
                 </p>
             </div>
 
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <router-link
                     v-for="tile in tiles"
                     :key="tile.key"
@@ -82,7 +82,7 @@
                 <li
                     v-for="lead in data.stalest"
                     :key="lead.id"
-                    class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    class="flex flex-col gap-2 px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
                 >
                     <div class="min-w-0">
                         <router-link
