@@ -1,5 +1,12 @@
 <template>
-    <div class="min-h-screen bg-slate-50 w-full min-w-0 overflow-x-hidden">
+    <!--
+        No background and no min-height of its own. The layout's <main> already
+        paints bg-surface-sunken; adding bg-slate-50 on top of it put a second,
+        slightly different tone behind the page, and min-h-screen forced a full
+        viewport of it below the content - which is the empty block at the
+        bottom of a short ticket.
+    -->
+    <div class="w-full min-w-0 overflow-x-hidden">
         <div class="page-narrow">
             <!-- Back + Header -->
             <div class="mb-6">
@@ -39,81 +46,69 @@
             </div>
 
             <template v-if="ticket">
-                <!-- Admin lifecycle overview -->
-                <BaseCard v-if="isStaffAdmin" title="Admin overview" class="mb-6">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-                        <div class="rounded-card p-3 border border-slate-200 bg-slate-50/60">
-                            <div class="text-eyebrow text-slate-500 uppercase">Created</div>
-                            <div class="text-slate-900 font-medium mt-0.5">{{ formatDateTime(ticket.created_at) }}</div>
-                        </div>
-                        <div class="rounded-card p-3 border border-slate-200 bg-slate-50/60">
-                            <div class="text-eyebrow text-slate-500 uppercase">Expected resolution</div>
-                            <div class="text-slate-900 font-medium mt-0.5">
-                                {{ ticket.estimated_resolve_hours ? `${ticket.estimated_resolve_hours} hour(s)` : 'Priority-based SLA' }}
-                            </div>
-                            <div v-if="ticket.sla_due_at" class="text-xs text-slate-600 mt-1">Due by {{ formatDateTime(ticket.sla_due_at) }}</div>
-                        </div>
-                        <div class="rounded-card p-3 border border-slate-200 bg-slate-50/60">
-                            <div class="text-eyebrow text-slate-500 uppercase">Resolved</div>
-                            <div class="text-slate-900 font-medium mt-0.5">{{ ticket.resolved_at ? formatDateTime(ticket.resolved_at) : 'Not resolved yet' }}</div>
-                            <div v-if="ticket.resolved_at && ticket.created_at" class="text-xs text-slate-600 mt-1">
-                                Time to resolve: {{ formatDuration(ticket.created_at, ticket.resolved_at) }}
-                            </div>
-                        </div>
-                        <div class="rounded-card p-3 border border-slate-200 bg-slate-50/60 sm:col-span-2 lg:col-span-3">
-                            <div class="text-eyebrow text-slate-500 uppercase">Comments</div>
-                            <div class="text-slate-900 font-medium mt-0.5">{{ (ticket.messages || []).length }} on this ticket — newest at the bottom.</div>
-                        </div>
-                    </div>
-                </BaseCard>
+                <!--
+                    One strip for where the ticket stands.
 
-                <!-- Details Card -->
-                <BaseCard title="Ticket Details" class="mb-6">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <span class="text-eyebrow text-slate-500 uppercase">Customer</span>
+                    Created, SLA and Resolved used to be printed twice - once in
+                    an "Admin overview" card and again in the details grid a few
+                    hundred pixels below - and the comment count appeared three
+                    separate times on this page.
+                -->
+                <div class="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <div class="rounded-card border border-slate-200 bg-white p-3">
+                        <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Raised</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-900">{{ formatDateTime(ticket.created_at) }}</p>
+                        <p class="mt-0.5 text-xs text-slate-600">{{ ageLabel }}</p>
+                    </div>
+
+                    <div class="rounded-card border p-3" :class="slaTone">
+                        <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Deadline</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-900">
+                            {{ ticket.sla_due_at ? formatDateTime(ticket.sla_due_at) : 'None set' }}
+                        </p>
+                        <p class="mt-0.5 text-xs" :class="slaBreached ? 'font-medium text-danger-700' : 'text-slate-600'">
+                            {{ slaLabel }}
+                        </p>
+                    </div>
+
+                    <div class="rounded-card border border-slate-200 bg-white p-3">
+                        <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Resolved</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-900">
+                            {{ ticket.resolved_at ? formatDateTime(ticket.resolved_at) : 'Not yet' }}
+                        </p>
+                        <p v-if="ticket.resolved_at" class="mt-0.5 text-xs text-slate-600">
+                            Took {{ formatDuration(ticket.created_at, ticket.resolved_at) }}
+                        </p>
+                    </div>
+
+                    <div class="rounded-card border p-3"
+                         :class="assignedNames ? 'border-slate-200 bg-white' : 'border-danger-200 bg-danger-50/60'">
+                        <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Assigned to</p>
+                        <p class="mt-1 text-sm font-semibold break-words"
+                           :class="assignedNames ? 'text-slate-900' : 'text-danger-700'">
+                            {{ assignedNames || 'Nobody' }}
+                        </p>
+                    </div>
+                </div>
+
+                <BaseCard title="Ticket details" class="mb-6">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <!-- 116 of 150 tickets have no customer, so an endless
+                             row of "—" was telling nobody anything. -->
+                        <div v-if="ticket.customer_id">
+                            <span class="text-eyebrow uppercase text-slate-500">Customer</span>
                             <div class="mt-0.5">
-                                <router-link
-                                    v-if="ticket.customer_id"
-                                    :to="`/customers/${ticket.customer_id}`"
-                                    class="link"
-                                >
-                                    {{ ticket.customer?.name || '—' }}
+                                <router-link :to="`/customers/${ticket.customer_id}`" class="link">
+                                    {{ ticket.customer?.business_name || ticket.customer?.name || 'Customer' }}
                                 </router-link>
-                                <span v-else class="text-slate-600">—</span>
                             </div>
                         </div>
                         <div>
-                            <span class="text-eyebrow text-slate-500 uppercase">Assigned</span>
-                            <div class="mt-0.5 text-slate-900">
-                                <template v-if="ticket.assignees && ticket.assignees.length">
-                                    {{ ticket.assignees.map((a) => a.name).join(', ') }}
-                                </template>
-                                <template v-else>{{ ticket.assignee?.name || 'Unassigned' }}</template>
-                            </div>
-                        </div>
-                        <div>
-                            <span class="text-eyebrow text-slate-500 uppercase">Created By</span>
-                            <div class="mt-0.5 text-slate-900">{{ ticket.creator?.name || '—' }}</div>
-                        </div>
-                        <div>
-                            <span class="text-eyebrow text-slate-500 uppercase">Created At</span>
-                            <div class="mt-0.5 text-slate-900">{{ formatDateTime(ticket.created_at) }}</div>
-                        </div>
-                        <div v-if="ticket.resolved_at">
-                            <span class="text-eyebrow text-slate-500 uppercase">Resolved At</span>
-                            <div class="mt-0.5 text-slate-900">{{ formatDateTime(ticket.resolved_at) }}</div>
-                        </div>
-                        <div v-if="ticket.sla_due_at">
-                            <span class="text-eyebrow text-slate-500 uppercase">SLA Due</span>
-                            <div class="mt-0.5 text-slate-900">{{ formatDateTime(ticket.sla_due_at) }}</div>
-                        </div>
-                        <div v-if="ticket.estimated_resolve_hours">
-                            <span class="text-eyebrow text-slate-500 uppercase">Est. resolve (hours)</span>
-                            <div class="mt-0.5 text-slate-900">{{ ticket.estimated_resolve_hours }}</div>
+                            <span class="text-eyebrow uppercase text-slate-500">Raised by</span>
+                            <div class="mt-0.5 text-slate-900">{{ ticket.creator?.name || 'The POS feed' }}</div>
                         </div>
                         <div v-if="ticket.reference_url" class="sm:col-span-2">
-                            <span class="text-eyebrow text-slate-500 uppercase">Reference link (Drive / Sheet)</span>
+                            <span class="text-eyebrow uppercase text-slate-500">Reference link</span>
                             <div class="mt-0.5">
                                 <a
                                     :href="ticket.reference_url"
@@ -125,84 +120,15 @@
                         </div>
                     </div>
 
-                    <div v-if="ticket.description" class="mt-4 pt-4 border-t border-slate-200">
-                        <span class="text-eyebrow text-slate-500 uppercase">Description</span>
-                        <div class="mt-1 text-slate-700 whitespace-pre-wrap">{{ ticket.description }}</div>
+                    <div v-if="ticket.description" class="mt-4 border-t border-slate-200 pt-4">
+                        <span class="text-eyebrow uppercase text-slate-500">What was reported</span>
+                        <div class="mt-1 whitespace-pre-wrap text-slate-700">{{ ticket.description }}</div>
                     </div>
+                </BaseCard>
 
-                    <div class="mt-4 pt-4 border-t border-slate-200">
-                        <div class="callout callout-warning text-xs mb-3">
-                            <span class="font-semibold">Internal file sharing:</span>
-                            for larger files it is <strong>preferred</strong> to use Google Drive or Google Sheets and paste the link above (or in the description). You can still add attachments here.
-                        </div>
-                        <span class="text-eyebrow text-slate-500 uppercase">Attachments</span>
-                        <ul v-if="ticket.attachments && ticket.attachments.length" class="mt-2 space-y-2">
-                            <li
-                                v-for="att in ticket.attachments"
-                                :key="att.id"
-                                class="flex items-center justify-between gap-2 text-sm"
-                            >
-                                <a :href="att.url" target="_blank" rel="noopener noreferrer" class="link truncate">{{ att.original_name }}</a>
-                                <BaseButton
-                                    variant="ghost"
-                                    size="sm"
-                                    class="shrink-0"
-                                    :label="`Remove ${att.original_name}`"
-                                    @click="requestRemoveTicketAttachment(att)"
-                                >
-                                    <template #icon>
-                                        <TrashIcon class="icon-sm" aria-hidden="true" />
-                                    </template>
-                                    Remove
-                                </BaseButton>
-                            </li>
-                        </ul>
-                        <p v-else class="mt-1 text-sm text-slate-500">No files attached yet.</p>
-                        <div class="mt-3 flex flex-wrap items-center gap-2">
-                            <label class="form-label sr-only" for="ticketdetailview-attachments">Add attachments</label>
-                            <input
-                                id="ticketdetailview-attachments"
-                                ref="detailAttachmentInputRef"
-                                type="file"
-                                multiple
-                                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                                class="form-file"
-                                @change="onDetailAttachmentFilesSelected"
-                            />
-                            <BaseButton
-                                variant="soft"
-                                :disabled="!detailPendingAttachmentFiles.length"
-                                :loading="detailAttachmentUploading"
-                                @click="uploadDetailAttachments"
-                            >
-                                <template #icon>
-                                    <ArrowUpTrayIcon class="icon" aria-hidden="true" />
-                                </template>
-                                {{ detailAttachmentUploading ? 'Uploading…' : 'Upload selected' }}
-                            </BaseButton>
-                        </div>
-                        <ul v-if="detailPendingAttachmentFiles.length" class="mt-2 text-xs text-slate-600 space-y-1">
-                            <li v-for="(f, i) in detailPendingAttachmentFiles" :key="i" class="flex items-center justify-between gap-2">
-                                <span class="truncate">{{ f.name }}</span>
-                                <BaseButton
-                                    variant="ghost"
-                                    size="sm"
-                                    class="shrink-0"
-                                    :label="`Remove ${f.name}`"
-                                    @click="removeDetailPendingFile(i)"
-                                >
-                                    <template #icon>
-                                        <TrashIcon class="icon-sm" aria-hidden="true" />
-                                    </template>
-                                    Remove
-                                </BaseButton>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <!-- Quick edit: Status & Assign -->
-                    <div class="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
-                        <div class="w-full max-w-md">
+                <BaseCard title="Move it on" class="mb-6">
+                    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                        <div>
                             <label class="form-label" for="ticketdetailview-status">Status</label>
                             <select
                                 id="ticketdetailview-status"
@@ -216,10 +142,19 @@
                                 <option value="resolved">Resolved</option>
                                 <option value="closed">Closed</option>
                             </select>
+                            <p class="form-hint">Saves as soon as you change it.</p>
                         </div>
-                        <fieldset v-if="isStaffAdmin" class="form-fieldset w-full min-w-0">
-                            <legend class="form-legend">Assignees</legend>
-                            <div class="max-h-40 overflow-y-auto rounded-card border border-slate-200 bg-white p-2 space-y-1.5">
+
+                        <fieldset v-if="isStaffAdmin" class="form-fieldset min-w-0">
+                            <legend class="form-legend">Who is on it</legend>
+                            <!--
+                                These labels are `inline-flex`, and the container
+                                used `space-y`, which only separates block
+                                elements - so thirteen names ran together on one
+                                line and every checkbox appeared to belong to the
+                                name after it. A grid gives each its own cell.
+                            -->
+                            <div class="grid grid-cols-1 gap-x-4 gap-y-1 rounded-card border border-slate-200 bg-white p-3 sm:grid-cols-2">
                                 <label
                                     v-for="u in users"
                                     :key="u.id"
@@ -231,23 +166,97 @@
                                         :value="Number(u.id)"
                                         class="form-checkbox"
                                     />
-                                    {{ u.name }}
+                                    <span class="truncate">{{ u.name }}</span>
                                 </label>
                             </div>
-                            <div class="mt-3 flex flex-wrap items-center gap-2">
+                            <div class="mt-3">
                                 <BaseButton variant="soft" @click="saveAssignees">
                                     <template #icon>
                                         <CheckIcon class="icon" aria-hidden="true" />
                                     </template>
-                                    Save assignees
+                                    Save who is on it
                                 </BaseButton>
                             </div>
                         </fieldset>
                     </div>
                 </BaseCard>
 
+                <BaseCard title="Attachments" class="mb-6">
+                    <ul v-if="ticket.attachments && ticket.attachments.length" class="space-y-2">
+                        <li
+                            v-for="att in ticket.attachments"
+                            :key="att.id"
+                            class="flex items-center justify-between gap-2 text-sm"
+                        >
+                            <a :href="att.url" target="_blank" rel="noopener noreferrer" class="link truncate">{{ att.original_name }}</a>
+                            <BaseButton
+                                variant="ghost"
+                                size="sm"
+                                class="shrink-0"
+                                :label="`Remove ${att.original_name}`"
+                                @click="requestRemoveTicketAttachment(att)"
+                            >
+                                <template #icon>
+                                    <TrashIcon class="icon-sm" aria-hidden="true" />
+                                </template>
+                                Remove
+                            </BaseButton>
+                        </li>
+                    </ul>
+                    <p v-else class="text-sm text-slate-500">Nothing attached.</p>
+
+                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                        <label class="form-label sr-only" for="ticketdetailview-attachments">Add attachments</label>
+                        <input
+                            id="ticketdetailview-attachments"
+                            ref="detailAttachmentInputRef"
+                            type="file"
+                            multiple
+                            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                            class="form-file"
+                            @change="onDetailAttachmentFilesSelected"
+                        />
+                        <BaseButton
+                            variant="soft"
+                            :disabled="!detailPendingAttachmentFiles.length"
+                            :loading="detailAttachmentUploading"
+                            @click="uploadDetailAttachments"
+                        >
+                            <template #icon>
+                                <ArrowUpTrayIcon class="icon" aria-hidden="true" />
+                            </template>
+                            {{ detailAttachmentUploading ? 'Uploading…' : 'Upload selected' }}
+                        </BaseButton>
+                    </div>
+
+                    <ul v-if="detailPendingAttachmentFiles.length" class="mt-2 space-y-1 text-xs text-slate-600">
+                        <li v-for="(f, i) in detailPendingAttachmentFiles" :key="i" class="flex items-center justify-between gap-2">
+                            <span class="truncate">{{ f.name }}</span>
+                            <BaseButton
+                                variant="ghost"
+                                size="sm"
+                                class="shrink-0"
+                                :label="`Remove ${f.name}`"
+                                @click="removeDetailPendingFile(i)"
+                            >
+                                <template #icon>
+                                    <TrashIcon class="icon-sm" aria-hidden="true" />
+                                </template>
+                                Remove
+                            </BaseButton>
+                        </li>
+                    </ul>
+
+                    <!-- A hint, not a warning. It was a full amber callout sitting
+                         above the attachments themselves. -->
+                    <p class="form-hint mt-3">
+                        For anything large, put it on Google Drive and paste the link in the
+                        reference field instead.
+                    </p>
+                </BaseCard>
+
                 <!-- Comments -->
-                <BaseCard title="Comments" :subtitle="`${(ticket.messages || []).length} comment(s)`">
+                <BaseCard title="Comments" :subtitle="commentCountLabel">
                     <!-- Comment list -->
                     <EmptyState
                         v-if="!(ticket.messages && ticket.messages.length)"
@@ -423,6 +432,67 @@ const removingAttachment = ref(false);
 const isStaffAdmin = computed(() => {
     const n = auth.user?.role?.name;
     return ['Admin', 'Manager', 'System Admin'].includes(n);
+});
+
+/** Who is on it, or nothing - so the strip can say "Nobody" in red. */
+const assignedNames = computed(() => {
+    const list = ticket.value?.assignees;
+
+    if (Array.isArray(list) && list.length) {
+        return list.map((a) => a.name).filter(Boolean).join(', ');
+    }
+
+    return ticket.value?.assignee?.name || '';
+});
+
+const isFinished = computed(() => ['resolved', 'closed'].includes(ticket.value?.status));
+
+/** How long this has been going on, in the words a person would use. */
+const ageLabel = computed(() => {
+    if (! ticket.value?.created_at) return '';
+
+    const days = Math.floor((Date.now() - new Date(ticket.value.created_at)) / 86400000);
+
+    if (isFinished.value) return days <= 0 ? 'Closed the same day' : `${days} days from raised to now`;
+    if (days <= 0) return 'Raised today';
+
+    return `Open ${days} ${days === 1 ? 'day' : 'days'}`;
+});
+
+/**
+ * Past its deadline and still not finished.
+ *
+ * A ticket with no `sla_due_at` cannot breach at all - which was the state of
+ * every POS ticket in the system until recently - so that is said out loud
+ * rather than shown as a passing green.
+ */
+const slaBreached = computed(() =>
+    !! ticket.value?.sla_due_at && ! isFinished.value && new Date(ticket.value.sla_due_at) < new Date());
+
+const slaLabel = computed(() => {
+    if (! ticket.value?.sla_due_at) return 'No deadline, so it can never be late';
+    if (isFinished.value) return 'Finished';
+    if (slaBreached.value) return 'Past its deadline';
+
+    const hours = Math.round((new Date(ticket.value.sla_due_at) - Date.now()) / 3600000);
+
+    return hours <= 0 ? 'Due now' : `${hours} ${hours === 1 ? 'hour' : 'hours'} left`;
+});
+
+const slaTone = computed(() => {
+    if (slaBreached.value) return 'border-danger-200 bg-danger-50/60';
+    if (! ticket.value?.sla_due_at) return 'border-warning-200 bg-warning-50/50';
+
+    return 'border-slate-200 bg-white';
+});
+
+/** "0 comment(s)" reads as a bug in the page rather than a count. */
+const commentCountLabel = computed(() => {
+    const n = (ticket.value?.messages || []).length;
+
+    if (n === 0) return 'Nothing said yet';
+
+    return `${n} ${n === 1 ? 'comment' : 'comments'}, newest last`;
 });
 
 const sortedMessages = computed(() => {
