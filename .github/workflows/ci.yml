@@ -17,7 +17,10 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          # The lock file needs 8.4: symfony/clock and symfony/string require
+          # >=8.4.1, so composer install could never resolve on 8.3. Production
+          # runs 8.4 as well, which is the version worth testing against.
+          php-version: '8.4'
           extensions: mbstring, intl, gd, zip, pdo_sqlite, sqlite3
           coverage: none
 
@@ -68,7 +71,7 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.4'
           coverage: none
 
       - name: Lint all PHP files
