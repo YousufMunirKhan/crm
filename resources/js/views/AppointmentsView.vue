@@ -1,6 +1,6 @@
 <template>
     <ListingPageShell
-        :title="scopeIsEveryone ? 'Appointments' : 'My appointments'"
+        title="Appointments"
         :subtitle="scopeIsEveryone
             ? 'Visits and meetings across the team for the day you pick.'
             : 'Visits and meetings for the day you pick — open a card for full detail and status.'"

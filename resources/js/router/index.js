@@ -404,7 +404,9 @@ const routes = [
         path: '/appointments',
         name: 'appointments',
         component: () => import('@/views/AppointmentsView.vue'),
-        meta: { requiresAuth: true, title: 'My Appointments' },
+        // Not "My" - a manager sees the team's diary here, and the page says
+        // whose underneath.
+        meta: { requiresAuth: true, title: 'Appointments' },
     },
     {
         path: '/followups',
