@@ -46,6 +46,7 @@
                                     <PhoneIcon class="icon-sm shrink-0" aria-hidden="true" />
                                     {{ customer.phone }}
                                 </a>
+                                <CopyButton v-if="customer.phone" :value="customer.phone" label="phone number" />
                                 <a
                                     v-if="whatsappHref"
                                     :href="whatsappHref"
@@ -64,6 +65,7 @@
                                     <EnvelopeIcon class="icon-sm shrink-0" aria-hidden="true" />
                                     <span class="truncate">{{ customer.email }}</span>
                                 </a>
+                                <CopyButton v-if="customer.email" :value="customer.email" label="email address" />
                                 <span v-if="locationLine" class="btn btn-sm btn-ghost pointer-events-none">
                                     <MapPinIcon class="icon-sm" aria-hidden="true" />
                                     {{ locationLine }}
@@ -211,11 +213,10 @@
                             <div v-for="field in group.fields" :key="field.label" class="min-w-0">
                                 <dt class="text-eyebrow text-slate-500 uppercase">{{ field.label }}</dt>
                                 <dd class="mt-0.5 min-w-0">
-                                    <a
-                                        v-if="field.value && field.href"
-                                        :href="field.href"
-                                        class="link font-medium break-words"
-                                    >{{ field.value }}</a>
+                                    <span v-if="field.value && field.href" class="flex items-start gap-1 min-w-0">
+                                        <a :href="field.href" class="link font-medium break-words min-w-0">{{ field.value }}</a>
+                                        <CopyButton :value="field.value" :label="field.label.toLowerCase()" size="compact" />
+                                    </span>
                                     <span
                                         v-else
                                         class="font-medium break-words"
@@ -884,6 +885,7 @@ import {
 } from '@heroicons/vue/24/outline';
 import { formatLeadStage, formatLineItemStatus } from '@/utils/displayFormat';
 import { formatMoney } from '@/utils/money';
+import CopyButton from '@/components/CopyButton.vue';
 
 const route = useRoute();
 const router = useRouter();

@@ -323,10 +323,12 @@
                                             class="truncate hover:text-primary-700 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
                                         >{{ customer.phone }}</a>
                                         <span v-else class="text-slate-400">No phone</span>
+                                        <CopyButton v-if="customer.phone" :value="customer.phone" label="phone number" size="compact" />
                                     </div>
                                     <div v-if="customer.email" class="flex items-center gap-2 text-slate-600 min-w-0">
                                         <EnvelopeIcon class="icon-sm text-slate-500" aria-hidden="true" />
                                         <span class="truncate">{{ customer.email }}</span>
+                                        <CopyButton :value="customer.email" label="email address" size="compact" />
                                     </div>
                                     <div v-if="locationOf(customer)" class="flex items-center gap-2 text-xs text-slate-500 min-w-0">
                                         <MapPinIcon class="icon-sm text-slate-400" aria-hidden="true" />
@@ -453,15 +455,19 @@
                     </div>
 
                     <div class="text-sm text-slate-600 space-y-1">
-                        <div class="break-words">
+                        <div class="flex items-center gap-1 min-w-0">
                             <a
                                 v-if="customer.phone"
                                 :href="`tel:${customer.phone}`"
-                                class="hover:text-primary-700"
+                                class="min-w-0 break-words hover:text-primary-700"
                             >{{ customer.phone }}</a>
                             <span v-else class="text-slate-400">No phone</span>
+                            <CopyButton v-if="customer.phone" :value="customer.phone" label="phone number" />
                         </div>
-                        <div v-if="customer.email" class="break-all text-slate-500">{{ customer.email }}</div>
+                        <div v-if="customer.email" class="flex items-center gap-1 min-w-0">
+                            <span class="min-w-0 break-all text-slate-500">{{ customer.email }}</span>
+                            <CopyButton :value="customer.email" label="email address" />
+                        </div>
                         <div v-if="locationOf(customer)" class="text-xs text-slate-500 break-words">
                             {{ locationOf(customer) }}
                         </div>
@@ -574,6 +580,7 @@ import { exportToCSV as exportCSV } from '@/utils/exportCsv';
 import { formatLeadStage, leadStageTone } from '@/utils/displayFormat';
 import { describeDueDate } from '@/utils/dateFormatUi';
 import { useToastStore } from '@/stores/toast';
+import CopyButton from '@/components/CopyButton.vue';
 
 const route = useRoute();
 const toast = useToastStore();

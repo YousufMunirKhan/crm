@@ -14,7 +14,7 @@
             v-if="showSidebar"
             :class="[
                 'bg-gradient-to-b from-primary-600 via-primary-700 to-primary-800 text-white flex flex-col fixed left-0 top-0 bottom-0 z-modal transition-transform duration-300',
-                'w-64 max-w-64 min-w-64 overflow-x-hidden box-border',
+                'w-[86%] max-w-[20rem] lg:w-64 lg:max-w-64 lg:min-w-64 overflow-x-hidden box-border',
                 mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
             ]"
         >
@@ -52,7 +52,7 @@
                             @click="toggleGroup(item.label)"
                             :title="item.description || item.label"
                             :class="[
-                                'w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm hover:bg-white/10 transition-colors text-left rounded-lg mx-2 border-l-4',
+                                'w-full flex items-center justify-between gap-2 px-3 py-2.5 min-h-[44px] lg:min-h-0 text-sm hover:bg-white/10 transition-colors text-left rounded-lg mx-2 border-l-4',
                                 isGroupActive(item)
                                     ? 'bg-white/15 border-white text-white shadow-sm'
                                     : 'border-transparent text-white/95',
@@ -79,7 +79,7 @@
                                 :title="child.description || child.label"
                                 @click="mobileMenuOpen = false"
                                 :class="[
-                                    'flex items-center gap-3 px-3 py-2 text-sm transition-colors rounded-lg mx-1 pl-4 border-l-4',
+                                    'flex items-center gap-3 px-3 py-2 min-h-[44px] lg:min-h-0 text-sm transition-colors rounded-lg mx-1 pl-4 border-l-4',
                                     isChildActive(child)
                                         ? 'bg-white/15 border-white text-white shadow-sm'
                                         : 'border-transparent hover:bg-white/10 text-white/95',
@@ -97,7 +97,7 @@
                         :title="item.description || item.label"
                         @click="mobileMenuOpen = false"
                         :class="[
-                            'flex items-center gap-3 mx-2 px-3 py-2.5 text-sm rounded-lg transition-colors border-l-4',
+                            'flex items-center gap-3 mx-2 px-3 py-2.5 min-h-[44px] lg:min-h-0 text-sm rounded-lg transition-colors border-l-4',
                             isNavItemActive(item)
                                 ? 'bg-white/15 border-white text-white shadow-sm'
                                 : 'border-transparent hover:bg-white/10 text-white/95',
@@ -231,7 +231,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter, RouterLink, RouterView } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useBrandingStore } from '@/stores/branding';
@@ -258,6 +258,25 @@ const auth = useAuthStore();
 const branding = useBrandingStore();
 const toast = useToastStore();
 const mobileMenuOpen = ref(false);
+
+/**
+ * Hold the page still while the drawer is open.
+ *
+ * Without this the list behind the menu scrolls under your finger, so the
+ * drawer feels like it is sliding around rather than sitting on top - which is
+ * the difference between an app and a web page pretending to be one. Only on
+ * small screens; the desktop sidebar is part of the layout, not an overlay.
+ */
+watch(mobileMenuOpen, (open) => {
+    if (typeof document === 'undefined') return;
+
+    const lock = open && window.matchMedia('(max-width: 1023px)').matches;
+    document.body.style.overflow = lock ? 'hidden' : '';
+});
+
+onUnmounted(() => {
+    if (typeof document !== 'undefined') document.body.style.overflow = '';
+});
 const expandedGroups = ref(new Set());
 const commandPalette = ref(null);
 const todayAppointmentCount = ref(0);

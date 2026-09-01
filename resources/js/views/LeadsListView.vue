@@ -325,19 +325,29 @@
                     <span>{{ formatDate(lead.created_at) }}</span>
                 </div>
 
-                <div v-if="lead.customer?.email || lead.customer?.phone" class="flex flex-wrap gap-2 pt-1">
-                    <a
-                        v-if="lead.customer?.phone"
-                        :href="`tel:${lead.customer.phone}`"
-                        class="btn btn-sm btn-soft min-h-[44px]"
-                        @click.stop
-                    >{{ lead.customer.phone }}</a>
-                    <a
-                        v-if="lead.customer?.email"
-                        :href="`mailto:${lead.customer.email}`"
-                        class="btn btn-sm btn-soft min-h-[44px] min-w-0 max-w-full flex-nowrap"
-                        @click.stop
-                    ><span class="truncate">{{ lead.customer.email }}</span></a>
+                <!--
+                    Tap to call, and a separate button to copy. Tapping a tel:
+                    link dials, which is wrong when what you wanted was to paste
+                    the number into WhatsApp - and long-pressing to find "copy"
+                    is not something people discover.
+                -->
+                <div v-if="lead.customer?.email || lead.customer?.phone" class="space-y-2 pt-1">
+                    <div v-if="lead.customer?.phone" class="flex items-center gap-1 min-w-0">
+                        <a
+                            :href="`tel:${lead.customer.phone}`"
+                            class="btn btn-sm btn-soft min-h-[44px] flex-1 justify-center"
+                            @click.stop
+                        >{{ lead.customer.phone }}</a>
+                        <CopyButton :value="lead.customer.phone" label="phone number" />
+                    </div>
+                    <div v-if="lead.customer?.email" class="flex items-center gap-1 min-w-0">
+                        <a
+                            :href="`mailto:${lead.customer.email}`"
+                            class="btn btn-sm btn-soft min-h-[44px] flex-1 min-w-0 flex-nowrap justify-center"
+                            @click.stop
+                        ><span class="truncate">{{ lead.customer.email }}</span></a>
+                        <CopyButton :value="lead.customer.email" label="email address" />
+                    </div>
                 </div>
             </router-link>
         </div>
@@ -375,6 +385,7 @@ import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import CustomerName from '@/components/CustomerName.vue';
 import { BaseBadge, BaseButton, EmptyState, StatCard } from '@/components/base';
+import CopyButton from '@/components/CopyButton.vue';
 
 const auth = useAuthStore();
 const route = useRoute();
