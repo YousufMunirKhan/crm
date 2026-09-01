@@ -150,6 +150,8 @@
                         <span class="truncate">{{ todayAppointmentCount }} appt{{ todayAppointmentCount !== 1 ? 's' : '' }} today</span>
                     </router-link>
 
+                    <NotificationBell />
+
                     <!-- User menu -->
                     <Menu as="div" class="relative shrink-0">
                         <MenuButton
@@ -247,6 +249,7 @@ import {
     XMarkIcon,
 } from '@heroicons/vue/24/outline';
 import SidebarNavIcon from '@/components/SidebarNavIcon.vue';
+import NotificationBell from '@/components/NotificationBell.vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import BrandLogo from '@/components/BrandLogo.vue';
 import CommandPalette from '@/components/CommandPalette.vue';

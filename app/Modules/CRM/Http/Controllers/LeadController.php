@@ -71,6 +71,26 @@ class LeadController extends Controller
             $query->where('stage', $request->stage);
         }
 
+        // Open leads nobody has actually contacted in N days.
+        //
+        // Keyed off the activity timeline, not `leads.updated_at`: updated_at
+        // moves when somebody corrects a postcode and stands still through a
+        // twenty minute phone call, so it answers "who edited this" rather than
+        // "who spoke to them". Notes and automatic stage changes are excluded
+        // for the same reason - neither is contact, and counting them would let
+        // a lead look worked without anyone having picked up the phone.
+        if ($request->filled('stale_days')) {
+            $days = max(1, min(365, (int) $request->stale_days));
+
+            $query->whereNotIn('stage', ['won', 'lost'])
+                ->whereRaw(
+                    'COALESCE((SELECT MAX(a.created_at) FROM lead_activities a
+                        WHERE a.lead_id = leads.id AND a.type IN (?,?,?,?,?,?,?,?)), leads.created_at) < ?',
+                    ['call', 'meeting', 'visit', 'email', 'whatsapp', 'sms', 'quote_sent', 'appointment',
+                        now()->subDays($days)->toDateTimeString()]
+                );
+        }
+
         if ($request->filled('source')) {
             $query->where('source', $request->source);
         }

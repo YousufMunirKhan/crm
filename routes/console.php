@@ -39,6 +39,14 @@ Schedule::command('marketing:plan')
     ->weeklyOn(1, '07:30')
     ->withoutOverlapping();
 
+// The worklist nobody was being given. Runs before the marketing automations
+// so the first thing waiting is a person's own overdue work, not a campaign.
+Schedule::command('crm:daily-worklist')
+    ->dailyAt('06:45')
+    ->weekdays()
+    ->timezone(config('app.timezone'))
+    ->withoutOverlapping();
+
 Schedule::command('marketing:automations')
     ->dailyAt('07:00')
     ->timezone(config('app.timezone'));

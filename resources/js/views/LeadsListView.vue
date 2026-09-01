@@ -91,6 +91,15 @@
                         class="form-input"
                     />
                 </div>
+                <div class="w-full sm:w-auto sm:min-w-[11rem]">
+                    <label class="listing-label" for="leadslistview-stale">Last contact</label>
+                    <select id="leadslistview-stale" v-model="filters.stale_days" class="form-select">
+                        <option value="">Any</option>
+                        <option value="14">Nothing in 14 days</option>
+                        <option value="30">Nothing in 30 days</option>
+                        <option value="90">Nothing in 90 days</option>
+                    </select>
+                </div>
                 <div v-if="isAdmin" class="w-full sm:w-auto sm:min-w-[11rem]">
                     <label class="listing-label" for="leadslistview-assignee">Assignee</label>
                     <select id="leadslistview-assignee" v-model="filters.assigned_to" class="form-select">
@@ -417,6 +426,7 @@ const filters = ref({
     from: '',
     to: '',
     assigned_to: '',
+    stale_days: '',
     source: '',
     assigned_by_me: false,
 });
@@ -543,11 +553,12 @@ function filterParamsForApi() {
     if (filters.value.source?.trim()) p.source = filters.value.source.trim();
     if (filters.value.assigned_to) p.assigned_to = filters.value.assigned_to;
     if (isAdmin.value && filters.value.assigned_by_me) p.assigned_by_me = 1;
+    if (filters.value.stale_days) p.stale_days = filters.value.stale_days;
     return p;
 }
 
 function normalizeLeadListQuery(q) {
-    const keys = Object.keys(q || {}).filter((k) => ['search', 'stage', 'from', 'to', 'source', 'assigned_to', 'assigned_by_me'].includes(k)).sort();
+    const keys = Object.keys(q || {}).filter((k) => ['search', 'stage', 'from', 'to', 'source', 'assigned_to', 'assigned_by_me', 'stale_days'].includes(k)).sort();
     const o = {};
     keys.forEach((k) => {
         const v = q[k];
@@ -565,6 +576,7 @@ function syncUrlQuery() {
     if (filters.value.source?.trim()) q.source = filters.value.source.trim();
     if (filters.value.assigned_to) q.assigned_to = filters.value.assigned_to;
     if (isAdmin.value && filters.value.assigned_by_me) q.assigned_by_me = '1';
+    if (filters.value.stale_days) q.stale_days = String(filters.value.stale_days);
     const next = normalizeLeadListQuery(q);
     const cur = normalizeLeadListQuery(route.query);
     if (JSON.stringify(next) === JSON.stringify(cur)) return;
@@ -636,6 +648,7 @@ function resetFilters() {
         from: '',
         to: '',
         assigned_to: '',
+        stale_days: '',
         source: '',
         assigned_by_me: false,
     };
@@ -770,6 +783,7 @@ onMounted(async () => {
     filters.value.from = route.query.from || '';
     filters.value.to = route.query.to || '';
     filters.value.assigned_to = route.query.assigned_to || '';
+    filters.value.stale_days = route.query.stale_days || '';
     filters.value.source = route.query.source || '';
     filters.value.assigned_by_me = route.query.assigned_by_me === '1' || route.query.assigned_by_me === 'true';
 
@@ -786,6 +800,7 @@ watch(
         filters.value.from = q.from || '';
         filters.value.to = q.to || '';
         filters.value.assigned_to = q.assigned_to || '';
+        filters.value.stale_days = q.stale_days || '';
         filters.value.source = q.source || '';
         filters.value.assigned_by_me = q.assigned_by_me === '1' || q.assigned_by_me === 'true';
         loadLeads(1);

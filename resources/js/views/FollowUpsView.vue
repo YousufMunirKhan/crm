@@ -183,6 +183,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import axios from 'axios';
 import { ArrowDownTrayIcon, CalendarDaysIcon, FunnelIcon } from '@heroicons/vue/24/outline';
 import { exportToCSV as exportCSV } from '@/utils/exportCsv';
@@ -327,7 +328,17 @@ function toggleExpanded(id) {
     expandedId.value = expandedId.value === id ? null : id;
 }
 
+const route = useRoute();
+
 onMounted(() => {
+    // The morning notification links straight here with ?overdue=1, so it lands
+    // on the overdue list rather than on a screen the reader has to filter.
+    if (route.query.overdue === '1' || route.query.overdue === 'true') {
+        setOverdue();
+
+        return;
+    }
+
     setDueNow();
 });
 </script>
