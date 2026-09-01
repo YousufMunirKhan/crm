@@ -415,15 +415,18 @@ const navItems = computed(() => {
 
     // Insights - every read-only report lives here, nowhere else.
     items.push({ heading: 'Insights' });
-    items.push({ to: '/report/my-report', label: 'My Report', section: 'report', icon: 'chart-bar' });
+    items.push({ to: '/report/my-report', label: 'My work', section: 'report', icon: 'chart-bar' });
     if (isAdmin) {
         items.push(
+            // Three rows are gone: Target vs Achievement, Products by
+            // Employee and Employee Performance were each a slice of the
+            // Business Reports tabs, all three led by revenue figures that are
+            // £0 by design. Their addresses redirect to the matching tab.
             { to: '/reports', label: 'Business Reports', section: 'report', icon: 'chart-pie' },
-            { to: '/reports/geo', label: 'Geo map', section: 'report', icon: 'chart-pie' },
             { to: '/todays-report', label: "Today's Report", section: 'todays_report', icon: 'document' },
-            { to: '/report/target-achievement', label: 'Target vs Achievement', section: 'report', icon: 'chart-bar' },
-            { to: '/report/products-by-employee', label: 'Products by Employee', section: 'report', icon: 'cube' },
-            { to: '/report/employee-performance', label: 'Employee Performance', section: 'report', icon: 'chart-bar' },
+            { to: '/reports/geo', label: 'Geo map', section: 'report', icon: 'chart-pie' },
+            // Real money, and not CRM reporting - payroll, spend and payouts
+            // belong together and away from the sales reports.
             { to: '/salaries/reports', label: 'Salary Reports', section: 'salary_reports', icon: 'chart-bar' },
             { to: '/expenses/monthly-report', label: 'Expense Report', section: 'expenses', icon: 'currency' },
             { to: '/commission/report', label: 'Commission Reports', section: 'commission_management', icon: 'chart-bar' },

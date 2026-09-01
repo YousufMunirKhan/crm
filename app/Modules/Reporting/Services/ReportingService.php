@@ -22,6 +22,17 @@ use Illuminate\Support\Facades\Schema;
 class ReportingService
 {
     /**
+     * Activity that means somebody actually reached out.
+     *
+     * Excludes `stage_change`, which the system writes by itself when a card is
+     * dragged, and `note`, which costs nothing - counting either would let a
+     * quiet week look busy.
+     */
+    public const CONTACT_TYPES = [
+        'call', 'meeting', 'visit', 'email', 'whatsapp', 'sms', 'quote_sent', 'appointment',
+    ];
+
+    /**
      * Won line items in a reporting period.
      * Period: closed_at in range, or (legacy) closed_at null and lead created in range.
      */
@@ -129,6 +140,18 @@ class ReportingService
 
         $pipelineValue = (clone $leadQuery)->whereNotIn('stage', ['won', 'lost'])->sum('pipeline_value');
 
+        // A count, because the value is £0 for every deal by design. The sum
+        // above is kept only for callers that still read it.
+        $pipelineCount = (clone $leadQuery)->whereNotIn('stage', ['won', 'lost'])->count();
+
+        // Contact actually recorded in the period. This is the only measure of
+        // effort in the product that is neither money nor a stage somebody
+        // dragged, so it is the honest replacement for the revenue card.
+        $contactsLogged = LeadActivity::whereBetween('created_at', [$from, $to])
+            ->whereIn('type', self::CONTACT_TYPES)
+            ->when(isset($filters['agent_id']), fn ($q) => $q->where('user_id', $filters['agent_id']))
+            ->count();
+
         // Revenue was previously $leadRevenue + $invoiceRevenue, which counted
         // a sale twice whenever a won deal was also invoiced. Now that invoices
         // carry lead_id, invoiced leads are excluded from the lead-side total
@@ -174,6 +197,8 @@ class ReportingService
             'followups_count' => $leadsCount,
             'conversion_rate' => $conversionRate,
             'pipeline_value' => $pipelineValue,
+            'pipeline_count' => $pipelineCount,
+            'contacts_logged' => $contactsLogged,
             'revenue' => $revenue,
             'lead_revenue' => $leadRevenue,
             'invoice_revenue' => $invoiceRevenue,
@@ -456,6 +481,13 @@ class ReportingService
                 'conversion_rate' => $leads->count() > 0 ? round($wonLeads / $leads->count() * 100, 2) : 0,
                 'revenue' => $leadRevenue + $invoiceRevenue,
                 'appointments_count' => $appointmentsCount,
+                // Calls, visits, emails and messages this person actually
+                // recorded. With prices deliberately absent and stages used for
+                // filing, this is the only honest measure of effort left.
+                'contacts' => LeadActivity::whereBetween('created_at', [$from, $to])
+                    ->whereIn('type', self::CONTACT_TYPES)
+                    ->where('user_id', $agent->id)
+                    ->count(),
                 'tickets_resolved' => $agent->tickets()->whereBetween('resolved_at', [$from, $to])->count(),
             ];
         });

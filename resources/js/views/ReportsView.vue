@@ -164,7 +164,7 @@
                             <table class="table min-w-[1040px]">
                                 <caption class="sr-only">
                                     Team performance for {{ periodLabel }}: appointments, new leads, open pipeline,
-                                    won products, won leads, conversion rate and sales revenue per employee.
+                                    won products, won leads and recorded contact per employee.
                                 </caption>
                                 <thead class="table-thead">
                                     <tr>
@@ -174,8 +174,7 @@
                                         <th scope="col" class="table-th-num">Open Pipeline</th>
                                         <th scope="col" class="table-th-num">Won Products</th>
                                         <th scope="col" class="table-th-num">Won Leads</th>
-                                        <th scope="col" class="table-th-num">Conversion</th>
-                                        <th scope="col" class="table-th-num">Sales Revenue</th>
+                                        <th scope="col" class="table-th-num">Contacts</th>
                                         <th scope="col" class="table-th-num">Action</th>
                                     </tr>
                                 </thead>
@@ -187,9 +186,8 @@
                                         <td class="table-td-num">{{ row.open_pipeline }}</td>
                                         <td class="table-td-num font-semibold text-success-700">{{ row.won_products }}</td>
                                         <td class="table-td-num">{{ row.won_leads }}</td>
-                                        <td class="table-td-num">{{ row.conversion_rate }}%</td>
                                         <td class="table-td-num font-semibold text-slate-900">
-                                            {{ formatMoney(row.revenue) }}
+                                            {{ row.contacts ?? 0 }}
                                         </td>
                                         <td class="table-td-actions">
                                             <BaseButton
@@ -279,7 +277,7 @@
                                         />
                                         <StatCard
                                             label="Revenue"
-                                            :value="formatMoney(employeeOverview.last_week?.total_revenue || 0)"
+                                            :value="employeeOverview.last_week?.total_products || 0"
                                         />
                                     </div>
                                 </BaseCard>
@@ -295,7 +293,7 @@
                                         />
                                         <StatCard
                                             label="Revenue"
-                                            :value="formatMoney(employeeOverview.selected_month?.total_revenue || 0)"
+                                            :value="employeeOverview.selected_month?.total_products || 0"
                                         />
                                     </div>
                                 </BaseCard>
@@ -317,8 +315,6 @@
                                                 <th scope="col" class="table-th">Product</th>
                                                 <th scope="col" class="table-th">Customer</th>
                                                 <th scope="col" class="table-th-num">Qty</th>
-                                                <th scope="col" class="table-th-num">Unit Price</th>
-                                                <th scope="col" class="table-th-num">Total</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -329,11 +325,7 @@
                                             >
                                                 <td class="table-td-strong">{{ item.product_name }}</td>
                                                 <td class="table-td"><CustomerName :customer="{ name: item.customer_name, business_name: item.customer_business_name }" name-class="text-slate-900" /></td>
-                                                <td class="table-td-num">{{ item.quantity }}</td>
-                                                <td class="table-td-num">{{ formatMoney(item.unit_price) }}</td>
-                                                <td class="table-td-num font-semibold">
-                                                    {{ formatMoney(item.total_price) }}
-                                                </td>
+                                                <td class="table-td-num font-semibold">{{ item.quantity }}</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -390,7 +382,7 @@
                                             {{ row.products?.pending || 0 }}
                                         </td>
                                         <td class="table-td-num font-semibold">
-                                            {{ formatMoney(row.total_value || 0) }}
+                                            {{ row.total_products ?? row.won_products ?? 0 }}
                                         </td>
                                     </tr>
                                 </tbody>
@@ -402,58 +394,6 @@
                     </BaseCard>
                 </TabPanel>
 
-                <!-- Products & Revenue -->
-                <TabPanel class="focus-visible:outline-none">
-                    <BaseCard
-                        :padded="false"
-                        title="Product And Revenue Report"
-                        subtitle="Sales revenue is won product lines. Billed revenue is invoice total."
-                    >
-                        <div v-if="revenueByEmployee.length" class="table-wrap">
-                            <table class="table min-w-[860px]">
-                                <caption class="sr-only">
-                                    Sales, billed and total revenue plus won and lost product counts per employee
-                                    for {{ periodLabel }}.
-                                </caption>
-                                <thead class="table-thead">
-                                    <tr>
-                                        <th scope="col" class="table-th">Employee</th>
-                                        <th scope="col" class="table-th-num">Sales Revenue</th>
-                                        <th scope="col" class="table-th-num">Billed Revenue</th>
-                                        <th scope="col" class="table-th-num">Total Revenue</th>
-                                        <th scope="col" class="table-th-num">Won Products</th>
-                                        <th scope="col" class="table-th-num">Lost Products</th>
-                                        <th scope="col" class="table-th-num">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="row in revenueByEmployee" :key="row.employee_id" class="table-row">
-                                        <td class="table-td-strong">{{ row.employee_name }}</td>
-                                        <td class="table-td-num">{{ formatMoney(row.lead_revenue || 0) }}</td>
-                                        <td class="table-td-num">{{ formatMoney(row.invoice_revenue || 0) }}</td>
-                                        <td class="table-td-num font-semibold">{{ formatMoney(row.revenue || 0) }}</td>
-                                        <td class="table-td-num font-semibold text-success-700">
-                                            {{ row.products?.won || 0 }}
-                                        </td>
-                                        <td class="table-td-num text-danger-700">{{ row.products?.lost || 0 }}</td>
-                                        <td class="table-td-actions">
-                                            <BaseButton
-                                                variant="ghost"
-                                                size="sm"
-                                                @click="selectEmployee(row.employee_id, 'employee')"
-                                            >
-                                                Products
-                                            </BaseButton>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <EmptyState v-else heading="No revenue data for this period.">
-                            <template #icon><BanknotesIcon class="icon" aria-hidden="true" /></template>
-                        </EmptyState>
-                    </BaseCard>
-                </TabPanel>
 
                 <!-- Today -->
                 <TabPanel class="space-y-4 focus-visible:outline-none">
@@ -558,7 +498,6 @@ import axios from 'axios';
 import { TabGroup, TabList, Tab, TabPanels, TabPanel } from '@headlessui/vue';
 import {
     ArrowDownTrayIcon,
-    BanknotesIcon,
     CalendarDaysIcon,
     ChartBarIcon,
     CubeIcon,
@@ -569,7 +508,6 @@ import {
 import LogActivityModal from '@/components/LogActivityModal.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { BaseButton, BaseCard, EmptyState, StatCard } from '@/components/base';
-import { formatMoney } from '@/utils/money';
 import CustomerName from '@/components/CustomerName.vue';
 
 const dateToInput = (date) => {
@@ -600,7 +538,6 @@ const commData = ref({});
 const agentData = ref([]);
 const allEmployeesPipeline = ref([]);
 const todaysFollowUps = ref([]);
-const revenueByEmployee = ref([]);
 const teamLocationStatus = ref([]);
 const salesTrend = ref([]);
 const employeeOverview = ref({});
@@ -613,7 +550,6 @@ const sections = [
     { key: 'team', label: 'Team' },
     { key: 'employee', label: 'Employee' },
     { key: 'pipeline', label: 'Pipeline' },
-    { key: 'revenue', label: 'Products & Revenue' },
     { key: 'daily', label: 'Today' },
 ];
 
@@ -651,13 +587,6 @@ const periodLabel = computed(() => `${filters.value.from || '-'} to ${filters.va
 
 const communicationChannels = computed(() => Object.entries(commData.value.by_channel || {}));
 
-const revenueTotals = computed(() => revenueByEmployee.value.reduce((totals, row) => {
-    totals.sales += Number(row.lead_revenue || 0);
-    totals.billed += Number(row.invoice_revenue || 0);
-    totals.total += Number(row.revenue || 0);
-    return totals;
-}, { sales: 0, billed: 0, total: 0 }));
-
 const pipelineTotals = computed(() => allEmployeesPipeline.value.reduce((totals, row) => {
     totals.follow_up += Number(row.follow_up || 0);
     totals.lead += Number(row.lead || 0);
@@ -688,30 +617,23 @@ const todayFollowUpCount = computed(() => todaysFollowUps.value.reduce((sum, gro
 /**
  * Headline figures.
  *
- * "Sales Revenue" and "Billed Revenue" used to sit here as equals, which left
- * nobody able to say which one was the revenue. There is now one Revenue -
- * every sale counted once, invoiced where an invoice exists and won-deal value
- * where it does not - with the billed share as a caption underneath. A falling
- * billed share is a real problem and was invisible when the two were siblings.
+ * These used to open with Revenue, then Open pipeline, then a conversion rate.
+ * All three were fiction: prices are deliberately never recorded, so both money
+ * figures are £0 by design, and 391 leads are marked won against 3 lost, so any
+ * rate built on those stages reports how people file rather than how they sell.
+ * Three of four numbers on the main report said nothing.
+ *
+ * What is here instead is countable and true: product lines won, appointments,
+ * follow-ups due, and contact actually recorded.
  *
  * "Pipeline Value" was removed outright: it summed every lead in the period
  * including the lost ones. Open pipeline, which excludes won and lost, is the
  * only honest pipeline number and lives in the operating cards below.
  */
-const billedShare = computed(() => {
-    const total = revenueTotals.value.total;
-    if (!total) return 0;
-    return Math.round((revenueTotals.value.billed / total) * 100);
-});
+/** Calls, visits, emails and messages recorded in the period. */
+const contactsLogged = computed(() => executiveData.value.contacts_logged ?? 0);
 
 const summaryCards = computed(() => [
-    {
-        label: 'Revenue',
-        value: formatMoney(revenueTotals.value.total),
-        help: revenueTotals.value.total
-            ? `of which billed ${formatMoney(revenueTotals.value.billed)} (${billedShare.value}%)`
-            : 'Every sale counted once - invoiced, or won deal value',
-    },
     {
         label: 'Products won',
         value: pipelineTotals.value.won_products,
@@ -727,6 +649,11 @@ const summaryCards = computed(() => [
         value: todayFollowUpCount.value,
         help: 'Follow-ups still to handle today',
     },
+    {
+        label: 'Contacts logged',
+        value: contactsLogged.value,
+        help: 'Calls, visits, emails and messages recorded in this period',
+    },
 ]);
 
 const operatingCards = computed(() => [
@@ -736,14 +663,13 @@ const operatingCards = computed(() => [
         help: 'Leads created in this period',
     },
     {
-        label: 'Conversion',
-        value: `${executiveData.value.conversion_rate || 0}%`,
-        help: 'Of the leads created here, the share since won',
-    },
-    {
-        label: 'Open pipeline',
-        value: formatMoney(executiveData.value.pipeline_value || 0),
-        help: 'Deals still live - not won, not lost',
+        // Not a conversion rate. 391 leads are marked won against 3 lost,
+        // because won is free and lost costs a typed sentence - so any rate
+        // built on those stages reports how people file, not how they sell.
+        // Once the reason picker has a few months behind it this can come back.
+        label: 'Open opportunities',
+        value: executiveData.value.pipeline_count ?? pipelineTotals.value.open ?? 0,
+        help: 'Leads still live - not won, not lost',
     },
     {
         label: 'Tickets open',
@@ -771,11 +697,9 @@ const stageRows = computed(() => {
 
 const teamRows = computed(() => {
     const pipelineById = new Map(allEmployeesPipeline.value.map((row) => [String(row.employee_id), row]));
-    const revenueById = new Map(revenueByEmployee.value.map((row) => [String(row.employee_id), row]));
 
     return agentData.value.map((agent) => {
         const pipeline = pipelineById.get(String(agent.id)) || {};
-        const revenue = revenueById.get(String(agent.id)) || {};
         return {
             employee_id: agent.id,
             employee_name: agent.name,
@@ -785,9 +709,11 @@ const teamRows = computed(() => {
             won_products: Number(agent.won_products || pipeline.products?.won || 0),
             won_leads: Number(agent.won_leads || 0),
             conversion_rate: Number(agent.conversion_rate || 0),
-            revenue: Number(revenue.lead_revenue ?? agent.revenue ?? 0),
+            contacts: Number(agent.contacts || 0),
         };
-    }).sort((a, b) => b.revenue - a.revenue || b.won_products - a.won_products);
+    // Was sorted by revenue, which is £0 for everybody - so the order was
+    // whatever the database happened to return, wearing the look of a ranking.
+    }).sort((a, b) => b.won_products - a.won_products || b.contacts - a.contacts);
 });
 
 const selectedTeamRow = computed(() => teamRows.value.find((row) => String(row.employee_id) === String(filters.value.employee_id)));
@@ -797,10 +723,13 @@ const employeeActivityCards = computed(() => {
     const self = employeeOverview.value.targets?.self || {};
     return [
         { label: 'New leads', value: row.leads ?? self.new_leads ?? 0, help: 'Assigned in selected range' },
-        { label: 'Open pipeline', value: formatMoney(row.open_pipeline ?? self.open_pipeline ?? 0), help: 'Follow-up, lead, hot lead, quotation' },
         { label: 'Appointments', value: row.appointments ?? self.achieved_appointments ?? 0, help: 'Booked or handled' },
         { label: 'Won products', value: row.won_products ?? self.achieved_sales ?? 0, help: 'Closed line items' },
-        { label: 'Sales revenue', value: formatMoney(row.revenue ?? self.achieved_revenue ?? 0), help: 'Won product line value' },
+        // Was "Open pipeline" and "Sales revenue", both in pounds and both £0
+        // by design. A count of live opportunities and a count of recorded
+        // contact are the same facts without the fiction.
+        { label: 'Open opportunities', value: row.open_pipeline ?? self.open_pipeline ?? 0, help: 'Follow-up, lead, hot lead, quotation' },
+        { label: 'Contacts logged', value: row.contacts ?? 0, help: 'Calls, visits, emails and messages recorded' },
     ];
 });
 
@@ -810,7 +739,6 @@ const employeeTargetCards = computed(() => {
         return [
             { label: 'Appointments', value: '0 / 0', progress: 0 },
             { label: 'Sales', value: '0 / 0', progress: 0 },
-            { label: 'Revenue', value: `${formatMoney(0)} of ${formatMoney(0)}`, progress: 0 },
         ];
     }
     return [
@@ -823,11 +751,6 @@ const employeeTargetCards = computed(() => {
             label: 'Sales',
             value: `${self.achieved_sales || 0} / ${self.target_sales || 0}`,
             progress: clampPct(self.sales_progress),
-        },
-        {
-            label: 'Revenue',
-            value: `${formatMoney(self.achieved_revenue || 0)} of ${formatMoney(self.target_revenue || 0)}`,
-            progress: clampPct(self.revenue_progress),
         },
     ];
 });
@@ -898,7 +821,6 @@ const loadReports = async () => {
             axios.get('/api/reporting/agents', { params }),
             axios.get('/api/reporting/all-employees-pipeline', { params }),
             axios.get('/api/reporting/todays-followups', { params }),
-            axios.get('/api/reporting/revenue-by-employee', { params }),
             axios.get('/api/reporting/team-location-status', { params }),
             axios.get('/api/reporting/sales-performance', { params }),
         ]);
@@ -917,9 +839,8 @@ const loadReports = async () => {
         agentData.value = dataAt(3, []);
         allEmployeesPipeline.value = dataAt(4, []);
         todaysFollowUps.value = dataAt(5, []);
-        revenueByEmployee.value = dataAt(6, []);
-        teamLocationStatus.value = dataAt(7, []);
-        salesTrend.value = dataAt(8, []);
+        teamLocationStatus.value = dataAt(6, []);
+        salesTrend.value = dataAt(7, []);
 
         if (filters.value.employee_id) {
             await loadEmployeeReports();
@@ -968,7 +889,9 @@ const selectEmployee = (employeeId, section = 'employee') => {
 };
 
 const exportTeamCsv = () => {
-    const header = ['Employee', 'Appointments', 'New Leads', 'Open Pipeline', 'Won Products', 'Won Leads', 'Conversion', 'Sales Revenue'];
+    // The exported file matches the table: no revenue column of zeroes, and no
+    // conversion rate built on stages used for filing.
+    const header = ['Employee', 'Appointments', 'New Leads', 'Open Opportunities', 'Won Products', 'Won Leads', 'Contacts Logged'];
     const rows = teamRows.value.map((row) => [
         row.employee_name,
         row.appointments,
@@ -976,8 +899,7 @@ const exportTeamCsv = () => {
         row.open_pipeline,
         row.won_products,
         row.won_leads,
-        `${row.conversion_rate}%`,
-        row.revenue,
+        row.contacts,
     ]);
     const csv = [header, ...rows]
         .map((line) => line.map((cell) => `"${String(cell ?? '').replaceAll('"', '""')}"`).join(','))

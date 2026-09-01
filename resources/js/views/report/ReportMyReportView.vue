@@ -1,269 +1,210 @@
 <template>
-    <ListingPageShell
-        title="My report"
-        subtitle="Your targets vs achievements for the month — same metrics as the team leaderboard."
-        :badge="myReportBadge"
-    >
-        <template #filters>
-            <div>
-                <label class="form-label" for="reportmyreportview-month">Month</label>
-                <select id="reportmyreportview-month" v-model="selectedMonth" class="form-select w-full sm:w-56" @change="loadReport">
-                    <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
-                </select>
-            </div>
-        </template>
+    <div class="page">
+        <p class="page-lead">
+            Your own book and your own record. Nobody else sees a different version of these numbers.
+        </p>
 
-        <div v-if="loading" class="px-4 sm:px-5 py-8 space-y-3" aria-busy="true">
-            <p class="sr-only">Loading your report…</p>
-            <div class="skeleton-text w-1/3"></div>
-            <div class="skeleton-text w-2/3"></div>
-            <div class="skeleton-text w-1/2"></div>
-            <div class="skeleton-text w-3/4"></div>
-        </div>
+        <MyWork />
 
-        <div v-else-if="self" class="px-4 sm:px-5 pb-5 space-y-4">
-            <!-- Ranking badge -->
-            <div
-                v-if="self.rank"
-                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-warning-50 to-warning-100 border border-warning-200"
-            >
-                <span class="text-2xl font-bold text-warning-800 tabular-nums">#{{ self.rank }}</span>
-                <span class="text-sm text-warning-800">
-                    out of {{ totalEmployeesWithTargets }} employee{{ totalEmployeesWithTargets !== 1 ? 's' : '' }} with targets
-                </span>
-            </div>
+        <BaseCard title="What you have recorded" :subtitle="periodLabel">
+            <template #actions>
+                <div class="tab-list" role="group" aria-label="Period">
+                    <button
+                        v-for="range in ranges"
+                        :key="range.key"
+                        type="button"
+                        :class="['tab', activeRange === range.key ? 'tab-active' : '']"
+                        :aria-pressed="activeRange === range.key ? 'true' : 'false'"
+                        @click="setRange(range.key)"
+                    >
+                        {{ range.label }}
+                    </button>
+                </div>
+            </template>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-                <StatCard
+            <p v-if="loading" class="py-8 text-center text-sm text-slate-500" role="status">Loading…</p>
+
+            <div v-else class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div
                     v-for="card in activityCards"
                     :key="card.label"
-                    :label="card.label"
-                    :value="card.value"
-                    :caption="card.help"
-                />
-            </div>
-
-            <!-- Target vs Achievement cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <BaseCard>
-                    <div class="stat-label">Appointments</div>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-2xl font-bold text-slate-900 tabular-nums">{{ self.achieved_appointments }}</span>
-                        <span class="text-slate-500 tabular-nums">/ {{ self.target_appointments }}</span>
-                    </div>
-                    <div class="mt-2">
-                        <div class="flex justify-between text-xs text-slate-500 mb-1">
-                            <span>Progress</span>
-                            <span class="tabular-nums">{{ self.appointment_progress }}%</span>
-                        </div>
-                        <div
-                            class="w-full bg-slate-200 rounded-full h-2"
-                            role="progressbar"
-                            aria-label="Appointment target progress"
-                            :aria-valuenow="Math.min(self.appointment_progress || 0, 100)"
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                        >
-                            <div
-                                class="h-2 rounded-full bg-success-600 transition-all"
-                                :style="{ width: `${Math.min(self.appointment_progress || 0, 100)}%` }"
-                            ></div>
-                        </div>
-                    </div>
-                </BaseCard>
-                <BaseCard>
-                    <div class="stat-label">Sales (Products Won)</div>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-2xl font-bold text-slate-900 tabular-nums">{{ self.achieved_sales }}</span>
-                        <span class="text-slate-500 tabular-nums">/ {{ self.target_sales }}</span>
-                    </div>
-                    <div class="mt-2">
-                        <div class="flex justify-between text-xs text-slate-500 mb-1">
-                            <span>Progress</span>
-                            <span class="tabular-nums">{{ self.sales_progress }}%</span>
-                        </div>
-                        <div
-                            class="w-full bg-slate-200 rounded-full h-2"
-                            role="progressbar"
-                            aria-label="Sales target progress"
-                            :aria-valuenow="Math.min(self.sales_progress || 0, 100)"
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                        >
-                            <div
-                                class="h-2 rounded-full bg-primary-600 transition-all"
-                                :style="{ width: `${Math.min(self.sales_progress || 0, 100)}%` }"
-                            ></div>
-                        </div>
-                    </div>
-                </BaseCard>
-                <BaseCard>
-                    <div class="stat-label">Revenue</div>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-2xl font-bold text-slate-900 tabular-nums">£{{ formatNumber(self.achieved_revenue || 0) }}</span>
-                        <span class="text-slate-500 tabular-nums">/ £{{ formatNumber(self.target_revenue || 0) }}</span>
-                    </div>
-                    <div class="mt-2">
-                        <div class="flex justify-between text-xs text-slate-500 mb-1">
-                            <span>Progress</span>
-                            <span class="tabular-nums">{{ self.revenue_progress }}%</span>
-                        </div>
-                        <div
-                            class="w-full bg-slate-200 rounded-full h-2"
-                            role="progressbar"
-                            aria-label="Revenue target progress"
-                            :aria-valuenow="Math.min(self.revenue_progress || 0, 100)"
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                        >
-                            <div
-                                class="h-2 rounded-full bg-primary-500 transition-all"
-                                :style="{ width: `${Math.min(self.revenue_progress || 0, 100)}%` }"
-                            ></div>
-                        </div>
-                    </div>
-                </BaseCard>
-            </div>
-
-            <BaseCard
-                v-if="self.sales_target_lines?.length"
-                title="Sales targets by product & category"
-                subtitle="Won line items in the month — category rows include every product in that category."
-                :padded="false"
-            >
-                <div class="table-wrap">
-                    <table class="table">
-                        <caption class="sr-only">Sales targets by product and category, with achieved and target quantities</caption>
-                        <thead class="table-thead">
-                            <tr>
-                                <th scope="col" class="table-th">Target</th>
-                                <th scope="col" class="table-th-num">Achieved</th>
-                                <th scope="col" class="table-th-num">Target qty</th>
-                                <th scope="col" class="table-th-num">Progress</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="(ln, idx) in self.sales_target_lines" :key="idx" class="table-row">
-                                <td class="table-td-strong">{{ ln.label }}</td>
-                                <td class="table-td-num font-medium">{{ ln.achieved_quantity }}</td>
-                                <td class="table-td-num">{{ ln.target_quantity }}</td>
-                                <td class="table-td-num">{{ lineProgress(ln) }}%</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    class="rounded-card border border-slate-200 bg-white p-3 sm:p-4"
+                >
+                    <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">{{ card.label }}</p>
+                    <p class="mt-1 text-2xl font-bold tabular-nums text-slate-900 sm:text-3xl">{{ card.value }}</p>
+                    <p class="mt-1 text-[11px] leading-snug text-slate-600">{{ card.help }}</p>
                 </div>
-            </BaseCard>
+            </div>
+        </BaseCard>
 
-            <p v-if="!self.rank && (self.target_appointments || self.target_sales || self.target_revenue)" class="callout callout-info">
-                No ranking yet — you may not be in the Sales/CallAgent role or targets were set recently.
-            </p>
-            <p v-if="!self.target_appointments && !self.target_sales && !self.target_revenue" class="callout callout-warning">
-                No targets set for this month. Ask your admin to use Set targets (Employees).
-            </p>
-        </div>
-
-        <EmptyState
-            v-else
-            heading="Unable to load your report"
-            description="We could not fetch your targets for this month. Pick another month or try again shortly."
+        <BaseCard
+            v-if="target"
+            title="Your targets this month"
+            subtitle="Set by your manager. Counted from appointments held and product lines won."
         >
-            <template #icon>
-                <ChartBarIcon class="icon" aria-hidden="true" />
-            </template>
-        </EmptyState>
-    </ListingPageShell>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div v-for="row in targetRows" :key="row.label">
+                    <div class="flex items-baseline justify-between gap-2">
+                        <span class="text-sm font-medium text-slate-800">{{ row.label }}</span>
+                        <span class="text-sm tabular-nums text-slate-600">{{ row.value }}</span>
+                    </div>
+                    <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
+                        <div class="h-full rounded-full bg-primary-600" :style="{ width: `${row.progress}%` }" />
+                    </div>
+                </div>
+            </div>
+        </BaseCard>
+
+        <p v-else class="callout callout-info">
+            No targets are set for you this month. Ask your manager if you think there should be.
+        </p>
+    </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import axios from 'axios';
-import ListingPageShell from '@/components/ListingPageShell.vue';
-import { BaseCard, EmptyState, StatCard } from '@/components/base';
-import { ChartBarIcon } from '@heroicons/vue/24/outline';
+import MyWork from '@/components/MyWork.vue';
+import { BaseCard } from '@/components/base';
+import { useAuthStore } from '@/stores/auth';
 
-const formatMonth = (date) => {
-    const d = date instanceof Date ? date : new Date(date);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    return `${y}-${m}`;
-};
+/**
+ * A salesperson's own report.
+ *
+ * What was here: a revenue tile, a revenue target with a progress bar, a rank,
+ * and an "open pipeline" in pounds. Prices are deliberately never recorded, so
+ * every one of those read £0 - a person opening their own report was shown a
+ * page telling them their work was worth nothing, four times over.
+ *
+ * What replaces it is the part of their record that is real: what they have let
+ * go quiet, what they promised and missed, and what they actually did in the
+ * period. The book health at the top is the same component and the same service
+ * the owner's dashboard uses, scoped to this person, so a rep and their manager
+ * cannot end up quoting different numbers at each other.
+ */
+const auth = useAuthStore();
 
-const selectedMonth = ref(formatMonth(new Date()));
-const loading = ref(false);
-const self = ref(null);
-const totalEmployeesWithTargets = ref(0);
+const loading = ref(true);
+const agent = ref({});
+const target = ref(null);
+const activeRange = ref('this_month');
 
-const myReportBadge = computed(() => {
-    if (loading.value || !self.value) return null;
-    if (self.value.rank != null) return `Rank #${self.value.rank}`;
-    return totalEmployeesWithTargets.value ? `${totalEmployeesWithTargets.value} in leaderboard` : null;
-});
+const ranges = [
+    { key: 'this_week', label: 'This week' },
+    { key: 'this_month', label: 'This month' },
+    { key: 'last_month', label: 'Last month' },
+];
 
-const monthOptions = (() => {
-    const opts = [];
-    const now = new Date();
-    for (let i = 0; i < 12; i++) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        opts.push({
-            value: formatMonth(d),
-            label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
-        });
-    }
-    return opts;
-})();
-
-const formatNumber = (n) => new Intl.NumberFormat('en-GB').format(n);
+const periodLabel = computed(() =>
+    ranges.find((r) => r.key === activeRange.value)?.label ?? '');
 
 const activityCards = computed(() => [
     {
-        label: 'New leads',
-        value: self.value?.new_leads || 0,
-        help: 'Assigned this month',
-    },
-    {
-        label: 'Open pipeline',
-        value: `£${formatNumber(self.value?.open_pipeline || 0)}`,
-        help: 'Not won or lost yet',
+        label: 'Contacts logged',
+        value: agent.value.contacts ?? 0,
+        help: 'Calls, visits, emails and messages you recorded',
     },
     {
         label: 'Appointments',
-        value: self.value?.achieved_appointments || 0,
-        help: 'Booked or handled',
+        value: agent.value.appointments_count ?? 0,
+        help: 'Booked or handled in this period',
     },
     {
-        label: 'Won products',
-        value: self.value?.achieved_sales || 0,
-        help: 'Closed product lines',
+        label: 'Products won',
+        value: agent.value.won_products ?? 0,
+        help: 'Line items you closed as won',
     },
     {
-        label: 'Revenue',
-        value: `£${formatNumber(self.value?.achieved_revenue || 0)}`,
-        help: 'Won products plus invoices',
+        label: 'New leads',
+        value: agent.value.leads_count ?? 0,
+        help: 'Assigned to you in this period',
     },
 ]);
 
-const lineProgress = (ln) => {
-    const t = Number(ln.target_quantity || 0);
-    const a = Number(ln.achieved_quantity || 0);
-    if (t <= 0) return a > 0 ? 100 : 0;
-    return Math.min(100, Math.round((a / t) * 100));
-};
+const targetRows = computed(() => {
+    const t = target.value;
 
-const loadReport = async () => {
+    if (! t) return [];
+
+    return [
+        {
+            label: 'Appointments',
+            value: `${t.achieved_appointments || 0} of ${t.target_appointments || 0}`,
+            progress: pct(t.achieved_appointments, t.target_appointments),
+        },
+        {
+            label: 'Sales',
+            value: `${t.achieved_sales || 0} of ${t.target_sales || 0}`,
+            progress: pct(t.achieved_sales, t.target_sales),
+        },
+    ];
+});
+
+function pct(done, of) {
+    const total = Number(of || 0);
+
+    return total > 0 ? Math.min(100, Math.round((Number(done || 0) / total) * 100)) : 0;
+}
+
+/** The date window for the chosen range, as the reporting API expects it. */
+function rangeParams() {
+    const now = new Date();
+    const iso = (d) => d.toISOString().slice(0, 10);
+
+    if (activeRange.value === 'this_week') {
+        const start = new Date(now);
+        // Monday, not Sunday - a UK working week.
+        start.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+
+        return { from: iso(start), to: iso(now) };
+    }
+
+    if (activeRange.value === 'last_month') {
+        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const end = new Date(now.getFullYear(), now.getMonth(), 0);
+
+        return { from: iso(start), to: iso(end) };
+    }
+
+    return { from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to: iso(now) };
+}
+
+async function load() {
     loading.value = true;
+
+    const params = rangeParams();
+    const month = params.from.slice(0, 7);
+
     try {
-        const res = await axios.get('/api/reporting/employee-self-report', {
-            params: { month: selectedMonth.value },
-        });
-        self.value = res.data.self ?? null;
-        totalEmployeesWithTargets.value = res.data.total_employees_with_targets ?? 0;
-    } catch (e) {
-        console.error('Failed to load report:', e);
-        self.value = null;
+        const [agentsRes, targetsRes] = await Promise.all([
+            axios.get('/api/reporting/agents', { params }),
+            axios.get('/api/hr/employee-targets', { params: { month } }).catch(() => ({ data: { data: [] } })),
+        ]);
+
+        const rows = Array.isArray(agentsRes.data) ? agentsRes.data : (agentsRes.data?.data ?? []);
+
+        // The endpoint already narrows a non-manager to their own row; the find
+        // is for managers opening their own report.
+        agent.value = rows.find((r) => String(r.id) === String(auth.user?.id)) ?? rows[0] ?? {};
+
+        const targets = targetsRes.data?.data ?? [];
+        const mine = targets.find((t) => String(t.user_id) === String(auth.user?.id));
+
+        target.value = mine && (Number(mine.target_appointments) > 0 || Number(mine.target_sales) > 0)
+            ? mine
+            : null;
+    } catch {
+        agent.value = {};
+        target.value = null;
     } finally {
         loading.value = false;
     }
-};
+}
 
-onMounted(loadReport);
+function setRange(key) {
+    activeRange.value = key;
+    load();
+}
+
+onMounted(load);
 </script>

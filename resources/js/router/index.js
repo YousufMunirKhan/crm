@@ -144,25 +144,24 @@ const routes = [
         path: '/report/my-report',
         name: 'report-my-report',
         component: () => import('@/views/report/ReportMyReportView.vue'),
-        meta: { requiresAuth: true, title: 'My Report' },
+        meta: { requiresAuth: true, title: 'My work' },
     },
+    /*
+     * Three reports that each showed a slice of the Business Reports tabs, all
+     * three led by revenue figures that are £0 by design. Kept as redirects
+     * rather than deleted outright, because people bookmark reports.
+     */
     {
         path: '/report/target-achievement',
-        name: 'report-target-achievement',
-        component: () => import('@/views/report/ReportTargetAchievementView.vue'),
-        meta: { requiresAuth: true, title: 'Target vs Achievement', roles: ['Admin', 'Manager', 'System Admin'] },
+        redirect: { path: '/reports', query: { tab: 'team' } },
     },
     {
         path: '/report/products-by-employee',
-        name: 'report-products-by-employee',
-        component: () => import('@/views/report/ReportProductsByEmployeeView.vue'),
-        meta: { requiresAuth: true, title: 'Products Sold by Employee', roles: ['Admin', 'Manager', 'System Admin'] },
+        redirect: { path: '/reports', query: { tab: 'employee' } },
     },
     {
         path: '/report/employee-performance',
-        name: 'report-employee-performance',
-        component: () => import('@/views/report/ReportEmployeePerformanceView.vue'),
-        meta: { requiresAuth: true, title: 'Employee Performance', roles: ['Admin', 'Manager', 'System Admin'] },
+        redirect: { path: '/reports', query: { tab: 'employee' } },
     },
     {
         path: '/reports',
