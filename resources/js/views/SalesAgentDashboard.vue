@@ -1,49 +1,45 @@
 <template>
     <div class="page">
-        <p class="page-lead">Your follow-ups, appointments and pipeline.</p>
+        <p class="page-lead">{{ greeting }} Here is what needs you today.</p>
 
-        <!-- Attendance & Stats Row (no Revenue) -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-            <div class="min-w-0">
-                <AttendanceClock />
-            </div>
-            <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 min-w-0">
-                <StatCard
-                    label="Today's Active Leads"
-                    :value="stats.daily?.leads || 0"
-                    :caption="`Won: ${stats.daily?.won || 0}`"
-                    tone="primary"
-                >
-                    <template #icon>
-                        <CalendarDaysIcon class="icon" aria-hidden="true" />
-                    </template>
-                </StatCard>
-                <StatCard
-                    label="Monthly Active Leads"
-                    :value="stats.monthly?.leads || 0"
-                    :caption="`Won: ${stats.monthly?.won || 0}`"
-                    tone="primary"
-                >
-                    <template #icon>
-                        <ChartBarIcon class="icon" aria-hidden="true" />
-                    </template>
-                </StatCard>
-                <StatCard
-                    label="Yearly Active Leads"
-                    :value="stats.yearly?.leads || 0"
-                    :caption="`Won: ${stats.yearly?.won || 0}`"
-                    tone="primary"
-                >
-                    <template #icon>
-                        <ArrowTrendingUpIcon class="icon" aria-hidden="true" />
-                    </template>
-                </StatCard>
-            </div>
+        <AttendanceClock />
+
+        <!--
+            The day in one line. This used to be three cards sharing a grid row
+            with the attendance panel, so each stretched to its height and put a
+            single digit at the top of a 470px white box - three of them, above
+            anything a rep actually has to do.
+        -->
+        <div class="flex flex-wrap gap-2">
+            <button
+                v-if="overdueFollowUps.length"
+                type="button"
+                class="inline-flex min-h-[44px] items-center gap-2 rounded-control border border-danger-200
+                       bg-danger-50 px-3 text-sm font-medium text-danger-800 touch-manipulation
+                       hover:bg-danger-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-500/40"
+                @click="scrollToWork"
+            >
+                <ExclamationTriangleIcon class="icon-sm shrink-0" aria-hidden="true" />
+                {{ overdueFollowUps.length }} overdue
+            </button>
+            <span class="inline-flex min-h-[44px] items-center gap-2 rounded-control border border-slate-200 bg-white px-3 text-sm text-slate-700">
+                <CalendarDaysIcon class="icon-sm shrink-0 text-slate-400" aria-hidden="true" />
+                {{ displayFollowUpsToday.length }} due today
+            </span>
+            <span class="inline-flex min-h-[44px] items-center gap-2 rounded-control border border-slate-200 bg-white px-3 text-sm text-slate-700">
+                <ClockIcon class="icon-sm shrink-0 text-slate-400" aria-hidden="true" />
+                {{ todayAppointments.length }}
+                {{ todayAppointments.length === 1 ? 'appointment' : 'appointments' }}
+            </span>
+            <span class="inline-flex min-h-[44px] items-center gap-2 rounded-control border border-slate-200 bg-white px-3 text-sm text-slate-700">
+                <ArrowTrendingUpIcon class="icon-sm shrink-0 text-slate-400" aria-hidden="true" />
+                {{ stats.yearly?.won || 0 }} won this year
+            </span>
         </div>
 
         <!-- My Targets (if admin has set them for this month) -->
         <section
-            v-if="myTarget"
+            v-if="hasRealTarget"
             class="card bg-gradient-to-r from-primary-50 via-white to-success-50 border-primary-200 px-4 py-4 md:px-6 md:py-5 flex flex-col gap-4"
         >
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -80,10 +76,6 @@
                         :style="{ width: `${Math.min(100, myTarget.overall_progress || 0)}%` }"
                     ></div>
                 </div>
-                <p v-if="myTarget.target_revenue > 0" class="text-[11px] text-slate-500 tabular-nums">
-                    Revenue: {{ formatNumber(myTarget.achieved_revenue) }} / {{ formatNumber(myTarget.target_revenue) }}
-                    ({{ myTarget.revenue_progress }}%)
-                </p>
             </div>
         </section>
 
@@ -108,8 +100,15 @@
                     </div>
                 </div>
                 <div class="text-left sm:text-right text-sm w-full sm:w-auto shrink-0">
-                    <div class="font-bold text-success-700 tabular-nums break-words">£{{ formatNumber(monthlyTopPerformer.revenue || 0) }}</div>
-                    <div class="text-xs text-slate-500 tabular-nums">{{ monthlyTopPerformer.conversion_rate || 0 }}% conv.</div>
+                    <!-- This said £0 next to a real win count, which reads as
+                         "their wins were worth nothing". Prices are deliberately
+                         not recorded, so a count is the honest figure. -->
+                    <div class="font-bold tabular-nums text-success-700">
+                        {{ monthlyTopPerformer.won_products || monthlyTopPerformer.won_count || 0 }} won
+                    </div>
+                    <div class="text-xs tabular-nums text-slate-500">
+                        from {{ monthlyTopPerformer.leads_count || 0 }} leads
+                    </div>
                 </div>
             </div>
         </section>
@@ -174,6 +173,64 @@
 
             <!-- Today / Selected Date Follow-ups -->
             <div v-show="activeTab === 'today'" class="space-y-6">
+                <section v-if="overdueFollowUps.length" ref="workSection">
+                    <h2 class="mb-3 flex items-center gap-2 text-base font-semibold text-slate-900">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-danger-100 text-danger-700">
+                            <ExclamationTriangleIcon class="icon" aria-hidden="true" />
+                        </span>
+                        Overdue
+                        <span class="rounded-full bg-danger-100 px-2 py-0.5 text-xs font-semibold text-danger-800 tabular-nums">
+                            {{ overdueFollowUps.length }}
+                        </span>
+                    </h2>
+                    <p class="mb-3 text-xs text-slate-500">
+                        You set these dates yourself and they have passed. Oldest first.
+                    </p>
+                    <div class="space-y-3">
+                        <div
+                            v-for="fu in overdueOnDashboard"
+                            :key="`overdue-${fu.id}`"
+                            class="flex min-w-0 flex-col gap-3 rounded-card border border-danger-200 bg-danger-50/60 p-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <div class="min-w-0 flex-1">
+                                <router-link
+                                    v-if="fu.customer_id"
+                                    :to="`/customers/${fu.customer_id}`"
+                                    class="link break-words"
+                                >
+                                    {{ fu.customer?.business_name || fu.customer?.name || 'Customer' }}
+                                </router-link>
+                                <div v-else class="font-medium text-slate-900">
+                                    {{ fu.customer?.name || 'Customer' }}
+                                </div>
+                                <div class="mt-1 text-xs font-medium text-danger-800 tabular-nums">
+                                    {{ overdueLabel(fu.next_follow_up_at) }}
+                                </div>
+                                <div v-if="fu.customer?.phone" class="mt-1.5 flex items-center gap-1">
+                                    <a
+                                        :href="`tel:${fu.customer.phone}`"
+                                        class="text-sm text-primary-700 hover:underline tabular-nums"
+                                    >{{ fu.customer.phone }}</a>
+                                    <CopyButton :value="fu.customer.phone" label="phone number" size="compact" />
+                                </div>
+                            </div>
+                            <div class="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+                                <BaseButton variant="outline" @click="openActivityModal(fu)">Log</BaseButton>
+                                <BaseButton variant="success" @click="openCompleteModal(fu)">Done</BaseButton>
+                            </div>
+                        </div>
+
+                        <BaseButton
+                            v-if="overdueFollowUps.length > OVERDUE_ON_DASHBOARD"
+                            variant="outline"
+                            block-mobile
+                            to="/follow-ups?overdue=1"
+                        >
+                            See all {{ overdueFollowUps.length }} overdue
+                        </BaseButton>
+                    </div>
+                </section>
+
                 <section>
                     <h2 class="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
                         <span class="w-8 h-8 rounded-control bg-primary-100 text-primary-700 flex items-center justify-center shrink-0">
@@ -360,15 +417,15 @@
                                 :to="`/customers/${lead.customer_id}`"
                                 class="link break-words"
                             >
-                                {{ lead.customer?.name || 'Customer' }}
+                                {{ lead.customer?.business_name || lead.customer?.name || 'Customer' }}
                             </router-link>
                             <div v-else class="font-medium text-slate-900">
-                                {{ lead.customer?.name || 'Customer' }}
+                                {{ lead.customer?.business_name || lead.customer?.name || 'Customer' }}
                             </div>
                             <div class="text-xs text-slate-500">{{ formatLeadStage(lead.stage) }} • {{ lead.items?.length ? lead.items.map(i => i.product?.name).filter(Boolean).join(', ') : '-' }}</div>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 sm:justify-end">
-                            <div class="text-sm font-medium text-slate-700 tabular-nums">£{{ formatNumber(getLeadValue(lead)) }}</div>
+                            <div class="text-xs text-slate-500">{{ sinceLabel(lead.updated_at) }}</div>
                             <BaseButton
                                 variant="success"
                                 class="sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity"
@@ -402,8 +459,18 @@
                         class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-50 rounded-card hover:bg-slate-100 transition-colors min-w-0"
                     >
                         <div class="flex-1 min-w-0">
-                            <div class="font-medium text-slate-900 break-words">{{ customer.name }}</div>
-                            <div class="text-xs text-slate-500">{{ customer.phone }}</div>
+                            <div class="font-medium text-slate-900 break-words">
+                                {{ customer.business_name || customer.name }}
+                            </div>
+                            <div v-if="customer.business_name && customer.name" class="text-xs text-slate-500 break-words">
+                                {{ customer.name }}
+                            </div>
+                            <div v-if="customer.phone" class="mt-1 flex items-center gap-1">
+                                <a :href="`tel:${customer.phone}`" class="text-sm tabular-nums text-primary-700 hover:underline">
+                                    {{ customer.phone }}
+                                </a>
+                                <CopyButton :value="customer.phone" label="phone number" size="compact" />
+                            </div>
                         </div>
                         <BaseButton
                             variant="primary"
@@ -535,10 +602,10 @@ import {
     ArrowTrendingUpIcon,
     BoltIcon,
     CalendarDaysIcon,
-    ChartBarIcon,
     CheckCircleIcon,
     ClockIcon,
     DocumentTextIcon,
+    ExclamationTriangleIcon,
     ListBulletIcon,
     PlusCircleIcon,
     TrophyIcon,
@@ -557,6 +624,7 @@ import {
     StatCard,
 } from '@/components/base';
 import AttendanceClock from '@/components/AttendanceClock.vue';
+import CopyButton from '@/components/CopyButton.vue';
 import LogActivityModal from '@/components/LogActivityModal.vue';
 import { formatLeadStage } from '@/utils/displayFormat';
 
@@ -604,10 +672,6 @@ const displayFollowUpsToday = computed(() => {
     return todayFollowUps.value;
 });
 
-const formatNumber = (num) => {
-    return new Intl.NumberFormat('en-GB').format(num || 0);
-};
-
 const num = (v) => {
     if (v === null || v === undefined || v === '') return 0;
     if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
@@ -647,13 +711,82 @@ const formatSelectedDateLabel = (dateStr) => {
     return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-const getLeadValue = (lead) => {
-    if (lead.stage === 'won' && lead.items?.length > 0) {
-        const itemsTotal = lead.items.reduce((sum, item) => sum + (parseFloat(item.total_price) || 0), 0);
-        return itemsTotal > 0 ? itemsTotal : (lead.pipeline_value || 0);
+/**
+ * Follow-ups whose date has already passed.
+ *
+ * Not part of the dashboard payload, because every follow-up surface in this
+ * product was built to look forward - which is exactly how 33 missed promises
+ * became invisible to the people who made them.
+ */
+const overdueFollowUps = ref([]);
+
+/**
+ * How many overdue rows the dashboard itself shows.
+ *
+ * There are 33 outstanding across the company and one rep can easily hold a
+ * dozen. Printing them all turns the first screen into a wall of red that
+ * buries the appointments and today's work underneath it - which is how a list
+ * stops being read at all. The oldest few, then a link to the rest.
+ */
+const OVERDUE_ON_DASHBOARD = 5;
+
+const overdueOnDashboard = computed(() => overdueFollowUps.value.slice(0, OVERDUE_ON_DASHBOARD));
+const workSection = ref(null);
+
+const greeting = computed(() => {
+    const h = new Date().getHours();
+
+    if (h < 12) return 'Good morning.';
+    if (h < 17) return 'Good afternoon.';
+
+    return 'Good evening.';
+});
+
+/** A target panel with nothing in it is a progress bar stuck at 0%. */
+const hasRealTarget = computed(() =>
+    !!myTarget.value
+    && (Number(myTarget.value.target_appointments) > 0 || Number(myTarget.value.target_sales) > 0));
+
+function overdueLabel(when) {
+    if (!when) return 'Overdue';
+
+    const due = new Date(when);
+    const days = Math.floor((new Date(new Date().toDateString()) - new Date(due.toDateString())) / 86400000);
+
+    if (days <= 0) return 'Due today';
+    if (days === 1) return 'Was due yesterday';
+
+    return `Was due ${days} days ago`;
+}
+
+function sinceLabel(when) {
+    if (!when) return '';
+
+    const days = Math.floor((Date.now() - new Date(when).getTime()) / 86400000);
+
+    if (days <= 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 30) return `${days}d ago`;
+
+    return `${Math.floor(days / 30)}mo ago`;
+}
+
+function scrollToWork() {
+    workSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function loadOverdue() {
+    try {
+        const { data } = await axios.get('/api/followups', { params: { overdue: 1 } });
+        const rows = Array.isArray(data) ? data : (data?.data ?? []);
+
+        overdueFollowUps.value = rows
+            .slice()
+            .sort((a, b) => new Date(a.next_follow_up_at) - new Date(b.next_follow_up_at));
+    } catch {
+        overdueFollowUps.value = [];
     }
-    return lead.pipeline_value || 0;
-};
+}
 
 const loadDashboard = async (dateParam = null) => {
     loading.value = true;
@@ -862,5 +995,6 @@ const completeFollowUp = async () => {
 onMounted(() => {
     selectedDate.value = todayStr.value;
     loadDashboard();
+    loadOverdue();
 });
 </script>

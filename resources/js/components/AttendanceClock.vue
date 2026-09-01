@@ -36,9 +36,13 @@
                         Check-out: {{ formatTime(status.check_out_time) }}
                     </div>
                 </div>
+                <div v-if="status.checked_in && status.check_in_time" class="shrink-0 text-right">
+                    <div class="text-[11px] uppercase tracking-wide text-slate-500">Worked</div>
+                    <div class="text-lg font-bold tabular-nums text-slate-900 sm:text-xl">{{ workingHours }}</div>
+                </div>
             </div>
 
-            <div class="flex gap-3">
+            <div class="flex gap-3 sm:max-w-xs">
                 <button
                     v-if="!status.checked_in"
                     @click="checkIn"
@@ -60,7 +64,7 @@
                 </div>
             </div>
 
-            <p class="text-xs text-slate-500">
+            <p v-if="!status.checked_in" class="text-xs text-slate-500">
                 Camera and location permission are required for attendance proof.
             </p>
 
@@ -68,7 +72,11 @@
                 {{ proofError }}
             </div>
 
-            <div v-if="status.attendance" class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+            <details v-if="status.attendance" class="rounded-lg border border-slate-200">
+                <summary class="cursor-pointer px-3 py-2 text-xs font-medium text-slate-600 touch-manipulation">
+                    Photo and location proof
+                </summary>
+                <div class="grid grid-cols-1 gap-3 border-t border-slate-100 p-3 text-sm sm:grid-cols-2">
                 <div class="rounded-lg border border-slate-200 p-3">
                     <div class="font-medium text-slate-900">Check-in proof</div>
                     <div class="mt-2 flex items-center gap-3">
@@ -131,12 +139,8 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div v-if="status.checked_in && status.check_in_time" class="text-center">
-                <div class="text-sm text-slate-500">Working Hours</div>
-                <div class="text-2xl font-bold text-slate-900">{{ workingHours }}</div>
-            </div>
+                </div>
+            </details>
         </div>
     </div>
 </template>
