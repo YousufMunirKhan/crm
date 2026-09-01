@@ -227,17 +227,13 @@
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-center w-full md:max-w-md md:ml-auto">
-                        <div class="px-3 py-2 bg-white rounded-control border border-slate-200 min-w-0">
-                            <div class="text-xs text-slate-500">Revenue</div>
-                            <div class="text-sm font-bold text-success-700 tabular-nums break-words">£{{ formatNumber(monthlyTopPerformer.revenue || 0) }}</div>
-                        </div>
                         <div class="px-3 py-2 bg-white rounded-control border border-slate-200">
                             <div class="text-xs text-slate-500">Sales won</div>
                             <div class="text-sm font-bold text-slate-900 tabular-nums">{{ monthlyTopPerformer.won_products || monthlyTopPerformer.won_count || 0 }}</div>
                         </div>
                         <div class="px-3 py-2 bg-white rounded-control border border-slate-200">
-                            <div class="text-xs text-slate-500">Conversion</div>
-                            <div class="text-sm font-bold text-slate-900 tabular-nums">{{ monthlyTopPerformer.conversion_rate || 0 }}%</div>
+                            <div class="text-xs text-slate-500">Leads worked</div>
+                            <div class="text-sm font-bold text-slate-900 tabular-nums">{{ monthlyTopPerformer.leads_count || 0 }}</div>
                         </div>
                     </div>
                 </div>
@@ -263,12 +259,9 @@
                             </div>
                         </div>
                         <div class="rounded-card bg-white/80 border border-slate-200 p-3">
-                            <div class="text-xs text-slate-500">Won value vs target</div>
-                            <div class="text-sm font-semibold text-slate-900 tabular-nums break-words">
-                                £{{ formatNumber(performerMonthTarget.achieved_revenue) }}
-                                <span v-if="num(performerMonthTarget.target_revenue) > 0" class="text-slate-500 font-normal">
-                                    / £{{ formatNumber(performerMonthTarget.target_revenue) }}
-                                </span>
+                            <div class="text-xs text-slate-500">Appointments held</div>
+                            <div class="text-sm font-semibold text-slate-900 tabular-nums">
+                                {{ performerMonthTarget.achieved_appointments || 0 }}
                             </div>
                         </div>
                     </div>
@@ -618,7 +611,6 @@ const performerHasActivity = computed(() => {
     return [
         p.leads_count,
         p.won_products ?? p.won_count,
-        p.revenue,
         p.appointments_count,
     ].some((v) => Number(v) > 0);
 });
@@ -901,33 +893,33 @@ const loadDashboard = async () => {
 
         const agents = normalizeAgentsList(agentsRes.data);
 
+        // One ordering, used for the spotlight and its fallback: most won lines,
+        // then the size of the book they worked to get them.
+        const byWonThenLeads = (a, b) => {
+            const aWon = Math.max(num(a.won_products), num(a.won_count), num(a.won_leads));
+            const bWon = Math.max(num(b.won_products), num(b.won_count), num(b.won_leads));
+
+            if (bWon !== aWon) return bWon - aWon;
+
+            return num(b.leads_count) - num(a.leads_count);
+        };
+
         const performanceCandidates = agents
             .filter((a) =>
                 num(a.leads_count) > 0 ||
                 num(a.won_count) > 0 ||
                 num(a.won_products) > 0 ||
-                num(a.won_leads) > 0 ||
-                num(a.revenue) > 0
+                num(a.won_leads) > 0
             )
-            .sort((a, b) => {
-                const aWon = Math.max(num(a.won_products), num(a.won_count), num(a.won_leads));
-                const bWon = Math.max(num(b.won_products), num(b.won_count), num(b.won_leads));
-                if (bWon !== aWon) return bWon - aWon;
-                if (num(b.revenue) !== num(a.revenue)) return num(b.revenue) - num(a.revenue);
-                return num(b.leads_count) - num(a.leads_count);
-            });
+            // Revenue used to sit in here as a tiebreak. It is £0 for everybody,
+            // so it never broke a tie - it only made the order look considered.
+            .sort(byWonThenLeads);
         let spotlight = performanceCandidates[0] || null;
         if (!spotlight && agents.length === 1) {
             spotlight = agents[0];
         }
         if (!spotlight && agents.length > 0) {
-            spotlight = [...agents].sort((a, b) => {
-                const bWon = Math.max(num(b.won_products), num(b.won_count), num(b.won_leads));
-                const aWon = Math.max(num(a.won_products), num(a.won_count), num(a.won_leads));
-                if (bWon !== aWon) return bWon - aWon;
-                if (num(b.revenue) !== num(a.revenue)) return num(b.revenue) - num(a.revenue);
-                return num(b.leads_count) - num(a.leads_count);
-            })[0];
+            spotlight = [...agents].sort(byWonThenLeads)[0];
         }
         monthlyTopPerformer.value = spotlight;
 
@@ -942,7 +934,7 @@ const loadDashboard = async () => {
 
         // Employee targets / achievement board (current month)
         // Only include: (1) users with at least one non-zero target for this month, or
-        // (2) users with real activity (appointments / wins / revenue). Do not list every sales agent.
+        // (2) users with real activity (appointments / wins). Do not list every sales agent.
         const targetsRaw = targetsRes.data?.data || [];
         const targetsByUser = {};
 
@@ -953,8 +945,9 @@ const loadDashboard = async () => {
                 : 0;
             const tp = num(t.target_appointments);
             const ts = lines.length ? tsFromLines : num(t.target_sales);
-            const tr = num(t.target_revenue);
-            if (tp === 0 && ts === 0 && tr === 0) {
+            // A revenue target is deliberately never achieved against, so a row
+            // that has only that would sit at 0% forever and read as failure.
+            if (tp === 0 && ts === 0) {
                 continue;
             }
             const achievedFromLines = lines.length
@@ -966,10 +959,8 @@ const loadDashboard = async () => {
                 lines,
                 target_appointments: tp,
                 target_sales: ts,
-                target_revenue: tr,
                 achieved_appointments: 0,
                 achieved_sales: achievedFromLines,
-                achieved_revenue: 0,
             };
         }
 
@@ -977,8 +968,7 @@ const loadDashboard = async () => {
             num(ag.appointments_count) > 0 ||
             num(ag.won_products) > 0 ||
             num(ag.won_count) > 0 ||
-            num(ag.won_leads) > 0 ||
-            num(ag.revenue) > 0;
+            num(ag.won_leads) > 0;
 
         for (const ag of agents) {
             const id = ag.id;
@@ -993,10 +983,8 @@ const loadDashboard = async () => {
                     lines: [],
                     target_appointments: 0,
                     target_sales: 0,
-                    target_revenue: 0,
                     achieved_appointments: 0,
                     achieved_sales: 0,
-                    achieved_revenue: 0,
                 };
             row.achieved_appointments = num(ag.appointments_count);
             if (row.lines?.length) {
@@ -1004,7 +992,6 @@ const loadDashboard = async () => {
             } else {
                 row.achieved_sales = num(ag.won_products) || num(ag.won_count);
             }
-            row.achieved_revenue = num(ag.revenue);
             targetsByUser[id] = row;
         }
 
@@ -1021,12 +1008,10 @@ const loadDashboard = async () => {
             .filter((t) => {
                 const hasTargets =
                     num(t.target_appointments) > 0 ||
-                    num(t.target_sales) > 0 ||
-                    num(t.target_revenue) > 0;
+                    num(t.target_sales) > 0;
                 const hasAchievement =
                     num(t.achieved_appointments) > 0 ||
-                    num(t.achieved_sales) > 0 ||
-                    num(t.achieved_revenue) > 0;
+                    num(t.achieved_sales) > 0;
                 return hasTargets || hasAchievement;
             })
             .sort((a, b) => num(b.achieved_appointments) - num(a.achieved_appointments));

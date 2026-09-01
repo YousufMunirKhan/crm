@@ -21,6 +21,62 @@
             </div>
         </template>
 
+        <!--
+            Appointments whose date has passed with nobody saying what happened.
+            They sit above the day's list because this screen shows one date at a
+            time, so they are otherwise only reachable by guessing the date.
+        -->
+        <div v-if="awaiting.length" class="px-3 pt-3 pb-1 sm:px-5 sm:pt-5">
+            <div class="rounded-card border border-warning-200 bg-warning-50/60 p-3 sm:p-4">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 class="text-sm font-semibold text-warning-900">
+                        {{ awaiting.length }} {{ awaiting.length === 1 ? 'appointment needs' : 'appointments need' }} an outcome
+                    </h2>
+                    <p class="text-xs text-warning-800">The date has passed and nobody said what happened.</p>
+                </div>
+
+                <ul class="mt-3 space-y-2">
+                    <li
+                        v-for="apt in awaiting"
+                        :key="apt.id"
+                        class="rounded-control border border-warning-200 bg-white p-3"
+                    >
+                        <div class="flex flex-wrap items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <router-link
+                                    :to="`/appointments/${apt.id}`"
+                                    class="block text-sm font-semibold text-slate-900 hover:underline truncate"
+                                >
+                                    {{ apt.business_name || apt.customer?.business_name || apt.customer?.name || 'Customer' }}
+                                </router-link>
+                                <p class="text-xs text-slate-600 mt-0.5">
+                                    {{ formatDate(apt.appointment_date) }} at {{ apt.appointment_time || '10:00' }}
+                                    <span class="text-slate-400">·</span> {{ daysAgo(apt.appointment_date) }}
+                                </p>
+                            </div>
+
+                            <div class="flex flex-wrap gap-1.5">
+                                <button
+                                    v-for="choice in outcomeChoices"
+                                    :key="choice.value"
+                                    type="button"
+                                    class="inline-flex items-center rounded-control border px-2.5 text-xs font-medium
+                                           h-11 sm:h-8 touch-manipulation transition-colors
+                                           disabled:opacity-50 disabled:pointer-events-none
+                                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                                    :class="choice.class"
+                                    :disabled="saving === apt.id"
+                                    @click="setOutcome(apt, choice.value)"
+                                >
+                                    {{ choice.label }}
+                                </button>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
         <div v-if="loading" class="space-y-3 px-3 pb-3 sm:px-5 sm:pb-5" aria-busy="true">
             <div v-for="n in 4" :key="`sk-${n}`" class="table-card">
                 <span class="skeleton-text block w-1/2" />
@@ -94,10 +150,30 @@ import axios from 'axios';
 import { CalendarDaysIcon, ChevronRightIcon } from '@heroicons/vue/24/outline';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { BaseBadge, BaseButton, EmptyState } from '@/components/base';
+import { useToastStore } from '@/stores/toast';
+
+const toast = useToastStore();
 
 const loading = ref(true);
 const appointments = ref([]);
 const selectedDate = ref('');
+
+/**
+ * Past appointments still marked pending.
+ *
+ * 35 of 39 appointments in the system sit at "pending" forever, which makes
+ * held-rate and no-show-rate impossible to measure and leaves the calendar
+ * saying things are still ahead when they happened weeks ago. Closing one is a
+ * single tap here rather than a page, a form and a save.
+ */
+const awaiting = ref([]);
+const saving = ref(null);
+
+const outcomeChoices = [
+    { value: 'completed', label: 'It happened', class: 'border-success-200 bg-success-50 text-success-800 hover:bg-success-100' },
+    { value: 'no_show', label: 'No show', class: 'border-danger-200 bg-danger-50 text-danger-800 hover:bg-danger-100' },
+    { value: 'cancelled', label: 'Cancelled', class: 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50' },
+];
 
 const todayStr = computed(() => {
     const d = new Date();
@@ -141,6 +217,39 @@ function formatStage(stage) {
         .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function daysAgo(ymd) {
+    if (!ymd) return '';
+    const then = new Date(`${ymd}T00:00:00`);
+    const days = Math.round((new Date(new Date().toDateString()) - then) / 86400000);
+    if (days <= 0) return 'today';
+    return days === 1 ? 'yesterday' : `${days} days ago`;
+}
+
+async function loadAwaiting() {
+    try {
+        const res = await axios.get('/api/appointments', { params: { needs_outcome: 1 } });
+        awaiting.value = res.data ?? [];
+    } catch {
+        awaiting.value = [];
+    }
+}
+
+async function setOutcome(apt, status) {
+    if (saving.value) return;
+    saving.value = apt.id;
+
+    try {
+        await axios.put(`/api/appointments/${apt.id}`, { appointment_status: status });
+        awaiting.value = awaiting.value.filter((a) => a.id !== apt.id);
+        toast.success('Saved. Thanks - that is what the held-rate is built from.');
+        await loadAppointments();
+    } catch (e) {
+        toast.error(e?.response?.data?.message || 'Could not save that.');
+    } finally {
+        saving.value = null;
+    }
+}
+
 async function loadAppointments() {
     const date = selectedDate.value || todayStr.value;
     loading.value = true;
@@ -158,5 +267,6 @@ async function loadAppointments() {
 onMounted(() => {
     selectedDate.value = todayStr.value;
     loadAppointments();
+    loadAwaiting();
 });
 </script>

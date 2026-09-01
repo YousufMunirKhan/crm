@@ -30,8 +30,23 @@ class AppointmentController extends Controller
 
         $activities = $query->get();
 
-        $date = $request->get('date');
-        if ($date) {
+        // Appointments whose date has gone by while the status is still
+        // "pending" - nobody ever said whether they happened.
+        //
+        // This screen shows one day at a time, so an appointment left pending
+        // three weeks ago is only reachable by guessing its date. That is why
+        // 35 of 39 are stuck: not neglect, no route to them.
+        if ($request->boolean('needs_outcome')) {
+            $today = now()->toDateString();
+
+            $activities = $activities->filter(function ($a) use ($today) {
+                $date = $this->appointmentDateFrom($a);
+
+                return $date !== null
+                    && $date < $today
+                    && ($a->appointment_status ?? 'pending') === LeadActivity::APPOINTMENT_STATUS_PENDING;
+            })->values();
+        } elseif ($date = $request->get('date')) {
             $activities = $activities->filter(function ($a) use ($date) {
                 return $this->appointmentDateFrom($a) === $date;
             })->values();
@@ -234,6 +249,7 @@ class AppointmentController extends Controller
             'outcome_notes' => ['nullable', 'string', 'max:5000'],
             'lead_stage' => ['nullable', 'string', 'in:won,lost'],
             'lost_reason' => ['nullable', 'string', 'max:500'],
+            'lost_reason_code' => ['required_if:lead_stage,lost', 'nullable', \Illuminate\Validation\Rule::in(\App\Modules\CRM\Support\LostReasons::codes())],
             'won_items' => ['nullable', 'array'],
             'won_items.*.lead_item_id' => ['required_with:won_items', 'integer'],
             'won_items.*.quantity' => ['required_with:won_items', 'integer', 'min:1'],
@@ -266,8 +282,15 @@ class AppointmentController extends Controller
         if (!empty($data['lead_stage'])) {
             $lead = $activity->lead;
             $update = ['stage' => $data['lead_stage']];
-            if ($data['lead_stage'] === 'lost' && !empty($data['lost_reason'])) {
-                $update['lost_reason'] = $data['lost_reason'];
+            // Closing a lead from the appointment screen used to bypass the
+            // reason picker completely, which would have left a second way to
+            // mark something lost with nothing recorded against it.
+            if ($data['lead_stage'] === 'lost') {
+                $update['lost_reason_code'] = $data['lost_reason_code'];
+                $update['lost_reason'] = \App\Modules\CRM\Support\LostReasons::compose(
+                    $data['lost_reason_code'],
+                    $data['lost_reason'] ?? null
+                );
             }
             $lead->update($update);
             $lead->customer?->syncTypeFromLeads();

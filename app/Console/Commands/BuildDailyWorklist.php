@@ -84,6 +84,18 @@ class BuildDailyWorklist extends Command
             );
         }
 
+        foreach ($this->appointmentsAwaitingOutcome() as $userId => $count) {
+            $raised += $this->raise(
+                $userId,
+                'appointments.needs_outcome',
+                $count.' '.$this->plural($count, 'appointment needs', 'appointments need').' an outcome',
+                'The date has passed and nobody said whether it happened. One tap on the appointments '
+                    .'screen closes it - that is what the held rate and the no-show rate are built from.',
+                ['route' => '/appointments', 'count' => $count],
+                $dryRun
+            );
+        }
+
         foreach ($this->managers() as $manager) {
             $unowned = $this->unownedLeadCount();
 
@@ -170,6 +182,28 @@ class BuildDailyWorklist extends Command
               ), l.created_at) < ?
             GROUP BY l.assigned_to
         ", [$cutoff]))->pluck('c', 'user_id')->map(fn ($c) => (int) $c)->all();
+    }
+
+    /**
+     * Appointments whose date has gone by with the status still pending, by the
+     * person responsible.
+     *
+     * 35 of 39 in the system sit here permanently. The appointments screen shows
+     * one day at a time, so once the day passes there was no route back to them.
+     */
+    private function appointmentsAwaitingOutcome(): array
+    {
+        return \App\Modules\CRM\Models\LeadActivity::query()
+            ->where('type', 'appointment')
+            ->where(fn ($q) => $q->whereNull('appointment_status')
+                ->orWhere('appointment_status', 'pending'))
+            ->whereNotNull('appointment_date')
+            ->whereDate('appointment_date', '<', now()->toDateString())
+            ->get(['id', 'assigned_user_id', 'user_id'])
+            ->groupBy(fn ($a) => $a->assigned_user_id ?: $a->user_id)
+            ->filter(fn ($rows, $userId) => (bool) $userId)
+            ->map->count()
+            ->all();
     }
 
     private function unownedLeadCount(): int
