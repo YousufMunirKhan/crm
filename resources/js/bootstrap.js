@@ -45,11 +45,23 @@ axios.interceptors.response.use(
         const status = error.response?.status;
 
         if (status === 401) {
-            // Unauthorized - clear auth and redirect to login
             localStorage.removeItem('auth_token');
             delete axios.defaults.headers.common['Authorization'];
+
             if (window.location.pathname !== '/login') {
-                window.location.href = '/login';
+                // Tokens last twelve hours, so this lands on somebody in the
+                // middle of a working day. Being dropped on a blank login form
+                // with no explanation reads as the app having broken, and
+                // whatever they were doing is gone. Say what happened, and come
+                // back to the same screen afterwards.
+                const from = window.location.pathname + window.location.search;
+                const query = new URLSearchParams({ expired: '1' });
+
+                if (from !== '/' && from !== '/login') {
+                    query.set('next', from);
+                }
+
+                window.location.href = `/login?${query.toString()}`;
             }
 
             return Promise.reject(error);

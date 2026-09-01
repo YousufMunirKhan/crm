@@ -82,6 +82,11 @@
                         </button>
                     </div>
 
+                    <div v-if="sessionExpired && !error" class="callout callout-info" role="status">
+                        Your session ended, so you were signed out. Sign in and you will go
+                        straight back to where you were.
+                    </div>
+
                     <div v-if="error" class="callout callout-danger" role="alert">
                         {{ error }}
                     </div>
@@ -145,13 +150,18 @@
 
 <script setup>
 import BrandLogo from '@/components/BrandLogo.vue';
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline';
 import { BaseButton, BaseModal } from '@/components/base';
 import { useAuthStore } from '@/stores/auth';
 import axios from 'axios';
 
 const auth = useAuthStore();
+const route = useRoute();
+
+/** Set when a request came back 401 mid-session rather than at a fresh visit. */
+const sessionExpired = computed(() => route.query.expired === '1');
 
 const form = ref({
     email: '',
@@ -199,7 +209,7 @@ const handleLogin = async () => {
     error.value = null;
 
     try {
-        await auth.login(form.value);
+        await auth.login(form.value, route.query.next);
     } catch (err) {
         error.value = err.response?.data?.message || 'Invalid credentials';
     } finally {

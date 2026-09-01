@@ -85,7 +85,7 @@ export const useAuthStore = defineStore('auth', {
             }
         },
 
-        async login(payload) {
+        async login(payload, next = null) {
             try {
                 const { data } = await axios.post('/api/auth/login', payload);
                 this.user = data.user;
@@ -97,7 +97,12 @@ export const useAuthStore = defineStore('auth', {
                 // Set axios default header
                 axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
                 
-                router.push('/');
+                // Back to the screen they were thrown out of, when there
+                // was one. Guarded to a path on this site so the parameter
+                // cannot be used to bounce somebody elsewhere.
+                const target = typeof next === 'string' && /^\/(?!\/)/.test(next) ? next : '/';
+
+                router.push(target);
             } catch (error) {
                 throw error;
             }

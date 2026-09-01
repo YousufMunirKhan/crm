@@ -150,6 +150,26 @@
                         <span class="truncate">{{ todayAppointmentCount }} appt{{ todayAppointmentCount !== 1 ? 's' : '' }} today</span>
                     </router-link>
 
+                    <!--
+                        A deploy replaces every hashed asset, so a tab left open
+                        across one is holding filenames that no longer exist and
+                        404s on the next screen it opens. The app knew a new
+                        version had arrived and only wrote it to the console.
+                    -->
+                    <button
+                        v-if="pwa.updateAvailable"
+                        type="button"
+                        class="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-control border
+                               border-warning-300 bg-warning-50 px-2.5 text-xs font-medium text-warning-900
+                               touch-manipulation transition-colors hover:bg-warning-100
+                               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning-500/40"
+                        @click="reloadForUpdate"
+                    >
+                        <ArrowPathIcon class="icon-sm shrink-0" aria-hidden="true" />
+                        <span class="hidden sm:inline">Update ready</span>
+                        <span class="sm:hidden">Update</span>
+                    </button>
+
                     <NotificationBell />
 
                     <!-- User menu -->
@@ -250,6 +270,8 @@ import {
 } from '@heroicons/vue/24/outline';
 import SidebarNavIcon from '@/components/SidebarNavIcon.vue';
 import NotificationBell from '@/components/NotificationBell.vue';
+import { ArrowPathIcon } from '@heroicons/vue/24/outline';
+import { usePwaStore } from '@/stores/pwa';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import BrandLogo from '@/components/BrandLogo.vue';
 import CommandPalette from '@/components/CommandPalette.vue';
@@ -261,6 +283,15 @@ const router = useRouter();
 const auth = useAuthStore();
 const branding = useBrandingStore();
 const toast = useToastStore();
+const pwa = usePwaStore();
+
+/**
+ * Take the waiting build. The service worker has already installed it; a plain
+ * reload is what hands the tab over to it.
+ */
+function reloadForUpdate() {
+    window.location.reload();
+}
 const mobileMenuOpen = ref(false);
 
 /**

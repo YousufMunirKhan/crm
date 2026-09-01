@@ -13,6 +13,13 @@ export const usePwaStore = defineStore('pwa', () => {
     const pwaEnabled = ref(true); // Can be controlled by admin settings
     const serviceWorkerRegistered = ref(false);
 
+    /**
+     * A newer build has been installed and is waiting for the tab to be
+     * reloaded. Surfaced so the app can offer the update rather than leaving
+     * somebody on files that no longer exist on the server.
+     */
+    const updateAvailable = ref(false);
+
     // Detect platform
     const detectPlatform = () => {
         const userAgent = navigator.userAgent || navigator.vendor || window.opera;
@@ -50,7 +57,11 @@ export const usePwaStore = defineStore('pwa', () => {
                     const newWorker = registration.installing;
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // This used to log and stop there, so a tab open
+                            // across a deploy kept using files that had been
+                            // replaced and 404'd on the next screen it opened.
                             console.log('[PWA] New version available');
+                            updateAvailable.value = true;
                         }
                     });
                 });
@@ -161,6 +172,7 @@ export const usePwaStore = defineStore('pwa', () => {
         showIOSModal,
         pwaEnabled,
         serviceWorkerRegistered,
+        updateAvailable,
         
         // Computed
         shouldShowInstallButton,

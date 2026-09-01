@@ -502,6 +502,57 @@ router.afterEach((to) => {
     document.title = title && title !== appName ? `${title} — ${appName}` : appName;
 });
 
+/**
+ * Recover when a deploy pulls the file out from under an open tab.
+ *
+ * Every screen after the first is a lazily imported chunk with a content hash
+ * in its name. Deploying replaces those files, so a browser that loaded the app
+ * before the deploy is holding a map of filenames that no longer exist: the
+ * next navigation asks for LeadsListView-BLvT_amt.js, gets a 404, and the route
+ * simply never opens. Nothing on screen explains it, and the app looks broken
+ * until somebody thinks to hard-refresh.
+ *
+ * A failed chunk fetch is not a bug to report, it is a stale tab. Reload it on
+ * the route the person was trying to reach, so they land where they meant to.
+ * The sessionStorage guard stops that becoming a refresh loop if the file is
+ * genuinely missing rather than merely renamed.
+ */
+router.onError((error, to) => {
+    const message = String(error?.message ?? '');
+
+    const isStaleChunk = /dynamically imported module|Importing a module script failed|error loading dynamically imported/i
+        .test(message);
+
+    if (! isStaleChunk) {
+        return;
+    }
+
+    const key = 'reloaded-for-stale-assets';
+    const target = to?.fullPath ?? window.location.pathname;
+
+    let previous = null;
+
+    try {
+        previous = JSON.parse(sessionStorage.getItem(key) ?? 'null');
+    } catch {
+        previous = null;
+    }
+
+    // Same route, moments ago: reloading again would not help.
+    if (previous?.path === target && Date.now() - previous.at < 20000) {
+        return;
+    }
+
+    try {
+        sessionStorage.setItem(key, JSON.stringify({ path: target, at: Date.now() }));
+    } catch {
+        // A private window with storage blocked still gets one reload, just no
+        // loop protection - which is the right way round.
+    }
+
+    window.location.assign(target);
+});
+
 export default router;
 
 
