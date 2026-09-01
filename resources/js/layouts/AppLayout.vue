@@ -233,6 +233,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter, RouterLink, RouterView } from 'vue-router';
+import { lockBodyScroll, releaseAllBodyScrollLocks, unlockBodyScroll } from '@/composables/useBodyScrollLock';
 import { useAuthStore } from '@/stores/auth';
 import { useBrandingStore } from '@/stores/branding';
 import { useToastStore } from '@/stores/toast';
@@ -267,16 +268,29 @@ const mobileMenuOpen = ref(false);
  * the difference between an app and a web page pretending to be one. Only on
  * small screens; the desktop sidebar is part of the layout, not an overlay.
  */
+const drawerLock = {};
+
 watch(mobileMenuOpen, (open) => {
-    if (typeof document === 'undefined') return;
+    if (typeof window === 'undefined') return;
 
-    const lock = open && window.matchMedia('(max-width: 1023px)').matches;
-    document.body.style.overflow = lock ? 'hidden' : '';
+    if (open && window.matchMedia('(max-width: 1023px)').matches) {
+        lockBodyScroll(drawerLock);
+    } else {
+        unlockBodyScroll(drawerLock);
+    }
 });
 
-onUnmounted(() => {
-    if (typeof document !== 'undefined') document.body.style.overflow = '';
+/**
+ * A lock whose owner disappeared - a dialog removed by the navigation itself,
+ * a component torn down mid-transition - would otherwise leave the page
+ * unscrollable with nothing on screen to explain it, which reads as a freeze.
+ */
+watch(() => route.fullPath, () => {
+    mobileMenuOpen.value = false;
+    releaseAllBodyScrollLocks();
 });
+
+onUnmounted(() => unlockBodyScroll(drawerLock));
 const expandedGroups = ref(new Set());
 const commandPalette = ref(null);
 const todayAppointmentCount = ref(0);

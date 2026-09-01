@@ -1,4 +1,5 @@
 import { nextTick, onBeforeUnmount, watch } from 'vue';
+import { lockBodyScroll, unlockBodyScroll } from './useBodyScrollLock';
 
 const FOCUSABLE = [
     'a[href]',
@@ -15,7 +16,6 @@ const FOCUSABLE = [
  * and Tab - otherwise one Escape closes the whole pile.
  */
 const stack = [];
-let bodyOverflowBeforeFirstTrap = '';
 
 /**
  * Traps focus inside a dialog while it is open, restores it on close, and
@@ -78,10 +78,9 @@ export function useFocusTrap(containerRef, isOpen, onClose) {
 
         previouslyFocused = document.activeElement;
 
-        if (stack.length === 0) {
-            bodyOverflowBeforeFirstTrap = document.body.style.overflow;
-            document.body.style.overflow = 'hidden';
-        }
+        // Counted centrally, so a drawer closing elsewhere cannot hand the
+        // page back its scrollbar while this dialog is still open.
+        lockBodyScroll(handle);
         stack.push(handle);
 
         document.addEventListener('keydown', onKeydown, true);
@@ -99,10 +98,7 @@ export function useFocusTrap(containerRef, isOpen, onClose) {
         if (index === -1) return;
         stack.splice(index, 1);
 
-        // Only the last dialog to close gives scrolling back.
-        if (stack.length === 0) {
-            document.body.style.overflow = bodyOverflowBeforeFirstTrap;
-        }
+        unlockBodyScroll(handle);
 
         previouslyFocused?.focus?.();
         previouslyFocused = null;
