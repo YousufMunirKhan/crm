@@ -10,7 +10,18 @@ class RoleController extends Controller
 {
     public function index()
     {
-        return response()->json(Role::query()->orderBy('name')->get());
+        return response()->json(
+            Role::query()->orderBy('name')->get()->map(function (Role $role) {
+                // Sections this role's whitelist has never been asked about,
+                // so the screen can say so instead of showing them unchecked as
+                // though somebody had decided.
+                return $role->toArray() + [
+                    'undecided_sections' => $role->hasFullMenuAccess()
+                        ? []
+                        : NavSections::undecided($role->nav_permissions),
+                ];
+            })
+        );
     }
 
     public function update(Request $request, Role $role)

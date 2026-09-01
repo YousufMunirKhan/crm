@@ -46,7 +46,6 @@ final class NavSections
             'employees' => 'Employees',
             'hr_records' => 'HR — Employee records',
             'hr_attendance' => 'HR — Attendance',
-            'bank_documents' => 'My bank & documents',
             'expenses' => 'Expenses',
             'salary_slips' => 'Salary Slips',
             'salary_reports' => 'Salary Reports',
@@ -92,6 +91,35 @@ final class NavSections
         }
 
         return false;
+    }
+
+    /**
+     * Sections a role's whitelist has never been asked about.
+     *
+     * A whitelist only holds the keys that existed when it was last saved, and
+     * anything missing reads as denied. So adding a section to the product
+     * quietly takes it away from every restricted role, with nobody touching a
+     * setting - ten keys are in that state on this system right now. Denying by
+     * default is the safe half; saying so out loud is the missing half.
+     *
+     * @param  array<string, mixed>|null  $permissions
+     * @return list<string>
+     */
+    public static function undecided(?array $permissions): array
+    {
+        if (! is_array($permissions) || $permissions === []) {
+            return [];
+        }
+
+        $covered = array_keys($permissions);
+
+        foreach (self::legacyAliases() as $legacy => $grants) {
+            if (! empty($permissions[$legacy])) {
+                $covered = array_merge($covered, $grants);
+            }
+        }
+
+        return array_values(array_diff(self::keys(), $covered));
     }
 
     /**

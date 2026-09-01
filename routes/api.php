@@ -105,6 +105,16 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     // Users Management (specific routes before {user} binding)
     Route::post('/users/reset-all-passwords', [UserController::class, 'resetAllPasswords']);
     Route::apiResource('users', UserController::class);
+    // Exceptions to a person's role: one section, usually with an end date.
+    // Without this the only way to give somebody extra access was to build them
+    // a private copy of a role, or make them an admin.
+    Route::get('/users/{user}/access', [\App\Http\Controllers\UserPermissionGrantController::class, 'index'])
+        ->middleware('role:Admin,System Admin');
+    Route::post('/users/{user}/access', [\App\Http\Controllers\UserPermissionGrantController::class, 'store'])
+        ->middleware('role:Admin,System Admin');
+    Route::delete('/users/{user}/access/{grant}', [\App\Http\Controllers\UserPermissionGrantController::class, 'destroy'])
+        ->middleware('role:Admin,System Admin');
+
     Route::get('/roles', [RoleController::class, 'index']);
     Route::patch('/roles/{role}', [RoleController::class, 'update']);
 
@@ -124,7 +134,7 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     Route::apiResource('leads', LeadController::class);
     // Marketing agent - the weekly plan. Generating only ever makes a draft;
     // nothing leaves without an explicit send from a manager.
-    Route::prefix('marketing/agent')->group(function () {
+    Route::prefix('marketing/agent')->middleware('nav.section:marketing_agent')->group(function () {
         Route::get('/plans', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'index']);
         Route::post('/plans', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'generate']);
         Route::get('/plans/{id}', [\App\Modules\Marketing\Http\Controllers\MarketingAgentController::class, 'show']);
@@ -167,7 +177,7 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     Route::apiResource('communications', CommunicationController::class)->only(['index', 'store', 'show']);
 
     // WhatsApp Cloud API (New Integration)
-    Route::prefix('whatsapp')->group(function () {
+    Route::prefix('whatsapp')->middleware('nav.section:marketing_whatsapp')->group(function () {
         // Settings
         Route::get('/settings', [\App\Modules\Communication\Http\Controllers\WhatsAppSettingsController::class, 'index']);
         Route::post('/settings', [\App\Modules\Communication\Http\Controllers\WhatsAppSettingsController::class, 'store']);
@@ -198,36 +208,46 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     Route::post('/tickets/{id}/attachments', [TicketController::class, 'storeAttachments']);
     Route::delete('/tickets/{id}/attachments/{attachmentId}', [TicketController::class, 'destroyAttachment']);
 
-    Route::get('/pos-support-tickets', [\App\Http\Controllers\PosSupportTicketAdminController::class, 'index']);
-    Route::patch('/pos-support-tickets/{id}/status', [\App\Http\Controllers\PosSupportTicketAdminController::class, 'updateStatus']);
+    Route::middleware('nav.section:pos_support')->group(function () {
+        Route::get('/pos-support-tickets', [\App\Http\Controllers\PosSupportTicketAdminController::class, 'index']);
+        Route::patch('/pos-support-tickets/{id}/status', [\App\Http\Controllers\PosSupportTicketAdminController::class, 'updateStatus']);
+    });
 
     // Invoices
-    Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'generatePDF'])->name('invoices.pdf');
+    Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'generatePDF'])->name('invoices.pdf')
+        ->middleware('nav.section:invoices');
     Route::post('/invoices/{id}/send-email', [InvoiceController::class, 'sendEmail'])->name('invoices.send-email')->middleware('role:Admin,Manager,System Admin');
     Route::post('/invoices/{id}/payments', [InvoiceController::class, 'storePayment'])->name('invoices.payments.store')->middleware('role:Admin,Manager,System Admin');
     Route::delete('/invoices/{id}/payments/{paymentId}', [InvoiceController::class, 'destroyPayment'])->name('invoices.payments.destroy')->middleware('role:Admin,Manager,System Admin');
     Route::post('/leads/{leadId}/invoice', [InvoiceController::class, 'storeFromLead'])
         ->middleware('role:Admin,Manager,System Admin')
         ->name('leads.invoice');
-    Route::apiResource('invoices', InvoiceController::class);
+    Route::apiResource('invoices', InvoiceController::class)->middleware('nav.section:invoices');
 
     // HR
     Route::get('/hr/attendance/today', [HrController::class, 'todayStatus']);
     Route::post('/hr/attendance/check-in', [HrController::class, 'checkIn']);
     Route::post('/hr/attendance/check-out', [HrController::class, 'checkOut']);
-    Route::get('/hr/attendance/chart-summary', [HrController::class, 'attendanceChartSummary']);
-    Route::get('/hr/attendance/monthly-report', [HrController::class, 'attendanceMonthlyReport']);
-    Route::get('/hr/attendance', [HrController::class, 'attendance']);
-    Route::delete('/hr/attendance/{id}', [HrController::class, 'deleteAttendance']);
-    Route::get('/hr/salaries', [HrController::class, 'salaries']);
-    Route::get('/hr/salaries/report', [HrController::class, 'salaryReport']);
-    Route::get('/hr/salaries/export', [HrController::class, 'exportSalaryReport']);
-    Route::post('/hr/salaries', [HrController::class, 'createSalary']);
-    Route::get('/hr/salaries/{id}', [HrController::class, 'showSalary']);
-    Route::put('/hr/salaries/{id}', [HrController::class, 'updateSalary']);
-    Route::delete('/hr/salaries/{id}', [HrController::class, 'deleteSalary']);
-    Route::get('/hr/salaries/{id}/slip', [HrController::class, 'generateSalarySlip']);
-    Route::post('/hr/salaries/{id}/send-email', [HrController::class, 'sendSalarySlipEmail']);
+    // Everybody's attendance, as opposed to your own clock in and out above,
+    // which stays open to all staff.
+    Route::middleware('nav.section:hr_attendance')->group(function () {
+        Route::get('/hr/attendance/chart-summary', [HrController::class, 'attendanceChartSummary']);
+        Route::get('/hr/attendance/monthly-report', [HrController::class, 'attendanceMonthlyReport']);
+        Route::get('/hr/attendance', [HrController::class, 'attendance']);
+        Route::delete('/hr/attendance/{id}', [HrController::class, 'deleteAttendance']);
+    });
+    // Payroll. Every route here is somebody's pay.
+    Route::middleware('nav.section:salary_slips,salary_reports')->group(function () {
+        Route::get('/hr/salaries', [HrController::class, 'salaries']);
+        Route::get('/hr/salaries/report', [HrController::class, 'salaryReport']);
+        Route::get('/hr/salaries/export', [HrController::class, 'exportSalaryReport']);
+        Route::post('/hr/salaries', [HrController::class, 'createSalary']);
+        Route::get('/hr/salaries/{id}', [HrController::class, 'showSalary']);
+        Route::put('/hr/salaries/{id}', [HrController::class, 'updateSalary']);
+        Route::delete('/hr/salaries/{id}', [HrController::class, 'deleteSalary']);
+        Route::get('/hr/salaries/{id}/slip', [HrController::class, 'generateSalarySlip']);
+        Route::post('/hr/salaries/{id}/send-email', [HrController::class, 'sendSalarySlipEmail']);
+    });
     Route::get('/hr/employees', [HrController::class, 'employees']);
     Route::get('/hr/employees/{id}/attendance-stats', [HrController::class, 'employeeAttendanceStats']);
     Route::get('/hr/employees/{id}/documents', [HrController::class, 'employeeDocuments']);
@@ -236,24 +256,31 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     Route::get('/hr/employee-targets', [HrController::class, 'employeeTargets']);
     Route::put('/hr/employee-targets/{userId}', [HrController::class, 'upsertEmployeeTarget']);
 
-    // Expenses (Admin only)
-    Route::get('/hr/expenses', [ExpenseController::class, 'index']);
-    Route::post('/hr/expenses', [ExpenseController::class, 'store']);
-    Route::post('/hr/expenses/bulk-close', [ExpenseController::class, 'bulkClose']);
-    Route::post('/hr/expenses/import', [ExpenseController::class, 'import']);
-    Route::get('/hr/expenses/report/monthly', [ExpenseController::class, 'monthlyReport']);
-    Route::get('/hr/expenses/{id}', [ExpenseController::class, 'show']);
-    Route::put('/hr/expenses/{id}', [ExpenseController::class, 'update']);
-    Route::post('/hr/expenses/{id}/attachments', [ExpenseController::class, 'storeAttachments']);
-    Route::delete('/hr/expenses/{id}/attachments/{attachmentId}', [ExpenseController::class, 'destroyAttachment']);
-    Route::delete('/hr/expenses/{id}', [ExpenseController::class, 'destroy']);
+    // Expenses. The comment here read "Admin only" and nothing enforced it.
+    Route::middleware('nav.section:expenses')->group(function () {
+        Route::get('/hr/expenses', [ExpenseController::class, 'index']);
+        Route::post('/hr/expenses', [ExpenseController::class, 'store']);
+        Route::post('/hr/expenses/bulk-close', [ExpenseController::class, 'bulkClose']);
+        Route::post('/hr/expenses/import', [ExpenseController::class, 'import']);
+        Route::get('/hr/expenses/report/monthly', [ExpenseController::class, 'monthlyReport']);
+        Route::get('/hr/expenses/{id}', [ExpenseController::class, 'show']);
+        Route::put('/hr/expenses/{id}', [ExpenseController::class, 'update']);
+        Route::post('/hr/expenses/{id}/attachments', [ExpenseController::class, 'storeAttachments']);
+        Route::delete('/hr/expenses/{id}/attachments/{attachmentId}', [ExpenseController::class, 'destroyAttachment']);
+        Route::delete('/hr/expenses/{id}', [ExpenseController::class, 'destroy']);
+    });
+
+    // Per-agent figures. Deliberately outside the Reports gate: the dashboard
+    // and the goals screen both need it, both are reachable without Reports,
+    // and the endpoint already narrows a non-manager to their own row.
+    Route::get('/reporting/agents', [ReportingController::class, 'agents']);
 
     // Reporting
+    Route::middleware('nav.section:report')->group(function () {
     Route::get('/reporting/executive', [ReportingController::class, 'executive']);
     Route::get('/reporting/funnel', [ReportingController::class, 'funnel']);
     Route::get('/reporting/geo', [ReportingController::class, 'geo']);
     Route::get('/reporting/communications', [ReportingController::class, 'communications']);
-    Route::get('/reporting/agents', [ReportingController::class, 'agents']);
     Route::get('/reporting/all-employees-pipeline', [ReportingController::class, 'allEmployeesPipeline']);
     Route::get('/reporting/todays-followups', [ReportingController::class, 'todaysFollowUps']);
     Route::get('/reporting/sales-performance', [ReportingController::class, 'salesPerformance']);
@@ -265,6 +292,7 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     Route::get('/reporting/employee-performance-overview', [ReportingController::class, 'employeePerformanceOverview']);
     Route::get('/reporting/target-vs-achievement', [ReportingController::class, 'targetVsAchievement']);
     Route::get('/reporting/employee-self-report', [ReportingController::class, 'employeeSelfReport']);
+    });
 
     // Import/Export - reads and writes the whole customer/lead database.
     Route::middleware('role:Admin,Manager,System Admin')->group(function () {
@@ -304,7 +332,7 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
         ->middleware('role:Admin,Manager,System Admin,Marketing');
 
     // Email Management (filter, export, preview, send bulk, report)
-    Route::prefix('email-management')->group(function () {
+    Route::prefix('email-management')->middleware('nav.section:marketing_email')->group(function () {
         Route::get('/smtp-status', [\App\Http\Controllers\EmailManagementController::class, 'smtpStatus']);
         Route::post('/filtered-contacts', [\App\Http\Controllers\EmailManagementController::class, 'getFilteredContacts']);
         Route::post('/export', [\App\Http\Controllers\EmailManagementController::class, 'exportFilteredContacts']);
@@ -322,7 +350,7 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     });
 
     // WhatsApp Management (Meta template bulk sends — same audience/product filters as email)
-    Route::prefix('whatsapp-management')->group(function () {
+    Route::prefix('whatsapp-management')->middleware('nav.section:marketing_whatsapp')->group(function () {
         Route::get('/whatsapp-status', [\App\Http\Controllers\WhatsAppManagementController::class, 'whatsappStatus']);
         Route::get('/approved-templates', [\App\Http\Controllers\WhatsAppManagementController::class, 'approvedTemplates']);
         Route::post('/filtered-contacts', [\App\Http\Controllers\WhatsAppManagementController::class, 'getFilteredContacts']);
@@ -333,7 +361,7 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     });
 
     // SMS Management (same filters as email, settings from Settings → SMS)
-    Route::prefix('sms-management')->group(function () {
+    Route::prefix('sms-management')->middleware('nav.section:marketing_sms')->group(function () {
         Route::get('/sms-status', [\App\Http\Controllers\SmsManagementController::class, 'smsStatus']);
         Route::post('/filtered-contacts', [\App\Http\Controllers\SmsManagementController::class, 'getFilteredContacts']);
         Route::get('/preview-template/{templateId}', [\App\Http\Controllers\SmsManagementController::class, 'previewTemplate']);
@@ -342,7 +370,7 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     });
 
     // Cold calling (Google Places — API key in Settings → Cold calling)
-    Route::prefix('cold-calling')->group(function () {
+    Route::prefix('cold-calling')->middleware('nav.section:marketing_cold_calling')->group(function () {
         Route::get('/settings-status', [ColdCallingController::class, 'settingsStatus']);
         Route::post('/runs', [ColdCallingController::class, 'startRun']);
         Route::get('/runs', [ColdCallingController::class, 'indexRuns']);
@@ -358,7 +386,7 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     });
 
     // Commission management (Admin/Manager/System Admin only)
-    Route::prefix('commission-management')->group(function () {
+    Route::prefix('commission-management')->middleware('nav.section:commission_management')->group(function () {
         Route::get('/sales', [CommissionManagementController::class, 'sales']);
         Route::get('/report', [CommissionManagementController::class, 'report']);
         Route::get('/report/pdf/user', [CommissionManagementController::class, 'downloadUserCommissionPdf']);
@@ -373,7 +401,7 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     });
 
     // Email Templates (Admin only - checked in controller)
-    Route::prefix('email-templates')->group(function () {
+    Route::prefix('email-templates')->middleware('nav.section:marketing_templates,marketing_email')->group(function () {
         Route::get('/', [\App\Http\Controllers\EmailTemplateController::class, 'index']);
         Route::post('/test-send', [\App\Http\Controllers\EmailTemplateController::class, 'testSend']);
         Route::post('/preview-html', [\App\Http\Controllers\EmailTemplateController::class, 'previewHtml']);

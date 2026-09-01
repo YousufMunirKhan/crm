@@ -193,41 +193,13 @@
                         </div>
                     </div>
 
-                    <div v-if="canEditNavPerms" class="space-y-4 border border-slate-200 rounded-card p-4 bg-slate-50/80">
-                        <h2 class="form-section-title text-base">Sidebar menu access</h2>
-                        <p class="text-xs text-slate-600">
-                            Leave this off for default role menu. Turn on to limit this user to selected sections.
-                        </p>
-                        <label class="form-choice text-slate-800">
-                            <input
-                                v-model="restrictMenu"
-                                type="checkbox"
-                                class="form-checkbox"
-                            />
-                            Limit sidebar to selected sections only
-                        </label>
-                        <fieldset
-                            v-if="restrictMenu"
-                            class="form-fieldset"
-                        >
-                            <legend class="form-legend">Visible sections</legend>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-56 overflow-y-auto border border-slate-200 rounded-card p-3 bg-white">
-                                <label
-                                    v-for="opt in NAV_SECTION_OPTIONS"
-                                    v-show="opt.key !== 'dashboard'"
-                                    :key="opt.key"
-                                    class="form-choice text-slate-700"
-                                >
-                                    <input
-                                        v-model="sectionChecks[opt.key]"
-                                        type="checkbox"
-                                        class="form-checkbox"
-                                    />
-                                    {{ opt.label }}
-                                </label>
-                            </div>
-                        </fieldset>
-                    </div>
+                    <UserAccessPanel
+                        v-if="canEditNavPerms && route.params.id"
+                        :user-id="route.params.id"
+                        :legacy-whitelist="restrictMenu"
+                        id-prefix="employeeeditview-access"
+                        @legacy-cleared="restrictMenu = false"
+                    />
 
                     <!-- Bank details -->
                     <div class="space-y-4 border-t border-slate-100 pt-6">
@@ -425,7 +397,7 @@ import { ArrowLeftIcon, ArrowUpTrayIcon, PlusIcon, TrashIcon } from '@heroicons/
 import { BaseButton, ConfirmDialog } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
-import { NAV_SECTION_OPTIONS } from '@/constants/navSections';
+import UserAccessPanel from '@/components/UserAccessPanel.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -493,12 +465,6 @@ const isSelfHrOnly = computed(() => isSelf.value && !isElevatedRole.value);
 
 const canManageDocuments = computed(() => isElevatedRole.value || isSelf.value);
 
-function defaultSectionChecks() {
-    const out = {};
-    for (const { key } of NAV_SECTION_OPTIONS) out[key] = true;
-    return out;
-}
-const sectionChecks = ref(defaultSectionChecks());
 
 const canEditNavPerms = computed(() => {
     const r = auth.user?.role?.name;
@@ -534,16 +500,10 @@ const loadEmployee = async () => {
             bank_sort_code: data.bank_sort_code || '',
             bank_account_number: data.bank_account_number || '',
         };
+        // Read only so the panel can warn about it. The old per-user list
+        // replaced the role outright; the access panel edits permissions now.
         const np = data.nav_permissions;
-        if (np && typeof np === 'object' && Object.keys(np).length > 0) {
-            restrictMenu.value = true;
-            const checks = defaultSectionChecks();
-            for (const key of Object.keys(checks)) checks[key] = !!np[key];
-            sectionChecks.value = checks;
-        } else {
-            restrictMenu.value = false;
-            sectionChecks.value = defaultSectionChecks();
-        }
+        restrictMenu.value = !!(np && typeof np === 'object' && Object.keys(np).length > 0);
 
         // Load existing documents for this employee
         try {
@@ -622,17 +582,6 @@ const handleSubmit = async () => {
             if (!payload.address) payload.address = null;
             if (!payload.hire_date) payload.hire_date = null;
             if (!payload.date_of_birth) payload.date_of_birth = null;
-            if (canEditNavPerms.value) {
-                if (restrictMenu.value) {
-                    const nav_permissions = {};
-                    for (const { key } of NAV_SECTION_OPTIONS) {
-                        nav_permissions[key] = !!sectionChecks.value[key];
-                    }
-                    payload.nav_permissions = nav_permissions;
-                } else {
-                    payload.nav_permissions = null;
-                }
-            }
         }
 
         await axios.put(`/api/users/${route.params.id}`, payload);

@@ -34,6 +34,15 @@
                     </p>
                 </div>
                 <div v-else-if="uiState[role.id]" class="p-4 space-y-4">
+                    <p v-if="role.undecided_sections?.length" class="callout callout-warning">
+                        <strong>{{ role.undecided_sections.length }}
+                        {{ role.undecided_sections.length === 1 ? 'section has' : 'sections have' }}
+                        never been decided for this role</strong> and are currently hidden by default:
+                        {{ undecidedLabels(role) }}.
+                        They were added to the app after this role was last saved. Tick the ones this
+                        role should have and save, and the list clears.
+                    </p>
+
                     <label class="form-choice" :for="`role-${role.id}-restrict`">
                         <input
                             :id="`role-${role.id}-restrict`"
@@ -106,6 +115,18 @@ function defaultChecks() {
         c[key] = true;
     }
     return c;
+}
+
+/**
+ * A whitelist only holds the keys that existed when it was last saved, and a
+ * missing key reads as denied. Adding a section to the product therefore takes
+ * it away from every restricted role with nobody touching a setting. Denying by
+ * default is right; doing it silently is not.
+ */
+function undecidedLabels(role) {
+    const byKey = Object.fromEntries(NAV_SECTION_OPTIONS.map((o) => [o.key, o.label]));
+
+    return (role.undecided_sections || []).map((k) => byKey[k] || k).join(', ');
 }
 
 function isFullAccessRole(role) {

@@ -104,40 +104,11 @@
                 />
             </div>
 
-            <fieldset v-if="canEditNavPerms" class="form-fieldset">
-                <legend class="form-legend">Sidebar menu access</legend>
-                <p class="form-hint">
-                    By default this user gets every menu item their role allows. Turn on to hide sections (Dashboard always stays).
-                </p>
-                <label class="form-choice" for="employeeform-restrict-menu">
-                    <input id="employeeform-restrict-menu"
-                        v-model="restrictMenu"
-                        type="checkbox"
-                        class="form-checkbox"
-                    />
-                    Limit sidebar to selected sections only
-                </label>
-                <div
-                    v-if="restrictMenu"
-                    class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto rounded-control border border-slate-200 bg-white p-3"
-                >
-                    <label
-                        v-for="opt in NAV_SECTION_OPTIONS"
-                        v-show="opt.key !== 'dashboard'"
-                        :key="opt.key"
-                        class="form-choice"
-                        :for="`employeeform-nav-${opt.key}`"
-                    >
-                        <input
-                            :id="`employeeform-nav-${opt.key}`"
-                            v-model="sectionChecks[opt.key]"
-                            type="checkbox"
-                            class="form-checkbox"
-                        />
-                        {{ opt.label }}
-                    </label>
-                </div>
-            </fieldset>
+            <p v-if="canEditNavPerms" class="callout callout-info">
+                Their role decides what they can see. If this person needs something their role
+                does not cover, open their employee page after saving and add it there - one
+                section at a time, with an end date if it is only for a while.
+            </p>
 
             <!-- Attachments when creating/editing (optional uploads) -->
             <div class="border-t border-slate-200 pt-4 space-y-3">
@@ -228,7 +199,6 @@ import { ArrowUpTrayIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { BaseButton, BaseModal } from '@/components/base';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
-import { NAV_SECTION_OPTIONS } from '@/constants/navSections';
 
 const toast = useToastStore();
 const auth = useAuthStore();
@@ -238,16 +208,6 @@ const canEditNavPerms = computed(() => {
     return r === 'Admin' || r === 'System Admin';
 });
 
-function defaultSectionChecks() {
-    const o = {};
-    for (const { key } of NAV_SECTION_OPTIONS) {
-        o[key] = true;
-    }
-    return o;
-}
-
-const sectionChecks = ref(defaultSectionChecks());
-const restrictMenu = ref(false);
 
 const props = defineProps({
     employee: {
@@ -300,18 +260,6 @@ watch(() => props.employee, (newEmployee) => {
             send_contract: false,
             is_active: newEmployee.is_active ?? true,
         };
-        const np = newEmployee.nav_permissions;
-        if (np && typeof np === 'object' && Object.keys(np).length > 0) {
-            restrictMenu.value = true;
-            const d = defaultSectionChecks();
-            for (const key of Object.keys(d)) {
-                d[key] = !!np[key];
-            }
-            sectionChecks.value = d;
-        } else {
-            restrictMenu.value = false;
-            sectionChecks.value = defaultSectionChecks();
-        }
     } else {
         form.value = {
             name: '',
@@ -325,8 +273,6 @@ watch(() => props.employee, (newEmployee) => {
             send_contract: false,
             is_active: true,
         };
-        restrictMenu.value = false;
-        sectionChecks.value = defaultSectionChecks();
     }
 }, { immediate: true });
 
@@ -346,17 +292,6 @@ const handleSubmit = async () => {
         if (!payload.hire_date) payload.hire_date = null;
         if (!payload.employee_type) payload.employee_type = null;
 
-        if (canEditNavPerms.value) {
-            if (restrictMenu.value) {
-                const nav_permissions = {};
-                for (const { key } of NAV_SECTION_OPTIONS) {
-                    nav_permissions[key] = !!sectionChecks.value[key];
-                }
-                payload.nav_permissions = nav_permissions;
-            } else {
-                payload.nav_permissions = null;
-            }
-        }
 
         // Ensure send_contract is boolean
         if (payload.send_contract === undefined) {

@@ -13,14 +13,32 @@ export const useAuthStore = defineStore('auth', {
     getters: {
         isAuthenticated: (state) => !!state.user && !!state.token,
         role: (state) => state.user?.role?.name ?? null,
-        /** User nav_permissions override role nav_permissions; either whitelist when set. Dashboard always allowed. */
+        /**
+         * Whether this user may see a section.
+         *
+         * The server resolves this and sends the answer as `nav_sections`. This
+         * used to be a second implementation of the same precedence rules, and
+         * the two had already drifted apart - POS Support was special-cased
+         * here and not on the server, and neither knew about the per-user
+         * grants that now exist. Two implementations mean two answers, and the
+         * one that matters is the server's, because that is the one guarding
+         * the data.
+         *
+         * The old client-side chain is kept only as a fallback for a session
+         * whose token predates this change and has not refreshed yet.
+         */
         navSectionAllowed: (state) => (sectionKey) => {
             if (!state.user || !sectionKey) return true;
             if (sectionKey === 'dashboard') return true;
+
+            const resolved = state.user.nav_sections;
+            if (resolved && typeof resolved === 'object' && sectionKey in resolved) {
+                return !!resolved[sectionKey];
+            }
+
             const roleName = state.user.role?.name;
             if (roleName === 'Admin' || roleName === 'System Admin') return true;
 
-            // POS Support is opt-in: explicit pos_support on user/role whitelist, or Admin / Manager / System Admin.
             if (sectionKey === 'pos_support') {
                 if (roleName === 'Manager') return true;
                 const userP = state.user.nav_permissions;

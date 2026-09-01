@@ -22,7 +22,6 @@ export const NAV_SECTION_OPTIONS = [
     { key: 'employees', label: 'Employees' },
     { key: 'hr_records', label: 'HR — Employee records' },
     { key: 'hr_attendance', label: 'HR — Attendance' },
-    { key: 'bank_documents', label: 'My bank & documents' },
     { key: 'expenses', label: 'Expenses' },
     { key: 'salary_slips', label: 'Salary Slips' },
     { key: 'salary_reports', label: 'Salary Reports' },

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\NavSections;
+use App\Models\UserPermissionGrant;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 
@@ -58,11 +59,6 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
-     * Sidebar section visibility.
-     * User nav_permissions (if set) overrides role nav_permissions (if set); otherwise full menu.
-     * Whitelist: only keys with true are shown. Dashboard always allowed. Admin/System Admin: all sections.
-     */
-    /**
      * Gates access to the Filament back-office panel.
      *
      * Deliberately narrow: the panel exposes catalogue, payroll and settings,
@@ -80,6 +76,22 @@ class User extends Authenticatable implements FilamentUser
             || $this->isRole('Manager');
     }
 
+    /**
+     * Can this person see and use a section of the app?
+     *
+     * Read in order, first answer wins:
+     *
+     *  1. Dashboard is always allowed - somewhere has to be home.
+     *  2. Admin and System Admin see everything, and cannot be limited.
+     *  3. A live per-user exception. This is the layer that was missing: an
+     *     admin can hand one person one section without inventing a role for
+     *     them, and it can carry an end date so it undoes itself.
+     *  4. The person's own nav_permissions, if anyone still has them. That
+     *     replaces the role rather than adding to it, which is exactly why it
+     *     went unused; kept only so existing rows keep behaving as they did.
+     *  5. Their role's whitelist.
+     *  6. Otherwise allowed.
+     */
     public function allowsNavSection(string $key): bool
     {
         if ($key === 'dashboard') {
@@ -88,6 +100,11 @@ class User extends Authenticatable implements FilamentUser
 
         if ($this->isRole('Admin') || $this->isRole('System Admin')) {
             return true;
+        }
+
+        $override = $this->navSectionOverride($key);
+        if ($override !== null) {
+            return $override;
         }
 
         $userP = $this->nav_permissions;
@@ -102,6 +119,53 @@ class User extends Authenticatable implements FilamentUser
         }
 
         return true;
+    }
+
+    /**
+     * A live exception for one section, or null when the role decides.
+     *
+     * A revoke beats a grant on the same section: if somebody has been
+     * deliberately shut out of something, another row must not quietly let them
+     * back in.
+     */
+    public function navSectionOverride(string $key): ?bool
+    {
+        $rows = $this->relationLoaded('permissionGrants')
+            ? $this->permissionGrants->where('section', $key)->filter->isActive()
+            : $this->permissionGrants()->active()->where('section', $key)->get();
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        return ! $rows->contains('effect', UserPermissionGrant::EFFECT_REVOKE);
+    }
+
+    public function permissionGrants(): HasMany
+    {
+        return $this->hasMany(UserPermissionGrant::class);
+    }
+
+    /**
+     * Every section this person can reach, for the client to hold.
+     *
+     * The SPA used to reimplement this whole precedence chain in its auth store
+     * and had already drifted from it - POS Support was special-cased on one
+     * side only. Sending the answer removes the second implementation.
+     *
+     * @return array<string, bool>
+     */
+    public function navSectionMap(): array
+    {
+        $out = [];
+
+        foreach (NavSections::keys() as $key) {
+            $out[$key] = $key === 'pos_support'
+                ? $this->canAccessPosSupport()
+                : $this->allowsNavSection($key);
+        }
+
+        return $out;
     }
 
     /**
@@ -125,6 +189,11 @@ class User extends Authenticatable implements FilamentUser
     {
         if ($this->isRole('Admin') || $this->isRole('Manager') || $this->isRole('System Admin')) {
             return true;
+        }
+
+        $override = $this->navSectionOverride('pos_support');
+        if ($override !== null) {
+            return $override;
         }
 
         $userP = $this->nav_permissions;

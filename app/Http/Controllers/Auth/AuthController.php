@@ -42,8 +42,10 @@ class AuthController extends Controller
 
         $user->tokens()->where('name', $deviceName)->delete();
 
+        $user->load('role');
+
         return response()->json([
-            'user' => $user->load('role'),
+            'user' => $user->toArray() + ['nav_sections' => $user->navSectionMap()],
             'token' => $user->createToken($deviceName)->plainTextToken,
         ]);
     }
@@ -61,7 +63,17 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return response()->json($request->user()->load('role'));
+        $user = $request->user()->load('role');
+
+        // The resolved answer for every section, worked out in one place.
+        //
+        // The SPA used to re-implement the whole precedence chain in its auth
+        // store, and the two had already drifted - POS Support was special-cased
+        // on the client only, and neither side knew about per-user grants. A
+        // permission system with two implementations has two answers.
+        return response()->json(
+            $user->toArray() + ['nav_sections' => $user->navSectionMap()]
+        );
     }
 
     public function logout(Request $request)
