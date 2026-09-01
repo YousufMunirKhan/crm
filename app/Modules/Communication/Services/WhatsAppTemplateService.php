@@ -218,7 +218,7 @@ class WhatsAppTemplateService
      */
     private function logSyncFailure(string $message): void
     {
-        $key = 'whatsapp:sync-failure:'.md5($message);
+        $key = 'whatsapp:sync-failure:'.md5(self::fingerprintFailure($message));
 
         if (\Illuminate\Support\Facades\Cache::get($key)) {
             return;
@@ -230,6 +230,31 @@ class WhatsAppTemplateService
             'error' => $message,
             'note' => 'Repeats of this exact error are suppressed for an hour.',
         ]);
+    }
+
+    /**
+     * The error without the parts that change every time.
+     *
+     * Meta puts the current time and a fresh trace id inside the message text,
+     * so hashing it raw produced a different key on every attempt and
+     * suppressed nothing - the log kept filling at four lines an hour while the
+     * throttle looked like it was working. What identifies the failure is the
+     * type, the code and the surrounding words, not when it happened.
+     */
+    private static function fingerprintFailure(string $message): string
+    {
+        // Only what changes between attempts. The error code and type are the
+        // whole point of telling two failures apart, so they stay.
+        return preg_replace(
+            [
+                '/fbtrace_id=\S+/',                                  // a new id every request
+                '/\b\d{1,2}-[A-Za-z]{3}-\d{2}\b/',                   // 01-Sep-26
+                '/\b\d{1,2}:\d{2}:\d{2}\b/',                         // 06:16:02
+                '/\b(?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day\b/',  // Tuesday
+            ],
+            '',
+            $message
+        ) ?? $message;
     }
 
     /**
