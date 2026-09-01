@@ -18,19 +18,19 @@
                 mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
             ]"
         >
-            <div class="h-16 shrink-0 w-full max-w-full min-w-0 flex items-center justify-between gap-2 px-3 font-semibold text-lg border-b border-white/10 bg-primary-600/95 backdrop-blur-sm overflow-hidden">
+            <div class="h-16 shrink-0 w-full max-w-full min-w-0 flex items-center justify-between gap-2 px-3 font-semibold text-lg border-b border-slate-200 bg-white overflow-hidden">
                 <router-link to="/" class="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
                     <BrandLogo
                         :src="branding.logoUrl || branding.faviconUrl"
                         :company-name="branding.companyName"
-                        img-class="h-9 w-auto max-w-full object-contain object-left bg-transparent drop-shadow-sm"
-                        text-class="text-white truncate text-sm font-bold"
+                        img-class="h-9 w-auto max-w-full object-contain object-left bg-transparent"
+                        text-class="text-slate-900 truncate text-sm font-bold"
                     />
                 </router-link>
                 <button
                     type="button"
                     @click="mobileMenuOpen = false"
-                    class="lg:hidden shrink-0 text-white/80 hover:text-white p-1 rounded-md hover:bg-white/10"
+                    class="lg:hidden shrink-0 text-slate-500 hover:text-slate-900 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md hover:bg-slate-100"
                     aria-label="Close menu"
                 >
                     <XMarkIcon class="w-6 h-6" aria-hidden="true" />
