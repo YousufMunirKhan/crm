@@ -5,8 +5,7 @@
         :tabindex="interactive ? 0 : undefined"
         :role="interactive ? 'button' : undefined"
         @click="interactive ? $emit('click', $event) : undefined"
-        @keydown.enter.prevent="interactive ? $emit('click', $event) : undefined"
-        @keydown.space.prevent="interactive ? $emit('click', $event) : undefined"
+        @keydown="onActivateKey"
     >
         <div v-if="$slots.header || title || subtitle || $slots.actions" class="card-head">
             <div class="min-w-0">
@@ -32,7 +31,7 @@
 </template>
 
 <script setup>
-defineProps({
+const props = defineProps({
     title: { type: String, default: '' },
     subtitle: { type: String, default: '' },
     /** Wrap the default slot in .card-body. */
@@ -42,5 +41,35 @@ defineProps({
     as: { type: String, default: 'div' },
 });
 
-defineEmits(['click']);
+const emit = defineEmits(['click']);
+
+/**
+ * Enter and Space activate an interactive card, and only when the card itself
+ * is what has focus.
+ *
+ * This was `@keydown.enter.prevent` / `@keydown.space.prevent` with the emit
+ * behind an `interactive` ternary. Vue applies `.prevent` unconditionally - it
+ * compiles to preventDefault() running before the handler, so it fired on
+ * every card whether interactive or not. Keydown bubbles, so a space typed
+ * into an input inside a card was cancelled on its way up and never reached
+ * the field: every form wrapped in a card silently refused spaces, and Enter
+ * could not open a new line in a textarea.
+ */
+function onActivateKey(event) {
+    if (! props.interactive) {
+        return;
+    }
+
+    // A key pressed inside a nested control belongs to that control.
+    if (event.target !== event.currentTarget) {
+        return;
+    }
+
+    if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') {
+        return;
+    }
+
+    event.preventDefault();
+    emit('click', event);
+}
 </script>
