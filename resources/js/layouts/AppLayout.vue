@@ -400,6 +400,7 @@ const navItems = computed(() => {
             { to: '/employees', label: 'Employees', section: 'employees', icon: 'id-card' },
             { to: '/hr', label: 'Employee records', section: 'hr_records', icon: 'users', activeExact: ['/hr'], activePrefixes: ['/hr/employees'] },
             { to: '/hr/attendance-report', label: 'Attendance', section: 'hr_attendance', icon: 'clipboard' },
+            { to: '/team-map', label: 'Where the team is', section: 'hr_attendance', icon: 'map-pin' },
             { to: '/employees/goals', label: 'Targets', section: 'employees', icon: 'funnel' },
             { to: '/salaries/list', label: 'Salary slips', section: 'salary_slips', icon: 'document' },
             { to: '/expenses', label: 'Expenses', section: 'expenses', icon: 'currency' },

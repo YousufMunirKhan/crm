@@ -214,6 +214,55 @@ class EmployeeLocationTest extends TestCase
             ->assertJsonPath('points.0.usable', false);
     }
 
+    // ───────────────────────────────────── a phone that has stopped talking
+
+    public function test_a_silent_phone_is_visible_rather_than_looking_like_an_idle_person(): void
+    {
+        $managerRole = Role::firstOrCreate(['name' => 'Manager'], ['nav_permissions' => null]);
+        $manager = User::factory()->create(['role_id' => $managerRole->id, 'is_active' => true]);
+
+        $reporting = $this->rep();
+        $silent = $this->rep();
+
+        $shiftA = $this->clockIn($reporting);
+        $shiftB = $this->clockIn($silent);
+
+        EmployeeLocation::create([
+            'user_id' => $reporting->id, 'attendance_id' => $shiftA->id,
+            'latitude' => 52.4862, 'longitude' => -1.8904, 'recorded_at' => now()->subMinutes(5),
+        ]);
+
+        // Two hours ago, then nothing. On iOS this is what happens when the
+        // person answers "While Using" to the background-location prompt:
+        // tracking stops with no error and nothing on this end.
+        EmployeeLocation::create([
+            'user_id' => $silent->id, 'attendance_id' => $shiftB->id,
+            'latitude' => 52.4862, 'longitude' => -1.8904, 'recorded_at' => now()->subHours(2),
+        ]);
+
+        $body = $this->actingAs($manager, 'sanctum')
+            ->getJson('/api/hr/attendance/live-map')
+            ->assertOk()
+            ->json();
+
+        $this->assertSame(2, $body['on_shift']);
+        $this->assertSame(1, $body['silent']);
+
+        // Loudest problem first.
+        $this->assertSame($silent->id, $body['people'][0]['user']['id']);
+        $this->assertFalse($body['people'][0]['reporting']);
+        $this->assertTrue($body['people'][1]['reporting']);
+    }
+
+    public function test_a_rep_cannot_see_where_the_team_is(): void
+    {
+        $rep = $this->rep();
+
+        $this->actingAs($rep, 'sanctum')
+            ->getJson('/api/hr/attendance/live-map')
+            ->assertStatus(403);
+    }
+
     public function test_old_trails_expire_and_the_shift_record_survives(): void
     {
         $rep = $this->rep();

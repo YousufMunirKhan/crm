@@ -244,6 +244,7 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     // trail is guarded inside the controller.
     Route::post('/hr/attendance/location', [\App\Modules\HR\Http\Controllers\EmployeeLocationController::class, 'store']);
     Route::get('/hr/attendance/location/status', [\App\Modules\HR\Http\Controllers\EmployeeLocationController::class, 'status']);
+    Route::get('/hr/attendance/live-map', [\App\Modules\HR\Http\Controllers\EmployeeLocationController::class, 'liveStatus']);
     Route::get('/hr/attendance/location/{userId}', [\App\Modules\HR\Http\Controllers\EmployeeLocationController::class, 'index']);
 
     Route::get('/hr/attendance/chart-summary', [HrController::class, 'attendanceChartSummary']);

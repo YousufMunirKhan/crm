@@ -172,6 +172,67 @@ class EmployeeLocationController extends Controller
         ]);
     }
 
+    /**
+     * Everybody on shift right now, and whether their phone is still reporting.
+     *
+     * This exists because of how iOS behaves. Some weeks after granting
+     * "Always" location, iOS asks the person again whether to keep allowing it
+     * in the background - and if they tap "While Using", tracking stops with no
+     * error, no notification, and nothing at all on this end. Android has its
+     * own versions: battery optimisation killing the service, or the app being
+     * force-quit.
+     *
+     * In every one of those cases the trail simply stops. Without this screen a
+     * silent phone is indistinguishable from a person who did nothing all
+     * afternoon, and somebody would eventually be asked the wrong question.
+     */
+    public function liveStatus(Request $request)
+    {
+        $actor = $request->user();
+
+        if (! $actor->isRole('Admin') && ! $actor->isRole('Manager') && ! $actor->isRole('System Admin')) {
+            abort(403, 'Only a manager can see where the team is.');
+        }
+
+        $shifts = Attendance::with('user:id,name')
+            ->whereNotNull('check_in_at')
+            ->whereNull('check_out_at')
+            ->whereDate('date', '>=', now()->subDay()->toDateString())
+            ->get();
+
+        $rows = $shifts->map(function (Attendance $shift) {
+            $last = EmployeeLocation::where('attendance_id', $shift->id)
+                ->orderByDesc('recorded_at')
+                ->first();
+
+            $silentFor = $last
+                ? (int) $last->recorded_at->diffInMinutes(now())
+                : (int) $shift->check_in_at->diffInMinutes(now());
+
+            return [
+                'user' => $shift->user?->only(['id', 'name']),
+                'attendance_id' => $shift->id,
+                'checked_in_at' => $shift->check_in_at?->toIso8601String(),
+                'last_seen_at' => $last?->recorded_at?->toIso8601String(),
+                'silent_minutes' => $silentFor,
+                'latitude' => $last ? (float) $last->latitude : null,
+                'longitude' => $last ? (float) $last->longitude : null,
+                'accuracy' => $last?->accuracy === null ? null : (float) $last->accuracy,
+                'battery_level' => $last?->battery_level,
+                // Three intervals missed. One missed ping is a tunnel; three in
+                // a row is a phone that has stopped talking to us.
+                'reporting' => $silentFor <= 45,
+                'ever_reported' => (bool) $last,
+            ];
+        })->sortByDesc('silent_minutes')->values();
+
+        return response()->json([
+            'on_shift' => $rows->count(),
+            'silent' => $rows->where('reporting', false)->count(),
+            'people' => $rows,
+        ]);
+    }
+
     /** The shift this person is currently in, if any. */
     private function openShiftFor(User $user): ?Attendance
     {

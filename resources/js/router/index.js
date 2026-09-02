@@ -360,6 +360,17 @@ const routes = [
         meta: { requiresAuth: true, title: 'WhatsApp Inbox', section: 'marketing_whatsapp' },
     },
     {
+        path: '/team-map',
+        name: 'team-map',
+        component: () => import('@/views/TeamMapView.vue'),
+        meta: {
+            requiresAuth: true,
+            title: 'Where the team is',
+            roles: ['Admin', 'Manager', 'System Admin'],
+            section: 'hr_attendance',
+        },
+    },
+    {
         path: '/reports/geo',
         name: 'reports-geo',
         component: () => import('@/views/GeoMapView.vue'),

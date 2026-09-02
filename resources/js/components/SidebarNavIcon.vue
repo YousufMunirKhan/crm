@@ -26,6 +26,7 @@ import {
     HomeIcon,
     IdentificationIcon,
     ListBulletIcon,
+    MapPinIcon,
     MegaphoneIcon,
     PhoneIcon,
     RectangleGroupIcon,
@@ -73,6 +74,7 @@ const ICONS = {
     pound: CurrencyPoundIcon,
     document: DocumentTextIcon,
     clipboard: ClipboardDocumentIcon,
+    'map-pin': MapPinIcon,
     shield: ShieldCheckIcon,
     cog: Cog6ToothIcon,
 };
