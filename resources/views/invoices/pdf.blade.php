@@ -280,13 +280,15 @@
             z-index: 1;
             font-size: 13px;
         }
-        .page-count {
-            margin-top: 20px;
-            color: #5f6472;
-        }
-        .page-count:after {
-            content: "Page " counter(page) " / " counter(pages);
-        }
+        /*
+         * The page counter is NOT drawn here. DomPDF never resolves
+         * counter(pages) in CSS content - the total is only known after
+         * pagination, and the :after is laid out in the single content pass,
+         * so it rendered as 0 and every invoice footer read "Page 1 / 0".
+         * Moving it to position:fixed puts it on every page but still leaves
+         * the total at 0. It is stamped per page from the canvas instead, in
+         * InvoiceService::stampPageNumbers().
+         */
     </style>
 </head>
 <body>
@@ -420,7 +422,6 @@
 
         <div class="footer">
             <div>{{ $companyEmail }}</div>
-            <div class="page-count"></div>
         </div>
     </div>
 </body>

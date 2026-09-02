@@ -290,7 +290,51 @@ class InvoiceService
             ->setOption('margin-left', 10)
             ->setOption('margin-right', 10);
 
+        $this->stampPageNumbers($pdf);
+
         return $pdf;
+    }
+
+    /**
+     * Draws "Page n / total" at the foot of every page.
+     *
+     * The template used to do this in CSS, as
+     * `content: "Page " counter(page) " / " counter(pages)`. DomPDF does not
+     * resolve counter(pages) that way: the total is only known once pagination
+     * has finished, while the :after content is laid out in the single content
+     * pass before it, so the total always came out as 0 - every invoice read
+     * "Page 1 / 0". Making the element position:fixed puts it on each page but
+     * still leaves the total at 0.
+     *
+     * page_text() is the mechanism that does work: DomPDF substitutes
+     * {PAGE_NUM} and {PAGE_COUNT} per page while writing the document out.
+     */
+    private function stampPageNumbers($pdf): void
+    {
+        // The canvas only exists once the document has been laid out. Going
+        // through the wrapper's render() marks it rendered, so the later
+        // output()/download() does not lay the whole document out a second time.
+        $pdf->render();
+
+        $dompdf = $pdf->getDomPDF();
+        $canvas = $dompdf->getCanvas();
+        $metrics = $dompdf->getFontMetrics();
+
+        $font = $metrics->getFont('DejaVu Sans', 'normal');
+        $size = 9;
+
+        // Centre on the widest string the counter can produce, not on the
+        // placeholder, or a two digit page count sits off centre.
+        $width = $metrics->getTextWidth('Page 00 / 00', $font, $size);
+
+        $canvas->page_text(
+            ($canvas->get_width() - $width) / 2,
+            $canvas->get_height() - 26,
+            'Page {PAGE_NUM} / {PAGE_COUNT}',
+            $font,
+            $size,
+            [0.37, 0.39, 0.45]
+        );
     }
 
     public function sendEmail(Invoice $invoice, string $to, ?string $customMessage = null): void
