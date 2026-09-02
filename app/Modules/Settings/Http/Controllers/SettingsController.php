@@ -10,9 +10,58 @@ use Illuminate\Support\Facades\Storage;
 
 class SettingsController extends Controller
 {
-    public function index()
+    /**
+     * Credentials, never sent to anybody who cannot already change them.
+     *
+     * This endpoint returned the whole settings table to any signed-in member
+     * of staff - which on this system meant the SMTP relay password, both SMS
+     * API keys and the Google Maps key were readable by a sales agent. Writing
+     * them was correctly gated to administrators all along; only reading was
+     * missed.
+     *
+     * An allow-list rather than a deny-list, deliberately: a credential added
+     * next year is then secret by default, instead of leaking until somebody
+     * remembers to add it here.
+     */
+    private const SECRET_KEYS = [
+        'smtp_password',
+        'smtp_username',
+        'sms_api_key',
+        'sms_secret_key',
+        'google_maps_api_key',
+        'facebook_app_secret',
+        'facebook_access_token',
+        'whatsapp_access_token',
+        'anthropic_api_key',
+    ];
+
+    /** Anything matching these is treated as a credential even if new. */
+    private const SECRET_PATTERNS = ['password', 'secret', 'token', '_key', 'api_key'];
+
+    public static function isSecretKey(string $key): bool
+    {
+        if (in_array($key, self::SECRET_KEYS, true)) {
+            return true;
+        }
+
+        foreach (self::SECRET_PATTERNS as $needle) {
+            if (str_contains($key, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function index(Request $request)
     {
         $settings = Setting::all()->pluck('value', 'key');
+
+        $user = $request->user();
+
+        if (! $user->isRole('Admin') && ! $user->isRole('System Admin')) {
+            $settings = $settings->reject(fn ($value, $key) => self::isSecretKey($key));
+        }
 
         return response()->json($settings);
     }
@@ -44,8 +93,14 @@ class SettingsController extends Controller
         return response()->json(['message' => 'Settings updated successfully']);
     }
 
-    public function get($key)
+    public function get(Request $request, $key)
     {
+        if (self::isSecretKey($key)
+            && ! $request->user()->isRole('Admin')
+            && ! $request->user()->isRole('System Admin')) {
+            abort(403, 'That setting is not readable.');
+        }
+
         $setting = Setting::where('key', $key)->first();
 
         return response()->json(['value' => $setting?->value]);

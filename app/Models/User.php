@@ -40,9 +40,36 @@ class User extends Authenticatable implements FilamentUser
         'nav_permissions',
     ];
 
+    /**
+     * Never serialised unless a controller deliberately asks for them.
+     *
+     * `GET /api/users` and `GET /api/hr/employees` returned whole user models,
+     * and both are called from two dozen places for assignee dropdowns - so
+     * every colleague's bank account number, sort code and date of birth were
+     * readable by any signed-in member of staff. Seven of the fifteen people on
+     * this system have bank details filled in.
+     *
+     * Hidden here and made visible only where access has already been checked,
+     * which is the safe direction: a new list endpoint added later cannot leak
+     * them by forgetting a column list.
+     */
     protected $hidden = [
         'password',
         'remember_token',
+        'bank_account_number',
+        'bank_sort_code',
+        'bank_account_name',
+        'bank_name',
+        'date_of_birth',
+    ];
+
+    /** Fields hidden above, for the screens allowed to show them. */
+    public const PERSONAL_FIELDS = [
+        'bank_account_number',
+        'bank_sort_code',
+        'bank_account_name',
+        'bank_name',
+        'date_of_birth',
     ];
 
     protected function casts(): array

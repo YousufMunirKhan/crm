@@ -79,7 +79,10 @@ class UserController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        return response()->json($user);
+        // Access is already checked above, so this is the one place bank
+        // details are meant to be readable - the employee's own page, or HR's
+        // view of it.
+        return response()->json($user->makeVisible(User::PERSONAL_FIELDS));
     }
 
     public function store(Request $request)

@@ -29,6 +29,26 @@ class AuthController extends Controller
         }
 
         /*
+         * Switching somebody off has to actually switch them off.
+         *
+         * `is_active` was checked in exactly one place - the gate to the
+         * Filament panel - so marking a leaver inactive removed the back office
+         * and nothing else. They kept full access to the SPA and the whole API,
+         * and any token they already held stayed valid, until the row was
+         * deleted. Two accounts on this system are in that state today.
+         *
+         * The wording is deliberately not "your account is disabled": that
+         * confirms the address exists to anybody guessing.
+         */
+        if (! $user->is_active) {
+            $user->tokens()->delete();
+
+            throw ValidationException::withMessages([
+                'email' => ['The provided credentials are incorrect.'],
+            ]);
+        }
+
+        /*
          * Revoke only this device's previous token, not every token the user
          * has. The comment here used to say "for this device" while the code
          * deleted all of them - so on a CRM that ships as an installable PWA,
