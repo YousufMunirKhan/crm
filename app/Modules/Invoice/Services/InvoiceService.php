@@ -164,16 +164,24 @@ class InvoiceService
      * Takes a row lock over this year's invoices so two concurrent creates
      * cannot pick the same number and collide on the unique index. Only the
      * numeric suffix is read back, rather than the whole year's rows.
+     *
+     * Deleted invoices are counted. `invoice_number` is unique across the whole
+     * table and deleting an invoice only soft deletes it, so the number a
+     * deleted row holds is still taken. Reading live rows only handed the next
+     * create a number that already existed, and the insert died on the unique
+     * index - so deleting an invoice broke the next one anybody raised.
      */
     public function generateInvoiceNumber(): string
     {
         $year = date('Y');
         $prefix = 'INV/'.$year.'/';
 
-        $max = Invoice::query()
+        $taken = Invoice::withTrashed()
             ->where('invoice_number', 'like', $prefix.'%')
             ->lockForUpdate()
-            ->pluck('invoice_number')
+            ->pluck('invoice_number');
+
+        $max = $taken
             ->map(function ($number) use ($year) {
                 if (preg_match('/^INV[\/_-]'.preg_quote($year, '/').'[\/_-](\d+)$/', (string) $number, $m)) {
                     return (int) $m[1];
@@ -183,7 +191,17 @@ class InvoiceService
             })
             ->max() ?? 0;
 
-        return $prefix.str_pad((string) ($max + 1), 5, '0', STR_PAD_LEFT);
+        // A number this pattern cannot read - an import, or a format used
+        // before this one - still occupies the index. Step over anything
+        // already held rather than handing back a number that will not insert.
+        $existing = $taken->flip();
+        $next = $max + 1;
+        do {
+            $candidate = $prefix.str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+            $next++;
+        } while ($existing->has($candidate));
+
+        return $candidate;
     }
 
     /**
