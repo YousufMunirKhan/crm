@@ -170,6 +170,18 @@
                         <span class="sm:hidden">Update</span>
                     </button>
 
+                    <span
+                        v-if="shiftLocation.tracking.value"
+                        class="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-control border
+                               border-success-200 bg-success-50 px-2.5 text-xs font-medium text-success-800"
+                        :title="`Location is being recorded while you are clocked in.${
+                            shiftLocation.lastSentAt.value ? ' Last sent ' + shiftLocation.lastSentAt.value.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''
+                        }`"
+                    >
+                        <MapPinIcon class="icon-sm shrink-0" aria-hidden="true" />
+                        <span class="hidden sm:inline">On shift</span>
+                    </span>
+
                     <NotificationBell />
 
                     <!-- User menu -->
@@ -270,7 +282,8 @@ import {
 } from '@heroicons/vue/24/outline';
 import SidebarNavIcon from '@/components/SidebarNavIcon.vue';
 import NotificationBell from '@/components/NotificationBell.vue';
-import { ArrowPathIcon } from '@heroicons/vue/24/outline';
+import { ArrowPathIcon, MapPinIcon } from '@heroicons/vue/24/outline';
+import { useShiftLocation } from '@/composables/useShiftLocation';
 import { usePwaStore } from '@/stores/pwa';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import BrandLogo from '@/components/BrandLogo.vue';
@@ -284,6 +297,12 @@ const auth = useAuthStore();
 const branding = useBrandingStore();
 const toast = useToastStore();
 const pwa = usePwaStore();
+
+/**
+ * Location while on shift. Lives in the shell so it survives navigation - a
+ * timer inside a page dies the moment somebody opens a lead.
+ */
+const shiftLocation = useShiftLocation();
 
 /**
  * Take the waiting build. The service worker has already installed it; a plain
@@ -517,6 +536,10 @@ onMounted(async () => {
     } catch (e) {
         // ignore
     }
+
+    // Only starts if the server says this person is clocked in, so somebody
+    // who is not on shift is never asked for location permission at all.
+    shiftLocation.start();
 });
 
 const user = computed(() => auth.user);

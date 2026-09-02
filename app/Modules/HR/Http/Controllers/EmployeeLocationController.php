@@ -164,6 +164,11 @@ class EmployeeLocationController extends Controller
                 'accuracy' => $p->accuracy === null ? null : (float) $p->accuracy,
                 'recorded_at' => $p->recorded_at->toIso8601String(),
                 'battery_level' => $p->battery_level,
+                // A browser can only read a position while the CRM is open, so
+                // its trail covers the parts of the day the app was in use.
+                // Saying which client sent a point is what stops a gap being
+                // read as somebody standing still.
+                'source' => $p->source,
                 // Sent rather than filtered out, so the map can show a vague
                 // reading as vague instead of dropping it and leaving a gap
                 // nobody can explain.
@@ -219,6 +224,7 @@ class EmployeeLocationController extends Controller
                 'longitude' => $last ? (float) $last->longitude : null,
                 'accuracy' => $last?->accuracy === null ? null : (float) $last->accuracy,
                 'battery_level' => $last?->battery_level,
+                'source' => $last?->source,
                 // Three intervals missed. One missed ping is a tunnel; three in
                 // a row is a phone that has stopped talking to us.
                 'reporting' => $silentFor <= 45,

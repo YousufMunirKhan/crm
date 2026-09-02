@@ -65,7 +65,13 @@
             </div>
 
             <p v-if="!status.checked_in" class="text-xs text-slate-500">
-                Camera and location permission are required for attendance proof.
+                Camera and location permission are required for attendance proof. While you are
+                clocked in, your location is recorded every 15 minutes if the app is open. It
+                stops when you clock out.
+            </p>
+            <p v-else class="text-xs text-slate-500">
+                Your location is recorded every 15 minutes while this app is open, and stops the
+                moment you clock out.
             </p>
 
             <div v-if="proofError" class="rounded-lg border border-danger-200 bg-danger-50 p-3 text-sm text-danger-700">
@@ -155,9 +161,11 @@ import {
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
+import { useShiftLocation } from '@/composables/useShiftLocation';
 
 const emit = defineEmits(['updated']);
 const toast = useToastStore();
+const shiftLocation = useShiftLocation();
 
 const loading = ref(true);
 const actionLoading = ref(false);
@@ -364,9 +372,17 @@ const submitAttendance = async (url, successMessage, title) => {
     }
 };
 
-const checkIn = () => submitAttendance('/api/hr/attendance/check-in', 'Successfully checked in!', 'Time In');
+// Start and stop the shift tracker here rather than waiting for a reload -
+// somebody clocks in and then goes straight out.
+const checkIn = async () => {
+    await submitAttendance('/api/hr/attendance/check-in', 'Successfully checked in!', 'Time In');
+    shiftLocation.refresh();
+};
 
-const checkOut = () => submitAttendance('/api/hr/attendance/check-out', 'Successfully checked out!', 'Time Out');
+const checkOut = async () => {
+    await submitAttendance('/api/hr/attendance/check-out', 'Successfully checked out!', 'Time Out');
+    shiftLocation.stop();
+};
 
 const refreshStatus = async () => {
     loading.value = true;

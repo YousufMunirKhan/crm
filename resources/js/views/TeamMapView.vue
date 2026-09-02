@@ -53,6 +53,11 @@
                 </ul>
             </div>
 
+            <p v-if="browserOnly" class="callout callout-info">
+                This trail comes from the CRM running in a browser, which can only take a reading
+                while the app is open. Gaps are time the app was closed, not time standing still.
+            </p>
+
             <div ref="mapEl" class="h-[26rem] w-full overflow-hidden rounded-card border border-slate-200 sm:h-[32rem]" />
 
             <p v-if="!loading && !hasAnything" class="callout callout-info">
@@ -123,6 +128,10 @@ const badge = computed(() => {
 });
 
 const hasAnything = computed(() => people.value.length > 0 || trail.value.length > 0);
+
+/** Every point came from the web app, so the coverage is partial by nature. */
+const browserOnly = computed(() =>
+    trail.value.length > 0 && trail.value.every((p) => p.source === 'browser'));
 
 const trailUserName = computed(() =>
     people.value.find((p) => String(p.user?.id) === String(selectedUserId.value))?.user?.name ?? 'Trail');
