@@ -239,7 +239,14 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     // Everybody's attendance, as opposed to your own clock in and out above,
     // which stays open to all staff.
     Route::middleware('nav.section:hr_attendance')->group(function () {
-        Route::get('/hr/attendance/chart-summary', [HrController::class, 'attendanceChartSummary']);
+        // Location during a shift. Posting and checking status are open to all
+    // staff because they are about the person doing them; reading somebody's
+    // trail is guarded inside the controller.
+    Route::post('/hr/attendance/location', [\App\Modules\HR\Http\Controllers\EmployeeLocationController::class, 'store']);
+    Route::get('/hr/attendance/location/status', [\App\Modules\HR\Http\Controllers\EmployeeLocationController::class, 'status']);
+    Route::get('/hr/attendance/location/{userId}', [\App\Modules\HR\Http\Controllers\EmployeeLocationController::class, 'index']);
+
+    Route::get('/hr/attendance/chart-summary', [HrController::class, 'attendanceChartSummary']);
         Route::get('/hr/attendance/monthly-report', [HrController::class, 'attendanceMonthlyReport']);
         Route::get('/hr/attendance', [HrController::class, 'attendance']);
         Route::delete('/hr/attendance/{id}', [HrController::class, 'deleteAttendance']);

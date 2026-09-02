@@ -51,6 +51,12 @@ Schedule::command('marketing:automations')
     ->dailyAt('07:00')
     ->timezone(config('app.timezone'));
 
+// Location history past its retention period. Staff movement is the most
+// sensitive thing here, so it expires on a schedule rather than on request.
+Schedule::command('crm:prune-locations')
+    ->dailyAt('02:30')
+    ->timezone(config('app.timezone'));
+
 // Start campaigns whose scheduled send time has arrived.
 Schedule::command('campaigns:dispatch-due')
     ->everyFiveMinutes();
