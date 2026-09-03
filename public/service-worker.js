@@ -1,4 +1,4 @@
-const VERSION = 'crm-pwa-v3';
+const VERSION = 'crm-pwa-v4';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
