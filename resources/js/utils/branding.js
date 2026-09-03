@@ -11,7 +11,7 @@ export function absolutePublicUrl(path) {
 const DEFAULT_FAVICON_PATH = '/icons/icon-72x72.svg';
 
 /**
- * Set document favicon and shortcut icon; update apple-touch-icon links to match.
+ * Set the document favicon and shortcut icon - the browser tab only.
  * Empty url restores the built-in SVG icon (same as welcome.blade default).
  */
 export function applyFavicon(url) {
@@ -49,7 +49,15 @@ export function applyFavicon(url) {
         shortcut.href = href;
     }
 
-    document.querySelectorAll('link[rel="apple-touch-icon"]').forEach((el) => {
-        el.href = href;
-    });
+    // apple-touch-icon is deliberately left alone.
+    //
+    // It is what iOS copies onto the home screen, and iOS is fussy about it in
+    // two ways the uploaded favicon cannot satisfy: it needs at least 180x180,
+    // and it does not read webp. The upload is validated only as "an image
+    // under 1MB", so pointing the home-screen icon at it - as this used to -
+    // handed iOS a 96px webp it could not use, and the installed app fell back
+    // to a screenshot of the page.
+    //
+    // The static PNGs in pwa-head.blade.php are sized for this. The setting
+    // governs the browser tab; the home screen keeps the real icon set.
 }
