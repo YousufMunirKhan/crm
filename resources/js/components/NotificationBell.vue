@@ -17,21 +17,21 @@
         </MenuButton>
 
         <MenuItems
-            class="popover-panel absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm focus-visible:outline-none"
+            class="popover-panel fixed left-3 right-3 top-[calc(env(safe-area-inset-top)+4.75rem)] max-h-[calc(100dvh-6rem)] max-w-none overflow-hidden focus-visible:outline-none sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[calc(100vw-2rem)] sm:max-w-sm"
         >
             <div class="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
                 <p class="text-xs font-semibold text-slate-800">What needs you</p>
                 <button
                     v-if="unread > 0"
                     type="button"
-                    class="text-[11px] font-medium text-primary-700 hover:underline"
+                    class="shrink-0 text-[11px] font-medium text-primary-700 hover:underline"
                     @click.stop="markAllRead"
                 >
                     Mark all read
                 </button>
             </div>
 
-            <div class="max-h-[min(70vh,26rem)] overflow-y-auto overscroll-contain">
+            <div class="max-h-[min(70dvh,26rem)] overflow-y-auto overscroll-contain">
                 <p v-if="loading" class="px-3 py-6 text-center text-xs text-slate-500">Loading…</p>
 
                 <p v-else-if="items.length === 0" class="px-3 py-6 text-center text-xs text-slate-500">
@@ -55,8 +55,8 @@
                             aria-hidden="true"
                         />
                         <span class="min-w-0">
-                            <span class="block text-xs font-semibold text-slate-800">{{ item.title }}</span>
-                            <span class="mt-0.5 block text-[11px] leading-snug text-slate-600">{{ item.message }}</span>
+                            <span class="block break-words text-xs font-semibold text-slate-800">{{ item.title }}</span>
+                            <span class="mt-0.5 block break-words text-[11px] leading-snug text-slate-600">{{ item.message }}</span>
                             <span class="mt-1 block text-[10px] text-slate-400">{{ when(item.created_at) }}</span>
                         </span>
                     </button>

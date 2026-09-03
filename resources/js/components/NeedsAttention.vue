@@ -14,13 +14,13 @@
                     v-for="tile in tiles"
                     :key="tile.key"
                     :to="tile.to"
-                    class="group flex min-h-[44px] flex-col gap-1 rounded-card border p-4 transition-colors
+                    class="group flex min-h-[44px] min-w-0 flex-col gap-1 rounded-card border p-4 transition-colors
                            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
                     :class="tile.value > 0
                         ? 'border-danger-200 bg-danger-50/70 hover:bg-danger-50'
                         : 'border-slate-200 bg-white hover:bg-slate-50'"
                 >
-                    <span class="text-xs font-medium uppercase tracking-wide"
+                    <span class="break-words text-xs font-medium uppercase tracking-wide"
                           :class="tile.value > 0 ? 'text-danger-800' : 'text-slate-500'">
                         {{ tile.label }}
                     </span>
@@ -28,7 +28,7 @@
                           :class="tile.value > 0 ? 'text-danger-700' : 'text-slate-400'">
                         {{ tile.value }}
                     </span>
-                    <span class="text-xs leading-snug text-slate-600">{{ tile.caption }}</span>
+                    <span class="break-words text-xs leading-snug text-slate-600">{{ tile.caption }}</span>
                 </router-link>
             </div>
         </div>

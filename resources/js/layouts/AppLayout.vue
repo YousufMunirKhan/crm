@@ -1,5 +1,5 @@
 <template>
-    <div class="h-screen min-h-0 overflow-hidden flex bg-gradient-to-br from-gray-50 to-gray-100 text-slate-900">
+    <div class="h-[100dvh] min-h-0 overflow-hidden flex bg-gradient-to-br from-gray-50 to-gray-100 text-slate-900">
         <a href="#main" class="skip-link">Skip to content</a>
 
         <!-- Mobile Menu Overlay -->
@@ -12,6 +12,7 @@
         <!-- Sidebar: full CRM menu (including on customer / lead workspace) -->
         <aside
             v-if="showSidebar"
+            id="app-sidebar"
             :class="[
                 'bg-gradient-to-b from-primary-600 via-primary-700 to-primary-800 text-white flex flex-col fixed left-0 top-0 bottom-0 z-modal transition-transform duration-300',
                 'w-[86%] max-w-[20rem] lg:w-64 lg:max-w-64 lg:min-w-64 overflow-x-hidden box-border',
@@ -113,12 +114,14 @@
         <!-- Main content -->
         <div :class="['flex-1 flex flex-col min-h-0 min-w-0 w-full overflow-hidden', showSidebar ? 'lg:ml-64' : '']">
             <!-- Top header - Only show if sidebar is visible -->
-            <header v-if="showSidebar" class="shrink-0 min-h-14 sm:min-h-16 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-y-2 gap-x-2 sm:gap-x-3 px-3 sm:px-4 lg:px-6 py-2 z-30">
+            <header v-if="showSidebar" class="sticky top-0 shrink-0 min-h-14 sm:min-h-16 bg-white border-b border-slate-200 flex flex-nowrap items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 py-2 z-sticky">
                 <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 sm:flex-initial">
                     <button
                         @click="mobileMenuOpen = !mobileMenuOpen"
                         class="lg:hidden p-2 -ml-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg shrink-0 touch-manipulation"
                         aria-label="Toggle menu"
+                        aria-controls="app-sidebar"
+                        :aria-expanded="mobileMenuOpen ? 'true' : 'false'"
                     >
                         <Bars3Icon class="w-6 h-6" aria-hidden="true" />
                     </button>
@@ -254,7 +257,7 @@
 
             <!-- Content -->
             <div class="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
-                <main id="main" class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-surface-sunken px-3 py-4 sm:px-4 sm:py-5 lg:px-6">
+                <main id="main" class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-surface-sunken px-3 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-4 sm:py-5 lg:px-6">
                     <RouterView />
                 </main>
             </div>
@@ -309,7 +312,7 @@ const shiftLocation = useShiftLocation();
  * reload is what hands the tab over to it.
  */
 function reloadForUpdate() {
-    window.location.reload();
+    pwa.activateUpdate();
 }
 const mobileMenuOpen = ref(false);
 
@@ -607,5 +610,3 @@ watch(
 
 const logout = () => auth.logout();
 </script>
-
-

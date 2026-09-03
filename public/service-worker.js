@@ -1,112 +1,138 @@
-const CACHE_NAME = 'crm-cache-v1';
-const STATIC_CACHE = 'crm-static-v1';
-const DYNAMIC_CACHE = 'crm-dynamic-v1';
+const VERSION = 'crm-pwa-v2';
+const STATIC_CACHE = `${VERSION}-static`;
+const RUNTIME_CACHE = `${VERSION}-runtime`;
 
-// Static assets to cache on install
 const STATIC_ASSETS = [
-  '/',
   '/manifest.json',
   '/favicon.ico',
+  '/icons/icon-72x72.png',
+  '/icons/icon-96x96.png',
+  '/icons/icon-128x128.png',
+  '/icons/icon-144x144.png',
+  '/icons/icon-152x152.png',
+  '/icons/icon-180x180.png',
   '/icons/icon-192x192.png',
+  '/icons/icon-384x384.png',
   '/icons/icon-512x512.png',
 ];
 
-// Install event - cache static assets
+const OFFLINE_HTML = `
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CRM offline</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #0f172a;
+      background: #f1f5f9;
+    }
+    main {
+      max-width: 360px;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 22px;
+      background: #ffffff;
+      box-shadow: 0 8px 24px rgb(15 23 42 / 0.08);
+    }
+    h1 { margin: 0 0 8px; font-size: 20px; }
+    p { margin: 0; color: #475569; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>You are offline</h1>
+    <p>The CRM needs an internet connection for live customer, lead, invoice, and attendance data. Reconnect and reopen this screen.</p>
+  </main>
+</body>
+</html>`;
+
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Installing...');
   event.waitUntil(
     caches.open(STATIC_CACHE)
-      .then((cache) => {
-        console.log('[Service Worker] Pre-caching static assets');
-        return cache.addAll(STATIC_ASSETS);
-      })
+      .then((cache) => cache.addAll(STATIC_ASSETS))
       .catch((error) => {
         console.log('[Service Worker] Pre-cache failed:', error);
       })
   );
-  // Activate immediately
-  self.skipWaiting();
 });
 
-// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] Activating...');
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== STATIC_CACHE && name !== DYNAMIC_CACHE)
-          .map((name) => {
-            console.log('[Service Worker] Deleting old cache:', name);
-            return caches.delete(name);
-          })
-      );
-    })
+    caches.keys().then((cacheNames) => Promise.all(
+      cacheNames
+        .filter((name) => ![STATIC_CACHE, RUNTIME_CACHE].includes(name))
+        .map((name) => caches.delete(name))
+    ))
   );
-  // Take control of all pages immediately
   self.clients.claim();
 });
 
-// Fetch event - network first, fallback to cache
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests
-  if (request.method !== 'GET') {
+  if (request.method !== 'GET' || !url.protocol.startsWith('http')) {
     return;
   }
 
-  // Skip API requests - always go to network
-  if (url.pathname.startsWith('/api/')) {
+  if (url.origin !== self.location.origin) {
     return;
   }
 
-  // Skip chrome-extension and other non-http requests
-  if (!url.protocol.startsWith('http')) {
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin/')) {
     return;
   }
 
-  event.respondWith(
-    // Try network first
-    fetch(request)
-      .then((response) => {
-        // Don't cache non-successful responses
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
-        }
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request).catch(() => new Response(OFFLINE_HTML, {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        status: 503,
+        statusText: 'Offline',
+      }))
+    );
+    return;
+  }
 
-        // Clone the response
-        const responseToCache = response.clone();
-
-        // Cache the response for later
-        caches.open(DYNAMIC_CACHE)
-          .then((cache) => {
-            cache.put(request, responseToCache);
-          });
-
-        return response;
-      })
-      .catch(() => {
-        // If network fails, try cache
-        return caches.match(request)
-          .then((cachedResponse) => {
-            if (cachedResponse) {
-              return cachedResponse;
-            }
-            
-            // For navigation requests, return the offline page (which is the main app)
-            if (request.mode === 'navigate') {
-              return caches.match('/');
-            }
-            
-            return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
-          });
-      })
-  );
+  if (isCacheableAsset(url, request)) {
+    event.respondWith(cacheFirst(request));
+  }
 });
 
-// Handle push notifications (for future use)
+function isCacheableAsset(url, request) {
+  return url.pathname.startsWith('/build/')
+    || url.pathname.startsWith('/icons/')
+    || url.pathname === '/manifest.json'
+    || url.pathname === '/favicon.ico';
+}
+
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+
+  const response = await fetch(request);
+  if (response && response.status === 200 && response.type === 'basic') {
+    const cache = await caches.open(RUNTIME_CACHE);
+    cache.put(request, response.clone());
+  }
+
+  return response;
+}
+
 self.addEventListener('push', (event) => {
   const options = {
     body: event.data ? event.data.text() : 'New notification',
@@ -123,12 +149,7 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(
-    clients.openWindow('/')
-  );
+  event.waitUntil(clients.openWindow('/'));
 });
-
-

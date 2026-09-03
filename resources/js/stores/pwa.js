@@ -2,6 +2,9 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 
 export const usePwaStore = defineStore('pwa', () => {
+    let initialized = false;
+    let refreshingForUpdate = false;
+
     // State
     const deferredPrompt = ref(null);
     const isInstallable = ref(false);
@@ -12,6 +15,7 @@ export const usePwaStore = defineStore('pwa', () => {
     const showIOSModal = ref(false);
     const pwaEnabled = ref(true); // Can be controlled by admin settings
     const serviceWorkerRegistered = ref(false);
+    const waitingWorker = ref(null);
 
     /**
      * A newer build has been installed and is waiting for the tab to be
@@ -52,19 +56,29 @@ export const usePwaStore = defineStore('pwa', () => {
                 serviceWorkerRegistered.value = true;
                 console.log('[PWA] Service Worker registered:', registration.scope);
 
+                if (registration.waiting && navigator.serviceWorker.controller) {
+                    waitingWorker.value = registration.waiting;
+                    updateAvailable.value = true;
+                }
+
                 // Check for updates
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
+                    if (!newWorker) return;
+
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                             // This used to log and stop there, so a tab open
                             // across a deploy kept using files that had been
                             // replaced and 404'd on the next screen it opened.
                             console.log('[PWA] New version available');
+                            waitingWorker.value = newWorker;
                             updateAvailable.value = true;
                         }
                     });
                 });
+
+                registration.update().catch(() => {});
 
                 return registration;
             } catch (error) {
@@ -77,7 +91,18 @@ export const usePwaStore = defineStore('pwa', () => {
 
     // Initialize PWA
     const initialize = () => {
+        if (initialized) return;
+        initialized = true;
+
         detectPlatform();
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (refreshingForUpdate) return;
+                refreshingForUpdate = true;
+                window.location.reload();
+            });
+        }
         
         // Listen for beforeinstallprompt event (Chrome, Edge, etc.)
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -100,6 +125,15 @@ export const usePwaStore = defineStore('pwa', () => {
 
         // Register service worker
         registerServiceWorker();
+    };
+
+    const activateUpdate = () => {
+        if (!waitingWorker.value) {
+            window.location.reload();
+            return;
+        }
+
+        waitingWorker.value.postMessage({ type: 'SKIP_WAITING' });
     };
 
     // Trigger install prompt
@@ -172,6 +206,7 @@ export const usePwaStore = defineStore('pwa', () => {
         showIOSModal,
         pwaEnabled,
         serviceWorkerRegistered,
+        waitingWorker,
         updateAvailable,
         
         // Computed
@@ -181,9 +216,9 @@ export const usePwaStore = defineStore('pwa', () => {
         // Actions
         initialize,
         promptInstall,
+        activateUpdate,
         closeIOSModal,
         loadSettings,
         registerServiceWorker,
     };
 });
-

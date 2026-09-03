@@ -14,13 +14,16 @@
         <!-- PWA Meta Tags -->
         <meta name="theme-color" content="#2563eb">
         <meta name="description" content="Customer Relationship Management System">
+        <meta name="application-name" content="CRM">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="format-detection" content="telephone=no">
         
         <!-- PWA Manifest -->
         <link rel="manifest" href="/manifest.json">
         
         <!-- Apple PWA Meta Tags -->
         <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
         <meta name="apple-mobile-web-app-title" content="CRM">
         
         <!-- Apple Touch Icons -->

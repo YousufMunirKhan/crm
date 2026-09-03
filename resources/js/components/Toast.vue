@@ -3,7 +3,7 @@
         <Transition name="slide-fade">
             <div
                 v-if="visible"
-                class="fixed top-4 right-4 z-toast max-w-sm w-full"
+                class="fixed left-3 right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-toast w-auto sm:left-auto sm:right-4 sm:top-4 sm:w-full sm:max-w-sm"
                 :role="type === 'error' ? 'alert' : 'status'"
                 :aria-live="type === 'error' ? 'assertive' : 'polite'"
                 aria-atomic="true"
@@ -12,8 +12,8 @@
                     <component :is="icon" class="w-6 h-6 shrink-0" aria-hidden="true" />
 
                     <div class="flex-1 min-w-0">
-                        <p v-if="title" class="font-semibold text-sm">{{ title }}</p>
-                        <p class="text-sm">{{ message }}</p>
+                        <p v-if="title" class="break-words text-sm font-semibold">{{ title }}</p>
+                        <p class="break-words text-sm">{{ message }}</p>
                     </div>
 
                     <button
