@@ -22,27 +22,44 @@ export function applyFavicon(url) {
             ? absolutePublicUrl(url)
             : `${window.location.origin}${DEFAULT_FAVICON_PATH}`;
 
-    let icon = document.querySelector('link[rel="icon"]');
-    if (!icon) {
-        icon = document.createElement('link');
+    // Every rel="icon" link, not just the first.
+    //
+    // The page declares two - a PNG and an SVG. This used to use querySelector,
+    // which returns one element, so the SVG was left pointing at the built-in
+    // file while the PNG got the configured icon. Browsers that prefer SVG then
+    // showed the old artwork, and since that filename never changes it stayed
+    // in the cache for the week the CDN's max-age allows.
+    let icons = Array.from(document.querySelectorAll('link[rel="icon"]'));
+    if (icons.length === 0) {
+        const icon = document.createElement('link');
         icon.rel = 'icon';
         document.head.appendChild(icon);
+        icons = [icon];
     }
-    icon.href = href;
+
     const lower = href.toLowerCase();
-    if (lower.endsWith('.svg')) {
-        icon.type = 'image/svg+xml';
-    } else if (lower.endsWith('.png')) {
-        icon.type = 'image/png';
-    } else if (lower.endsWith('.ico')) {
-        icon.type = 'image/x-icon';
-    } else if (lower.endsWith('.gif')) {
-        icon.type = 'image/gif';
-    } else if (lower.endsWith('.webp')) {
-        icon.type = 'image/webp';
-    } else {
-        icon.removeAttribute('type');
-    }
+    const type = lower.endsWith('.svg')
+        ? 'image/svg+xml'
+        : lower.endsWith('.png')
+          ? 'image/png'
+          : lower.endsWith('.ico')
+            ? 'image/x-icon'
+            : lower.endsWith('.gif')
+              ? 'image/gif'
+              : lower.endsWith('.webp')
+                ? 'image/webp'
+                : null;
+
+    icons.forEach((icon) => {
+        icon.href = href;
+        // The sizes hint belongs to the markup's own file, not to this one.
+        icon.removeAttribute('sizes');
+        if (type) {
+            icon.type = type;
+        } else {
+            icon.removeAttribute('type');
+        }
+    });
 
     const shortcut = document.querySelector('link[rel="shortcut icon"]');
     if (shortcut) {

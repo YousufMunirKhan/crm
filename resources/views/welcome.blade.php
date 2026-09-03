@@ -27,19 +27,19 @@
         <meta name="apple-mobile-web-app-title" content="CRM">
         
         <!-- Apple Touch Icons -->
-        <link rel="apple-touch-icon" href="/icons/icon-180x180.png">
-        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png">
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png">
-        <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-180x180.png">
+        <link rel="apple-touch-icon" href="/icons/icon-180x180.png?v=2">
+        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png?v=2">
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png?v=2">
+        <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-180x180.png?v=2">
         
         <!-- Favicon -->
-        <link rel="icon" type="image/png" sizes="96x96" href="/icons/icon-96x96.png">
-        <link rel="icon" type="image/svg+xml" href="/icons/icon-72x72.svg">
-        <link rel="shortcut icon" href="/favicon.ico">
+        <link rel="icon" type="image/png" sizes="96x96" href="/icons/icon-96x96.png?v=2">
+        <link rel="icon" type="image/svg+xml" href="/icons/icon-72x72.svg?v=2">
+        <link rel="shortcut icon" href="/favicon.ico?v=2">
         
         <!-- Microsoft Tiles -->
         <meta name="msapplication-TileColor" content="#2563eb">
-        <meta name="msapplication-TileImage" content="/icons/icon-192x192.png">
+        <meta name="msapplication-TileImage" content="/icons/icon-192x192.png?v=2">
         
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
