@@ -1,4 +1,4 @@
-const VERSION = 'crm-pwa-v2';
+const VERSION = 'crm-pwa-v3';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -14,6 +14,8 @@ const STATIC_ASSETS = [
   '/icons/icon-192x192.png',
   '/icons/icon-384x384.png',
   '/icons/icon-512x512.png',
+  '/icons/icon-maskable-192x192.png',
+  '/icons/icon-maskable-512x512.png',
 ];
 
 const OFFLINE_HTML = `
