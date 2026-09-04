@@ -14,7 +14,10 @@
             v-if="showSidebar"
             id="app-sidebar"
             :class="[
+                // Same reason as the header: fixed to top-0 under viewport-fit=cover
+                // puts the logo row - and the close button on it - behind the notch.
                 'bg-gradient-to-b from-primary-600 via-primary-700 to-primary-800 text-white flex flex-col fixed left-0 top-0 bottom-0 z-modal transition-transform duration-300',
+                'pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]',
                 'w-[86%] max-w-[20rem] lg:w-64 lg:max-w-64 lg:min-w-64 overflow-x-hidden box-border',
                 mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
             ]"
@@ -114,11 +117,17 @@
         <!-- Main content -->
         <div :class="['flex-1 flex flex-col min-h-0 min-w-0 w-full overflow-hidden', showSidebar ? 'lg:ml-64' : '']">
             <!-- Top header - Only show if sidebar is visible -->
-            <header v-if="showSidebar" class="sticky top-0 shrink-0 min-h-14 sm:min-h-16 bg-white border-b border-slate-200 flex flex-nowrap items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 py-2 z-sticky">
+            <!--
+                The top padding carries the safe-area inset because the viewport
+                is viewport-fit=cover: without it this bar starts at the physical
+                top of the screen and the row - the menu button first - sits under
+                the notch or Dynamic Island, where it cannot be seen or tapped.
+            -->
+            <header v-if="showSidebar" class="sticky top-0 shrink-0 min-h-14 sm:min-h-16 bg-white border-b border-slate-200 flex flex-nowrap items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] z-sticky">
                 <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 sm:flex-initial">
                     <button
                         @click="mobileMenuOpen = !mobileMenuOpen"
-                        class="lg:hidden p-2 -ml-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg shrink-0 touch-manipulation"
+                        class="lg:hidden p-2 -ml-1 min-h-[44px] min-w-[44px] items-center justify-center flex text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg shrink-0 touch-manipulation"
                         aria-label="Toggle menu"
                         aria-controls="app-sidebar"
                         :aria-expanded="mobileMenuOpen ? 'true' : 'false'"
