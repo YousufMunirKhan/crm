@@ -164,8 +164,9 @@ class LeadController extends Controller
                                 LeadActivity::APPOINTMENT_STATUS_RESCHEDULED,
                             ]);
                     })
-                    ->orderBy('appointment_date')
-                    ->orderBy('appointment_time')
+                    // Newest first, matching the appointments screen.
+                    ->orderByDesc('appointment_date')
+                    ->orderByDesc('appointment_time')
                     ->limit(5);
             },
         ]);
@@ -271,8 +272,9 @@ class LeadController extends Controller
                                 LeadActivity::APPOINTMENT_STATUS_RESCHEDULED,
                             ]);
                     })
-                    ->orderBy('appointment_date')
-                    ->orderBy('appointment_time')
+                    // Newest first, matching the appointments screen.
+                    ->orderByDesc('appointment_date')
+                    ->orderByDesc('appointment_time')
                     ->limit(5);
             },
         ])->orderBy('created_at', 'desc');

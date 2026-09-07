@@ -122,6 +122,11 @@ class CustomerController extends Controller
             'leads.assignmentLogs.newAssignee',
             'leads.product',
             'leads.items.product',
+            // Newest first. This was the one place that loaded activities with no
+            // order at all, so it fell back to whatever the database returned -
+            // insertion order, oldest at the top. Everywhere else states it:
+            // FollowUpController uses latest(), assignmentLogs() orders desc.
+            'leads.activities' => fn ($q) => $q->latest(),
             'leads.activities.user',
             'leads.activities.assignee',
             'invoices.items',

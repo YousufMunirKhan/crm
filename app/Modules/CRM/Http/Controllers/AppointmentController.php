@@ -65,7 +65,14 @@ class AppointmentController extends Controller
             })->values();
         }
 
-        $activities = $activities->sortBy(function ($a) {
+        // Newest first.
+        //
+        // The list that needs an outcome spans weeks, and it used to arrive
+        // oldest first - so the appointment from three weeks ago sat at the top
+        // and yesterday's was at the bottom. People can remember how yesterday
+        // went; they cannot remember three weeks back, which is part of why so
+        // many of these were never closed.
+        $activities = $activities->sortByDesc(function ($a) {
             return ($this->appointmentDateFrom($a) ?? '') . ' ' . ($this->appointmentTimeFrom($a) ?? '00:00');
         })->values();
 
