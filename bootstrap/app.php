@@ -33,6 +33,17 @@ return Application::configure(basePath: dirname(__DIR__))
          */
         $isApi = fn (\Illuminate\Http\Request $request) => $request->is('api/*') || $request->expectsJson();
 
+        /**
+         * Mail somebody when the server breaks.
+         *
+         * Returning nothing here leaves the normal logging in place - this adds
+         * a notification, it does not replace the record. Which errors qualify,
+         * and how often the same one may mail, live in App\Support\ErrorAlerts.
+         */
+        $exceptions->report(function (\Throwable $e): void {
+            \App\Support\ErrorAlerts::report($e);
+        });
+
         $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, \Illuminate\Http\Request $request) use ($isApi) {
             if ($isApi($request)) {
                 return response()->json(['message' => 'Unauthenticated.'], 401);
