@@ -31,6 +31,7 @@ class Attendance extends Model
         'check_out_location_accuracy',
         'check_out_location_captured_at',
         'check_out_location_source',
+        'auto_closed_at',
         'work_hours',
     ];
 
@@ -63,6 +64,7 @@ class Attendance extends Model
         'check_in_location_captured_at' => 'datetime',
         'check_out_at' => 'datetime',
         'check_out_location_captured_at' => 'datetime',
+        'auto_closed_at' => 'datetime',
         'work_hours' => 'decimal:2',
         'check_in_latitude' => 'decimal:7',
         'check_in_longitude' => 'decimal:7',

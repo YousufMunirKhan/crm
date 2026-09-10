@@ -95,11 +95,15 @@ class HrController extends Controller
                 continue;
             }
 
-            if ($row->check_out_at) {
+            // Clocked out, or gave up waiting for them to. Either way they are
+            // not working now - but a shift that was closed for them has no
+            // finish time, and saying so is the point.
+            if ($row->check_out_at || $row->auto_closed_at) {
                 $finished[] = $person + [
                     'checked_in_at' => $row->check_in_at->toIso8601String(),
-                    'checked_out_at' => $row->check_out_at->toIso8601String(),
+                    'checked_out_at' => $row->check_out_at?->toIso8601String(),
                     'work_hours' => $row->work_hours === null ? null : (float) $row->work_hours,
+                    'never_clocked_out' => $row->check_out_at === null,
                 ];
 
                 continue;

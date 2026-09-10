@@ -202,6 +202,10 @@ class EmployeeLocationController extends Controller
         $shifts = Attendance::with('user:id,name')
             ->whereNotNull('check_in_at')
             ->whereNull('check_out_at')
+            // A shift nobody closed is not somebody still working. Without this
+            // they sit here being counted as on shift until the date window
+            // moves past them.
+            ->whereNull('auto_closed_at')
             ->whereDate('date', '>=', now()->subDay()->toDateString())
             ->get();
 
@@ -245,6 +249,10 @@ class EmployeeLocationController extends Controller
         return Attendance::where('user_id', $user->id)
             ->whereNotNull('check_in_at')
             ->whereNull('check_out_at')
+            // A shift nobody closed is not somebody still working. Without this
+            // they sit here being counted as on shift until the date window
+            // moves past them.
+            ->whereNull('auto_closed_at')
             ->whereDate('date', '>=', now()->subDay()->toDateString())
             ->latest('check_in_at')
             ->first();

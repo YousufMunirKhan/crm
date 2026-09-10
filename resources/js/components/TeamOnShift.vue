@@ -71,7 +71,14 @@
                 <ul class="mt-1 divide-y divide-slate-50">
                     <li v-for="person in data.finished" :key="person.id" class="flex items-center justify-between gap-3 py-2">
                         <span class="truncate text-sm text-slate-700">{{ person.name }}</span>
-                        <span class="shrink-0 text-xs tabular-nums text-slate-500">
+                        <span
+                            v-if="person.never_clocked_out"
+                            class="shrink-0 text-xs text-warning-800"
+                            title="The shift was closed automatically. No finish time was recorded."
+                        >
+                            never clocked out
+                        </span>
+                        <span v-else class="shrink-0 text-xs tabular-nums text-slate-500">
                             {{ formatTime(person.checked_in_at) }} – {{ formatTime(person.checked_out_at) }}
                         </span>
                     </li>

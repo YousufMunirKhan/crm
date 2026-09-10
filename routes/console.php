@@ -57,6 +57,14 @@ Schedule::command('crm:prune-locations')
     ->dailyAt('02:30')
     ->timezone(config('app.timezone'));
 
+// Shifts nobody clocked out of. A quarter of every attendance row was sitting
+// open, read as "still on shift" by anything that asks who is working, and the
+// count grew every day. Hourly so an abandoned shift stops counting within the
+// hour rather than at the end of the day.
+Schedule::command('crm:close-abandoned-shifts')
+    ->hourly()
+    ->timezone(config('attendance.timezone'));
+
 // Start campaigns whose scheduled send time has arrived.
 Schedule::command('campaigns:dispatch-due')
     ->everyFiveMinutes();
