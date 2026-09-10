@@ -3,7 +3,7 @@
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
             <h3 class="text-sm font-semibold text-slate-800">Who is on shift</h3>
             <div class="flex items-center gap-2">
-                <router-link to="/attendance-report" class="text-xs font-medium text-primary-700 hover:underline">
+                <router-link to="/hr/attendance-report" class="text-xs font-medium text-primary-700 hover:underline">
                     Attendance
                 </router-link>
                 <button
