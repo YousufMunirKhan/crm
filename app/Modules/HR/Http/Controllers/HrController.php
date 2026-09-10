@@ -52,6 +52,65 @@ class HrController extends Controller
         }
     }
 
+    /**
+     * Replace the photo on your own attendance for today.
+     *
+     * The photo is proof of attendance, so replacing one is not a neutral edit:
+     * done quietly it makes every photo in the system worth less, because none
+     * of them can be assumed to be the one that was taken at the time.
+     *
+     * Two things keep it honest. The previous file is left on disk rather than
+     * overwritten, and the swap is written to the audit log with both paths, so
+     * the original is still there and still reachable. Restricted to Admin and
+     * System Admin at the route.
+     */
+    public function replaceTodayPhoto(Request $request)
+    {
+        $data = $request->validate([
+            'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'which' => ['required', 'in:check_in,check_out'],
+        ]);
+
+        $user = $request->user();
+        $today = now()->toDateString();
+
+        // whereDate rather than a plain equality: the column is cast to a date,
+        // and on an engine without a real date type that writes a midnight
+        // timestamp, which never equals a bare Y-m-d string.
+        $attendance = Attendance::where('user_id', $user->id)
+            ->whereDate('date', $today)
+            ->first();
+
+        if (! $attendance || ! $attendance->check_in_at) {
+            return response()->json(['error' => 'You have not clocked in today.'], 400);
+        }
+
+        if ($data['which'] === 'check_out' && ! $attendance->check_out_at) {
+            return response()->json(['error' => 'You have not clocked out yet.'], 400);
+        }
+
+        $column = $data['which'].'_photo_path';
+        $previous = $attendance->{$column};
+
+        $photoPath = $request->file('photo')->store("attendance-proof/{$user->id}/{$today}", 'public');
+
+        if (! $photoPath) {
+            return response()->json(['error' => 'Could not save the photo. Please try again.'], 400);
+        }
+
+        $attendance->{$column} = $photoPath;
+        $attendance->save();
+
+        app(\App\Services\AuditLogService::class)->log(
+            'attendance.photo_replaced',
+            $attendance,
+            [$column => $previous],
+            [$column => $photoPath],
+        );
+
+        return response()->json($attendance->fresh());
+    }
+
     private function attendanceProofFromRequest(Request $request, int $userId, string $action): array
     {
         $data = $request->validate([

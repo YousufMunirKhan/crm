@@ -236,6 +236,11 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     Route::get('/hr/attendance/today', [HrController::class, 'todayStatus']);
     Route::post('/hr/attendance/check-in', [HrController::class, 'checkIn']);
     Route::post('/hr/attendance/check-out', [HrController::class, 'checkOut']);
+    // Retaking your own attendance photo. Admins only: the photo is the proof,
+    // so being able to change it after the fact is not something to hand to
+    // everyone whose attendance it records. The swap is written to the audit log.
+    Route::post('/hr/attendance/today/photo', [HrController::class, 'replaceTodayPhoto'])
+        ->middleware('role:Admin,System Admin');
     // Everybody's attendance, as opposed to your own clock in and out above,
     // which stays open to all staff.
     Route::middleware('nav.section:hr_attendance')->group(function () {

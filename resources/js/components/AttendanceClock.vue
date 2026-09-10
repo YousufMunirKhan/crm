@@ -113,6 +113,15 @@
                             </div>
                         </div>
                     </div>
+                    <button
+                        v-if="canReplacePhoto && status.checked_in"
+                        type="button"
+                        @click="replacePhoto('check_in')"
+                        :disabled="!!replacingPhoto"
+                        class="mt-3 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
+                    >
+                        {{ replacingPhoto === 'check_in' ? 'Retaking...' : 'Retake photo' }}
+                    </button>
                 </div>
                 <div class="rounded-lg border border-slate-200 p-3">
                     <div class="font-medium text-slate-900">Check-out proof</div>
@@ -144,6 +153,15 @@
                             </div>
                         </div>
                     </div>
+                    <button
+                        v-if="canReplacePhoto && status.checked_out"
+                        type="button"
+                        @click="replacePhoto('check_out')"
+                        :disabled="!!replacingPhoto"
+                        class="mt-3 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
+                    >
+                        {{ replacingPhoto === 'check_out' ? 'Retaking...' : 'Retake photo' }}
+                    </button>
                 </div>
                 </div>
             </details>
@@ -161,15 +179,26 @@ import {
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
+import { useAuthStore } from '@/stores/auth';
 import { useShiftLocation } from '@/composables/useShiftLocation';
 
 const emit = defineEmits(['updated']);
 const toast = useToastStore();
+const auth = useAuthStore();
 const shiftLocation = useShiftLocation();
 
 const loading = ref(true);
 const actionLoading = ref(false);
 const proofError = ref('');
+const replacingPhoto = ref('');
+
+/**
+ * Retaking the proof photo is an admin's option, not everyone's.
+ *
+ * The server enforces this on the route - this only decides whether the button
+ * is drawn. It is the same pair of roles either way.
+ */
+const canReplacePhoto = computed(() => ['Admin', 'System Admin'].includes(auth.role));
 const status = ref({
     checked_in: false,
     checked_out: false,
@@ -257,6 +286,43 @@ const getLocation = () => new Promise((resolve, reject) => {
     );
 });
 
+/**
+ * Errors that mean "this browser cannot open a camera for you", as opposed to
+ * "you said no". A desktop with no webcam, a camera already held by another
+ * app, or a machine whose only camera does not report a facing direction all
+ * land here - and for all of them the file input is a working way through.
+ */
+const NO_USABLE_CAMERA = [
+    'NotFoundError',
+    'DevicesNotFoundError',
+    'OverconstrainedError',
+    'ConstraintNotSatisfiedError',
+    'NotReadableError',
+    'TrackStartError',
+];
+
+/**
+ * Prefer the selfie camera, settle for any.
+ *
+ * facingMode: 'user' is the right thing to ask for on a phone. On a desktop it
+ * often matches nothing, and asking again without it is the difference between
+ * a working webcam and "Requested device not found".
+ */
+const openCameraStream = async () => {
+    try {
+        return await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } },
+            audio: false,
+        });
+    } catch (error) {
+        if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
+            throw error;
+        }
+
+        return await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    }
+};
+
 const capturePhoto = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
         return capturePhotoFromFileInput();
@@ -264,10 +330,7 @@ const capturePhoto = async () => {
 
     let stream = null;
     try {
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } },
-            audio: false,
-        });
+        stream = await openCameraStream();
 
         const video = document.createElement('video');
         video.srcObject = stream;
@@ -299,6 +362,15 @@ const capturePhoto = async () => {
         if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
             throw new Error('Please allow camera permission to record attendance.');
         }
+
+        // There is no camera this browser can open. The file input still gets a
+        // photo - the camera app on a phone, an existing file on a desktop - and
+        // that beats refusing to let somebody clock in at all, which is what
+        // "Requested device not found" amounted to.
+        if (NO_USABLE_CAMERA.includes(error?.name)) {
+            return capturePhotoFromFileInput();
+        }
+
         throw error;
     } finally {
         if (stream) stream.getTracks().forEach((track) => track.stop());
@@ -382,6 +454,39 @@ const checkIn = async () => {
 const checkOut = async () => {
     await submitAttendance('/api/hr/attendance/check-out', 'Successfully checked out!', 'Time Out');
     shiftLocation.stop();
+};
+
+/**
+ * Take the proof photo again for today.
+ *
+ * Only the photo. The location and the time it was clocked stay as they were
+ * recorded - a retake is for a photo that came out unusable, not a way to
+ * re-record where somebody was.
+ */
+const replacePhoto = async (which) => {
+    if (replacingPhoto.value) return;
+
+    replacingPhoto.value = which;
+    proofError.value = '';
+
+    try {
+        const photo = await capturePhoto();
+        const form = new FormData();
+        form.append('photo', photo, 'attendance.jpg');
+        form.append('which', which);
+
+        await axios.post('/api/hr/attendance/today/photo', form);
+        await fetchStatus();
+        emit('updated');
+        toast.success('Photo replaced.', 'Attendance');
+    } catch (error) {
+        console.error('Photo replace failed:', error);
+        const message = error.response?.data?.error || error.message || 'Could not replace the photo.';
+        proofError.value = message;
+        toast.error(message, 'Error');
+    } finally {
+        replacingPhoto.value = '';
+    }
 };
 
 const refreshStatus = async () => {
