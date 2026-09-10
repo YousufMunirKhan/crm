@@ -199,6 +199,48 @@
                 </div>
             </details>
         </div>
+
+        <!--
+            The camera, on screen. The photo is taken when the person presses the
+            button, not half a second after the stream opens.
+        -->
+        <div
+            v-if="cameraPreviewOpen"
+            class="fixed inset-0 z-modal flex items-center justify-center bg-slate-900/80 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Attendance photo"
+        >
+            <div class="w-full max-w-sm rounded-xl bg-white p-4 shadow-lg">
+                <div class="text-sm font-medium text-slate-900">Attendance photo</div>
+                <p class="mt-1 text-xs text-slate-500">
+                    Check you are in frame, then take the photo.
+                </p>
+                <video
+                    ref="previewVideo"
+                    autoplay
+                    playsinline
+                    muted
+                    class="mt-3 w-full -scale-x-100 rounded-lg bg-slate-900"
+                ></video>
+                <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <button
+                        type="button"
+                        @click="takePhotoNow"
+                        class="min-h-11 flex-1 rounded-lg bg-success-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-success-700 touch-manipulation"
+                    >
+                        Take photo
+                    </button>
+                    <button
+                        type="button"
+                        @click="cancelCameraPreview"
+                        class="min-h-11 rounded-lg border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 touch-manipulation"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -209,7 +251,7 @@ import {
     CheckIcon,
     ClockIcon,
 } from '@heroicons/vue/24/outline';
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
@@ -229,6 +271,12 @@ const replacingPhoto = ref('');
 const photoPickerOpen = ref(false);
 let photoPickerResolve = null;
 let photoPickerReject = null;
+
+/** The live camera, shown so people can see themselves before the shutter. */
+const cameraPreviewOpen = ref(false);
+const previewVideo = ref(null);
+let previewResolve = null;
+let previewReject = null;
 
 /**
  * Retaking the proof photo is an admin's option, not everyone's.
@@ -367,35 +415,9 @@ const capturePhoto = async () => {
     }
 
     let stream = null;
+
     try {
         stream = await openCameraStream();
-
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.muted = true;
-        video.playsInline = true;
-        video.setAttribute('playsinline', 'true');
-        video.setAttribute('webkit-playsinline', 'true');
-        await video.play();
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        const sourceWidth = video.videoWidth || 720;
-        const sourceHeight = video.videoHeight || 540;
-        const maxWidth = 960;
-        const scale = Math.min(1, maxWidth / sourceWidth);
-        const width = Math.round(sourceWidth * scale);
-        const height = Math.round(sourceHeight * scale);
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext('2d').drawImage(video, 0, 0, width, height);
-
-        return await new Promise((resolve, reject) => {
-            canvas.toBlob((blob) => {
-                if (blob) resolve(blob);
-                else reject(new Error('Could not capture photo. Please try again.'));
-            }, 'image/jpeg', 0.82);
-        });
     } catch (error) {
         if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
             throw new Error('Please allow camera permission to record attendance.');
@@ -410,9 +432,93 @@ const capturePhoto = async () => {
         }
 
         throw error;
-    } finally {
-        if (stream) stream.getTracks().forEach((track) => track.stop());
     }
+
+    try {
+        return await photoFromPreview(stream);
+    } finally {
+        stream.getTracks().forEach((track) => track.stop());
+        closeCameraPreview();
+    }
+};
+
+/**
+ * Show the camera and let the person take the photo.
+ *
+ * The video element used to be created in script and never put on the page: it
+ * played out of sight, and half a second later a frame was grabbed and sent.
+ * Nobody saw what was taken - whether they were in frame, whether the lens was
+ * covered, whether the picture was of the ceiling. For a photo whose whole
+ * purpose is to show who was there, that is the wrong way round.
+ *
+ * The preview is mirrored because that is what people expect to see of
+ * themselves. The captured frame is not - the file is evidence, and it should
+ * be the way the camera saw it.
+ */
+const photoFromPreview = async (stream) => {
+    cameraPreviewOpen.value = true;
+    await nextTick();
+
+    const video = previewVideo.value;
+
+    if (!video) {
+        throw new Error('Could not open the camera preview. Please try again.');
+    }
+
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
+    await video.play();
+
+    return new Promise((resolve, reject) => {
+        previewResolve = resolve;
+        previewReject = reject;
+    });
+};
+
+const takePhotoNow = () => {
+    const video = previewVideo.value;
+
+    if (!video?.videoWidth) {
+        return;
+    }
+
+    const maxWidth = 960;
+    const scale = Math.min(1, maxWidth / video.videoWidth);
+    const width = Math.round(video.videoWidth * scale);
+    const height = Math.round(video.videoHeight * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(video, 0, 0, width, height);
+
+    const resolve = previewResolve;
+    const reject = previewReject;
+    previewResolve = null;
+    previewReject = null;
+
+    canvas.toBlob((blob) => {
+        if (blob) resolve?.(blob);
+        else reject?.(new Error('Could not capture photo. Please try again.'));
+    }, 'image/jpeg', 0.82);
+};
+
+const cancelCameraPreview = () => {
+    const reject = previewReject;
+    previewResolve = null;
+    previewReject = null;
+    reject?.(new Error('Attendance needs a photo, so nothing was recorded.'));
+};
+
+const closeCameraPreview = () => {
+    cameraPreviewOpen.value = false;
+
+    if (previewVideo.value) {
+        previewVideo.value.srcObject = null;
+    }
+
+    previewResolve = null;
+    previewReject = null;
 };
 
 /**
@@ -500,8 +606,11 @@ const submitAttendance = async (url, successMessage, title) => {
         proofError.value = message;
         toast.error(message, 'Error');
     } finally {
-        // If something else in the run failed - location refused, say - the photo
-        // panel is left asking for something nobody is waiting for any more.
+        // If something else in the run failed - location refused, say - the camera
+        // and the photo panel are left waiting on somebody who has already been
+        // told it did not work. Cancelling the preview also stops the stream,
+        // because that is what releases the camera light.
+        cancelCameraPreview();
         settlePhotoPicker();
         actionLoading.value = false;
     }
@@ -548,6 +657,11 @@ const replacePhoto = async (which) => {
         proofError.value = message;
         toast.error(message, 'Error');
     } finally {
+        // If something else in the run failed - location refused, say - the camera
+        // and the photo panel are left waiting on somebody who has already been
+        // told it did not work. Cancelling the preview also stops the stream,
+        // because that is what releases the camera light.
+        cancelCameraPreview();
         settlePhotoPicker();
         replacingPhoto.value = '';
     }
