@@ -136,7 +136,7 @@ class EmployeeLocationController extends Controller
 
         $request->validate(['date' => ['nullable', 'date']]);
 
-        $date = $request->date ? Carbon::parse($request->date)->toDateString() : now()->toDateString();
+        $date = $request->date ? Carbon::parse($request->date)->toDateString() : Attendance::workingDate();
 
         // whereDate, not where: `date` is cast to a date on the model, so
         // Eloquent stores it as a full datetime and a plain string comparison

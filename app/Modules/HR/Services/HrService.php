@@ -23,7 +23,7 @@ class HrService
 
     public function checkIn(int $userId, array $proof = []): Attendance
     {
-        $today = now()->toDateString();
+        $today = Attendance::workingDate();
 
         $attendance = Attendance::firstOrNew([
             'user_id' => $userId,
@@ -53,7 +53,7 @@ class HrService
 
     public function checkOut(int $userId, array $proof = []): Attendance
     {
-        $today = now()->toDateString();
+        $today = Attendance::workingDate();
 
         // whereDate rather than a plain equality: the column is cast to a date,
         // and on an engine without a real date type that writes a midnight

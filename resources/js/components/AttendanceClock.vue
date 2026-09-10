@@ -256,6 +256,7 @@ import axios from 'axios';
 import { useToastStore } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
 import { useShiftLocation } from '@/composables/useShiftLocation';
+import { UK_TIMEZONE, ukTime } from '@/utils/datetime';
 
 const emit = defineEmits(['updated']);
 const toast = useToastStore();
@@ -297,7 +298,10 @@ const elapsedSeconds = ref(0);
 
 let workingTimer = null;
 
+// The UK date, which is the day the shift is filed under - not the reader's,
+// which for anybody far enough east is already tomorrow.
 const currentDate = computed(() => new Date().toLocaleDateString('en-GB', {
+    timeZone: UK_TIMEZONE,
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -332,11 +336,7 @@ const workingHours = computed(() => {
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 });
 
-const formatTime = (timeString) => {
-    if (!timeString) return '';
-    const date = new Date(timeString);
-    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-};
+const formatTime = (timeString) => ukTime(timeString);
 
 const calculateElapsed = () => {
     if (!status.value.check_in_time) return 0;

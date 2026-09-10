@@ -64,7 +64,7 @@ class HrController extends Controller
      */
     public function todayRoster(Request $request)
     {
-        $today = now()->toDateString();
+        $today = Attendance::workingDate();
 
         $users = User::query()
             ->with('role:id,name')
@@ -149,7 +149,7 @@ class HrController extends Controller
         ]);
 
         $user = $request->user();
-        $today = now()->toDateString();
+        $today = Attendance::workingDate();
 
         // whereDate rather than a plain equality: the column is cast to a date,
         // and on an engine without a real date type that writes a midnight
@@ -226,7 +226,7 @@ class HrController extends Controller
             throw new \Exception('Please allow location permission to record attendance.');
         }
 
-        $date = now()->toDateString();
+        $date = Attendance::workingDate();
         $directory = "attendance-proof/{$userId}/{$date}";
         $photoPath = $request->file('photo')->store($directory, 'public');
 
@@ -540,7 +540,7 @@ class HrController extends Controller
     {
         $user = $request->user();
         $userId = $user->id;
-        $today = now()->toDateString();
+        $today = Attendance::workingDate();
 
         $attendance = Attendance::where('user_id', $userId)
             ->where('date', $today)

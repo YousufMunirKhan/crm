@@ -4,13 +4,22 @@
             A greeting, not a second page title - the top bar already says
             "Dashboard". Demoted to h2 so the page keeps exactly one h1.
         -->
-        <div class="min-w-0">
-            <h2 class="text-page-title text-slate-900 break-words">
-                Welcome back, {{ welcomeName }}
-            </h2>
-            <p class="page-lead mt-1">
-                Here’s what’s happening with your pipeline today.
-            </p>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+                <h2 class="text-page-title text-slate-900 break-words">
+                    Welcome back, {{ welcomeName }}
+                </h2>
+                <p class="page-lead mt-1">
+                    Here’s what’s happening with your pipeline today.
+                </p>
+            </div>
+            <!--
+                Shown to everybody, not just the people abroad. Every shift and
+                deadline on this system is a UK one, and half the staff are not
+                in the UK - without this a 9am start means two different things
+                depending on who is reading it.
+            -->
+            <UkClock class="shrink-0" />
         </div>
 
         <!--
@@ -571,6 +580,7 @@ import {
 import AttendanceClock from '@/components/AttendanceClock.vue';
 import NeedsAttention from '@/components/NeedsAttention.vue';
 import TeamOnShift from '@/components/TeamOnShift.vue';
+import UkClock from '@/components/UkClock.vue';
 import AttendanceWorkHoursChart from '@/components/AttendanceWorkHoursChart.vue';
 import LogActivityModal from '@/components/LogActivityModal.vue';
 import CustomerName from '@/components/CustomerName.vue';

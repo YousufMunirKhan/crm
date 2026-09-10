@@ -74,6 +74,19 @@ class Attendance extends Model
         'check_out_location_accuracy' => 'decimal:2',
     ];
 
+    /**
+     * Today, as the business means it.
+     *
+     * Timestamps are stored in UTC and that is not changing - it is the only
+     * sane way to keep them. But the day a shift is filed under is a UK day,
+     * and for half the year UTC midnight lands at one in the morning here, so
+     * anyone starting at half past midnight was being filed under yesterday.
+     */
+    public static function workingDate(): string
+    {
+        return now()->setTimezone(config('attendance.timezone', 'Europe/London'))->toDateString();
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class);

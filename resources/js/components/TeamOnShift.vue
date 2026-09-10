@@ -103,15 +103,15 @@
 import { ArrowPathIcon } from '@heroicons/vue/24/outline';
 import { onMounted, onUnmounted, ref } from 'vue';
 import axios from 'axios';
+import { ukTime } from '@/utils/datetime';
 
 const loading = ref(true);
 const data = ref(null);
 let timer = null;
 
-const formatTime = (iso) => {
-    if (!iso) return '';
-    return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-};
+// UK time, not the reader's. Somebody looking at this from Karachi was seeing
+// shift times shifted five hours from the ones on the report.
+const formatTime = (iso) => ukTime(iso);
 
 /** Minutes are what the server counts in; hours are what people read in. */
 const elapsed = (minutes) => {
