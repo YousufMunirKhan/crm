@@ -36,6 +36,13 @@ Route::get('/downloads/email-merge-tags-guide.md', function () {
     ]);
 })->name('downloads.email-merge-tags-guide');
 
+// The scheduler, for a host with no cron. Declared before the catch-all so it
+// is not swallowed by it. Throttled because it is unauthenticated by nature -
+// the token is the whole of the check - and a pinger only needs one a minute.
+Route::get('/scheduler/run/{token}', \App\Http\Controllers\SchedulerRunController::class)
+    ->middleware('throttle:10,1')
+    ->name('scheduler.run');
+
 // SPA catch-all. Must exclude /admin (Filament panel) and /livewire
 // (Livewire's update endpoint), or they render the Vue shell instead.
 Route::get('/{any}', function () {
