@@ -74,6 +74,39 @@
                 moment you clock out.
             </p>
 
+            <!--
+                Only appears when the browser could not open a camera at all - no
+                webcam, or one already held by another app. The control has to be
+                pressed by hand: a file dialog cannot be opened from script once
+                the click that started this has been awaited away, which is why
+                the old off-screen input never showed anything.
+            -->
+            <div v-if="photoPickerOpen" class="rounded-lg border border-warning-200 bg-warning-50 p-3">
+                <div class="text-sm font-medium text-warning-800">No camera available on this device</div>
+                <p class="mt-1 text-xs text-warning-800">
+                    Take or choose a photo instead, and attendance will be recorded as normal.
+                </p>
+                <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <label class="min-h-11 flex-1 cursor-pointer rounded-lg bg-primary-600 px-4 py-3 text-center text-sm font-medium text-white transition-colors hover:bg-primary-700 touch-manipulation">
+                        Take or choose photo
+                        <input
+                            type="file"
+                            accept="image/*"
+                            capture="user"
+                            class="sr-only"
+                            @change="onPhotoPicked"
+                        />
+                    </label>
+                    <button
+                        type="button"
+                        @click="cancelPhotoPicker"
+                        class="min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 touch-manipulation"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+
             <div v-if="proofError" class="rounded-lg border border-danger-200 bg-danger-50 p-3 text-sm text-danger-700">
                 {{ proofError }}
             </div>
@@ -191,6 +224,11 @@ const loading = ref(true);
 const actionLoading = ref(false);
 const proofError = ref('');
 const replacingPhoto = ref('');
+
+/** Shown only when the browser could not open a camera at all. */
+const photoPickerOpen = ref(false);
+let photoPickerResolve = null;
+let photoPickerReject = null;
 
 /**
  * Retaking the proof photo is an admin's option, not everyone's.
@@ -325,7 +363,7 @@ const openCameraStream = async () => {
 
 const capturePhoto = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-        return capturePhotoFromFileInput();
+        return requestPhotoFromUser();
     }
 
     let stream = null;
@@ -368,7 +406,7 @@ const capturePhoto = async () => {
         // that beats refusing to let somebody clock in at all, which is what
         // "Requested device not found" amounted to.
         if (NO_USABLE_CAMERA.includes(error?.name)) {
-            return capturePhotoFromFileInput();
+            return requestPhotoFromUser();
         }
 
         throw error;
@@ -377,27 +415,49 @@ const capturePhoto = async () => {
     }
 };
 
-const capturePhotoFromFileInput = () => new Promise((resolve, reject) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'user';
-    input.style.position = 'fixed';
-    input.style.left = '-9999px';
-    document.body.appendChild(input);
-
-    input.addEventListener('change', () => {
-        const file = input.files?.[0];
-        document.body.removeChild(input);
-        if (file) {
-            resolve(file);
-        } else {
-            reject(new Error('Please capture a photo to record attendance.'));
-        }
-    }, { once: true });
-
-    input.click();
+/**
+ * Ask the person for a photo, because the camera could not be opened.
+ *
+ * This used to build an input off-screen and click it in script. That cannot
+ * work here: by the time we know the camera failed we have awaited getUserMedia
+ * at least once, the user activation from pressing the button is gone, and a
+ * browser will not open a file dialog without one. Nothing appeared, and since
+ * the promise only ever settled on `change`, the button sat on "Capturing
+ * proof..." for good.
+ *
+ * So the panel is shown instead and the person presses the control themselves,
+ * which is a real gesture. Cancelling rejects rather than hanging.
+ */
+const requestPhotoFromUser = () => new Promise((resolve, reject) => {
+    photoPickerResolve = resolve;
+    photoPickerReject = reject;
+    photoPickerOpen.value = true;
 });
+
+const settlePhotoPicker = () => {
+    photoPickerOpen.value = false;
+    photoPickerResolve = null;
+    photoPickerReject = null;
+};
+
+const onPhotoPicked = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    // Dismissing the file dialog is not the same as giving up on clocking in -
+    // leave the panel up so they can try again.
+    if (!file) return;
+
+    const resolve = photoPickerResolve;
+    settlePhotoPicker();
+    resolve?.(file);
+};
+
+const cancelPhotoPicker = () => {
+    const reject = photoPickerReject;
+    settlePhotoPicker();
+    reject?.(new Error('Attendance needs a photo, so nothing was recorded.'));
+};
 
 const collectProof = async () => {
     proofError.value = '';
@@ -440,6 +500,9 @@ const submitAttendance = async (url, successMessage, title) => {
         proofError.value = message;
         toast.error(message, 'Error');
     } finally {
+        // If something else in the run failed - location refused, say - the photo
+        // panel is left asking for something nobody is waiting for any more.
+        settlePhotoPicker();
         actionLoading.value = false;
     }
 };
@@ -485,6 +548,7 @@ const replacePhoto = async (which) => {
         proofError.value = message;
         toast.error(message, 'Error');
     } finally {
+        settlePhotoPicker();
         replacingPhoto.value = '';
     }
 };
