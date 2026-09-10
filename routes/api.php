@@ -236,6 +236,10 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     Route::get('/hr/attendance/today', [HrController::class, 'todayStatus']);
     Route::post('/hr/attendance/check-in', [HrController::class, 'checkIn']);
     Route::post('/hr/attendance/check-out', [HrController::class, 'checkOut']);
+    // Who is available right now. Read-only and about today only, which is why
+    // it sits out here rather than behind the full attendance section.
+    Route::get('/hr/attendance/today-roster', [HrController::class, 'todayRoster'])
+        ->middleware('role:Admin,Manager,System Admin');
     // Retaking your own attendance photo. Admins only: the photo is the proof,
     // so being able to change it after the fact is not something to hand to
     // everyone whose attendance it records. The swap is written to the audit log.

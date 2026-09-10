@@ -76,11 +76,16 @@
                 </router-link>
             </div>
 
-            <!-- A count tells you the shape of the problem; twenty names with a
-                 number beside them is the thing somebody can act on. -->
+            <!-- A count tells you the shape of the problem; a few names with a
+                 number beside them is the thing somebody can act on.
+
+                 Five, not the whole list. Twenty rows of it pushed everything
+                 else on the dashboard off the screen, and a worklist nobody
+                 scrolls past the top of may as well be five rows long. The rest
+                 are one link away. -->
             <ul class="divide-y divide-slate-50">
                 <li
-                    v-for="lead in data.stalest"
+                    v-for="lead in visibleStalest"
                     :key="lead.id"
                     class="flex flex-col gap-2 px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
                 >
@@ -111,6 +116,14 @@
                     <QuickLogActivity :lead-id="lead.id" compact class="shrink-0" @logged="refresh" />
                 </li>
             </ul>
+
+            <router-link
+                v-if="data.stalest.length > STALEST_SHOWN"
+                to="/leads?stale_days=30"
+                class="block border-t border-slate-100 px-4 py-3 text-center text-xs font-medium text-primary-700 hover:bg-slate-50 hover:underline"
+            >
+                View all {{ data.leads.quiet_30 }} without contact
+            </router-link>
         </div>
 
         <!-- ── What is missing from the records ───────────────────────────── -->
@@ -153,6 +166,11 @@ import { formatLeadStage } from '@/utils/displayFormat';
  */
 const loading = ref(true);
 const data = ref(null);
+
+/** How many of the stalest to put on the dashboard. The rest are a link away. */
+const STALEST_SHOWN = 5;
+
+const visibleStalest = computed(() => (data.value?.stalest ?? []).slice(0, STALEST_SHOWN));
 
 const tiles = computed(() => {
     if (! data.value) return [];

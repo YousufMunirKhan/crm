@@ -3,6 +3,7 @@
 namespace App\Modules\HR\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Modules\HR\Models\Attendance;
 use App\Modules\HR\Models\Salary;
 use App\Modules\HR\Models\EmployeeTarget;
@@ -50,6 +51,78 @@ class HrController extends Controller
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 400);
         }
+    }
+
+    /**
+     * Who is on shift, who has finished, and who never started - today.
+     *
+     * The existing live-map endpoint answers a different question: it is about
+     * where people are and whether their phone is still reporting. What an
+     * admin opening the dashboard wants first is simpler than that - who is
+     * available right now - and the people who have not clocked in are a real
+     * part of that answer, so they are counted rather than left out.
+     */
+    public function todayRoster(Request $request)
+    {
+        $today = now()->toDateString();
+
+        $users = User::query()
+            ->with('role:id,name')
+            // is_active is nullable on older rows, and null there means nobody
+            // ever disabled them rather than that they are gone.
+            ->where(fn ($q) => $q->where('is_active', true)->orWhereNull('is_active'))
+            ->orderBy('name')
+            ->get(['id', 'name', 'role_id']);
+
+        $attendance = Attendance::whereDate('date', $today)->get()->keyBy('user_id');
+
+        $onShift = [];
+        $finished = [];
+        $notIn = [];
+
+        foreach ($users as $user) {
+            $row = $attendance->get($user->id);
+
+            $person = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'role' => $user->role?->name,
+            ];
+
+            if (! $row || ! $row->check_in_at) {
+                $notIn[] = $person;
+
+                continue;
+            }
+
+            if ($row->check_out_at) {
+                $finished[] = $person + [
+                    'checked_in_at' => $row->check_in_at->toIso8601String(),
+                    'checked_out_at' => $row->check_out_at->toIso8601String(),
+                    'work_hours' => $row->work_hours === null ? null : (float) $row->work_hours,
+                ];
+
+                continue;
+            }
+
+            $onShift[] = $person + [
+                'checked_in_at' => $row->check_in_at->toIso8601String(),
+                'minutes_on_shift' => (int) $row->check_in_at->diffInMinutes(now()),
+                'location_name' => $row->check_in_location_name,
+            ];
+        }
+
+        return response()->json([
+            'date' => $today,
+            'counts' => [
+                'on_shift' => count($onShift),
+                'finished' => count($finished),
+                'not_in' => count($notIn),
+            ],
+            'on_shift' => $onShift,
+            'finished' => $finished,
+            'not_in' => $notIn,
+        ]);
     }
 
     /**

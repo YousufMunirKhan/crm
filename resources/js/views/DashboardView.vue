@@ -14,6 +14,21 @@
         </div>
 
         <!--
+            First thing on the page, because it is the first thing anybody does.
+            The clock used to sit below the stat cards and the leaderboard - past
+            a screen and a half of numbers - which is a long way to scroll to
+            press one button at the start of a shift.
+
+            The roster sits beside it for the same reason: an admin opening this
+            wants to know who is actually working right now before anything else
+            on the page is worth reading.
+        -->
+        <div class="grid gap-4" :class="canUseOrgDashboardFilters ? 'lg:grid-cols-2' : ''">
+            <AttendanceClock />
+            <TeamOnShift v-if="canUseOrgDashboardFilters" />
+        </div>
+
+        <!--
             Above the date range on purpose. Everything below this point answers
             "what happened in a window", which on a quiet week is a screen of
             zeroes; this answers "what is rotting right now", which is the
@@ -296,9 +311,6 @@
             </EmptyState>
         </section>
 
-        <!-- Attendance Clock for non-admin -->
-        <AttendanceClock />
-
         <!-- Attendance: hours per day (only users who checked in) -->
         <BaseCard
             title="Attendance by day"
@@ -558,6 +570,7 @@ import {
 } from '@/components/base';
 import AttendanceClock from '@/components/AttendanceClock.vue';
 import NeedsAttention from '@/components/NeedsAttention.vue';
+import TeamOnShift from '@/components/TeamOnShift.vue';
 import AttendanceWorkHoursChart from '@/components/AttendanceWorkHoursChart.vue';
 import LogActivityModal from '@/components/LogActivityModal.vue';
 import CustomerName from '@/components/CustomerName.vue';
