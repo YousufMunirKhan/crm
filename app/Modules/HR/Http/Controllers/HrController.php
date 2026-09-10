@@ -104,6 +104,8 @@ class HrController extends Controller
                     'checked_out_at' => $row->check_out_at?->toIso8601String(),
                     'work_hours' => $row->work_hours === null ? null : (float) $row->work_hours,
                     'never_clocked_out' => $row->check_out_at === null,
+                    'sessions_count' => (int) $row->sessions_count,
+                    'breaks_count' => (int) $row->breaks_count,
                 ];
 
                 continue;
@@ -113,6 +115,8 @@ class HrController extends Controller
                 'checked_in_at' => $row->check_in_at->toIso8601String(),
                 'minutes_on_shift' => (int) $row->check_in_at->diffInMinutes(now()),
                 'location_name' => $row->check_in_location_name,
+                'sessions_count' => (int) $row->sessions_count,
+                'breaks_count' => (int) $row->breaks_count,
             ];
         }
 
@@ -542,16 +546,35 @@ class HrController extends Controller
         $userId = $user->id;
         $today = Attendance::workingDate();
 
-        $attendance = Attendance::where('user_id', $userId)
-            ->where('date', $today)
+        $attendance = Attendance::with('sessions')
+            ->where('user_id', $userId)
+            ->whereDate('date', $today)
             ->first();
 
+        $sessions = $attendance?->sessions ?? collect();
+        $openSession = $sessions->first(fn ($s) => $s->check_out_at === null && $s->auto_closed_at === null);
+        $limit = max(1, (int) config('attendance.max_sessions_per_day', 6));
+
         return response()->json([
-            'checked_in' => $attendance?->check_in_at !== null,
+            // checked_in now means "clocked in right now", which is what the
+            // button needs to know. Somebody on their lunch break has a day's
+            // attendance and is not currently working, and those are two
+            // different questions.
+            'checked_in' => $openSession !== null,
             'checked_out' => $attendance?->check_out_at !== null,
-            'check_in_time' => $attendance?->check_in_at,
+            'check_in_time' => $openSession?->check_in_at ?? $attendance?->check_in_at,
             'check_out_time' => $attendance?->check_out_at,
             'attendance' => $attendance,
+            'sessions' => $sessions->map(fn ($s) => [
+                'sequence' => $s->sequence,
+                'check_in_at' => $s->check_in_at?->toIso8601String(),
+                'check_out_at' => $s->check_out_at?->toIso8601String(),
+                'never_clocked_out' => $s->check_out_at === null && $s->auto_closed_at !== null,
+            ])->values(),
+            'sessions_used' => $sessions->count(),
+            'sessions_limit' => $limit,
+            'can_check_in' => $openSession === null && $sessions->count() < $limit,
+            'breaks_taken' => max(0, $sessions->count() - 1),
             'server_date' => $today,
             'server_time' => now()->toDateTimeString(),
         ]);

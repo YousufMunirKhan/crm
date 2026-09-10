@@ -33,6 +33,8 @@ class Attendance extends Model
         'check_out_location_source',
         'auto_closed_at',
         'work_hours',
+        'sessions_count',
+        'breaks_count',
     ];
 
     protected $appends = [
@@ -85,6 +87,11 @@ class Attendance extends Model
     public static function workingDate(): string
     {
         return now()->setTimezone(config('attendance.timezone', 'Europe/London'))->toDateString();
+    }
+
+    public function sessions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(AttendanceSession::class, 'attendance_id')->orderBy('sequence');
     }
 
     public function user(): BelongsTo

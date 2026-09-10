@@ -3,10 +3,12 @@
 namespace App\Modules\HR\Services;
 
 use App\Modules\HR\Models\Attendance;
+use App\Modules\HR\Models\AttendanceSession;
 use App\Modules\HR\Models\Salary;
 use App\Models\Notification;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class HrService
@@ -25,26 +27,42 @@ class HrService
     {
         $today = Attendance::workingDate();
 
-        $attendance = Attendance::firstOrNew([
-            'user_id' => $userId,
-            'date' => $today,
-        ]);
+        $attendance = DB::transaction(function () use ($userId, $today, $proof) {
+            // Not firstOrCreate: `date` is cast to a date, so it is stored as a
+            // midnight timestamp while the lookup value is a bare Y-m-d string.
+            // firstOrCreate never matched the existing row and went straight to
+            // inserting a duplicate.
+            $attendance = Attendance::where('user_id', $userId)->whereDate('date', $today)->first()
+                ?? Attendance::create(['user_id' => $userId, 'date' => $today]);
 
-        if ($attendance->check_in_at) {
-            throw new \Exception('Already checked in today');
-        }
+            if ($attendance->sessions()->open()->exists()) {
+                throw new \Exception('You are already clocked in.');
+            }
 
-        $attendance->check_in_at = now();
-        $attendance->fill([
-            'check_in_photo_path' => $proof['photo_path'] ?? null,
-            'check_in_latitude' => $proof['latitude'] ?? null,
-            'check_in_longitude' => $proof['longitude'] ?? null,
-            'check_in_location_name' => $proof['location_name'] ?? null,
-            'check_in_location_accuracy' => $proof['accuracy'] ?? null,
-            'check_in_location_captured_at' => $proof['captured_at'] ?? now(),
-            'check_in_location_source' => $proof['source'] ?? null,
-        ]);
-        $attendance->save();
+            $used = $attendance->sessions()->count();
+            $limit = max(1, (int) config('attendance.max_sessions_per_day', 6));
+
+            // A cap rather than no cap: a button pressed by accident should not
+            // be able to fill the day with sessions.
+            if ($used >= $limit) {
+                throw new \Exception("You have already clocked in {$limit} times today.");
+            }
+
+            AttendanceSession::create([
+                'attendance_id' => $attendance->id,
+                'user_id' => $userId,
+                'sequence' => $used + 1,
+                'check_in_at' => now(),
+                'check_in_photo_path' => $proof['photo_path'] ?? null,
+                'check_in_latitude' => $proof['latitude'] ?? null,
+                'check_in_longitude' => $proof['longitude'] ?? null,
+                'check_in_location_name' => $proof['location_name'] ?? null,
+                'check_in_location_accuracy' => $proof['accuracy'] ?? null,
+                'check_in_location_source' => $proof['source'] ?? null,
+            ]);
+
+            return $this->rollUpDay($attendance);
+        });
 
         $this->notifyAdminsOfClock($attendance, 'check_in');
 
@@ -58,32 +76,93 @@ class HrService
         // whereDate rather than a plain equality: the column is cast to a date,
         // and on an engine without a real date type that writes a midnight
         // timestamp, which never equals a bare Y-m-d string.
-        $attendance = Attendance::where('user_id', $userId)
-            ->whereDate('date', $today)
-            ->first();
+        $attendance = DB::transaction(function () use ($userId, $today, $proof) {
+            $attendance = Attendance::where('user_id', $userId)
+                ->whereDate('date', $today)
+                ->first();
 
-        if (!$attendance || !$attendance->check_in_at) {
-            throw new \Exception('No check-in found for today');
-        }
+            $session = $attendance?->sessions()->open()->orderByDesc('sequence')->first();
 
-        if ($attendance->check_out_at) {
-            throw new \Exception('Already checked out today');
-        }
+            if (! $session) {
+                throw new \Exception('You are not clocked in.');
+            }
 
-        $attendance->check_out_at = now();
-        $attendance->fill([
-            'check_out_photo_path' => $proof['photo_path'] ?? null,
-            'check_out_latitude' => $proof['latitude'] ?? null,
-            'check_out_longitude' => $proof['longitude'] ?? null,
-            'check_out_location_name' => $proof['location_name'] ?? null,
-            'check_out_location_accuracy' => $proof['accuracy'] ?? null,
-            'check_out_location_captured_at' => $proof['captured_at'] ?? now(),
-            'check_out_location_source' => $proof['source'] ?? null,
-        ]);
-        $attendance->work_hours = $attendance->check_in_at->diffInHours($attendance->check_out_at, true);
-        $attendance->save();
+            $session->update([
+                'check_out_at' => now(),
+                'check_out_photo_path' => $proof['photo_path'] ?? null,
+                'check_out_latitude' => $proof['latitude'] ?? null,
+                'check_out_longitude' => $proof['longitude'] ?? null,
+                'check_out_location_name' => $proof['location_name'] ?? null,
+                'check_out_location_accuracy' => $proof['accuracy'] ?? null,
+                'check_out_location_source' => $proof['source'] ?? null,
+            ]);
+
+            return $this->rollUpDay($attendance);
+        });
 
         $this->notifyAdminsOfClock($attendance, 'check_out');
+
+        return $attendance;
+    }
+
+    /**
+     * Rewrite the day row from its sessions.
+     *
+     * The day row is what every report on this system reads, and it keeps the
+     * shape it always had: first clock-in, last clock-out, hours, and the proof
+     * from each end. Nothing that reads it needed changing.
+     *
+     * Two decisions worth naming.
+     *
+     * **check_out_at stays null while a session is open.** Everything that asks
+     * who is working treats a missing clock-out as "still here", and somebody on
+     * their lunch break has not finished for the day. Only when nobody is
+     * clocked in does the day get a finish time.
+     *
+     * **Hours run from the first clock-in to the last clock-out**, breaks
+     * included, because that is how this business counts them. It is not the
+     * only defensible answer - the alternative is to add the sessions up and
+     * leave the gaps out - so it is written here rather than assumed.
+     */
+    private function rollUpDay(Attendance $attendance): Attendance
+    {
+        $sessions = $attendance->sessions()->get();
+
+        $first = $sessions->first();
+        $closed = $sessions->filter(fn (AttendanceSession $s) => $s->check_out_at !== null);
+        $last = $closed->last();
+        $stillIn = $sessions->contains(
+            fn (AttendanceSession $s) => $s->check_out_at === null && $s->auto_closed_at === null
+        );
+
+        $attendance->fill([
+            'check_in_at' => $first?->check_in_at,
+            'check_in_photo_path' => $first?->check_in_photo_path,
+            'check_in_latitude' => $first?->check_in_latitude,
+            'check_in_longitude' => $first?->check_in_longitude,
+            'check_in_location_name' => $first?->check_in_location_name,
+            'check_in_location_accuracy' => $first?->check_in_location_accuracy,
+            'check_in_location_captured_at' => $first?->check_in_at,
+            'check_in_location_source' => $first?->check_in_location_source,
+
+            'check_out_at' => $stillIn ? null : $last?->check_out_at,
+            'check_out_photo_path' => $stillIn ? null : $last?->check_out_photo_path,
+            'check_out_latitude' => $stillIn ? null : $last?->check_out_latitude,
+            'check_out_longitude' => $stillIn ? null : $last?->check_out_longitude,
+            'check_out_location_name' => $stillIn ? null : $last?->check_out_location_name,
+            'check_out_location_accuracy' => $stillIn ? null : $last?->check_out_location_accuracy,
+            'check_out_location_captured_at' => $stillIn ? null : $last?->check_out_at,
+            'check_out_location_source' => $stillIn ? null : $last?->check_out_location_source,
+
+            'sessions_count' => $sessions->count(),
+            'breaks_count' => max(0, $sessions->count() - 1),
+        ]);
+
+        $attendance->work_hours = (! $stillIn && $first?->check_in_at && $last?->check_out_at)
+            ? round($first->check_in_at->diffInMinutes($last->check_out_at, true) / 60, 2)
+            : 0;
+
+        $attendance->save();
 
         return $attendance;
     }

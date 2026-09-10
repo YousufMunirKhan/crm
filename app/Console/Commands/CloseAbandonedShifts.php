@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Modules\HR\Models\Attendance;
+use App\Modules\HR\Models\AttendanceSession;
 use Illuminate\Console\Command;
 
 /**
@@ -40,11 +41,20 @@ class CloseAbandonedShifts extends Command
 
         $cutoff = now()->subHours($hours);
 
+        // Sessions are where a shift is actually open now; the day row above
+        // them is a summary. Closing the session and then rebuilding the day
+        // from it keeps the two saying the same thing.
+        $openSessions = AttendanceSession::query()
+            ->open()
+            ->where('check_in_at', '<', $cutoff)
+            ->pluck('attendance_id');
+
         $abandoned = Attendance::query()
             ->whereNotNull('check_in_at')
             ->whereNull('check_out_at')
             ->whereNull('auto_closed_at')
             ->where('check_in_at', '<', $cutoff)
+            ->when($openSessions->isNotEmpty(), fn ($q) => $q->orWhereIn('id', $openSessions))
             ->orderBy('check_in_at')
             ->get();
 
@@ -78,8 +88,15 @@ class CloseAbandonedShifts extends Command
             return self::SUCCESS;
         }
 
+        $ids = $abandoned->pluck('id');
+
+        AttendanceSession::query()
+            ->open()
+            ->whereIn('attendance_id', $ids)
+            ->update(['auto_closed_at' => now()]);
+
         Attendance::query()
-            ->whereIn('id', $abandoned->pluck('id'))
+            ->whereIn('id', $ids)
             ->update(['auto_closed_at' => now()]);
 
         $this->info('Closed '.$abandoned->count().'. No finish time was written - those hours were never recorded.');

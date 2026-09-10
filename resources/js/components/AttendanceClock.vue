@@ -43,24 +43,30 @@
             </div>
 
             <div class="flex gap-3 sm:max-w-xs">
+                <!--
+                    Clocking out no longer ends the day. Somebody going to lunch
+                    can come back, up to the day's limit - which is the whole
+                    point of the change, because before this a break cost you the
+                    afternoon and people stopped clocking out at all.
+                -->
                 <button
-                    v-if="!status.checked_in"
-                    @click="checkIn"
-                    :disabled="actionLoading"
-                    class="min-h-11 flex-1 rounded-lg bg-success-600 px-4 py-3 font-medium text-white transition-colors hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
-                >
-                    {{ actionLoading ? 'Capturing proof...' : 'Time In' }}
-                </button>
-                <button
-                    v-else-if="!status.checked_out"
+                    v-if="status.checked_in"
                     @click="checkOut"
                     :disabled="actionLoading"
                     class="min-h-11 flex-1 rounded-lg bg-danger-600 px-4 py-3 font-medium text-white transition-colors hover:bg-danger-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
                 >
                     {{ actionLoading ? 'Capturing proof...' : 'Time Out' }}
                 </button>
+                <button
+                    v-else-if="status.can_check_in"
+                    @click="checkIn"
+                    :disabled="actionLoading"
+                    class="min-h-11 flex-1 rounded-lg bg-success-600 px-4 py-3 font-medium text-white transition-colors hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
+                >
+                    {{ actionLoading ? 'Capturing proof...' : (status.sessions_used ? 'Time In again' : 'Time In') }}
+                </button>
                 <div v-else class="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-lg text-center font-medium">
-                    Shift Complete
+                    All {{ status.sessions_limit }} clock-ins used today
                 </div>
             </div>
 
@@ -73,6 +79,22 @@
                 Your location is recorded every 15 minutes while this app is open, and stops the
                 moment you clock out.
             </p>
+
+            <!-- Only once there is more than one, so an ordinary day stays quiet. -->
+            <div v-if="status.sessions && status.sessions.length > 1" class="rounded-lg border border-slate-200 px-3 py-2">
+                <div class="text-xs font-medium text-slate-700">
+                    {{ status.sessions.length }} clock-ins today,
+                    {{ status.breaks_taken }} break{{ status.breaks_taken === 1 ? '' : 's' }}
+                </div>
+                <ul class="mt-1 space-y-0.5">
+                    <li v-for="session in status.sessions" :key="session.sequence" class="text-xs tabular-nums text-slate-500">
+                        {{ formatTime(session.check_in_at) }} –
+                        <span v-if="session.check_out_at">{{ formatTime(session.check_out_at) }}</span>
+                        <span v-else-if="session.never_clocked_out" class="text-warning-800">never clocked out</span>
+                        <span v-else class="font-medium text-success-700">still in</span>
+                    </li>
+                </ul>
+            </div>
 
             <!--
                 Only appears when the browser could not open a camera at all - no
@@ -309,20 +331,33 @@ const currentDate = computed(() => new Date().toLocaleDateString('en-GB', {
 }));
 
 const statusText = computed(() => {
-    if (status.value.checked_out) return 'Shift Completed';
     if (status.value.checked_in) return 'Currently Working';
+
+    // Clocked out but able to clock back in is a break, not the end of a day.
+    // Calling it "Shift Completed" while offering a Time In button underneath
+    // said two different things at once.
+    if (status.value.sessions_used && status.value.can_check_in) return 'On a break';
+    if (status.value.checked_out) return 'Shift Completed';
+
     return 'Not Checked In';
 });
 
+/** Clocked out, but the day is not over - they can come back. */
+const onBreak = computed(() => !status.value.checked_in
+    && !!status.value.sessions_used
+    && !!status.value.can_check_in);
+
 const statusBgClass = computed(() => {
-    if (status.value.checked_out) return 'bg-slate-100';
     if (status.value.checked_in) return 'bg-success-50';
+    if (onBreak.value) return 'bg-warning-50';
+    if (status.value.checked_out) return 'bg-slate-100';
     return 'bg-warning-50';
 });
 
 const statusIconClass = computed(() => {
-    if (status.value.checked_out) return 'bg-slate-200 text-slate-600';
     if (status.value.checked_in) return 'bg-success-200 text-success-700';
+    if (onBreak.value) return 'bg-warning-200 text-warning-800';
+    if (status.value.checked_out) return 'bg-slate-200 text-slate-600';
     return 'bg-warning-200 text-warning-800';
 });
 
