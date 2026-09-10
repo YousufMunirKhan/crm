@@ -41,6 +41,22 @@ class Attendance extends Model
         'check_out_map_url',
     ];
 
+    /**
+     * Kept in the table, kept out of responses.
+     *
+     * Whether a position was measured or came from somebody's set work address
+     * is worth recording - if a shift is ever queried, that is the difference
+     * between a reading and an assumption. It is not worth putting in front of
+     * the person clocking in, or on a report where it reads as a mark against
+     * them rather than a fact about their phone.
+     *
+     * Anyone who needs it can query the column.
+     */
+    protected $hidden = [
+        'check_in_location_source',
+        'check_out_location_source',
+    ];
+
     protected $casts = [
         'date' => 'date',
         'check_in_at' => 'datetime',
