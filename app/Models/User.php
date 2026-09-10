@@ -38,6 +38,9 @@ class User extends Authenticatable implements FilamentUser
         'is_active',
         'commission_eligible',
         'nav_permissions',
+        'fixed_work_latitude',
+        'fixed_work_longitude',
+        'fixed_work_location_name',
     ];
 
     /**

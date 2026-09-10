@@ -22,6 +22,7 @@ class Attendance extends Model
         'check_in_location_name',
         'check_in_location_accuracy',
         'check_in_location_captured_at',
+        'check_in_location_source',
         'check_out_at',
         'check_out_photo_path',
         'check_out_latitude',
@@ -29,6 +30,7 @@ class Attendance extends Model
         'check_out_location_name',
         'check_out_location_accuracy',
         'check_out_location_captured_at',
+        'check_out_location_source',
         'work_hours',
     ];
 

@@ -567,13 +567,29 @@ const cancelPhotoPicker = () => {
 
 const collectProof = async () => {
     proofError.value = '';
-    const [photo, position] = await Promise.all([capturePhoto(), getLocation()]);
+
+    // Location is attempted, not insisted on here.
+    //
+    // Somebody whose browser will not give a reading may still have a fixed work
+    // address set on their account, and only the server knows that - so the
+    // decision belongs there. If they have no fixed address either, the server
+    // refuses with the same message this used to throw, so nothing is lost.
+    const [photo, position] = await Promise.all([
+        capturePhoto(),
+        getLocation().catch(() => null),
+    ]);
+
     const formData = new FormData();
     formData.append('photo', photo, `attendance-${Date.now()}.jpg`);
-    formData.append('latitude', String(position.coords.latitude));
-    formData.append('longitude', String(position.coords.longitude));
-    formData.append('accuracy', String(position.coords.accuracy || 0));
+
+    if (position) {
+        formData.append('latitude', String(position.coords.latitude));
+        formData.append('longitude', String(position.coords.longitude));
+        formData.append('accuracy', String(position.coords.accuracy || 0));
+    }
+
     formData.append('captured_at', new Date().toISOString());
+
     return formData;
 };
 

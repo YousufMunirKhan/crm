@@ -186,14 +186,41 @@ class HrController extends Controller
 
     private function attendanceProofFromRequest(Request $request, int $userId, string $action): array
     {
+        // Coordinates are no longer required outright. They used to be, and the
+        // effect was that anyone whose browser would not give a reading - an
+        // office desktop, a phone with location switched off - simply could not
+        // clock in, and their attendance record stopped. Where a person has a
+        // fixed work address set, that stands in.
         $data = $request->validate([
             'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'location_name' => ['nullable', 'string', 'max:500'],
             'accuracy' => ['nullable', 'numeric', 'min:0', 'max:100000'],
             'captured_at' => ['nullable', 'date'],
         ]);
+
+        $fromDevice = isset($data['latitude'], $data['longitude']);
+        $user = $request->user();
+
+        if ($fromDevice) {
+            $latitude = (float) $data['latitude'];
+            $longitude = (float) $data['longitude'];
+            $locationName = $data['location_name'] ?? $this->resolveLocationName($latitude, $longitude);
+            $accuracy = isset($data['accuracy']) ? (float) $data['accuracy'] : null;
+            $source = 'gps';
+        } elseif ($user?->fixed_work_latitude !== null && $user?->fixed_work_longitude !== null) {
+            $latitude = (float) $user->fixed_work_latitude;
+            $longitude = (float) $user->fixed_work_longitude;
+            $locationName = $user->fixed_work_location_name
+                ?: $this->resolveLocationName($latitude, $longitude);
+            // No accuracy: this is not a measurement, and putting a metre figure
+            // on it would dress it up as one.
+            $accuracy = null;
+            $source = 'fixed';
+        } else {
+            throw new \Exception('Please allow location permission to record attendance.');
+        }
 
         $date = now()->toDateString();
         $directory = "attendance-proof/{$userId}/{$date}";
@@ -205,11 +232,12 @@ class HrController extends Controller
 
         return [
             'photo_path' => $photoPath,
-            'latitude' => (float) $data['latitude'],
-            'longitude' => (float) $data['longitude'],
-            'location_name' => $data['location_name'] ?? $this->resolveLocationName((float) $data['latitude'], (float) $data['longitude']),
-            'accuracy' => isset($data['accuracy']) ? (float) $data['accuracy'] : null,
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+            'location_name' => $locationName,
+            'accuracy' => $accuracy,
             'captured_at' => isset($data['captured_at']) ? Carbon::parse($data['captured_at']) : now(),
+            'source' => $source,
         ];
     }
 

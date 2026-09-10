@@ -42,6 +42,7 @@ class HrService
             'check_in_location_name' => $proof['location_name'] ?? null,
             'check_in_location_accuracy' => $proof['accuracy'] ?? null,
             'check_in_location_captured_at' => $proof['captured_at'] ?? now(),
+            'check_in_location_source' => $proof['source'] ?? null,
         ]);
         $attendance->save();
 
@@ -77,6 +78,7 @@ class HrService
             'check_out_location_name' => $proof['location_name'] ?? null,
             'check_out_location_accuracy' => $proof['accuracy'] ?? null,
             'check_out_location_captured_at' => $proof['captured_at'] ?? now(),
+            'check_out_location_source' => $proof['source'] ?? null,
         ]);
         $attendance->work_hours = $attendance->check_in_at->diffInHours($attendance->check_out_at, true);
         $attendance->save();
