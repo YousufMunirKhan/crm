@@ -100,10 +100,47 @@
                                 <option value="urgent">Urgent</option>
                             </select>
                         </div>
+
+                        <div>
+                            <label class="form-label" for="ticketcreateview-sla">SLA (deadline)</label>
+                            <select id="ticketcreateview-sla" v-model="form.sla_hours" class="form-select">
+                                <option :value="2">2 Hours</option>
+                                <option :value="8">8 Hours</option>
+                                <option :value="24">1 Day</option>
+                                <option :value="48">2 Days</option>
+                                <option :value="72">3 Days</option>
+                                <option :value="96">4 Days</option>
+                                <option :value="120">5 Days</option>
+                                <option :value="168">1 Week</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div v-if="form.sla_hours === 'custom'">
+                        <label class="form-label" for="ticketcreateview-sla-custom">Custom SLA (hours)</label>
+                        <input
+                            id="ticketcreateview-sla-custom"
+                            v-model.number="form.sla_custom_hours"
+                            type="number"
+                            min="1"
+                            max="8760"
+                            class="form-input"
+                            placeholder="Enter hours e.g. 36"
+                            :aria-invalid="fieldErrors.sla_custom_hours ? 'true' : undefined"
+                            :aria-describedby="fieldErrors.sla_custom_hours ? 'ticketcreateview-sla-custom-error' : undefined"
+                        />
+                        <p
+                            v-if="fieldErrors.sla_custom_hours"
+                            id="ticketcreateview-sla-custom-error"
+                            class="form-error"
+                        >
+                            {{ fieldErrors.sla_custom_hours }}
+                        </p>
                     </div>
 
                     <div>
-                        <label class="form-label" for="ticketcreateview-estimated-resolve-hours">Expected resolution (hours)</label>
+                        <label class="form-label" for="ticketcreateview-estimated-resolve-hours">Estimated time to complete (hours)</label>
                         <input
                             id="ticketcreateview-estimated-resolve-hours"
                             v-model.number="form.estimated_resolve_hours"
@@ -111,7 +148,7 @@
                             min="1"
                             max="8760"
                             class="form-input"
-                            placeholder="Leave empty for priority-based SLA"
+                            placeholder="Internal estimate — does not affect SLA"
                             :aria-invalid="fieldErrors.estimated_resolve_hours ? 'true' : undefined"
                             :aria-describedby="fieldErrors.estimated_resolve_hours ? 'ticketcreateview-estimated-resolve-hours-error' : undefined"
                         />
@@ -252,6 +289,8 @@ const form = ref({
     description: '',
     reference_url: '',
     priority: 'medium',
+    sla_hours: 24,
+    sla_custom_hours: null,
     estimated_resolve_hours: null,
     assigned_user_ids: [],
 });
@@ -262,7 +301,8 @@ const { textareaRef: descriptionTextareaRef, syncHeight: syncDescriptionHeight }
 
 const FIELD_LABELS = {
     subject: 'Subject',
-    estimated_resolve_hours: 'Expected resolution (hours)',
+    sla_custom_hours: 'Custom SLA (hours)',
+    estimated_resolve_hours: 'Estimated time to complete (hours)',
 };
 
 const errorFields = computed(() =>
@@ -319,6 +359,12 @@ function validate() {
     if (!String(form.value.subject ?? '').trim()) {
         errs.subject = 'Enter a subject so the ticket can be identified.';
     }
+    if (form.value.sla_hours === 'custom') {
+        const ch = form.value.sla_custom_hours;
+        if (ch === null || ch === undefined || ch === '' || !Number.isFinite(Number(ch)) || Number(ch) < 1 || Number(ch) > 8760) {
+            errs.sla_custom_hours = 'Enter a number of hours between 1 and 8760.';
+        }
+    }
     const hours = form.value.estimated_resolve_hours;
     if (hours !== null && hours !== undefined && hours !== '') {
         const n = Number(hours);
@@ -352,6 +398,10 @@ async function handleSubmit() {
         if (payload.estimated_resolve_hours === '' || payload.estimated_resolve_hours === undefined) {
             payload.estimated_resolve_hours = null;
         }
+        if (payload.sla_hours === 'custom') {
+            payload.sla_hours = Number(payload.sla_custom_hours);
+        }
+        delete payload.sla_custom_hours;
 
         if (pendingFiles.value.length > 0) {
             const fd = new FormData();

@@ -148,6 +148,7 @@ class TicketController extends Controller
             'assigned_user_ids' => ['nullable', 'array'],
             'assigned_user_ids.*' => ['integer', 'exists:users,id'],
             'estimated_resolve_hours' => ['nullable', 'integer', 'min:1', 'max:8760'],
+            'sla_hours' => ['nullable', 'numeric', 'min:1', 'max:8760'],
             'attachments' => ['nullable', 'array', 'max:20'],
             'attachments.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx,csv,txt'],
         ]);
@@ -184,6 +185,7 @@ class TicketController extends Controller
             'assigned_user_ids' => ['sometimes', 'nullable', 'array'],
             'assigned_user_ids.*' => ['integer', 'exists:users,id'],
             'estimated_resolve_hours' => ['nullable', 'integer', 'min:1', 'max:8760'],
+            'sla_hours' => ['nullable', 'numeric', 'min:1', 'max:8760'],
         ]);
 
         $previousAssigneeIds = $ticket->assignees()->pluck('users.id')->sort()->values()->all();
@@ -209,13 +211,13 @@ class TicketController extends Controller
             }
         }
 
-        if (array_key_exists('estimated_resolve_hours', $data)) {
-            $priorityForSla = $data['priority'] ?? $ticket->priority;
-            if ($data['estimated_resolve_hours'] !== null) {
-                $data['sla_due_at'] = now()->addHours((int) $data['estimated_resolve_hours']);
+        if (array_key_exists('sla_hours', $data)) {
+            if ($data['sla_hours'] !== null) {
+                $data['sla_due_at'] = now()->addHours((float) $data['sla_hours']);
             } else {
-                $data['sla_due_at'] = $this->ticketService->calculateSLADueDate($priorityForSla);
+                $data['sla_due_at'] = now()->addHours(24);
             }
+            unset($data['sla_hours']);
         }
 
         $ticket->update($data);

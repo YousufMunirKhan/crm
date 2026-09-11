@@ -123,7 +123,34 @@
             </div>
 
             <div>
-                <label class="form-label" for="ticketform-estimated-resolve-hours">Expected resolution (hours)</label>
+                <label class="form-label" for="ticketform-sla">SLA (deadline)</label>
+                <select id="ticketform-sla" v-model="form.sla_hours" class="form-select">
+                    <option :value="2">2 Hours</option>
+                    <option :value="8">8 Hours</option>
+                    <option :value="24">1 Day</option>
+                    <option :value="48">2 Days</option>
+                    <option :value="72">3 Days</option>
+                    <option :value="96">4 Days</option>
+                    <option :value="120">5 Days</option>
+                    <option :value="168">1 Week</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+
+            <div v-if="form.sla_hours === 'custom'">
+                <label class="form-label" for="ticketform-sla-custom">Custom SLA (hours)</label>
+                <input id="ticketform-sla-custom"
+                    v-model.number="form.sla_custom_hours"
+                    type="number"
+                    min="1"
+                    max="8760"
+                    class="form-input"
+                    placeholder="Enter hours e.g. 36"
+                />
+            </div>
+
+            <div>
+                <label class="form-label" for="ticketform-estimated-resolve-hours">Estimated time to complete (hours)</label>
                 <input id="ticketform-estimated-resolve-hours"
                     v-model.number="form.estimated_resolve_hours"
                     type="number"
@@ -131,9 +158,8 @@
                     max="8760"
                     step="1"
                     class="form-input"
-                    placeholder="e.g. 24 — leave empty to use priority-based SLA"
+                    placeholder="Internal estimate — does not affect SLA"
                 />
-                <p class="form-hint">If set, the due-by time is calculated from when the ticket is saved. Assigned users receive this in the assignment email.</p>
             </div>
 
             <div class="form-grid-2">
@@ -265,6 +291,8 @@ const form = ref({
     description: '',
     reference_url: '',
     priority: 'medium',
+    sla_hours: 24,
+    sla_custom_hours: null,
     estimated_resolve_hours: null,
     status: 'open',
     assigned_user_ids: [],
@@ -322,6 +350,8 @@ onMounted(async () => {
             description: props.ticket.description || '',
             reference_url: props.ticket.reference_url || '',
             priority: props.ticket.priority,
+            sla_hours: 24,
+            sla_custom_hours: null,
             estimated_resolve_hours: props.ticket.estimated_resolve_hours ?? null,
             status: props.ticket.status,
             assigned_user_ids: [],
@@ -378,6 +408,10 @@ const buildFormDataPayload = (payload) => {
     if (payload.estimated_resolve_hours != null && payload.estimated_resolve_hours !== '') {
         fd.append('estimated_resolve_hours', String(payload.estimated_resolve_hours));
     }
+    const resolvedSla = payload.sla_hours === 'custom' ? Number(payload.sla_custom_hours) : payload.sla_hours;
+    if (resolvedSla != null) {
+        fd.append('sla_hours', String(resolvedSla));
+    }
     pendingAttachmentFiles.value.forEach((f) => fd.append('attachments[]', f));
     return fd;
 };
@@ -397,6 +431,10 @@ const handleSubmit = async () => {
         if (payload.reference_url === '') {
             payload.reference_url = null;
         }
+        if (payload.sla_hours === 'custom') {
+            payload.sla_hours = Number(payload.sla_custom_hours);
+        }
+        delete payload.sla_custom_hours;
 
         if (props.ticket) {
             await axios.put(`/api/tickets/${props.ticket.id}`, payload);

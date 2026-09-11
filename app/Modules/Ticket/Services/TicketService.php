@@ -53,9 +53,10 @@ class TicketService
             ? (int) $data['estimated_resolve_hours']
             : null;
 
-        $slaDue = $estimatedHours !== null && $estimatedHours > 0
-            ? now()->addHours($estimatedHours)
-            : $this->calculateSLADueDate($priority);
+        $slaHours = isset($data['sla_hours']) && $data['sla_hours'] !== '' && $data['sla_hours'] !== null
+            ? (float) $data['sla_hours']
+            : 24;
+        $slaDue = now()->addHours($slaHours);
 
         $assigneeIds = $this->normalizeAssigneeIdsFromPayload($data);
 
