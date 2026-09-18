@@ -7,6 +7,7 @@ use App\Models\SentCommunication;
 use App\Modules\Settings\Models\Setting;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 
 /**
  * Sends the mail nobody is watching, once each.
@@ -107,6 +108,11 @@ class AutomatedEmailSender
             return false;
         }
 
+        // Written before the send, not after, because the open pixel has to carry
+        // this row's id and an afterwards would not know it until the message
+        // had already gone.
+        $record = $this->record($reference, $to, $mail, $context, 'pending');
+
         // Branding is the same on every one of these, so it is put on here
         // rather than repeated at each call site and drifting between them.
         // Anything the caller set already wins.
@@ -114,6 +120,7 @@ class AutomatedEmailSender
             'companyName' => $this->companyName(),
             'logoUrl' => $this->logoUrl(),
             'company' => $this->companyDetails(),
+            'trackingPixel' => URL::signedRoute('email.track.open', ['id' => $record->id]),
         ], $mail->mailData);
 
         MailConfigFromDatabase::apply();
@@ -121,7 +128,7 @@ class AutomatedEmailSender
         try {
             Mail::to($to)->send($mail);
 
-            $this->record($reference, $to, $mail, $context, 'sent');
+            $record->forceFill(['status' => 'sent', 'sent_at' => now()])->save();
 
             // The host answers a burst with 450 "too much mail", and a digest
             // run is a burst by nature.
@@ -138,7 +145,7 @@ class AutomatedEmailSender
                 'error' => $e->getMessage(),
             ]);
 
-            $this->record($reference, $to, $mail, $context, 'failed', $e->getMessage());
+            $record->forceFill(['status' => 'failed', 'error_message' => $e->getMessage()])->save();
 
             return false;
         }
@@ -154,8 +161,8 @@ class AutomatedEmailSender
         array $context,
         string $status,
         ?string $error = null,
-    ): void {
-        SentCommunication::create([
+    ): SentCommunication {
+        return SentCommunication::create([
             'type' => 'email',
             'template_type' => self::TEMPLATE_TYPE,
             'reference' => $reference,

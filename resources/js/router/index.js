@@ -308,6 +308,12 @@ const routes = [
         meta: { requiresAuth: true, title: 'Import & export', roles: ['Admin', 'Manager', 'System Admin'] },
     },
     {
+        path: '/internal-emails',
+        name: 'internal-emails',
+        component: () => import('@/views/InternalEmailsView.vue'),
+        meta: { requiresAuth: true, title: 'Internal Email Management', roles: ['Admin', 'System Admin'] },
+    },
+    {
         path: '/access-manager',
         name: 'access-manager',
         component: () => import('@/views/AccessManagerView.vue'),

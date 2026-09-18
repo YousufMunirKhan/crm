@@ -80,5 +80,15 @@
             </td>
         </tr>
     </table>
+
+    {{--
+        Open tracking. Apple Mail fetches images before anybody looks, so this
+        over-counts for those readers; it is still the difference between
+        knowing a message was delivered and knowing nothing at all.
+    --}}
+    @isset($trackingPixel)
+        <img src="{{ $trackingPixel }}" width="1" height="1" alt=""
+             style="display:block; width:1px; height:1px; border:0; outline:none;">
+    @endisset
 </body>
 </html>

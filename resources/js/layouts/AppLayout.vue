@@ -471,6 +471,7 @@ const navItems = computed(() => {
             { heading: 'System' },
             { to: '/import-export', label: 'Import & export', section: 'settings', icon: 'document' },
             { to: '/settings', label: 'Settings', section: 'settings', icon: 'cog' },
+            { to: '/internal-emails', label: 'Internal Email Management', section: 'internal_emails', icon: 'mail' },
             { to: '/access-manager', label: 'Access Manager', section: 'access_manager', icon: 'shield' },
         );
     }

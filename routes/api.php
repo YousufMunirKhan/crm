@@ -349,6 +349,11 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     // Integration settings
     Route::put('/settings/smtp', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateSmtp'])->middleware('role:Admin,System Admin');
     Route::post('/settings/smtp/test', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'testSmtp'])->middleware('role:Admin,System Admin');
+    // What the system has emailed, and whether anybody read it. Admin only:
+    // it lists every customer address the schedule has written to.
+    Route::get('/internal-emails', [\App\Http\Controllers\InternalEmailLogController::class, 'index'])
+        ->middleware('role:Admin,System Admin');
+
     Route::put('/settings/sms', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateSms'])->middleware('role:Admin,System Admin');
     Route::post('/settings/sms/test', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'testSms'])->middleware('role:Admin,System Admin');
     Route::put('/settings/facebook', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateFacebook'])->middleware('role:Admin,System Admin');

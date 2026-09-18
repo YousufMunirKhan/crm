@@ -27,6 +27,7 @@ export const NAV_SECTION_OPTIONS = [
     { key: 'salary_reports', label: 'Salary Reports' },
     { key: 'commission_management', label: 'Commission Management' },
     { key: 'settings', label: 'Settings' },
+    { key: 'internal_emails', label: 'Internal Email Management' },
     { key: 'access_manager', label: 'Access Manager' },
 ];
 

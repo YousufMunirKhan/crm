@@ -51,6 +51,7 @@ final class NavSections
             'salary_reports' => 'Salary Reports',
             'commission_management' => 'Commission Management',
             'settings' => 'Settings',
+            'internal_emails' => 'Internal Email Management',
             'access_manager' => 'Access Manager',
         ];
     }
