@@ -97,6 +97,14 @@ Schedule::command('emails:invoice-due')
     ->timezone(config('app.display_timezone'))
     ->withoutOverlapping();
 
+// Ten in the morning, so a rep has had the first of the day to put something on
+// the board before being told where they are. Not Sundays - the command checks,
+// rather than the cron expression, so the rule is stated where the figures are.
+Schedule::command('emails:daily-lead-summary')
+    ->dailyAt('10:00')
+    ->timezone(config('app.display_timezone'))
+    ->withoutOverlapping();
+
 // After the due-soon run, and after invoices:mark-overdue at 01:00 has moved
 // yesterday's into the overdue status.
 Schedule::command('emails:invoice-overdue')

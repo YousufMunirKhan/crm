@@ -1,0 +1,180 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\User;
+use App\Modules\CRM\Models\Lead;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
+
+/**
+ * How many leads each person put on the board, per day, against the target.
+ *
+ * Counting happens here rather than in the command because two different
+ * emails ask the same question - one person's own week, and everybody's day -
+ * and they must not be able to disagree about the answer.
+ *
+ * Leads are stored in UTC and a working day is a UK one, so a day is the span
+ * between its UK boundaries converted to UTC. Counting on whereDate() would put
+ * an hour of every evening into the wrong day for seven months of the year.
+ */
+class DailyLeadScoreboard
+{
+    /** @var array<string, array<int, int>> counts[date][userId] */
+    private array $cache = [];
+
+    public function target(): int
+    {
+        return max(1, (int) config('leads.daily_target', 5));
+    }
+
+    public function timezone(): string
+    {
+        return (string) config('app.display_timezone');
+    }
+
+    /** The people measured on the daily target. */
+    public function people(): Collection
+    {
+        return User::query()
+            ->where('is_active', true)
+            ->whereHas('role', fn ($q) => $q->whereIn('name', (array) config('leads.target_roles', [])))
+            ->with('role')
+            ->orderBy('name')
+            ->get();
+    }
+
+    /** The people who get everybody's figures. */
+    public function watchers(): Collection
+    {
+        return User::query()
+            ->where('is_active', true)
+            ->whereHas('role', fn ($q) => $q->whereIn('name', (array) config('leads.summary_roles', [])))
+            ->with('role')
+            ->orderBy('name')
+            ->get();
+    }
+
+    /** Leads assigned to one person on one UK day. */
+    public function countFor(int $userId, string $date): int
+    {
+        return $this->countsOn($date)[$userId] ?? 0;
+    }
+
+    /**
+     * Every person's count on one UK day, in one query.
+     *
+     * @return array<int, int> userId => count
+     */
+    public function countsOn(string $date): array
+    {
+        if (isset($this->cache[$date])) {
+            return $this->cache[$date];
+        }
+
+        $tz = $this->timezone();
+        $from = Carbon::parse($date, $tz)->startOfDay()->utc();
+        $to = Carbon::parse($date, $tz)->endOfDay()->utc();
+
+        return $this->cache[$date] = Lead::query()
+            ->whereNotNull('assigned_to')
+            ->whereBetween('created_at', [$from, $to])
+            ->selectRaw('assigned_to, count(*) as total')
+            ->groupBy('assigned_to')
+            ->pluck('total', 'assigned_to')
+            ->map(fn ($n) => (int) $n)
+            ->all();
+    }
+
+    /**
+     * The last few days for one person, oldest first, shaped for the chart.
+     *
+     * @return array<int, array{date: string, label: string, count: int, target: int, is_today: bool}>
+     */
+    public function recentDaysFor(int $userId, string $upTo, int $days = 7): array
+    {
+        $tz = $this->timezone();
+        $end = Carbon::parse($upTo, $tz);
+        $rows = [];
+
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $day = $end->copy()->subDays($i);
+
+            // Sundays are not worked, so a zero there is not a miss.
+            if ($day->isSunday()) {
+                continue;
+            }
+
+            $date = $day->toDateString();
+
+            $rows[] = [
+                'date' => $date,
+                'label' => $day->format('D'),
+                'count' => $this->countFor($userId, $date),
+                'target' => $this->target(),
+                'is_today' => $date === $end->toDateString(),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * The same shape as one person's week, but for everybody's totals, so both
+     * emails draw the identical chart from the identical code.
+     *
+     * @return array<int, array{date: string, label: string, count: int, target: int, is_today: bool}>
+     */
+    public function recentDaysForTeam(string $upTo, int $days = 7): array
+    {
+        $tz = $this->timezone();
+        $end = Carbon::parse($upTo, $tz);
+        $people = $this->people()->pluck('id')->all();
+        $target = $this->target() * max(1, count($people));
+        $rows = [];
+
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $day = $end->copy()->subDays($i);
+
+            if ($day->isSunday()) {
+                continue;
+            }
+
+            $date = $day->toDateString();
+            $counts = $this->countsOn($date);
+
+            $rows[] = [
+                'date' => $date,
+                'label' => $day->format('D'),
+                'count' => array_sum(array_intersect_key($counts, array_flip($people))),
+                'target' => $target,
+                'is_today' => $date === $end->toDateString(),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Everybody's figures for one day, worst shortfall first.
+     *
+     * @return array<int, array{name: string, role: string|null, count: int, target: int, short: int}>
+     */
+    public function tableFor(string $date): array
+    {
+        $counts = $this->countsOn($date);
+        $target = $this->target();
+
+        return $this->people()
+            ->map(fn (User $u) => [
+                'name' => $u->name,
+                'role' => $u->role?->name,
+                'count' => $counts[$u->id] ?? 0,
+                'target' => $target,
+                'short' => max(0, $target - ($counts[$u->id] ?? 0)),
+            ])
+            ->sortBy([['short', 'desc'], ['name', 'asc']])
+            ->values()
+            ->all();
+    }
+}
