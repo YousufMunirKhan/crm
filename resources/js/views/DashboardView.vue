@@ -515,7 +515,9 @@
                     />
                 </div>
                 <fieldset class="form-fieldset">
-                    <legend class="form-legend">Did this win or lose the deal?</legend>
+                    <legend class="form-legend">
+                        How did it end? <span class="form-required" aria-hidden="true">*</span>
+                    </legend>
                     <div class="flex flex-wrap gap-4">
                         <label class="form-choice">
                             <input v-model="completeForm.outcome" type="radio" value="won" class="form-radio" />
@@ -526,8 +528,8 @@
                             <span>Lost</span>
                         </label>
                         <label class="form-choice">
-                            <input v-model="completeForm.outcome" type="radio" value="" class="form-radio" />
-                            <span>Neither yet</span>
+                            <input v-model="completeForm.outcome" type="radio" value="follow_again" class="form-radio" />
+                            <span>Needs another follow-up</span>
                         </label>
                     </div>
                 </fieldset>
@@ -547,7 +549,18 @@
                     </select>
                 </div>
                 <div>
-                    <label class="form-label" for="dashboardview-next-follow-up-date-optional">Next Follow-up Date (Optional)</label>
+                    <!--
+                        Saying it needs another follow-up and leaving the date blank
+                        clears next_follow_up_at, which drops the lead off the
+                        follow-up list entirely - the opposite of what was just said.
+                    -->
+                    <label class="form-label" for="dashboardview-next-follow-up-date-optional">
+                        Next Follow-up Date
+                        <template v-if="completeForm.outcome === 'follow_again'">
+                            <span class="form-required" aria-hidden="true">*</span>
+                        </template>
+                        <template v-else>(Optional)</template>
+                    </label>
                     <input id="dashboardview-next-follow-up-date-optional"
                         v-model="completeForm.nextFollowUpAt"
                         type="datetime-local"
@@ -1100,11 +1113,19 @@ const closeCompleteModal = () => {
 };
 
 /**
- * Marking it lost needs a reason - the same picker rule every other lost path
- * uses, so the dialog cannot submit something the API will reject.
+ * The dialog will not submit something the API would reject: an answer is
+ * required, lost needs a reason from the shared picker, and "needs another
+ * follow-up" needs the date it is being followed up on.
  */
-const completeOutcomeReady = computed(() => completeForm.value.outcome !== 'lost'
-    || isLostReasonComplete(completeForm.value.lostReasonCode, completeForm.value.lostReasonDetail));
+const completeOutcomeReady = computed(() => {
+    const { outcome, lostReasonCode, lostReasonDetail, nextFollowUpAt } = completeForm.value;
+
+    if (! outcome) return false;
+    if (outcome === 'lost') return isLostReasonComplete(lostReasonCode, lostReasonDetail);
+    if (outcome === 'follow_again') return String(nextFollowUpAt ?? '').trim() !== '';
+
+    return true;
+});
 
 const completeFollowUp = async () => {
     if (!selectedFollowUp.value?.id || completingFollowUp.value) return;

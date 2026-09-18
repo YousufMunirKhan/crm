@@ -98,6 +98,8 @@ class DashboardAppointmentsTest extends TestCase
         $this->postJson("/api/leads/{$lead->id}/complete-followup", [
             'remarks' => 'Met the owner, sending a quote.',
             'appointment_activity_id' => $appointment->id,
+            'outcome' => 'follow_again',
+            'next_follow_up_at' => now()->addWeek()->toDateTimeString(),
         ])->assertOk();
 
         $appointment->refresh();
@@ -131,6 +133,8 @@ class DashboardAppointmentsTest extends TestCase
         $this->postJson("/api/leads/{$lead->id}/complete-followup", [
             'remarks' => 'Done the morning one.',
             'appointment_activity_id' => $morning->id,
+            'outcome' => 'follow_again',
+            'next_follow_up_at' => now()->addWeek()->toDateTimeString(),
         ])->assertOk();
 
         $this->assertSame([$afternoon->id], $this->dashboardAppointmentIds());

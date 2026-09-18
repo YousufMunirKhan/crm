@@ -156,6 +156,60 @@ class CompleteFollowUpOutcomeTest extends TestCase
         $this->assertSame('lost', $lead->refresh()->stage);
     }
 
+    public function test_closing_an_appointment_without_an_answer_is_refused(): void
+    {
+        $lead = $this->lead();
+        $appointment = $this->appointment($lead);
+
+        $this->postJson("/api/leads/{$lead->id}/complete-followup", [
+            'remarks' => 'Went and saw them.',
+            'appointment_activity_id' => $appointment->id,
+        ])->assertStatus(422)->assertJsonValidationErrors('outcome');
+
+        $this->assertSame(
+            LeadActivity::APPOINTMENT_STATUS_PENDING,
+            $appointment->refresh()->appointment_status
+        );
+    }
+
+    public function test_needing_another_follow_up_must_say_when(): void
+    {
+        $lead = $this->lead();
+
+        $this->postJson("/api/leads/{$lead->id}/complete-followup", [
+            'remarks' => 'Wants to think about it.',
+            'outcome' => 'follow_again',
+        ])->assertStatus(422)->assertJsonValidationErrors('next_follow_up_at');
+    }
+
+    public function test_needing_another_follow_up_keeps_the_lead_on_the_list(): void
+    {
+        $lead = $this->lead();
+        $when = now()->addWeek()->startOfMinute();
+
+        $this->postJson("/api/leads/{$lead->id}/complete-followup", [
+            'remarks' => 'Wants to think about it.',
+            'outcome' => 'follow_again',
+            'next_follow_up_at' => $when->toDateTimeString(),
+        ])->assertOk();
+
+        $lead->refresh();
+        $this->assertSame('lead', $lead->stage);
+        $this->assertNotNull($lead->next_follow_up_at);
+        $this->assertSame($when->toDateTimeString(), $lead->next_follow_up_at->toDateTimeString());
+    }
+
+    public function test_a_lead_only_screen_can_still_complete_without_an_outcome(): void
+    {
+        $lead = $this->lead();
+
+        $this->postJson("/api/leads/{$lead->id}/complete-followup", [
+            'remarks' => 'Left a voicemail.',
+        ])->assertOk();
+
+        $this->assertSame('lead', $lead->refresh()->stage);
+    }
+
     public function test_the_answer_is_kept_on_the_activity_for_the_timeline(): void
     {
         $lead = $this->lead();

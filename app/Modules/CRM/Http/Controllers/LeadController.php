@@ -1231,11 +1231,19 @@ class LeadController extends Controller
             // Sent when the dashboard completes one particular appointment rather
             // than a plain follow-up, so we know which row is now done.
             'appointment_activity_id' => ['nullable', 'integer'],
-            // What the visit came to. Optional, so a caller that only wants to
-            // log a remark still works and simply answers nothing about the deal.
-            'outcome' => ['nullable', 'in:open,won,lost'],
+            // What the visit came to. Required whenever an appointment is being
+            // closed - "it happened" on its own is not an answer anyone can count -
+            // and left optional for the screens that only log a remark against a lead.
+            'outcome' => ['nullable', 'required_with:appointment_activity_id', 'in:won,lost,follow_again'],
             'lost_reason' => ['nullable', 'string', 'max:500'],
             'lost_reason_code' => ['required_if:outcome,lost', 'nullable', Rule::in(LostReasons::codes())],
+            // Answering "needs another follow-up" without a date would clear
+            // next_follow_up_at rather than set one, dropping the lead off the
+            // follow-up list - the opposite of what was just said.
+            'next_follow_up_at' => ['required_if:outcome,follow_again', 'nullable', 'date'],
+        ], [
+            'outcome.required_with' => 'Say whether this won, lost, or needs another follow-up.',
+            'next_follow_up_at.required_if' => 'Pick the date you will follow this up on.',
         ]);
 
         $outcome = $data['outcome'] ?? null;
