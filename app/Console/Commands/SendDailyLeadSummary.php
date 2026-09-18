@@ -42,7 +42,6 @@ class SendDailyLeadSummary extends Command
         $board->forMonthOf($date);
 
         $dateLabel = $day->format('l j F');
-        $target = $board->target();
         $rows = $board->tableFor($date);
         $teamDays = $board->recentDaysForTeam($date);
 
@@ -55,6 +54,7 @@ class SendDailyLeadSummary extends Command
         foreach ($board->people() as $person) {
             $email = trim((string) $person->email);
             $count = $board->countFor($person->id, $date);
+            $target = $board->targetFor($person->id);
             $short = max(0, $target - $count);
 
             if ($email === '') {
@@ -92,7 +92,7 @@ class SendDailyLeadSummary extends Command
             if ($sender->send(
                 'lead-summary:'.$watcher->id.':'.$date,
                 $email,
-                $this->summaryMail($sender, $dateLabel, $rows, $teamDays, $target),
+                $this->summaryMail($sender, $dateLabel, $rows, $teamDays),
             )) {
                 $sent++;
             }
@@ -134,13 +134,13 @@ class SendDailyLeadSummary extends Command
         $sender->send(
             'preview:lead-target:'.$stamp,
             $to,
-            $this->personalMail($sender, $board, $person, $date, $dateLabel, $count, max(0, $board->target() - $count)),
+            $this->personalMail($sender, $board, $person, $date, $dateLabel, $count, max(0, $board->targetFor($person->id) - $count)),
         );
 
         $sender->send(
             'preview:lead-summary:'.$stamp,
             $to,
-            $this->summaryMail($sender, $dateLabel, $rows, $teamDays, $board->target()),
+            $this->summaryMail($sender, $dateLabel, $rows, $teamDays),
         );
 
         $this->info("Sent both versions to {$to} (personal example built from {$person->name}).");
@@ -158,18 +158,19 @@ class SendDailyLeadSummary extends Command
         int $short,
     ): AutomatedEmail {
         $days = $board->recentDaysFor($person->id, $date);
+        $target = $board->targetFor($person->id);
 
         return new AutomatedEmail(
             mailSubject: $short > 0
-                ? "{$count} of {$board->target()} leads — {$short} short"
-                : "{$count} of {$board->target()} leads — target met",
+                ? "{$count} of {$target} leads — {$short} short"
+                : "{$count} of {$target} leads — target met",
             mailView: 'emails.automated.lead-target-personal',
             mailData: [
                 'companyName' => $sender->companyName(),
                 'repName' => $person->name,
                 'dateLabel' => $dateLabel,
                 'count' => $count,
-                'target' => $board->target(),
+                'target' => $target,
                 'short' => $short,
                 'days' => $days,
                 'weekTotal' => array_sum(array_column($days, 'count')),
@@ -183,10 +184,10 @@ class SendDailyLeadSummary extends Command
         string $dateLabel,
         array $rows,
         array $teamDays,
-        int $target,
     ): AutomatedEmail {
         $teamCount = array_sum(array_column($rows, 'count'));
-        $teamTarget = $target * max(1, count($rows));
+        // Summed rather than multiplied: people can be asked for different numbers.
+        $teamTarget = array_sum(array_column($rows, 'target'));
 
         return new AutomatedEmail(
             mailSubject: "Leads {$dateLabel}: {$teamCount} of {$teamTarget}",

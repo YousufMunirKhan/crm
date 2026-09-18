@@ -46,15 +46,18 @@ class DailyLeadSummaryTest extends TestCase
         ]);
 
         if ($withTarget) {
-            EmployeeTarget::create([
-                'user_id' => $user->id,
-                'month' => now(config('app.display_timezone'))->format('Y-m'),
-                'target_appointments' => 10,
-                'target_sales' => 5,
-            ]);
+            $this->targetFor($user, 5);
         }
 
         return $user;
+    }
+
+    private function targetFor(User $user, int $dailyLeads): EmployeeTarget
+    {
+        return EmployeeTarget::updateOrCreate(
+            ['user_id' => $user->id, 'month' => now(config('app.display_timezone'))->format('Y-m')],
+            ['target_appointments' => 10, 'target_sales' => 5, 'target_daily_leads' => $dailyLeads],
+        );
     }
 
     private function leadsFor(User $user, int $count, ?string $at = null): void
@@ -276,20 +279,40 @@ class DailyLeadSummaryTest extends TestCase
         });
     }
 
-    public function test_an_empty_target_row_does_not_count_as_a_target(): void
+    public function test_a_monthly_target_with_no_daily_leads_figure_is_not_measured_on_leads(): void
     {
+        // Somebody can be given a revenue or appointments target without being
+        // asked for leads at all, and being handed one should not imply the other.
         $user = $this->user('Sales', 'blank@example.com', withTarget: false);
-        EmployeeTarget::create([
-            'user_id' => $user->id,
-            'month' => now(config('app.display_timezone'))->format('Y-m'),
-            'target_appointments' => 0,
-            'target_sales' => 0,
-            'target_revenue' => 0,
-        ]);
+        $this->targetFor($user, 0);
 
         $this->artisan('emails:daily-lead-summary')->assertSuccessful();
 
         Mail::assertNotSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('blank@example.com'));
+    }
+
+    public function test_people_can_be_asked_for_different_numbers(): void
+    {
+        $hard = $this->user('Sales', 'hard@example.com', withTarget: false);
+        $easy = $this->user('CallAgent', 'easy@example.com', withTarget: false);
+        $this->user('Admin', 'boss@example.com', withTarget: false);
+        $this->targetFor($hard, 8);
+        $this->targetFor($easy, 2);
+        $this->leadsFor($hard, 3);
+        $this->leadsFor($easy, 3);
+
+        $this->artisan('emails:daily-lead-summary')->assertSuccessful();
+
+        Mail::assertSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('hard@example.com')
+            && $m->mailData['target'] === 8 && $m->mailData['short'] === 5);
+        Mail::assertSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('easy@example.com')
+            && $m->mailData['target'] === 2 && $m->mailData['short'] === 0);
+
+        // The team figure is the sum of what each was asked for, not one number
+        // times a headcount.
+        Mail::assertSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('boss@example.com')
+            && $m->mailView === 'emails.automated.lead-target-admin'
+            && $m->mailData['teamTarget'] === 10);
     }
 
     public function test_a_manager_with_a_target_is_measured_like_anybody_else(): void

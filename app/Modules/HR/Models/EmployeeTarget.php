@@ -16,6 +16,7 @@ class EmployeeTarget extends Model
         'month',
         'target_appointments',
         'target_sales',
+        'target_daily_leads',
         'target_revenue',
         'meta',
     ];

@@ -18,6 +18,7 @@
                         <th class="listing-th">Employee</th>
                         <th class="listing-th">Appointments (target / achieved)</th>
                         <th class="listing-th">Sales (target / achieved) <span class="font-normal text-slate-500">· by product/category</span></th>
+                        <th class="listing-th">Daily leads</th>
                         <th class="listing-th">Revenue (target / won)</th>
                         <th class="listing-th">Progress</th>
                         <th class="listing-th">Actions</th>
@@ -25,10 +26,10 @@
                 </thead>
                 <tbody>
                     <tr v-if="loading">
-                        <td colspan="6" class="listing-td text-center text-slate-500 py-10">Loading…</td>
+                        <td colspan="7" class="listing-td text-center text-slate-500 py-10">Loading…</td>
                     </tr>
                     <tr v-else-if="rows.length === 0">
-                        <td colspan="6" class="listing-td text-center text-slate-500 py-10">No employees found for this month.</td>
+                        <td colspan="7" class="listing-td text-center text-slate-500 py-10">No employees found.</td>
                     </tr>
                     <tr v-for="row in rows" :key="row.user_id" class="listing-row">
                         <td class="listing-td">
@@ -43,6 +44,10 @@
                                     {{ lineLabel(ln) }}: {{ ln.achieved_quantity ?? 0 }}/{{ ln.target_quantity ?? 0 }}
                                 </span>
                             </div>
+                        </td>
+                        <td class="listing-td">
+                            <span v-if="row.target_daily_leads">{{ row.target_daily_leads }} / day</span>
+                            <span v-else class="text-slate-400">Not set</span>
                         </td>
                         <td class="listing-td">£{{ formatNumber(row.target_revenue) }} / £{{ formatNumber(row.achieved_revenue) }}</td>
                         <td class="listing-td">
@@ -114,6 +119,23 @@
                         class="form-input"
                     />
                 </div>
+            </div>
+            <div>
+                <!--
+                    The only daily figure on this form. It was a single number in
+                    a config file, the same for everybody and settable by nobody.
+                -->
+                <label class="form-label" for="employeegoalsview-target-daily-leads">Daily leads</label>
+                <input id="employeegoalsview-target-daily-leads"
+                    v-model.number="editForm.target_daily_leads"
+                    type="number"
+                    min="0"
+                    class="form-input"
+                />
+                <p class="text-xs text-slate-500 mt-1">
+                    New leads expected per working day. Leave at 0 and this person is not measured on leads at all —
+                    they get no daily email and do not appear in the team summary.
+                </p>
             </div>
             <div>
                 <label class="form-label" for="employeegoalsview-target-revenue">Target revenue (£)</label>
@@ -253,6 +275,7 @@ const editForm = ref({
     month: '',
     target_appointments: 0,
     target_sales: 0,
+    target_daily_leads: 0,
     target_revenue: 0,
     lines: [],
 });
@@ -363,6 +386,7 @@ const loadData = async () => {
                 lines,
                 target_appointments: t.target_appointments || 0,
                 target_sales: t.target_sales || 0,
+                target_daily_leads: t.target_daily_leads || 0,
                 target_revenue: t.target_revenue || 0,
                 achieved_appointments: 0,
                 achieved_sales: achievedFromLines,
@@ -380,6 +404,7 @@ const loadData = async () => {
                     lines: [],
                     target_appointments: 0,
                     target_sales: 0,
+                    target_daily_leads: 0,
                     target_revenue: 0,
                     achieved_appointments: 0,
                     achieved_sales: 0,
@@ -430,6 +455,7 @@ const openEdit = (row) => {
         month: selectedMonth.value || getDefaultMonth(),
         target_appointments: row.target_appointments || 0,
         target_sales: row.target_sales || 0,
+        target_daily_leads: row.target_daily_leads || 0,
         target_revenue: row.target_revenue || 0,
         lines,
     };
@@ -464,6 +490,7 @@ const saveGoals = async () => {
             month: editForm.value.month,
             target_appointments: editForm.value.target_appointments || 0,
             target_sales: editForm.value.lines.length ? 0 : editForm.value.target_sales || 0,
+            target_daily_leads: editForm.value.target_daily_leads || 0,
             target_revenue: editForm.value.target_revenue || 0,
             lines: linesPayload,
         });

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Modules\CRM\Models\Lead;
+use App\Modules\HR\Models\EmployeeTarget;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -35,14 +36,27 @@ class DailyLeadScoreboard
         if ($month !== $this->month) {
             $this->month = $month;
             $this->people = null;
+            $this->targets = null;
         }
 
         return $this;
     }
 
-    public function target(): int
+    /** @var array<int, int>|null userId => their own daily lead target */
+    private ?array $targets = null;
+
+    /** The fallback when nobody has set one, and the default a new row gets. */
+    public function defaultTarget(): int
     {
         return max(1, (int) config('leads.daily_target', 5));
+    }
+
+    /** What this person is asked for in a day. */
+    public function targetFor(int $userId): int
+    {
+        $this->people();
+
+        return $this->targets[$userId] ?? $this->defaultTarget();
     }
 
     public function timezone(): string
@@ -51,13 +65,14 @@ class DailyLeadScoreboard
     }
 
     /**
-     * The people measured on the daily target: whoever has one set this month.
+     * The people measured on leads: whoever has a daily lead target this month.
      *
      * Role deliberately does not come into it. This started as a list of sales
      * roles and so told four people they were short of a number nobody had ever
-     * given them, while leaving out the two - an admin and a manager - who were
-     * actually creating the most leads on the system. A target is the thing that
-     * says somebody is being managed on numbers, so a target is the only test.
+     * given them, while leaving out the two - an admin and a manager - creating
+     * the most leads on the system. It then keyed off any target at all, which
+     * measured people on leads because somebody had set them a revenue figure.
+     * The daily lead target is its own number now, so it can answer for itself.
      */
     public function people(): Collection
     {
@@ -67,14 +82,16 @@ class DailyLeadScoreboard
 
         $month = $this->month ?? now($this->timezone())->format('Y-m');
 
+        $rows = EmployeeTarget::query()
+            ->where('month', $month)
+            ->where('target_daily_leads', '>', 0)
+            ->pluck('target_daily_leads', 'user_id');
+
+        $this->targets = $rows->map(fn ($n) => max(1, (int) $n))->all();
+
         return $this->people = User::query()
             ->where('is_active', true)
-            ->whereHas('employeeTargets', fn ($q) => $q
-                ->where('month', $month)
-                ->where(fn ($t) => $t
-                    ->where('target_appointments', '>', 0)
-                    ->orWhere('target_sales', '>', 0)
-                    ->orWhere('target_revenue', '>', 0)))
+            ->whereIn('id', $rows->keys())
             ->with('role')
             ->orderBy('name')
             ->get();
@@ -147,7 +164,7 @@ class DailyLeadScoreboard
                 'date' => $date,
                 'label' => $day->format('D'),
                 'count' => $this->countFor($userId, $date),
-                'target' => $this->target(),
+                'target' => $this->targetFor($userId),
                 'is_today' => $date === $end->toDateString(),
             ];
         }
@@ -166,7 +183,7 @@ class DailyLeadScoreboard
         $tz = $this->timezone();
         $end = Carbon::parse($upTo, $tz);
         $people = $this->people()->pluck('id')->all();
-        $target = $this->target() * max(1, count($people));
+        $target = array_sum(array_map(fn (int $id) => $this->targetFor($id), $people));
         $rows = [];
 
         for ($i = $days - 1; $i >= 0; $i--) {
@@ -199,15 +216,14 @@ class DailyLeadScoreboard
     public function tableFor(string $date): array
     {
         $counts = $this->countsOn($date);
-        $target = $this->target();
 
         return $this->people()
             ->map(fn (User $u) => [
                 'name' => $u->name,
                 'role' => $u->role?->name,
                 'count' => $counts[$u->id] ?? 0,
-                'target' => $target,
-                'short' => max(0, $target - ($counts[$u->id] ?? 0)),
+                'target' => $this->targetFor($u->id),
+                'short' => max(0, $this->targetFor($u->id) - ($counts[$u->id] ?? 0)),
             ])
             ->sortBy([['short', 'desc'], ['name', 'asc']])
             ->values()

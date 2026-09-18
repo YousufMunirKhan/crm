@@ -645,23 +645,59 @@ class HrController extends Controller
 
         $month = $request->input('month') ?: now()->format('Y-m');
 
-        $query = EmployeeTarget::with('user.role')
-            ->where('month', $month);
-
         $user = auth()->user();
         $canViewAll = $user->isRole('Admin') || $user->isRole('System Admin') || $user->isRole('Manager');
-        if (!$canViewAll) {
-            $query->where('user_id', $user->id);
-        }
 
-        $targets = $query->with(['lines.product', 'user.role'])->get();
+        // Everybody active, not only the people who already have a row.
+        //
+        // This listed employee_targets, so the screen for setting targets could
+        // only show you somebody once they had one - and the list it was merged
+        // with covers Sales, CallAgent and Support, which left the owner and the
+        // manager unreachable from it entirely. They create more leads than half
+        // the sales team.
+        $users = User::with('role')
+            ->where('is_active', true)
+            ->when(! $canViewAll, fn ($q) => $q->where('id', $user->id))
+            ->orderBy('name')
+            ->get();
+
+        $targets = EmployeeTarget::with(['lines.product', 'user.role'])
+            ->where('month', $month)
+            ->whereIn('user_id', $users->pluck('id'))
+            ->get()
+            ->keyBy('user_id');
 
         $from = Carbon::parse($month . '-01')->startOfMonth();
         $to = $from->copy()->endOfMonth();
 
-        $data = $targets->map(function (EmployeeTarget $t) use ($from, $to) {
+        $data = $users->map(function (User $person) use ($targets, $from, $to, $month) {
+            $totals = $this->reportingService->getEmployeeAchievementTotals((int) $person->id, $from, $to);
+            $t = $targets->get($person->id);
+
+            // Nothing set for this month: a real person with empty numbers, so
+            // the screen can offer them rather than hide them.
+            if (! $t) {
+                return [
+                    'id' => null,
+                    'user_id' => $person->id,
+                    'user' => $person,
+                    'month' => $month,
+                    'target_appointments' => 0,
+                    'target_sales' => 0,
+                    'target_daily_leads' => 0,
+                    'target_revenue' => '0.00',
+                    'has_target' => false,
+                    'lines' => [],
+                    'effective_target_sales' => 0,
+                    'achievement' => [
+                        'appointments' => $totals['appointments'],
+                        'sales_total_won_items' => $totals['sales'],
+                        'revenue' => $totals['revenue'],
+                    ],
+                ];
+            }
+
             $sales = $this->reportingService->resolveSalesTargetAndAchieved($t, (int) $t->user_id, $from, $to);
-            $totals = $this->reportingService->getEmployeeAchievementTotals((int) $t->user_id, $from, $to);
 
             $linesOut = [];
             foreach ($t->lines as $line) {
@@ -694,6 +730,7 @@ class HrController extends Controller
 
             $base = $t->toArray();
             $base['lines'] = $linesOut;
+            $base['has_target'] = true;
             $base['effective_target_sales'] = $sales['target_sales'];
             $base['achievement'] = [
                 'appointments' => $totals['appointments'],
@@ -727,6 +764,7 @@ class HrController extends Controller
             'month' => ['required', 'string', 'regex:/^\d{4}-\d{2}$/'],
             'target_appointments' => ['nullable', 'integer', 'min:0'],
             'target_sales' => ['nullable', 'integer', 'min:0'],
+            'target_daily_leads' => ['nullable', 'integer', 'min:0'],
             'target_revenue' => ['nullable', 'numeric', 'min:0'],
             'meta' => ['nullable', 'array'],
         ]);
@@ -764,6 +802,7 @@ class HrController extends Controller
             ]);
 
             $target->target_appointments = $data['target_appointments'] ?? 0;
+            $target->target_daily_leads = $data['target_daily_leads'] ?? 0;
             $target->target_revenue = $data['target_revenue'] ?? 0;
             $target->meta = $data['meta'] ?? null;
 
