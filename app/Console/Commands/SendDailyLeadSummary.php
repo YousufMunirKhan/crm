@@ -131,17 +131,16 @@ class SendDailyLeadSummary extends Command
         $count = $board->countFor($person->id, $date);
         $stamp = now()->format('YmdHis');
 
-        $sender->send(
-            'preview:lead-target:'.$stamp,
-            $to,
-            $this->personalMail($sender, $board, $person, $date, $dateLabel, $count, max(0, $board->targetFor($person->id) - $count)),
-        );
+        // Marked, like every other preview, so one can never be mistaken in an
+        // inbox for the thing it is a picture of.
+        $personal = $this->personalMail($sender, $board, $person, $date, $dateLabel, $count, max(0, $board->targetFor($person->id) - $count));
+        $personal->mailSubject = '[Preview] '.$personal->mailSubject;
 
-        $sender->send(
-            'preview:lead-summary:'.$stamp,
-            $to,
-            $this->summaryMail($sender, $board, $date, $dateLabel, $rows, $teamDays),
-        );
+        $summary = $this->summaryMail($sender, $board, $date, $dateLabel, $rows, $teamDays);
+        $summary->mailSubject = '[Preview] '.$summary->mailSubject;
+
+        $sender->send('preview:lead-target:'.$stamp, $to, $personal);
+        $sender->send('preview:lead-summary:'.$stamp, $to, $summary);
 
         $this->info("Sent both versions to {$to} (personal example built from {$person->name}).");
 
