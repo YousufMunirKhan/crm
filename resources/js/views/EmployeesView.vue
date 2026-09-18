@@ -259,6 +259,79 @@
         @confirm="toggleStatus"
         @cancel="closeStatusConfirm"
     />
+
+    <!--
+        Switching somebody off used to leave their pipeline assigned to an
+        account that no longer logs in, so it fell out of every list that starts
+        from an active user. The question is asked here because here is the only
+        moment anybody is thinking about it.
+    -->
+    <BaseModal v-model="showHandover" title="Who takes their work on?" size="md" :close-on-backdrop="false" @close="closeHandover">
+        <div v-if="handoverLoading" class="py-10 text-center text-sm text-slate-500" aria-busy="true">
+            Checking what they are holding…
+        </div>
+
+        <div v-else class="space-y-4">
+            <p class="text-sm text-slate-700">
+                <strong>{{ leavingName }}</strong> will no longer be able to log in.
+            </p>
+
+            <div v-if="openWork.total" class="rounded-card border border-warning-200 bg-warning-50/70 p-3">
+                <div class="text-sm font-semibold text-warning-900">
+                    They are holding {{ openWork.total }} open {{ openWork.total === 1 ? 'lead' : 'leads' }}.
+                </div>
+                <div class="mt-1 flex flex-wrap gap-1.5">
+                    <span
+                        v-for="(count, stage) in openWork.by_stage"
+                        :key="stage"
+                        class="rounded-full border border-warning-200 bg-white px-2 py-0.5 text-xs font-medium text-warning-900"
+                    >
+                        {{ count }} {{ stageLabel(stage) }}
+                    </span>
+                </div>
+                <p class="mt-2 text-xs text-warning-800">
+                    Leave nobody selected and they stay where they are — with somebody who cannot work them.
+                </p>
+            </div>
+
+            <div v-else class="callout callout-info text-sm">
+                They are not holding any open leads, so there is nothing to hand on.
+            </div>
+
+            <div v-if="openWork.total">
+                <p class="form-label">Hand them to</p>
+                <p class="text-xs text-slate-500 mb-2">
+                    Pick one person, or several — they are split evenly, and each is emailed their own list.
+                </p>
+
+                <div class="max-h-60 space-y-1 overflow-y-auto rounded-card border border-slate-200 p-2">
+                    <label
+                        v-for="candidate in handoverCandidates"
+                        :key="candidate.id"
+                        class="form-choice w-full rounded-control px-2 py-1.5 hover:bg-slate-50"
+                    >
+                        <input v-model="handoverRecipients" type="checkbox" class="form-checkbox" :value="candidate.id" />
+                        <span>
+                            {{ candidate.name }}
+                            <span class="text-xs text-slate-500">· {{ candidate.role?.name || '—' }}</span>
+                        </span>
+                    </label>
+                </div>
+
+                <p v-if="handoverRecipients.length > 1" class="mt-2 text-xs text-slate-600">
+                    {{ openWork.total }} leads split between {{ handoverRecipients.length }} people —
+                    about {{ Math.ceil(openWork.total / handoverRecipients.length) }} each.
+                </p>
+            </div>
+        </div>
+
+        <template #actions>
+            <BaseButton variant="outline" block-mobile :disabled="statusSubmitting" @click="closeHandover">Cancel</BaseButton>
+            <BaseButton variant="danger" block-mobile :loading="statusSubmitting" @click="confirmDeactivate">
+                {{ handoverRecipients.length ? 'Hand over and inactivate' : 'Inactivate anyway' }}
+            </BaseButton>
+        </template>
+    </BaseModal>
 </template>
 
 <script setup>
@@ -431,9 +504,80 @@ const handleSaved = () => {
     loadEmployees(pagination.value?.current_page || 1);
 };
 
-const askToggleStatus = (employee, makeActive) => {
+const showHandover = ref(false);
+const handoverLoading = ref(false);
+const handoverRecipients = ref([]);
+const handoverCandidates = ref([]);
+const openWork = ref({ total: 0, by_stage: {} });
+
+const leavingName = computed(() => statusTarget.value?.employee?.name ?? '');
+
+function stageLabel(stage) {
+    return String(stage).replace(/_/g, ' ');
+}
+
+const askToggleStatus = async (employee, makeActive) => {
     statusTarget.value = { employee, makeActive };
-    showStatusConfirm.value = true;
+
+    // Activating is just a switch. Switching off is the one that strands work.
+    if (makeActive) {
+        showStatusConfirm.value = true;
+        return;
+    }
+
+    handoverRecipients.value = [];
+    handoverCandidates.value = [];
+    openWork.value = { total: 0, by_stage: {} };
+    handoverLoading.value = true;
+    showHandover.value = true;
+
+    try {
+        const [work, people] = await Promise.all([
+            axios.get(`/api/users/${employee.id}/open-work`),
+            axios.get('/api/users', { params: { is_active: 1, per_page: 200 } }),
+        ]);
+
+        openWork.value = work.data?.open_work ?? { total: 0, by_stage: {} };
+
+        const list = people.data?.data ?? people.data ?? [];
+        handoverCandidates.value = list.filter((u) => u.id !== employee.id && u.is_active);
+    } catch (e) {
+        console.error('Could not work out what they are holding:', e);
+        toast.error('Could not check what they are holding.');
+    } finally {
+        handoverLoading.value = false;
+    }
+};
+
+const closeHandover = () => {
+    if (statusSubmitting.value) return;
+    showHandover.value = false;
+    statusTarget.value = null;
+};
+
+const confirmDeactivate = async () => {
+    if (!statusTarget.value || statusSubmitting.value) return;
+    const { employee } = statusTarget.value;
+
+    statusSubmitting.value = true;
+    try {
+        const { data } = await axios.post(`/api/users/${employee.id}/deactivate`, {
+            recipients: handoverRecipients.value,
+        });
+
+        showHandover.value = false;
+        statusTarget.value = null;
+        await loadEmployees(pagination.value?.current_page || 1);
+
+        const moved = data?.handed_over ?? [];
+        toast.success(moved.length
+            ? `${data.message} ${moved.map((m) => `${m.user.name}: ${m.count}`).join(', ')}`
+            : data.message);
+    } catch (error) {
+        toast.error(error.response?.data?.message || 'Could not inactivate them.');
+    } finally {
+        statusSubmitting.value = false;
+    }
 };
 
 const closeStatusConfirm = () => {

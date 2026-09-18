@@ -349,6 +349,14 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     // Integration settings
     Route::put('/settings/smtp', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateSmtp'])->middleware('role:Admin,System Admin');
     Route::post('/settings/smtp/test', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'testSmtp'])->middleware('role:Admin,System Admin');
+    // Switching somebody off, and deciding where their pipeline goes. One act,
+    // because doing only the first is what left a departed rep holding sixteen
+    // live opportunities.
+    Route::get('/users/{id}/open-work', [\App\Http\Controllers\UserDeactivationController::class, 'openWork'])
+        ->middleware('role:Admin,System Admin,Manager');
+    Route::post('/users/{id}/deactivate', [\App\Http\Controllers\UserDeactivationController::class, 'deactivate'])
+        ->middleware('role:Admin,System Admin,Manager');
+
     // What the system has emailed, and whether anybody read it. Admin only:
     // it lists every customer address the schedule has written to.
     Route::get('/internal-emails', [\App\Http\Controllers\InternalEmailLogController::class, 'index'])
