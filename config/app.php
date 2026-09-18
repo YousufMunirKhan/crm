@@ -69,6 +69,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Display Timezone
+    |--------------------------------------------------------------------------
+    |
+    | What a person in this business means by a time of day. Storage stays UTC
+    | above - every timestamp already written is in it, and reinterpreting them
+    | would move records that decide what people are paid - so the clock people
+    | read by lives here instead.
+    |
+    | Anything scheduled for a time somebody named out loud ("seven in the
+    | morning") belongs on this, not on the one above: 07:00 UTC is 08:00 here
+    | for the seven months of British Summer Time.
+    |
+    */
+
+    'display_timezone' => env('APP_DISPLAY_TIMEZONE', 'Europe/London'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

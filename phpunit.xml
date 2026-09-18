@@ -27,6 +27,8 @@
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <!-- The bulk-send pacing is there for a live SMTP host; in tests it is dead time. -->
+        <env name="MAIL_BULK_BETWEEN_MESSAGE_DELAY_MS" value="0"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>

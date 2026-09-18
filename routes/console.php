@@ -17,19 +17,19 @@ Schedule::command('commission:send-monthly-reports')
         (int) config('commission.monthly_report_day', 1),
         (string) config('commission.monthly_report_time', '08:00'),
     )
-    ->timezone(config('app.timezone'));
+    ->timezone(config('app.display_timezone'));
 
 // Accounts-receivable ageing: nothing else ever set the "overdue" status, so
 // it was a valid but unreachable state.
 Schedule::command('invoices:mark-overdue')
     ->dailyAt('01:00')
-    ->timezone(config('app.timezone'));
+    ->timezone(config('app.display_timezone'));
 
 // SLA breaches: sla_due_at was computed and displayed but never read again,
 // so a breach was only noticed if somebody happened to be looking.
 Schedule::command('tickets:check-sla')
     ->hourly()
-    ->timezone(config('app.timezone'));
+    ->timezone(config('app.display_timezone'));
 
 // Lifecycle automations. Raises internal tasks only - outbound sending still
 // goes through the campaign console where consent is enforced.
@@ -44,18 +44,18 @@ Schedule::command('marketing:plan')
 Schedule::command('crm:daily-worklist')
     ->dailyAt('06:45')
     ->weekdays()
-    ->timezone(config('app.timezone'))
+    ->timezone(config('app.display_timezone'))
     ->withoutOverlapping();
 
 Schedule::command('marketing:automations')
     ->dailyAt('07:00')
-    ->timezone(config('app.timezone'));
+    ->timezone(config('app.display_timezone'));
 
 // Location history past its retention period. Staff movement is the most
 // sensitive thing here, so it expires on a schedule rather than on request.
 Schedule::command('crm:prune-locations')
     ->dailyAt('02:30')
-    ->timezone(config('app.timezone'));
+    ->timezone(config('app.display_timezone'));
 
 // Shifts nobody clocked out of. A quarter of every attendance row was sitting
 // open, read as "still on shift" by anything that asks who is working, and the
@@ -68,6 +68,41 @@ Schedule::command('crm:close-abandoned-shifts')
 // Start campaigns whose scheduled send time has arrived.
 Schedule::command('campaigns:dispatch-due')
     ->everyFiveMinutes();
+
+// Automated email. Each is spaced from the next: the host answers a burst with
+// a 450 "too much mail", and these all land in the same few minutes otherwise.
+//
+// Every time named here is a time a person said out loud, so all of them hang
+// off the display timezone. On config('app.timezone') - which is UTC, and stays
+// UTC - "seven in the morning" is eight for the seven months of BST.
+
+// Hourly, so a day's notice means a day's notice whatever time the appointment
+// is at, rather than everything arriving in one morning batch.
+Schedule::command('emails:appointment-reminders')
+    ->hourly()
+    ->timezone(config('app.display_timezone'));
+
+Schedule::command('emails:rep-day')
+    ->dailyAt('07:00')
+    ->timezone(config('app.display_timezone'))
+    ->withoutOverlapping();
+
+Schedule::command('emails:follow-up-digest')
+    ->dailyAt('07:10')
+    ->timezone(config('app.display_timezone'))
+    ->withoutOverlapping();
+
+Schedule::command('emails:invoice-due')
+    ->dailyAt('08:00')
+    ->timezone(config('app.display_timezone'))
+    ->withoutOverlapping();
+
+// After the due-soon run, and after invoices:mark-overdue at 01:00 has moved
+// yesterday's into the overdue status.
+Schedule::command('emails:invoice-overdue')
+    ->dailyAt('08:20')
+    ->timezone(config('app.display_timezone'))
+    ->withoutOverlapping();
 
 // Did the scheduler run at all?
 //

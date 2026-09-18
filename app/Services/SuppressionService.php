@@ -44,6 +44,39 @@ class SuppressionService
     }
 
     /**
+     * Opt-out sources that mean the address itself is no good, as opposed to
+     * the person not wanting marketing from us.
+     *
+     * A hard bounce or a spam complaint is a fact about deliverability: more
+     * mail there is wasted at best and costs the sending domain its reputation
+     * at worst. An unsubscribe is a preference about marketing, and a
+     * preference about marketing does not follow somebody's invoice around.
+     */
+    public const UNDELIVERABLE_SOURCES = [
+        'delivery_webhook_hard_bounce',
+        'delivery_webhook_complaint',
+    ];
+
+    /**
+     * True when nothing at all should be sent here, marketing or not.
+     */
+    public function isUndeliverable(?string $identifier, string $channel = ContactConsent::CHANNEL_EMAIL): bool
+    {
+        $key = $this->normalise($identifier, $channel);
+
+        if ($key === null) {
+            return true;
+        }
+
+        return ContactConsent::query()
+            ->where('identifier', $key)
+            ->where('channel', $channel)
+            ->where('status', ContactConsent::STATUS_OPT_OUT)
+            ->whereIn('source', self::UNDELIVERABLE_SOURCES)
+            ->exists();
+    }
+
+    /**
      * True when this recipient must not receive marketing on this channel.
      */
     public function isSuppressed(?string $identifier, string $channel): bool

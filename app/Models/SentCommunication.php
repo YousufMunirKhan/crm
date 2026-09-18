@@ -11,6 +11,7 @@ class SentCommunication extends Model
         'type',
         'template_type',
         'template_id',
+        'reference',
         'customer_id',
         'lead_id',
         'recipient_email',
