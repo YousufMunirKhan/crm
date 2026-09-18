@@ -273,8 +273,14 @@ class SettingsController extends Controller
         $request->validate([
             'sms_api_key' => ['nullable', 'string'],
             'sms_secret_key' => ['nullable', 'string'],
-            'sms_sender_name' => ['nullable', 'string', 'max:11'], // Max 11 chars for sender name
+            // Max 11 chars for sender name. VoodooSMS also rejects the send outright
+            // ("BAD REQUEST Originator") when the name carries characters it does not
+            // accept - a slash in the name silently broke every send until it was found
+            // in the provider response rather than in the UI.
+            'sms_sender_name' => ['nullable', 'string', 'max:11', 'regex:/^[A-Za-z0-9 &._-]+$/'],
             'sms_default_message' => ['nullable', 'string'],
+        ], [
+            'sms_sender_name.regex' => 'The sender name may only contain letters, numbers, spaces, & . _ and -, and must be registered with VoodooSMS.',
         ]);
 
         foreach ($request->all() as $key => $value) {

@@ -161,7 +161,47 @@ class CommunicationController extends Controller
             $options
         );
 
+        // Sends run inside this request unless COMMUNICATION_QUEUE_ASYNC is on, so a
+        // rejection is already known here. Returning 201 regardless left the composer
+        // looking like it had sent while the provider had refused the message.
+        if ($communication->status === 'failed') {
+            return response()->json([
+                'message' => $this->failureMessage($communication),
+                'communication' => $communication->load(['customer', 'lead']),
+            ], 422);
+        }
+
         return response()->json($communication->load(['customer', 'lead']), 201);
+    }
+
+    /**
+     * Turn whatever the sender stored on the communication into something the
+     * composer can show. SMS/WhatsApp keep the raw provider body; the job stores
+     * its own errors under send_error.
+     */
+    private function failureMessage(Communication $communication): string
+    {
+        $payload = $communication->provider_payload;
+
+        if (is_array($payload) && !empty($payload['send_error'])) {
+            return (string) $payload['send_error'];
+        }
+
+        if (is_string($payload)) {
+            $decoded = json_decode($payload, true);
+            $resultText = is_array($decoded) ? ($decoded['resultText'] ?? null) : null;
+
+            if (is_string($resultText) && $resultText !== '') {
+                if (str_contains($resultText, 'Originator')) {
+                    return 'The SMS provider rejected the sender name: ' . $resultText
+                        . '. Check Settings → SMS → sender name - it must be registered with VoodooSMS and use letters and numbers only.';
+                }
+
+                return 'The provider rejected the message: ' . $resultText . '.';
+            }
+        }
+
+        return 'The message could not be sent. Check the settings for this channel and try again.';
     }
 
     public function show($id)
