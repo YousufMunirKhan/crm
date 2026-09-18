@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Modules\CRM\Models\Customer;
 use App\Modules\CRM\Models\Lead;
+use App\Modules\HR\Models\EmployeeTarget;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -30,15 +31,30 @@ class DailyLeadSummaryTest extends TestCase
         Mail::fake();
     }
 
-    private function user(string $roleName, string $email): User
+    /**
+     * A target for the month is what marks somebody as being managed on
+     * numbers, so it is part of making a rep rather than an afterthought.
+     */
+    private function user(string $roleName, string $email, bool $withTarget = true): User
     {
         $role = Role::firstOrCreate(['name' => $roleName], ['nav_permissions' => null]);
 
-        return User::factory()->create([
+        $user = User::factory()->create([
             'role_id' => $role->id,
             'is_active' => true,
             'email' => $email,
         ]);
+
+        if ($withTarget) {
+            EmployeeTarget::create([
+                'user_id' => $user->id,
+                'month' => now(config('app.display_timezone'))->format('Y-m'),
+                'target_appointments' => 10,
+                'target_sales' => 5,
+            ]);
+        }
+
+        return $user;
     }
 
     private function leadsFor(User $user, int $count, ?string $at = null): void
@@ -223,5 +239,54 @@ class DailyLeadSummaryTest extends TestCase
         $this->assertNotNull($event, 'the daily lead summary is not scheduled');
         $this->assertSame('0 10 * * *', $event->expression);
         $this->assertSame('Europe/London', (string) $event->timezone);
+    }
+
+    public function test_somebody_with_no_target_set_is_left_out(): void
+    {
+        $managed = $this->user('Sales', 'managed@example.com');
+        $unmanaged = $this->user('Sales', 'unmanaged@example.com', withTarget: false);
+        $this->user('Admin', 'boss@example.com');
+        $this->leadsFor($managed, 1);
+        $this->leadsFor($unmanaged, 1);
+
+        $this->artisan('emails:daily-lead-summary')->assertSuccessful();
+
+        // Nobody set them a number, so they are not short of one.
+        Mail::assertNotSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('unmanaged@example.com'));
+        Mail::assertSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('managed@example.com'));
+    }
+
+    public function test_the_summary_counts_only_the_people_it_lists(): void
+    {
+        $managed = $this->user('Sales', 'managed@example.com');
+        $unmanaged = $this->user('Sales', 'unmanaged@example.com', withTarget: false);
+        $this->user('Admin', 'boss@example.com');
+        $this->leadsFor($managed, 2);
+        $this->leadsFor($unmanaged, 3);
+
+        $this->artisan('emails:daily-lead-summary')->assertSuccessful();
+
+        Mail::assertSent(AutomatedEmail::class, function (AutomatedEmail $m) {
+            return $m->hasTo('boss@example.com')
+                && count($m->mailData['rows']) === 1
+                && $m->mailData['teamCount'] === 2
+                && $m->mailData['teamTarget'] === 5;
+        });
+    }
+
+    public function test_an_empty_target_row_does_not_count_as_a_target(): void
+    {
+        $user = $this->user('Sales', 'blank@example.com', withTarget: false);
+        EmployeeTarget::create([
+            'user_id' => $user->id,
+            'month' => now(config('app.display_timezone'))->format('Y-m'),
+            'target_appointments' => 0,
+            'target_sales' => 0,
+            'target_revenue' => 0,
+        ]);
+
+        $this->artisan('emails:daily-lead-summary')->assertSuccessful();
+
+        Mail::assertNotSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('blank@example.com'));
     }
 }

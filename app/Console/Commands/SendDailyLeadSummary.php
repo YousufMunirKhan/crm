@@ -39,6 +39,8 @@ class SendDailyLeadSummary extends Command
             return self::SUCCESS;
         }
 
+        $board->forMonthOf($date);
+
         $dateLabel = $day->format('l j F');
         $target = $board->target();
         $rows = $board->tableFor($date);

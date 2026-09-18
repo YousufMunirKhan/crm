@@ -255,6 +255,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(\App\Modules\CRM\Models\Lead::class, 'assigned_to');
     }
 
+    public function employeeTargets(): HasMany
+    {
+        return $this->hasMany(\App\Modules\HR\Models\EmployeeTarget::class);
+    }
+
     public function tickets(): HasMany
     {
         return $this->hasMany(\App\Modules\Ticket\Models\Ticket::class, 'assigned_to');

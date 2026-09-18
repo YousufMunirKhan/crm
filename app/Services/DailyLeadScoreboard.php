@@ -23,6 +23,23 @@ class DailyLeadScoreboard
     /** @var array<string, array<int, int>> counts[date][userId] */
     private array $cache = [];
 
+    private ?Collection $people = null;
+
+    private ?string $month = null;
+
+    /** Report on the month the given UK date falls in, rather than today's. */
+    public function forMonthOf(string $date): static
+    {
+        $month = Carbon::parse($date, $this->timezone())->format('Y-m');
+
+        if ($month !== $this->month) {
+            $this->month = $month;
+            $this->people = null;
+        }
+
+        return $this;
+    }
+
     public function target(): int
     {
         return max(1, (int) config('leads.daily_target', 5));
@@ -33,12 +50,32 @@ class DailyLeadScoreboard
         return (string) config('app.display_timezone');
     }
 
-    /** The people measured on the daily target. */
+    /**
+     * The people measured on the daily target.
+     *
+     * Having a target set for the month is what says somebody is being managed
+     * on numbers at all. Without that check this went to everyone holding a
+     * sales role, including four people nobody had ever set a target for - and
+     * an email telling you that you are short of a number you were never given
+     * is not a nudge, it is a complaint about nothing.
+     */
     public function people(): Collection
     {
-        return User::query()
+        if ($this->people !== null) {
+            return $this->people;
+        }
+
+        $month = $this->month ?? now($this->timezone())->format('Y-m');
+
+        return $this->people = User::query()
             ->where('is_active', true)
             ->whereHas('role', fn ($q) => $q->whereIn('name', (array) config('leads.target_roles', [])))
+            ->whereHas('employeeTargets', fn ($q) => $q
+                ->where('month', $month)
+                ->where(fn ($t) => $t
+                    ->where('target_appointments', '>', 0)
+                    ->orWhere('target_sales', '>', 0)
+                    ->orWhere('target_revenue', '>', 0)))
             ->with('role')
             ->orderBy('name')
             ->get();
