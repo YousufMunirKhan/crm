@@ -360,4 +360,39 @@ class AutomatedEmailsTest extends TestCase
 
         return [$event->expression, (string) $event->timezone];
     }
+
+    // ------------------------------------------------- people who have left
+
+    public function test_somebody_who_has_left_is_not_sent_their_follow_ups(): void
+    {
+        $gone = $this->rep('gone@example.com');
+        $tz = config('app.display_timezone');
+
+        Lead::create([
+            'customer_id' => $this->customer()->id,
+            'stage' => 'follow_up',
+            'assigned_to' => $gone->id,
+            'next_follow_up_at' => now($tz)->subDay()->setTime(9, 0),
+        ]);
+
+        // Their leads stay with them until a person moves them, so the work is
+        // still there; the email is not.
+        $gone->update(['is_active' => false]);
+
+        $this->artisan('emails:follow-up-digest')->assertSuccessful();
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_somebody_who_has_left_is_not_sent_their_day(): void
+    {
+        $gone = $this->rep('gone@example.com');
+        $today = now(config('app.display_timezone'))->toDateString();
+        $this->appointmentOn($today, '09:00', $gone);
+        $gone->update(['is_active' => false]);
+
+        $this->artisan('emails:rep-day')->assertSuccessful();
+
+        Mail::assertNothingSent();
+    }
 }

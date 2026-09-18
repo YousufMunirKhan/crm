@@ -53,7 +53,7 @@ class SendRepDailyAppointments extends Command
                 continue;
             }
 
-            $user = User::find($userId);
+            $user = User::where('is_active', true)->find($userId);
             $email = trim((string) ($user->email ?? ''));
 
             if (! $user || $email === '') {

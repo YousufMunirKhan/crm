@@ -46,7 +46,10 @@ class SendFollowUpDigests extends Command
         $sent = 0;
 
         foreach ($leads->groupBy('assigned_to') as $userId => $theirs) {
-            $user = User::find($userId);
+            // Somebody who has left keeps their leads until a person moves
+            // them, so without this they carry on being emailed about work
+            // they cannot do - which is exactly what was happening.
+            $user = User::where('is_active', true)->find($userId);
             $email = trim((string) ($user->email ?? ''));
 
             if (! $user || $email === '') {
