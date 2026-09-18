@@ -398,7 +398,7 @@ class DailyLeadSummaryTest extends TestCase
             && $m->mailData['salesTarget'] === 5);
     }
 
-    public function test_it_is_not_mentioned_earlier_in_the_month(): void
+    public function test_the_month_end_push_is_held_back_until_the_month_is_nearly_out(): void
     {
         $this->user('Sales', 'rep@example.com');
         $this->user('Admin', 'boss@example.com', withTarget: false);
@@ -406,10 +406,26 @@ class DailyLeadSummaryTest extends TestCase
         $this->artisan('emails:daily-lead-summary', ['--date' => $this->dayBeforeMonthEnd(20)])
             ->assertSuccessful();
 
+        // A rep still sees where their month stands - that is the point of it
+        // being on every email - but not the "days left" push.
         Mail::assertSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('rep@example.com')
-            && $m->mailData['sales'] === null);
+            && is_array($m->mailData['sales'])
+            && $m->mailData['monthEnd'] === false);
+
         Mail::assertSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('boss@example.com')
             && $m->mailData['salesRows'] === []);
+    }
+
+    public function test_a_rep_is_told_when_they_last_sold_something(): void
+    {
+        $this->user('Sales', 'rep@example.com');
+
+        $this->artisan('emails:daily-lead-summary')->assertSuccessful();
+
+        // Nothing won yet, so the email says so rather than leaving a blank.
+        Mail::assertSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('rep@example.com')
+            && array_key_exists('lastSale', $m->mailData)
+            && $m->mailData['lastSale'] === null);
     }
 
     public function test_the_email_says_plainly_when_the_lead_target_was_missed(): void
@@ -428,8 +444,8 @@ class DailyLeadSummaryTest extends TestCase
             ob_end_clean();
         }
 
-        $this->assertStringContainsString('Lead target not met', $html);
-        $this->assertStringContainsString('did not hit your lead target', $html);
-        $this->assertStringContainsString('4 leads short', $html);
+        $this->assertStringContainsString('You are 4 leads short today', $html);
+        $this->assertStringContainsString('The daily target is 5', $html);
+        $this->assertStringContainsString('Your last sale', $html);
     }
 }

@@ -67,6 +67,21 @@ class ReportingService
     }
 
     /**
+     * The most recent sale credited to this person, whenever it happened.
+     *
+     * Goes through the same crediting rule as every other figure here rather
+     * than asking lead_items directly, so "your last sale" and "sales this
+     * month" cannot end up counting different things.
+     */
+    public function lastWonLeadItemForAgent(int $agentId): ?LeadItem
+    {
+        return $this->baseWonLeadItemsForAgentInPeriod($agentId, Carbon::create(2000, 1, 1)->startOfDay(), now()->endOfDay())
+            ->with(['product:id,name', 'lead:id,customer_id', 'lead.customer:id,name,business_name'])
+            ->orderByRaw('COALESCE(closed_at, lead_items.created_at) DESC')
+            ->first();
+    }
+
+    /**
      * Won line items for an agent on one calendar day (daily activity / export).
      */
     public function wonLeadItemsForAgentOnDate(int $agentId, Carbon $date): Collection

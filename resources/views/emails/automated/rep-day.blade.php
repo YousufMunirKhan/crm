@@ -12,9 +12,9 @@
 
 @section('body')
     <p style="margin:0 0 18px;">
-        Morning {{ $repName }}. You have
-        <strong>{{ count($appointments) }}</strong>
-        {{ count($appointments) === 1 ? 'appointment' : 'appointments' }} today.
+        Morning {{ $repName }}. Here is your day — <strong>{{ count($appointments) }}</strong>
+        {{ count($appointments) === 1 ? 'appointment' : 'appointments' }}, in the order you will reach them.
+        Everything you need for each one is on the card.
     </p>
 
     @foreach($appointments as $apt)

@@ -153,17 +153,42 @@ class DailyLeadScoreboard
         );
 
         $wanted = (int) ($resolved['target_sales'] ?? 0);
-
-        if ($wanted <= 0) {
-            return null;
-        }
-
         $done = (int) ($resolved['achieved_sales'] ?? 0);
 
+        // Returned even with no sales target set: "you have made three this
+        // month" is worth saying on its own, and the caller decides whether
+        // there is a target to be behind.
         return [
             'target' => $wanted,
             'achieved' => $done,
             'short' => max(0, $wanted - $done),
+        ];
+    }
+
+    /**
+     * When this person last sold something, and what.
+     *
+     * A month-to-date count answers "how many"; it does not answer "when did
+     * this person last do it", which is the figure that shows somebody has
+     * gone quiet rather than merely started slowly.
+     *
+     * @return array{at: Carbon, days_ago: int, customer: string|null, product: string|null}|null
+     */
+    public function lastSaleFor(int $userId): ?array
+    {
+        $item = $this->reporting->lastWonLeadItemForAgent($userId);
+
+        if (! $item) {
+            return null;
+        }
+
+        $when = ($item->closed_at ?? $item->created_at)->copy()->setTimezone($this->timezone());
+
+        return [
+            'at' => $when,
+            'days_ago' => (int) $when->copy()->startOfDay()->diffInDays(now($this->timezone())->startOfDay()),
+            'customer' => $item->lead?->customer?->business_name ?: $item->lead?->customer?->name,
+            'product' => $item->product?->name,
         ];
     }
 
@@ -178,7 +203,11 @@ class DailyLeadScoreboard
             ->map(function (User $u) use ($date) {
                 $progress = $this->salesProgressFor($u->id, $date);
 
-                return $progress ? array_merge(['name' => $u->name], $progress) : null;
+                // The team table is about a target, so somebody without one is
+                // not a row with a blank in it.
+                return ($progress && $progress['target'] > 0)
+                    ? array_merge(['name' => $u->name], $progress)
+                    : null;
             })
             ->filter()
             ->sortBy([['short', 'desc'], ['name', 'asc']])

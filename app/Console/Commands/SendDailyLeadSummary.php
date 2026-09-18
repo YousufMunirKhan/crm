@@ -160,9 +160,9 @@ class SendDailyLeadSummary extends Command
         $days = $board->recentDaysFor($person->id, $date);
         $target = $board->targetFor($person->id);
 
-        // The monthly figure is only mentioned once it is close enough to be
-        // something today can still move.
-        $sales = $board->isMonthEndRun($date) ? $board->salesProgressFor($person->id, $date) : null;
+        // Always shown now: leads are the day's job and sales are the month's,
+        // and a rep told only about the first cannot see the second slipping.
+        $sales = $board->salesProgressFor($person->id, $date);
 
         return new AutomatedEmail(
             mailSubject: $short > 0
@@ -180,6 +180,8 @@ class SendDailyLeadSummary extends Command
                 'weekTotal' => array_sum(array_column($days, 'count')),
                 'weekTarget' => array_sum(array_column($days, 'target')),
                 'sales' => $sales,
+                'lastSale' => $board->lastSaleFor($person->id),
+                'monthEnd' => $board->isMonthEndRun($date),
                 'daysLeft' => $board->daysLeftInMonth($date),
                 'monthLabel' => Carbon::parse($date, $board->timezone())->format('F'),
             ],
