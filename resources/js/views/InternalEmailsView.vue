@@ -98,6 +98,7 @@
                         <th class="listing-th">Subject</th>
                         <th class="listing-th">Status</th>
                         <th class="listing-th">Opened</th>
+                        <th class="listing-th sr-only">Preview</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -122,9 +123,19 @@
                                 </span>
                                 <span v-else class="text-slate-400">Not reported</span>
                             </td>
+                            <td class="listing-td whitespace-nowrap text-right">
+                                <BaseButton
+                                    variant="outline"
+                                    :disabled="!row.has_copy"
+                                    :title="row.has_copy ? 'See the email as it was sent' : 'No copy was kept of this one'"
+                                    @click.stop="openPreview(row)"
+                                >
+                                    View email
+                                </BaseButton>
+                            </td>
                         </tr>
                         <tr v-if="expanded === row.id">
-                            <td colspan="6" class="bg-slate-50/70 px-4 py-3 text-sm">
+                            <td colspan="7" class="bg-slate-50/70 px-4 py-3 text-sm">
                                 <div class="grid gap-2 sm:grid-cols-2">
                                     <div><span class="text-slate-500">Reference:</span> <span class="font-mono text-xs">{{ row.reference || '—' }}</span></div>
                                     <div><span class="text-slate-500">Recorded:</span> {{ formatDateTime(row.created_at) }}</div>
@@ -149,6 +160,32 @@
                 </BaseButton>
             </div>
         </div>
+        <!--
+            The message itself, in a sandboxed frame. It is our own HTML, but it
+            is still a whole document being put back on a page, so it gets no
+            scripts, no forms and no access to the CRM around it.
+        -->
+        <BaseModal v-model="showPreview" :title="previewing?.subject || 'Email'" size="lg" @close="closePreview">
+            <div v-if="previewLoading" class="py-16 text-center text-slate-500 text-sm" aria-busy="true">
+                Loading the message…
+            </div>
+            <div v-else-if="previewError" class="callout callout-danger">{{ previewError }}</div>
+            <div v-else class="rounded-card border border-slate-200 overflow-hidden bg-slate-100">
+                <iframe
+                    :srcdoc="previewHtml"
+                    sandbox=""
+                    title="Email preview"
+                    class="w-full h-[70vh] bg-white"
+                />
+            </div>
+
+            <template #actions>
+                <div v-if="previewing" class="mr-auto text-xs text-slate-500">
+                    Sent to {{ previewing.recipient }} · {{ formatDateTime(previewing.sent_at || previewing.created_at) }}
+                </div>
+                <BaseButton variant="outline" block-mobile @click="closePreview">Close</BaseButton>
+            </template>
+        </BaseModal>
     </ListingPageShell>
 </template>
 
@@ -157,7 +194,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { EnvelopeIcon } from '@heroicons/vue/24/outline';
 import ListingPageShell from '@/components/ListingPageShell.vue';
-import { BaseBadge, BaseButton, EmptyState } from '@/components/base';
+import { BaseBadge, BaseButton, BaseModal, EmptyState } from '@/components/base';
 
 const loading = ref(true);
 const rows = ref([]);
@@ -217,6 +254,41 @@ function formatDateTime(value) {
     return new Date(value).toLocaleString('en-GB', {
         day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London',
     });
+}
+
+const showPreview = ref(false);
+const previewing = ref(null);
+const previewHtml = ref('');
+const previewLoading = ref(false);
+const previewError = ref('');
+
+async function openPreview(row) {
+    if (!row.has_copy) return;
+
+    previewing.value = row;
+    previewHtml.value = '';
+    previewError.value = '';
+    previewLoading.value = true;
+    showPreview.value = true;
+
+    try {
+        // Fetched rather than pointed at: the frame would not carry the
+        // caller's credentials, and this endpoint is admin-only.
+        const { data } = await axios.get(`/api/internal-emails/${row.id}/preview`, { responseType: 'text' });
+        previewHtml.value = typeof data === 'string' ? data : String(data);
+    } catch (e) {
+        previewError.value = e.response?.status === 403
+            ? 'You do not have access to this.'
+            : 'Could not load the message.';
+    } finally {
+        previewLoading.value = false;
+    }
+}
+
+function closePreview() {
+    showPreview.value = false;
+    previewing.value = null;
+    previewHtml.value = '';
 }
 
 function toggle(id) {

@@ -128,7 +128,14 @@ class AutomatedEmailSender
         try {
             Mail::to($to)->send($mail);
 
-            $record->forceFill(['status' => 'sent', 'sent_at' => now()])->save();
+            $record->forceFill([
+                'status' => 'sent',
+                'sent_at' => now(),
+                // The message itself, so it can be looked at afterwards. The
+                // view name alone cannot be replayed: the data that filled it
+                // is gone the moment the command finishes.
+                'content' => $this->renderedHtml($mail) ?? $mail->mailView,
+            ])->save();
 
             // The host answers a burst with 450 "too much mail", and a digest
             // run is a burst by nature.
@@ -148,6 +155,37 @@ class AutomatedEmailSender
             $record->forceFill(['status' => 'failed', 'error_message' => $e->getMessage()])->save();
 
             return false;
+        }
+    }
+
+    /**
+     * The message as it went out, or null if it cannot be drawn twice.
+     *
+     * Never allowed to fail the send: by the time this runs the email has
+     * already left, and losing a copy of it is not a reason to report the send
+     * as failed.
+     */
+    private function renderedHtml(AutomatedEmail $mail): ?string
+    {
+        $level = ob_get_level();
+
+        try {
+            $html = view($mail->mailView, $mail->mailData)->render();
+
+            // A 64KB column: a truncated copy is more use than none, and these
+            // run about 15KB.
+            return mb_strlen($html) > 60000 ? mb_substr($html, 0, 60000) : $html;
+        } catch (\Throwable $e) {
+            Log::warning('Could not keep a copy of an automated email', [
+                'view' => $mail->mailView,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        } finally {
+            while (ob_get_level() > $level) {
+                ob_end_clean();
+            }
         }
     }
 

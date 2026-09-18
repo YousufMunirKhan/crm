@@ -110,6 +110,7 @@ class InternalEmailLogController extends Controller
                 'created_at' => $row->created_at?->toIso8601String(),
                 'opened_at' => $row->opened_at?->toIso8601String(),
                 'open_count' => (int) ($row->open_count ?? 0),
+                'has_copy' => str_contains((string) $row->content, '<'),
                 'customer' => $row->customer ? [
                     'id' => $row->customer->id,
                     'name' => $row->customer->business_name ?: $row->customer->name,
@@ -131,6 +132,38 @@ class InternalEmailLogController extends Controller
                 'opened' => (int) ($summary->opened ?? 0),
             ],
             'kinds' => collect(self::KINDS)->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values(),
+        ]);
+    }
+
+    /**
+     * The message itself, as it was sent.
+     *
+     * Served as a document rather than returned as JSON for the client to
+     * inject: this is a whole HTML page, and the screen shows it in a sandboxed
+     * frame so nothing in it can touch the CRM around it.
+     */
+    public function show(Request $request, int $id)
+    {
+        $row = SentCommunication::query()
+            ->where('type', 'email')
+            ->whereKey($id)
+            ->firstOrFail();
+
+        $content = (string) $row->content;
+
+        // Older rows, and any whose render failed, kept only the view name.
+        if (! str_contains($content, '<')) {
+            $content = '<!DOCTYPE html><meta charset="utf-8">'
+                .'<div style="font-family:system-ui,sans-serif; padding:28px; color:#334155;">'
+                .'<p style="font-weight:600; color:#0f172a;">No copy was kept of this one.</p>'
+                .'<p>It was sent before the message was being stored, so only the template name survives: '
+                .'<code>'.e($content).'</code></p></div>';
+        }
+
+        return response($content, 200, [
+            'Content-Type' => 'text/html; charset=utf-8',
+            'Content-Security-Policy' => "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'",
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 

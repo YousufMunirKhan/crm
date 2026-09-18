@@ -353,6 +353,8 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     // it lists every customer address the schedule has written to.
     Route::get('/internal-emails', [\App\Http\Controllers\InternalEmailLogController::class, 'index'])
         ->middleware('role:Admin,System Admin');
+    Route::get('/internal-emails/{id}/preview', [\App\Http\Controllers\InternalEmailLogController::class, 'show'])
+        ->middleware('role:Admin,System Admin');
 
     Route::put('/settings/sms', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'updateSms'])->middleware('role:Admin,System Admin');
     Route::post('/settings/sms/test', [\App\Modules\Settings\Http\Controllers\SettingsController::class, 'testSms'])->middleware('role:Admin,System Admin');

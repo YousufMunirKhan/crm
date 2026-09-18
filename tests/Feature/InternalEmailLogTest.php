@@ -141,4 +141,80 @@ class InternalEmailLogTest extends TestCase
 
         $this->assertCount(1, $response->json('data'));
     }
+
+    // ------------------------------------------------------ seeing the email
+
+    public function test_an_admin_can_read_the_message_that_was_sent(): void
+    {
+        $row = $this->send(['content' => '<html><body><h1>Overdue: invoice INV-1</h1></body></html>']);
+
+        $this->actingAs($this->user('Admin'), 'sanctum')
+            ->get("/api/internal-emails/{$row->id}/preview")
+            ->assertOk()
+            ->assertHeader('Content-Type', 'text/html; charset=utf-8')
+            ->assertSee('Overdue: invoice INV-1', false);
+    }
+
+    public function test_the_list_says_whether_there_is_a_copy_to_read(): void
+    {
+        $this->send(['content' => 'emails.automated.invoice-overdue']);
+        $this->send(['content' => '<html><body>Hello</body></html>']);
+
+        $rows = $this->actingAs($this->user('Admin'), 'sanctum')
+            ->getJson('/api/internal-emails')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertTrue($rows[0]['has_copy']);
+        $this->assertFalse($rows[1]['has_copy']);
+    }
+
+    public function test_one_sent_before_copies_were_kept_says_so_rather_than_showing_a_blank(): void
+    {
+        $row = $this->send(['content' => 'emails.automated.invoice-overdue']);
+
+        $this->actingAs($this->user('Admin'), 'sanctum')
+            ->get("/api/internal-emails/{$row->id}/preview")
+            ->assertOk()
+            ->assertSee('No copy was kept', false)
+            ->assertSee('emails.automated.invoice-overdue', false);
+    }
+
+    public function test_nobody_else_can_read_the_message(): void
+    {
+        $row = $this->send(['content' => '<html><body>Private</body></html>']);
+
+        foreach (['Sales', 'Manager', 'Support'] as $role) {
+            $this->actingAs($this->user($role), 'sanctum')
+                ->get("/api/internal-emails/{$row->id}/preview")
+                ->assertForbidden();
+        }
+    }
+
+    public function test_the_sender_keeps_a_copy_of_what_it_sent(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+
+        $mail = new \App\Mail\AutomatedEmail(
+            mailSubject: 'Test',
+            mailView: 'emails.automated.appointment-reminder',
+            mailData: [
+                'customerName' => 'Kaleem',
+                'when' => 'Monday 1 January 2027 at 10:00',
+                'place' => '12 High Street',
+                'repName' => 'Aamir Ali',
+                'repPhone' => null,
+                'about' => null,
+            ],
+        );
+
+        app(AutomatedEmailSender::class)->send('appointment-reminder:99', 'kaleem@example.com', $mail);
+
+        $stored = SentCommunication::where('reference', 'appointment-reminder:99')->firstOrFail();
+
+        // The whole message, not the name of the template it came from.
+        $this->assertStringContainsString('<html', $stored->content);
+        $this->assertStringContainsString('Who is coming', $stored->content);
+        $this->assertStringContainsString('Aamir Ali', $stored->content);
+    }
 }
