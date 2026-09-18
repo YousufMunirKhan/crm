@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Modules\Settings\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -41,17 +40,6 @@ class SchedulerRunController extends Controller
 
         $output = trim(Artisan::output());
         $seconds = round(microtime(true) - $started, 2);
-
-        // A heartbeat, written whether or not anything was due.
-        //
-        // This endpoint being armed and nothing calling it looks exactly like it
-        // working, and the log line below cannot be relied on to tell them apart:
-        // production runs at LOG_LEVEL=error, so Log::info is dropped. That is
-        // how a scheduler that had never run once went unnoticed for months.
-        Setting::updateOrCreate(
-            ['key' => 'scheduler_last_run_at'],
-            ['value' => now()->toDateTimeString()],
-        );
 
         // Only when something actually ran. A minute where nothing was due is
         // the normal case and would otherwise fill the log sixty times an hour.

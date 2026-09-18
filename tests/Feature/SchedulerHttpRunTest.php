@@ -63,7 +63,7 @@ class SchedulerHttpRunTest extends TestCase
         $this->assertSame([], $ran);
     }
 
-    public function test_a_run_leaves_a_heartbeat_so_a_dead_pinger_is_visible(): void
+    public function test_a_run_leaves_a_heartbeat_however_it_was_triggered(): void
     {
         config(['scheduler.http_token' => 'a-long-secret-value']);
 
@@ -74,6 +74,18 @@ class SchedulerHttpRunTest extends TestCase
         // Production runs at LOG_LEVEL=error, so the log line this used to rely
         // on is dropped - an endpoint nobody is calling looked exactly like one
         // that is working.
+        $this->assertNotNull(Setting::where('key', 'scheduler_last_run_at')->first()?->value);
+    }
+
+    public function test_the_heartbeat_comes_from_the_schedule_not_from_this_endpoint(): void
+    {
+        // The control panel's cron calls schedule:run directly and never touches
+        // the controller, so a heartbeat written there would say nothing about
+        // the way this host is actually driven.
+        $this->assertNull(Setting::where('key', 'scheduler_last_run_at')->first());
+
+        Artisan::call('schedule:run');
+
         $this->assertNotNull(Setting::where('key', 'scheduler_last_run_at')->first()?->value);
     }
 

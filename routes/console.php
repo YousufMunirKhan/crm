@@ -69,6 +69,20 @@ Schedule::command('crm:close-abandoned-shifts')
 Schedule::command('campaigns:dispatch-due')
     ->everyFiveMinutes();
 
+// Did the scheduler run at all?
+//
+// Nothing here had ever run, and there was no way to see that: the only signal
+// was a Log::info the production log level drops. This records the fact from
+// inside the schedule, so it is written whichever way schedule:run was reached
+// - the control panel's cron entry or the HTTP endpoint - rather than only by
+// the one that happens to have a controller.
+Schedule::call(function () {
+    \App\Modules\Settings\Models\Setting::updateOrCreate(
+        ['key' => 'scheduler_last_run_at'],
+        ['value' => now()->toDateTimeString()],
+    );
+})->everyMinute()->name('scheduler-heartbeat');
+
 // Drain the queue here, because there is nowhere else to drain it.
 //
 // This host has no cron and no way to keep a daemon alive, so `queue:work` as a
