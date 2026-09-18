@@ -16,9 +16,17 @@ class AppointmentAssignedNotification extends Mailable
 
     public LeadActivity $activity;
 
-    public function __construct(LeadActivity $activity)
+    /**
+     * Who is being written to, which is not always the appointment's assignee.
+     *
+     * An appointment can be booked without one, and somebody still has to go.
+     */
+    public ?\App\Models\User $recipient;
+
+    public function __construct(LeadActivity $activity, ?\App\Models\User $recipient = null)
     {
         $this->activity = $activity;
+        $this->recipient = $recipient;
     }
 
     public function envelope(): Envelope
@@ -101,6 +109,11 @@ class AppointmentAssignedNotification extends Mailable
                 'leadValue' => $activity->lead?->pipeline_value,
                 'createdByName' => $activity->user?->name,
                 'leadOwnerName' => $activity->lead?->assignee?->name,
+                'recipientName' => $this->recipient?->name ?? $activity->assignee?->name,
+                // Said out loud when it is going to somebody because nobody was
+                // named, so they know why it landed with them.
+                'isStandIn' => $this->recipient !== null
+                    && $activity->assigned_user_id !== $this->recipient->id,
             ]);
     }
 }

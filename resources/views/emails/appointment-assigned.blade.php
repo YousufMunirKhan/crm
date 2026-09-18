@@ -34,7 +34,13 @@
             <h1>Appointment assigned to you</h1>
         </div>
         <div class="content">
-            <p>Hello {{ $activity->assignee->name ?? 'Team Member' }},</p>
+            <p>Hello {{ $recipientName ?? 'Team Member' }},</p>
+            @if(!empty($isStandIn))
+                <p style="background:#fffbeb; border-left:4px solid #d97706; border-radius:8px; padding:12px 14px; font-size:14px; color:#92400e;">
+                    This appointment has nobody assigned to it yet. It has come to you because the lead is yours —
+                    please assign somebody, or attend it.
+                </p>
+            @endif
             <p>An appointment has been booked and you are assigned to attend. The sales context is below so you know who you are visiting and what the opportunity is.</p>
 
             <div class="panel">

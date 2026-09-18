@@ -637,16 +637,22 @@ class LeadController extends Controller
             }
         }
 
-        // Send to assigned user (who will attend) so they know to go at that time
-        if ($activity->assigned_user_id) {
-            $assignee = $activity->assignee;
-            if ($assignee && $assignee->email) {
-                try {
-                    \Illuminate\Support\Facades\Mail::to($assignee->email)
-                        ->send(new \App\Mail\AppointmentAssignedNotification($activity));
-                } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error('Failed to send appointment email to assignee: '.$e->getMessage());
-                }
+        // Whoever has to turn up, so they know to go at that time.
+        //
+        // This used to require an assignee and send nothing without one, while
+        // the morning list falls back to the lead's owner - so an appointment
+        // booked with nobody named reached its first person on the day itself.
+        // Same order as that list, so the two cannot disagree about whose it is.
+        $recipient = $activity->assignee
+            ?? $activity->lead?->assignee
+            ?? $activity->user;
+
+        if ($recipient && $recipient->email) {
+            try {
+                \Illuminate\Support\Facades\Mail::to($recipient->email)
+                    ->send(new \App\Mail\AppointmentAssignedNotification($activity, $recipient));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Failed to send appointment email to assignee: '.$e->getMessage());
             }
         }
     }
