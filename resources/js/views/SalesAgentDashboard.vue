@@ -543,13 +543,30 @@
                         placeholder="Enter your remarks..."
                     />
                 </div>
-                <div>
-                    <label class="form-choice">
-                        <input v-model="completeForm.saleHappened" type="checkbox" class="form-checkbox" />
-                        <span>Sale happened</span>
-                    </label>
-                </div>
-                <div v-if="completeForm.saleHappened">
+                <fieldset class="form-fieldset">
+                    <legend class="form-legend">Did this win or lose the deal?</legend>
+                    <div class="flex flex-wrap gap-4">
+                        <label class="form-choice">
+                            <input v-model="completeForm.outcome" type="radio" value="won" class="form-radio" />
+                            <span>Won</span>
+                        </label>
+                        <label class="form-choice">
+                            <input v-model="completeForm.outcome" type="radio" value="lost" class="form-radio" />
+                            <span>Lost</span>
+                        </label>
+                        <label class="form-choice">
+                            <input v-model="completeForm.outcome" type="radio" value="" class="form-radio" />
+                            <span>Neither yet</span>
+                        </label>
+                    </div>
+                </fieldset>
+                <LostReasonPicker
+                    v-if="completeForm.outcome === 'lost'"
+                    v-model:code="completeForm.lostReasonCode"
+                    v-model:detail="completeForm.lostReasonDetail"
+                    id-prefix="salesagentdashboard-complete-lost"
+                />
+                <div v-if="completeForm.outcome === 'won'">
                     <label class="form-label" for="salesagentdashboard-new-stage">New Stage</label>
                     <select id="salesagentdashboard-new-stage" v-model="completeForm.newStage" class="form-select">
                         <option value="lead">Lead</option>
@@ -577,6 +594,7 @@
                     type="submit"
                     form="sales-agent-complete-followup-form"
                     block-mobile
+                    :disabled="!completeOutcomeReady"
                     :loading="completingFollowUp"
                 >
                     {{ completingFollowUp ? 'Saving...' : 'Complete Follow-up' }}
@@ -626,6 +644,8 @@ import AttendanceClock from '@/components/AttendanceClock.vue';
 import CopyButton from '@/components/CopyButton.vue';
 import MyWork from '@/components/MyWork.vue';
 import LogActivityModal from '@/components/LogActivityModal.vue';
+import LostReasonPicker from '@/components/LostReasonPicker.vue';
+import { isLostReasonComplete } from '@/constants/lostReasons';
 import { formatLeadStage } from '@/utils/displayFormat';
 
 const toast = useToastStore();
@@ -655,7 +675,9 @@ const activeTab = ref('today');
 const selectedDate = ref('');
 const completeForm = ref({
     remarks: '',
-    saleHappened: false,
+    outcome: '',
+    lostReasonCode: '',
+    lostReasonDetail: '',
     newStage: 'lead',
     nextFollowUpAt: '',
 });
@@ -956,7 +978,9 @@ const handleActivitySaved = () => {
 
 const openCompleteModal = (fu) => {
     selectedFollowUp.value = fu;
-    completeForm.value = { remarks: '', saleHappened: false, newStage: 'lead', nextFollowUpAt: '' };
+    completeForm.value = {
+        remarks: '', outcome: '', lostReasonCode: '', lostReasonDetail: '', newStage: 'lead', nextFollowUpAt: '',
+    };
     showCompleteModal.value = true;
 };
 
@@ -965,15 +989,30 @@ const closeCompleteModal = () => {
     selectedFollowUp.value = null;
 };
 
+/**
+ * Marking it lost needs a reason - the same picker rule every other lost path
+ * uses, so the dialog cannot submit something the API will reject.
+ */
+const completeOutcomeReady = computed(() => completeForm.value.outcome !== 'lost'
+    || isLostReasonComplete(completeForm.value.lostReasonCode, completeForm.value.lostReasonDetail));
+
 const completeFollowUp = async () => {
     if (!selectedFollowUp.value || completingFollowUp.value) return;
     completingFollowUp.value = true;
     try {
+        const won = completeForm.value.outcome === 'won';
         const payload = {
             remarks: completeForm.value.remarks,
-            sale_happened: completeForm.value.saleHappened,
-            new_stage: completeForm.value.saleHappened ? completeForm.value.newStage : null,
+            sale_happened: won,
+            new_stage: won ? completeForm.value.newStage : null,
         };
+        if (completeForm.value.outcome) {
+            payload.outcome = completeForm.value.outcome;
+        }
+        if (completeForm.value.outcome === 'lost') {
+            payload.lost_reason_code = completeForm.value.lostReasonCode;
+            payload.lost_reason = completeForm.value.lostReasonDetail.trim();
+        }
         if (completeForm.value.nextFollowUpAt) {
             payload.next_follow_up_at = completeForm.value.nextFollowUpAt;
         }

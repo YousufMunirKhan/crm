@@ -1231,7 +1231,19 @@ class LeadController extends Controller
             // Sent when the dashboard completes one particular appointment rather
             // than a plain follow-up, so we know which row is now done.
             'appointment_activity_id' => ['nullable', 'integer'],
+            // What the visit came to. Optional, so a caller that only wants to
+            // log a remark still works and simply answers nothing about the deal.
+            'outcome' => ['nullable', 'in:open,won,lost'],
+            'lost_reason' => ['nullable', 'string', 'max:500'],
+            'lost_reason_code' => ['required_if:outcome,lost', 'nullable', Rule::in(LostReasons::codes())],
         ]);
+
+        $outcome = $data['outcome'] ?? null;
+
+        if ($outcome === 'won') {
+            $data['sale_happened'] = true;
+            $data['new_stage'] = $data['new_stage'] ?? 'won';
+        }
 
         // Update follow-up date if needed
         if ($request->has('next_follow_up_at')) {
@@ -1255,6 +1267,27 @@ class LeadController extends Controller
             }
         }
 
+        // A visit that ended in a no is as much of an answer as one that ended in
+        // a sale, and this form could only record the sale - so a lost deal either
+        // sat in the pipeline forever or got marked won to get it off the list.
+        // The reason picker is the same one every other lost path uses.
+        if ($outcome === 'lost') {
+            if (in_array($data['lost_reason_code'], LostReasons::DETAIL_REQUIRED, true)
+                && trim((string) ($data['lost_reason'] ?? '')) === '') {
+                return response()->json([
+                    'message' => 'That reason needs a line of detail.',
+                    'errors' => ['lost_reason' => ['Please say what happened.']],
+                ], 422);
+            }
+
+            $lead->update([
+                'stage' => 'lost',
+                'lost_reason_code' => $data['lost_reason_code'],
+                'lost_reason' => LostReasons::compose($data['lost_reason_code'], $data['lost_reason'] ?? null),
+            ]);
+            $lead->customer?->syncTypeFromLeads();
+        }
+
         // Create activity log (guard against accidental duplicate inserts)
         $hasRecentDuplicate = LeadActivity::where('lead_id', $lead->id)
             ->where('type', 'follow_up_completed')
@@ -1271,6 +1304,8 @@ class LeadController extends Controller
                 'meta' => [
                     'sale_happened' => $data['sale_happened'] ?? false,
                     'new_stage' => $data['new_stage'] ?? null,
+                    'outcome' => $outcome,
+                    'lost_reason_code' => $outcome === 'lost' ? $data['lost_reason_code'] : null,
                 ],
             ]);
         }

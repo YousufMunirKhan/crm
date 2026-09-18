@@ -514,13 +514,30 @@
                         placeholder="Enter your remarks..."
                     />
                 </div>
-                <div>
-                    <label class="form-choice">
-                        <input v-model="completeForm.saleHappened" type="checkbox" class="form-checkbox" />
-                        <span>Sale won (counts as sale; prospect becomes customer)</span>
-                    </label>
-                </div>
-                <div v-if="completeForm.saleHappened">
+                <fieldset class="form-fieldset">
+                    <legend class="form-legend">Did this win or lose the deal?</legend>
+                    <div class="flex flex-wrap gap-4">
+                        <label class="form-choice">
+                            <input v-model="completeForm.outcome" type="radio" value="won" class="form-radio" />
+                            <span>Won</span>
+                        </label>
+                        <label class="form-choice">
+                            <input v-model="completeForm.outcome" type="radio" value="lost" class="form-radio" />
+                            <span>Lost</span>
+                        </label>
+                        <label class="form-choice">
+                            <input v-model="completeForm.outcome" type="radio" value="" class="form-radio" />
+                            <span>Neither yet</span>
+                        </label>
+                    </div>
+                </fieldset>
+                <LostReasonPicker
+                    v-if="completeForm.outcome === 'lost'"
+                    v-model:code="completeForm.lostReasonCode"
+                    v-model:detail="completeForm.lostReasonDetail"
+                    id-prefix="dashboardview-complete-lost"
+                />
+                <div v-if="completeForm.outcome === 'won'">
                     <label class="form-label" for="dashboardview-new-stage">New Stage</label>
                     <select id="dashboardview-new-stage" v-model="completeForm.newStage" class="form-select">
                         <option value="lead">Lead</option>
@@ -548,6 +565,7 @@
                     type="submit"
                     form="dashboard-complete-followup-form"
                     block-mobile
+                    :disabled="!completeOutcomeReady"
                     :loading="completingFollowUp"
                 >
                     {{ completingFollowUp ? 'Saving...' : 'Complete' }}
@@ -590,6 +608,8 @@ import UkClock from '@/components/UkClock.vue';
 import AttendanceWorkHoursChart from '@/components/AttendanceWorkHoursChart.vue';
 import LogActivityModal from '@/components/LogActivityModal.vue';
 import CustomerName from '@/components/CustomerName.vue';
+import LostReasonPicker from '@/components/LostReasonPicker.vue';
+import { isLostReasonComplete } from '@/constants/lostReasons';
 
 const auth = useAuthStore();
 const toast = useToastStore();
@@ -630,7 +650,9 @@ const completingFollowUp = ref(false);
 const selectedFollowUp = ref(null);
 const completeForm = ref({
     remarks: '',
-    saleHappened: false,
+    outcome: '',
+    lostReasonCode: '',
+    lostReasonDetail: '',
     newStage: 'won',
     nextFollowUpAt: '',
 });
@@ -1066,7 +1088,9 @@ const openCompleteForAppointment = (apt) => {
     // The activity id, not just the lead: a lead can hold several appointments
     // and only the one being completed should leave today's list.
     selectedFollowUp.value = { id: apt.lead_id, appointmentActivityId: apt.id };
-    completeForm.value = { remarks: '', saleHappened: false, newStage: 'won', nextFollowUpAt: '' };
+    completeForm.value = {
+        remarks: '', outcome: '', lostReasonCode: '', lostReasonDetail: '', newStage: 'won', nextFollowUpAt: '',
+    };
     showCompleteModal.value = true;
 };
 
@@ -1075,20 +1099,35 @@ const closeCompleteModal = () => {
     selectedFollowUp.value = null;
 };
 
+/**
+ * Marking it lost needs a reason - the same picker rule every other lost path
+ * uses, so the dialog cannot submit something the API will reject.
+ */
+const completeOutcomeReady = computed(() => completeForm.value.outcome !== 'lost'
+    || isLostReasonComplete(completeForm.value.lostReasonCode, completeForm.value.lostReasonDetail));
+
 const completeFollowUp = async () => {
     if (!selectedFollowUp.value?.id || completingFollowUp.value) return;
     completingFollowUp.value = true;
     try {
+        const won = completeForm.value.outcome === 'won';
         const payload = {
             remarks: completeForm.value.remarks,
-            sale_happened: completeForm.value.saleHappened,
-            new_stage: completeForm.value.saleHappened ? completeForm.value.newStage : null,
+            sale_happened: won,
+            new_stage: won ? completeForm.value.newStage : null,
         };
+        if (completeForm.value.outcome) {
+            payload.outcome = completeForm.value.outcome;
+        }
+        if (completeForm.value.outcome === 'lost') {
+            payload.lost_reason_code = completeForm.value.lostReasonCode;
+            payload.lost_reason = completeForm.value.lostReasonDetail.trim();
+        }
         if (completeForm.value.nextFollowUpAt) payload.next_follow_up_at = completeForm.value.nextFollowUpAt;
         if (selectedFollowUp.value.appointmentActivityId) {
             payload.appointment_activity_id = selectedFollowUp.value.appointmentActivityId;
         }
-        const saleWon = completeForm.value.saleHappened && completeForm.value.newStage === 'won';
+        const saleWon = won && completeForm.value.newStage === 'won';
         await axios.post(`/api/leads/${selectedFollowUp.value.id}/complete-followup`, payload);
         closeCompleteModal();
         loadDashboard();
