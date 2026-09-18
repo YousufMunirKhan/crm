@@ -51,13 +51,13 @@ class DailyLeadScoreboard
     }
 
     /**
-     * The people measured on the daily target.
+     * The people measured on the daily target: whoever has one set this month.
      *
-     * Having a target set for the month is what says somebody is being managed
-     * on numbers at all. Without that check this went to everyone holding a
-     * sales role, including four people nobody had ever set a target for - and
-     * an email telling you that you are short of a number you were never given
-     * is not a nudge, it is a complaint about nothing.
+     * Role deliberately does not come into it. This started as a list of sales
+     * roles and so told four people they were short of a number nobody had ever
+     * given them, while leaving out the two - an admin and a manager - who were
+     * actually creating the most leads on the system. A target is the thing that
+     * says somebody is being managed on numbers, so a target is the only test.
      */
     public function people(): Collection
     {
@@ -69,7 +69,6 @@ class DailyLeadScoreboard
 
         return $this->people = User::query()
             ->where('is_active', true)
-            ->whereHas('role', fn ($q) => $q->whereIn('name', (array) config('leads.target_roles', [])))
             ->whereHas('employeeTargets', fn ($q) => $q
                 ->where('month', $month)
                 ->where(fn ($t) => $t

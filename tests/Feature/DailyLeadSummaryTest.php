@@ -113,14 +113,15 @@ class DailyLeadSummaryTest extends TestCase
     {
         $busy = $this->user('Sales', 'busy@example.com');
         $quiet = $this->user('Sales', 'quiet@example.com');
-        $this->user('Admin', 'boss@example.com');
+        // No target of their own, so they only watch.
+        $this->user('Admin', 'boss@example.com', withTarget: false);
         $this->leadsFor($busy, 4);
         $this->leadsFor($quiet, 0);
 
         $this->artisan('emails:daily-lead-summary')->assertSuccessful();
 
         Mail::assertSent(AutomatedEmail::class, function (AutomatedEmail $m) use ($quiet) {
-            if (! $m->hasTo('boss@example.com')) {
+            if (! $m->hasTo('boss@example.com') || $m->mailView !== 'emails.automated.lead-target-admin') {
                 return false;
             }
 
@@ -260,7 +261,7 @@ class DailyLeadSummaryTest extends TestCase
     {
         $managed = $this->user('Sales', 'managed@example.com');
         $unmanaged = $this->user('Sales', 'unmanaged@example.com', withTarget: false);
-        $this->user('Admin', 'boss@example.com');
+        $this->user('Admin', 'boss@example.com', withTarget: false);
         $this->leadsFor($managed, 2);
         $this->leadsFor($unmanaged, 3);
 
@@ -268,6 +269,7 @@ class DailyLeadSummaryTest extends TestCase
 
         Mail::assertSent(AutomatedEmail::class, function (AutomatedEmail $m) {
             return $m->hasTo('boss@example.com')
+                && $m->mailView === 'emails.automated.lead-target-admin'
                 && count($m->mailData['rows']) === 1
                 && $m->mailData['teamCount'] === 2
                 && $m->mailData['teamTarget'] === 5;
@@ -288,5 +290,58 @@ class DailyLeadSummaryTest extends TestCase
         $this->artisan('emails:daily-lead-summary')->assertSuccessful();
 
         Mail::assertNotSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('blank@example.com'));
+    }
+
+    public function test_a_manager_with_a_target_is_measured_like_anybody_else(): void
+    {
+        // The manager and the owner on this system create more leads than half
+        // the sales team. A rule written in roles had them reading a team table
+        // while quietly missing the number themselves.
+        $manager = $this->user('Manager', 'manager@example.com');
+        $this->leadsFor($manager, 2);
+
+        $this->artisan('emails:daily-lead-summary')->assertSuccessful();
+
+        Mail::assertSent(AutomatedEmail::class, function (AutomatedEmail $m) {
+            return $m->hasTo('manager@example.com')
+                && $m->mailView === 'emails.automated.lead-target-personal'
+                && $m->mailData['count'] === 2;
+        });
+    }
+
+    public function test_a_manager_with_a_target_still_gets_the_team_table_too(): void
+    {
+        $manager = $this->user('Manager', 'manager@example.com');
+        $this->leadsFor($manager, 1);
+
+        $this->artisan('emails:daily-lead-summary')->assertSuccessful();
+
+        Mail::assertSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('manager@example.com')
+            && $m->mailView === 'emails.automated.lead-target-admin');
+    }
+
+    public function test_an_admin_without_a_target_only_watches(): void
+    {
+        $this->user('Admin', 'boss@example.com', withTarget: false);
+        $rep = $this->user('Sales', 'rep@example.com');
+        $this->leadsFor($rep, 1);
+
+        $this->artisan('emails:daily-lead-summary')->assertSuccessful();
+
+        Mail::assertNotSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('boss@example.com')
+            && $m->mailView === 'emails.automated.lead-target-personal');
+        Mail::assertSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('boss@example.com')
+            && $m->mailView === 'emails.automated.lead-target-admin');
+    }
+
+    public function test_an_inactive_person_is_left_out_whatever_their_target_says(): void
+    {
+        $gone = $this->user('Sales', 'gone@example.com');
+        $gone->update(['is_active' => false]);
+        $this->leadsFor($gone, 1);
+
+        $this->artisan('emails:daily-lead-summary')->assertSuccessful();
+
+        Mail::assertNotSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('gone@example.com'));
     }
 }

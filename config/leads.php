@@ -21,18 +21,21 @@ return [
     | Who is measured on it
     |--------------------------------------------------------------------------
     |
-    | The roles that are expected to create leads, and so are the ones that get
-    | told each morning where they stand. Everyone else appears in the summary
-    | that goes to management, not in a message addressed to them.
+    | There is no setting for this on purpose. Having a target set for the month
+    | is the whole test, whatever role somebody holds - the owner and the manager
+    | on this system create more leads than half the sales team, and a rule
+    | written in roles had them watching a number they were personally missing.
     |
-    */
-
-    'target_roles' => ['Sales', 'CallAgent'],
-
-    /*
+    | The targets screen is the single switch: set somebody a target and they
+    | start being told where they stand; leave it unset and they are not.
+    |
     |--------------------------------------------------------------------------
     | Who sees everybody
     |--------------------------------------------------------------------------
+    |
+    | The team table is a management view, so this one is a role. Anybody here
+    | who also has a target of their own gets both: their figure, and the room's.
+    |
     */
 
     'summary_roles' => ['Admin', 'System Admin', 'Manager'],
