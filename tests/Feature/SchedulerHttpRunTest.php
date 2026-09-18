@@ -2,11 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Modules\Settings\Models\Setting;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
 class SchedulerHttpRunTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_the_right_token_runs_the_scheduler(): void
     {
         config(['scheduler.http_token' => 'a-long-secret-value']);
@@ -56,5 +61,52 @@ class SchedulerHttpRunTest extends TestCase
 
         // Only schedule:run is invoked; the token is a credential, not input.
         $this->assertSame([], $ran);
+    }
+
+    public function test_a_run_leaves_a_heartbeat_so_a_dead_pinger_is_visible(): void
+    {
+        config(['scheduler.http_token' => 'a-long-secret-value']);
+
+        $this->assertNull(Setting::where('key', 'scheduler_last_run_at')->first());
+
+        $this->get('/scheduler/run/a-long-secret-value')->assertOk();
+
+        // Production runs at LOG_LEVEL=error, so the log line this used to rely
+        // on is dropped - an endpoint nobody is calling looked exactly like one
+        // that is working.
+        $this->assertNotNull(Setting::where('key', 'scheduler_last_run_at')->first()?->value);
+    }
+
+    public function test_a_refused_run_leaves_no_heartbeat(): void
+    {
+        config(['scheduler.http_token' => 'a-long-secret-value']);
+
+        $this->get('/scheduler/run/wrong')->assertNotFound();
+
+        $this->assertNull(Setting::where('key', 'scheduler_last_run_at')->first());
+    }
+
+    public function test_the_queue_is_drained_by_the_scheduler_when_there_is_no_worker(): void
+    {
+        // This host cannot keep `queue:work` alive, so the schedule drains the
+        // queue itself. On a sync connection there is nothing to drain.
+        $this->assertFalse($this->scheduledCommandsFor('sync')->contains(fn ($c) => str_contains($c, 'queue:work')));
+        $this->assertTrue($this->scheduledCommandsFor('database')->contains(fn ($c) => str_contains($c, 'queue:work')));
+    }
+
+    /** The commands routes/console.php registers under a given queue connection. */
+    private function scheduledCommandsFor(string $connection)
+    {
+        config(['queue.default' => $connection]);
+
+        $schedule = new Schedule();
+        $this->app->instance(Schedule::class, $schedule);
+        // The facade holds on to whatever it resolved first, so rebinding alone
+        // would leave routes/console.php registering against the real schedule.
+        \Illuminate\Support\Facades\Schedule::clearResolvedInstance(Schedule::class);
+
+        require base_path('routes/console.php');
+
+        return collect($schedule->events())->map(fn ($e) => $e->command ?? '');
     }
 }

@@ -68,3 +68,20 @@ Schedule::command('crm:close-abandoned-shifts')
 // Start campaigns whose scheduled send time has arrived.
 Schedule::command('campaigns:dispatch-due')
     ->everyFiveMinutes();
+
+// Drain the queue here, because there is nowhere else to drain it.
+//
+// This host has no cron and no way to keep a daemon alive, so `queue:work` as a
+// long-running process is not an option. Everything queued - the template sync
+// above, the chunks a campaign send is cut into - therefore sat in the jobs
+// table with nothing to pick it up.
+//
+// --stop-when-empty makes the usual minute, where there is nothing waiting,
+// cost almost nothing; --max-time keeps a busy one inside the pinger's request
+// rather than running into the next minute's, which withoutOverlapping would
+// then have to refuse.
+if (config('queue.default') !== 'sync') {
+    Schedule::command('queue:work --stop-when-empty --max-time=30 --tries=3')
+        ->everyMinute()
+        ->withoutOverlapping();
+}
