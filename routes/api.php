@@ -166,6 +166,7 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     Route::get('/appointments/today-count', [\App\Modules\CRM\Http\Controllers\AppointmentController::class, 'todayCount']);
     Route::get('/appointments', [\App\Modules\CRM\Http\Controllers\AppointmentController::class, 'index']);
     Route::post('/appointments', [\App\Modules\CRM\Http\Controllers\AppointmentController::class, 'store']);
+    Route::post('/appointments/close-pending', [\App\Modules\CRM\Http\Controllers\AppointmentController::class, 'closePending']);
     Route::delete('/appointments/{id}', [\App\Modules\CRM\Http\Controllers\AppointmentController::class, 'destroy']);
     Route::get('/appointments/{id}', [\App\Modules\CRM\Http\Controllers\AppointmentController::class, 'show']);
     Route::put('/appointments/{id}', [\App\Modules\CRM\Http\Controllers\AppointmentController::class, 'update']);

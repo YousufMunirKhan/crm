@@ -16,49 +16,10 @@ class AppointmentController extends Controller
      */
     public function index(Request $request)
     {
-        $user = auth()->user();
+        $activities = $this->visibleAppointments($request)->get();
 
-        // Management sees the company; everybody else sees their own.
-        //
-        // This screen was strictly personal, so the owner's dashboard could
-        // report 35 appointments left unclosed, link straight here, and land on
-        // "no appointments for this date" - because all 35 belonged to other
-        // people. A tile that promises a number and then delivers an empty page
-        // is worse than no tile at all.
-        $seesEveryone = ($user->isRole('Admin') || $user->isRole('Manager') || $user->isRole('System Admin'))
-            && ! $request->boolean('mine');
-
-        $query = LeadActivity::where('type', 'appointment')
-            ->when(! $seesEveryone, function ($q) use ($user) {
-                $q->where(function ($inner) use ($user) {
-                    $inner->where('assigned_user_id', $user->id)
-                        ->orWhere('user_id', $user->id)
-                        ->orWhereHas('lead', function ($lq) use ($user) {
-                            $lq->where('assigned_to', $user->id)
-                                ->orWhereHas('customer', fn ($cq) => $cq->forSalesAgent($user->id));
-                        });
-                });
-            })
-            ->with(['lead.customer', 'lead.assignee', 'lead.items.product', 'user', 'assignee']);
-
-        $activities = $query->get();
-
-        // Appointments whose date has gone by while the status is still
-        // "pending" - nobody ever said whether they happened.
-        //
-        // This screen shows one day at a time, so an appointment left pending
-        // three weeks ago is only reachable by guessing its date. That is why
-        // 35 of 39 are stuck: not neglect, no route to them.
         if ($request->boolean('needs_outcome')) {
-            $today = now()->toDateString();
-
-            $activities = $activities->filter(function ($a) use ($today) {
-                $date = $this->appointmentDateFrom($a);
-
-                return $date !== null
-                    && $date < $today
-                    && ($a->appointment_status ?? 'pending') === LeadActivity::APPOINTMENT_STATUS_PENDING;
-            })->values();
+            $activities = $this->stillNeedingAnOutcome($activities);
         } elseif ($date = $request->get('date')) {
             $activities = $activities->filter(function ($a) use ($date) {
                 return $this->appointmentDateFrom($a) === $date;
@@ -75,6 +36,14 @@ class AppointmentController extends Controller
         $activities = $activities->sortByDesc(function ($a) {
             return ($this->appointmentDateFrom($a) ?? '') . ' ' . ($this->appointmentTimeFrom($a) ?? '00:00');
         })->values();
+
+        // With no date this is the running history rather than one day of it, so
+        // it is capped: the page wants the ones just done, not every appointment
+        // ever booked.
+        if (! $request->boolean('needs_outcome') && ! $request->get('date')) {
+            $limit = max(1, min(200, (int) $request->get('limit', 50)));
+            $activities = $activities->take($limit)->values();
+        }
 
         $list = $activities->map(function ($a) {
             return [
@@ -98,6 +67,86 @@ class AppointmentController extends Controller
         });
 
         return response()->json($list);
+    }
+
+    /**
+     * The appointments this caller is allowed to see.
+     *
+     * Management sees the company; everybody else sees their own. This screen
+     * was strictly personal, so the owner's dashboard could report 35
+     * appointments left unclosed, link straight here, and land on "no
+     * appointments for this date" - because all 35 belonged to other people. A
+     * tile that promises a number and then delivers an empty page is worse than
+     * no tile at all.
+     */
+    private function visibleAppointments(Request $request)
+    {
+        $user = auth()->user();
+
+        $seesEveryone = ($user->isRole('Admin') || $user->isRole('Manager') || $user->isRole('System Admin'))
+            && ! $request->boolean('mine');
+
+        return LeadActivity::where('type', 'appointment')
+            ->when(! $seesEveryone, function ($q) use ($user) {
+                $q->where(function ($inner) use ($user) {
+                    $inner->where('assigned_user_id', $user->id)
+                        ->orWhere('user_id', $user->id)
+                        ->orWhereHas('lead', function ($lq) use ($user) {
+                            $lq->where('assigned_to', $user->id)
+                                ->orWhereHas('customer', fn ($cq) => $cq->forSalesAgent($user->id));
+                        });
+                });
+            })
+            ->with(['lead.customer', 'lead.assignee', 'lead.items.product', 'user', 'assignee']);
+    }
+
+    /**
+     * Appointments whose date has gone by while the status is still "pending" -
+     * nobody ever said whether they happened.
+     *
+     * This screen shows one day at a time, so an appointment left pending three
+     * weeks ago is only reachable by guessing its date. That is why so many are
+     * stuck: not neglect, no route to them.
+     */
+    private function stillNeedingAnOutcome($activities)
+    {
+        $today = now()->toDateString();
+
+        return $activities->filter(function ($a) use ($today) {
+            $date = $this->appointmentDateFrom($a);
+
+            return $date !== null
+                && $date < $today
+                && ($a->appointment_status ?? 'pending') === LeadActivity::APPOINTMENT_STATUS_PENDING;
+        })->values();
+    }
+
+    /**
+     * Close the whole backlog at once.
+     *
+     * Two dozen of these had been sitting open for months, and clearing them a
+     * tap at a time is exactly the chore that never gets done - which is how
+     * they piled up. Only what the caller can already see is touched, and only
+     * the appointment's own status: the lead is left exactly as it is.
+     */
+    public function closePending(Request $request)
+    {
+        $data = $request->validate([
+            'appointment_status' => ['nullable', 'in:completed,cancelled,no_show'],
+        ]);
+
+        $status = $data['appointment_status'] ?? LeadActivity::APPOINTMENT_STATUS_COMPLETED;
+
+        $activities = $this->stillNeedingAnOutcome($this->visibleAppointments($request)->get());
+
+        foreach ($activities as $activity) {
+            $activity->update(['appointment_status' => $status]);
+        }
+
+        return response()->json([
+            'closed' => $activities->count(),
+            'appointment_status' => $status,
+        ]);
     }
 
     /**

@@ -1,14 +1,21 @@
 <template>
     <ListingPageShell
         title="Appointments"
-        :subtitle="scopeIsEveryone
-            ? 'Visits and meetings across the team for the day you pick.'
+        :subtitle="viewMode === 'recent'
+            ? 'The visits just done, newest first, and how each one ended.'
             : 'Visits and meetings for the day you pick — open a card for full detail and status.'"
         :badge="appointmentsBadge"
     >
         <template #filters>
             <div class="listing-filters-row">
-                <div>
+                <div class="w-full sm:w-auto">
+                    <label class="listing-label" for="appointmentsview-view">Show</label>
+                    <select id="appointmentsview-view" v-model="viewMode" class="form-select w-full sm:w-44" @change="loadAppointments">
+                        <option value="recent">Most recent</option>
+                        <option value="date">A single date</option>
+                    </select>
+                </div>
+                <div v-if="viewMode === 'date'">
                     <label class="listing-label" for="appointmentsview-date">Date</label>
                     <input id="appointmentsview-date"
                         v-model="selectedDate"
@@ -17,7 +24,7 @@
                         @change="loadAppointments"
                     />
                 </div>
-                <BaseButton v-if="selectedDate !== todayStr" variant="outline" @click="resetDate">
+                <BaseButton v-if="viewMode === 'date' && selectedDate !== todayStr" variant="outline" @click="resetDate">
                     Today
                 </BaseButton>
                 <div v-if="canSeeEveryone" class="w-full sm:w-auto">
@@ -43,6 +50,21 @@
                     </h2>
                     <p class="text-xs text-warning-800">The date has passed and nobody said what happened.</p>
                 </div>
+
+                <!--
+                    Clearing a months-old backlog one tap at a time is the chore
+                    that let it become a backlog. This says the plain thing about
+                    all of them at once; anything more specific is still per-row.
+                -->
+                <BaseButton
+                    variant="outline"
+                    class="mt-3"
+                    :disabled="closingAll || saving !== null"
+                    :loading="closingAll"
+                    @click="closeAllAsHappened"
+                >
+                    Mark all {{ awaiting.length }} as "It happened"
+                </BaseButton>
 
                 <ul class="mt-3 space-y-2">
                     <li
@@ -97,8 +119,10 @@
         </div>
         <EmptyState
             v-else-if="!appointments.length"
-            heading="No appointments for this date"
-            description="Pick another date above, or jump back to today."
+            :heading="viewMode === 'recent' ? 'No appointments yet' : 'No appointments for this date'"
+            :description="viewMode === 'recent'
+                ? 'Book one from a customer or lead and it will appear here.'
+                : 'Pick another date above, or jump back to today.'"
         >
             <template #icon><CalendarDaysIcon class="icon" aria-hidden="true" /></template>
         </EmptyState>
@@ -144,8 +168,8 @@
                             <div v-if="apt.description" class="text-sm text-slate-500 mt-1 line-clamp-2">
                                 {{ apt.description }}
                             </div>
-                            <BaseBadge :tone="statusTone(apt.appointment_status)" class="mt-2">
-                                {{ statusLabel(apt.appointment_status) }}
+                            <BaseBadge :tone="resultOf(apt).tone" class="mt-2">
+                                {{ resultOf(apt).label }}
                             </BaseBadge>
                         </div>
                         <ChevronRightIcon class="icon text-slate-500" aria-hidden="true" />
@@ -181,6 +205,17 @@ const selectedDate = ref('');
  */
 const awaiting = ref([]);
 const saving = ref(null);
+const closingAll = ref(false);
+
+/**
+ * "Most recent" rather than today.
+ *
+ * The page opened on a single date, so the answer to "what did I do, and how
+ * did it go" meant picking dates one at a time until you found one. What a rep
+ * wants on arrival is the last few visits and what came of them.
+ */
+const viewMode = ref('recent');
+const RECENT_LIMIT = 50;
 
 const auth = useAuthStore();
 
@@ -207,35 +242,46 @@ const todayStr = computed(() => {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 });
 
-const appointmentsBadge = computed(() =>
-    !loading.value && appointments.value.length ? `${appointments.value.length} this day` : null,
-);
+const appointmentsBadge = computed(() => {
+    if (loading.value || !appointments.value.length) return null;
+
+    return viewMode.value === 'recent'
+        ? `${appointments.value.length} most recent`
+        : `${appointments.value.length} this day`;
+});
 
 function resetDate() {
     selectedDate.value = todayStr.value;
     loadAppointments();
 }
 
+/**
+ * What the visit came to, in one word.
+ *
+ * The badge used to report the appointment's own status, so a visit that won
+ * the deal and one that went nowhere both read "Completed". Once it happened,
+ * the interesting half of the answer is on the lead.
+ */
+function resultOf(apt) {
+    const status = apt.appointment_status || 'pending';
+
+    if (status === 'pending') return { label: 'No outcome yet', tone: 'warning' };
+    if (status === 'cancelled') return { label: 'Cancelled', tone: 'neutral' };
+    if (status === 'no_show') return { label: 'No show', tone: 'danger' };
+    if (status === 'rescheduled') return { label: 'Rescheduled', tone: 'primary' };
+
+    const stage = apt.lead?.stage;
+
+    if (stage === 'won') return { label: 'Won', tone: 'success' };
+    if (stage === 'lost') return { label: 'Lost', tone: 'danger' };
+
+    return { label: 'Happened', tone: 'neutral' };
+}
+
 function formatDate(ymd) {
     if (!ymd) return '—';
     const [y, m, d] = ymd.split('-');
     return `${d}/${m}/${y}`;
-}
-
-function statusLabel(s) {
-    const map = { pending: 'Pending', completed: 'Completed', cancelled: 'Cancelled', no_show: 'No show', rescheduled: 'Rescheduled' };
-    return map[s] || s;
-}
-
-function statusTone(s) {
-    const map = {
-        pending: 'warning',
-        completed: 'success',
-        cancelled: 'neutral',
-        no_show: 'danger',
-        rescheduled: 'primary',
-    };
-    return map[s] || 'neutral';
 }
 
 function formatStage(stage) {
@@ -279,13 +325,34 @@ async function setOutcome(apt, status) {
     }
 }
 
+async function closeAllAsHappened() {
+    if (closingAll.value || !awaiting.value.length) return;
+    closingAll.value = true;
+
+    try {
+        const res = await axios.post('/api/appointments/close-pending', {
+            appointment_status: 'completed',
+            ...(scopeIsEveryone.value ? {} : { mine: 1 }),
+        });
+        awaiting.value = [];
+        toast.success(`Closed ${res.data?.closed ?? 0} as "It happened".`);
+        await loadAppointments();
+    } catch (e) {
+        toast.error(e?.response?.data?.message || 'Could not close those.');
+        await loadAwaiting();
+    } finally {
+        closingAll.value = false;
+    }
+}
+
 async function loadAppointments() {
-    const date = selectedDate.value || todayStr.value;
     loading.value = true;
     try {
-        const res = await axios.get('/api/appointments', {
-            params: { date, ...(scopeIsEveryone.value ? {} : { mine: 1 }) },
-        });
+        const scoped = scopeIsEveryone.value ? {} : { mine: 1 };
+        const params = viewMode.value === 'recent'
+            ? { limit: RECENT_LIMIT, ...scoped }
+            : { date: selectedDate.value || todayStr.value, ...scoped };
+        const res = await axios.get('/api/appointments', { params });
         appointments.value = res.data ?? [];
     } catch (e) {
         console.error(e);
