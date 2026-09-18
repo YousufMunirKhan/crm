@@ -38,6 +38,122 @@
         </div>
 
         <!--
+            Today's work, directly under the clock. Appointments lead: they are
+            the only thing here with a time on it, and they used to sit below the
+            stats, the leaderboard and the attendance chart - far enough down that
+            a rep clocking in could not see what they were due at without hunting
+            for it.
+        -->
+        <div class="space-y-6">
+            <!-- Today's Appointments -->
+            <BaseCard title="Today's Appointments">
+                <template #actions>
+                    <BaseBadge tone="warning">{{ todayAppointments.length }} today</BaseBadge>
+                </template>
+
+                <EmptyState
+                    v-if="todayAppointments.length === 0"
+                    heading="No appointments for today"
+                    description="Appointments are always shown for the current date. Add one from a customer or lead (Appointment tab)."
+                >
+                    <template #icon>
+                        <CalendarDaysIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
+                <div v-else class="space-y-3 max-h-80 overflow-y-auto">
+                    <div
+                        v-for="apt in todayAppointments"
+                        :key="apt.id"
+                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-warning-50 rounded-card hover:bg-warning-100 transition-colors group"
+                    >
+                        <div class="flex-1 min-w-0">
+                            <router-link
+                                v-if="apt.customer_id"
+                                :to="`/customers/${apt.customer_id}`"
+                                class="block hover:text-primary-800"
+                            >
+                                <CustomerName :customer="apt.customer" fallback="Customer" name-class="link break-words" />
+                            </router-link>
+                            <CustomerName v-else :customer="apt.customer" fallback="Customer" />
+                            <div class="text-sm text-slate-600 mt-0.5">{{ apt.description || 'Appointment' }}</div>
+                            <div class="text-xs text-slate-500 mt-1 tabular-nums">{{ apt.appointment_time || '10:00' }}</div>
+                        </div>
+                        <div class="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
+                            <BaseButton
+                                v-if="apt.lead_id"
+                                variant="success"
+                                class="flex-1 sm:flex-none sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity"
+                                @click="openCompleteForAppointment(apt)"
+                            >
+                                Complete
+                            </BaseButton>
+                            <BaseButton
+                                v-if="apt.customer_id"
+                                variant="primary"
+                                class="flex-1 sm:flex-none"
+                                :to="`/customers/${apt.customer_id}`"
+                            >
+                                View
+                            </BaseButton>
+                        </div>
+                    </div>
+                </div>
+            </BaseCard>
+
+            <!-- Today's Follow-ups -->
+            <BaseCard title="Today's Follow-ups">
+                <template #actions>
+                    <BaseBadge tone="primary">{{ todayFollowUps.length }} due today</BaseBadge>
+                </template>
+
+                <EmptyState v-if="todayFollowUps.length === 0" heading="No follow-ups scheduled for today">
+                    <template #icon>
+                        <CalendarDaysIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
+                <div v-else class="space-y-3 max-h-80 overflow-y-auto">
+                    <div
+                        v-for="followUp in todayFollowUps"
+                        :key="followUp.id"
+                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-50 rounded-card hover:bg-slate-100 transition-colors group"
+                    >
+                        <div class="flex-1 min-w-0">
+                            <router-link
+                                v-if="followUp.customer_id"
+                                :to="`/customers/${followUp.customer_id}`"
+                                class="block hover:text-primary-800"
+                            >
+                                <CustomerName :customer="followUp.customer" fallback="Customer" name-class="link break-words" />
+                            </router-link>
+                            <CustomerName v-else :customer="followUp.customer" fallback="Customer" />
+                            <div class="text-xs text-slate-500">
+                                {{ followUp.assignee?.name || 'Unassigned' }} •
+                                {{ formatTime(followUp.next_follow_up_at) }}
+                            </div>
+                        </div>
+                        <div class="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
+                            <BaseButton
+                                variant="success"
+                                class="flex-1 sm:flex-none sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity"
+                                @click="openActivityModal(followUp)"
+                            >
+                                Log
+                            </BaseButton>
+                            <BaseButton
+                                v-if="followUp.customer_id"
+                                variant="primary"
+                                class="flex-1 sm:flex-none"
+                                :to="`/customers/${followUp.customer_id}`"
+                            >
+                                View
+                            </BaseButton>
+                        </div>
+                    </div>
+                </div>
+            </BaseCard>
+        </div>
+
+        <!--
             Above the date range on purpose. Everything below this point answers
             "what happened in a window", which on a quiet week is a screen of
             zeroes; this answers "what is rotting right now", which is the
@@ -367,116 +483,6 @@
                 </div>
             </div>
         </BaseCard>
-
-        <!-- Today's Follow-ups & appointments -->
-        <div class="space-y-6">
-            <!-- Today's Follow-ups -->
-            <BaseCard title="Today's Follow-ups">
-                <template #actions>
-                    <BaseBadge tone="primary">{{ todayFollowUps.length }} due today</BaseBadge>
-                </template>
-
-                <EmptyState v-if="todayFollowUps.length === 0" heading="No follow-ups scheduled for today">
-                    <template #icon>
-                        <CalendarDaysIcon class="icon" aria-hidden="true" />
-                    </template>
-                </EmptyState>
-                <div v-else class="space-y-3 max-h-80 overflow-y-auto">
-                    <div
-                        v-for="followUp in todayFollowUps"
-                        :key="followUp.id"
-                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-50 rounded-card hover:bg-slate-100 transition-colors group"
-                    >
-                        <div class="flex-1 min-w-0">
-                            <router-link
-                                v-if="followUp.customer_id"
-                                :to="`/customers/${followUp.customer_id}`"
-                                class="block hover:text-primary-800"
-                            >
-                                <CustomerName :customer="followUp.customer" fallback="Customer" name-class="link break-words" />
-                            </router-link>
-                            <CustomerName v-else :customer="followUp.customer" fallback="Customer" />
-                            <div class="text-xs text-slate-500">
-                                {{ followUp.assignee?.name || 'Unassigned' }} •
-                                {{ formatTime(followUp.next_follow_up_at) }}
-                            </div>
-                        </div>
-                        <div class="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
-                            <BaseButton
-                                variant="success"
-                                class="flex-1 sm:flex-none sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity"
-                                @click="openActivityModal(followUp)"
-                            >
-                                Log
-                            </BaseButton>
-                            <BaseButton
-                                v-if="followUp.customer_id"
-                                variant="primary"
-                                class="flex-1 sm:flex-none"
-                                :to="`/customers/${followUp.customer_id}`"
-                            >
-                                View
-                            </BaseButton>
-                        </div>
-                    </div>
-                </div>
-            </BaseCard>
-
-            <!-- Today's Appointments -->
-            <BaseCard title="Today's Appointments">
-                <template #actions>
-                    <BaseBadge tone="warning">{{ todayAppointments.length }} today</BaseBadge>
-                </template>
-
-                <EmptyState
-                    v-if="todayAppointments.length === 0"
-                    heading="No appointments for today"
-                    description="Appointments are always shown for the current date. Add one from a customer or lead (Appointment tab)."
-                >
-                    <template #icon>
-                        <CalendarDaysIcon class="icon" aria-hidden="true" />
-                    </template>
-                </EmptyState>
-                <div v-else class="space-y-3 max-h-80 overflow-y-auto">
-                    <div
-                        v-for="apt in todayAppointments"
-                        :key="apt.id"
-                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-warning-50 rounded-card hover:bg-warning-100 transition-colors group"
-                    >
-                        <div class="flex-1 min-w-0">
-                            <router-link
-                                v-if="apt.customer_id"
-                                :to="`/customers/${apt.customer_id}`"
-                                class="block hover:text-primary-800"
-                            >
-                                <CustomerName :customer="apt.customer" fallback="Customer" name-class="link break-words" />
-                            </router-link>
-                            <CustomerName v-else :customer="apt.customer" fallback="Customer" />
-                            <div class="text-sm text-slate-600 mt-0.5">{{ apt.description || 'Appointment' }}</div>
-                            <div class="text-xs text-slate-500 mt-1 tabular-nums">{{ apt.appointment_time || '10:00' }}</div>
-                        </div>
-                        <div class="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
-                            <BaseButton
-                                v-if="apt.lead_id"
-                                variant="success"
-                                class="flex-1 sm:flex-none sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity"
-                                @click="openCompleteForAppointment(apt)"
-                            >
-                                Complete
-                            </BaseButton>
-                            <BaseButton
-                                v-if="apt.customer_id"
-                                variant="primary"
-                                class="flex-1 sm:flex-none"
-                                :to="`/customers/${apt.customer_id}`"
-                            >
-                                View
-                            </BaseButton>
-                        </div>
-                    </div>
-                </div>
-            </BaseCard>
-        </div>
 
         <!-- Log Activity Modal -->
         <LogActivityModal
@@ -1057,7 +1063,9 @@ const loadDashboard = async () => {
 
 const openCompleteForAppointment = (apt) => {
     if (!apt?.lead_id) return;
-    selectedFollowUp.value = { id: apt.lead_id };
+    // The activity id, not just the lead: a lead can hold several appointments
+    // and only the one being completed should leave today's list.
+    selectedFollowUp.value = { id: apt.lead_id, appointmentActivityId: apt.id };
     completeForm.value = { remarks: '', saleHappened: false, newStage: 'won', nextFollowUpAt: '' };
     showCompleteModal.value = true;
 };
@@ -1077,6 +1085,9 @@ const completeFollowUp = async () => {
             new_stage: completeForm.value.saleHappened ? completeForm.value.newStage : null,
         };
         if (completeForm.value.nextFollowUpAt) payload.next_follow_up_at = completeForm.value.nextFollowUpAt;
+        if (selectedFollowUp.value.appointmentActivityId) {
+            payload.appointment_activity_id = selectedFollowUp.value.appointmentActivityId;
+        }
         const saleWon = completeForm.value.saleHappened && completeForm.value.newStage === 'won';
         await axios.post(`/api/leads/${selectedFollowUp.value.id}/complete-followup`, payload);
         closeCompleteModal();

@@ -1228,6 +1228,9 @@ class LeadController extends Controller
             'remarks' => ['required', 'string', 'max:1000'],
             'sale_happened' => ['nullable', 'boolean'],
             'new_stage' => ['nullable', 'in:follow_up,lead,hot_lead,quotation,won,lost'],
+            // Sent when the dashboard completes one particular appointment rather
+            // than a plain follow-up, so we know which row is now done.
+            'appointment_activity_id' => ['nullable', 'integer'],
         ]);
 
         // Update follow-up date if needed
@@ -1238,8 +1241,9 @@ class LeadController extends Controller
             $lead->update(['next_follow_up_at' => null]);
         }
 
-        // Update stage if sale happened
-        if ($data['sale_happened'] && isset($data['new_stage'])) {
+        // Update stage if sale happened. The field is optional, so read it as one:
+        // a caller that simply leaves it out was getting a 500 off the missing key.
+        if (! empty($data['sale_happened']) && isset($data['new_stage'])) {
             $lead->update(['stage' => $data['new_stage']]);
             $lead->customer?->syncTypeFromLeads();
 
@@ -1268,6 +1272,21 @@ class LeadController extends Controller
                     'sale_happened' => $data['sale_happened'] ?? false,
                     'new_stage' => $data['new_stage'] ?? null,
                 ],
+            ]);
+        }
+
+        // Close the appointment this was completing. Without it the appointment
+        // kept its pending status, so the dashboard listed it again on the next
+        // load - the remark was saved but the row never left the list.
+        if (! empty($data['appointment_activity_id'])) {
+            $appointment = LeadActivity::where('id', $data['appointment_activity_id'])
+                ->where('lead_id', $lead->id)
+                ->where('type', 'appointment')
+                ->first();
+
+            $appointment?->update([
+                'appointment_status' => LeadActivity::APPOINTMENT_STATUS_COMPLETED,
+                'outcome_notes' => $data['remarks'],
             ]);
         }
 

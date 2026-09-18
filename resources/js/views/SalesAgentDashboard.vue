@@ -4,6 +4,281 @@
 
         <AttendanceClock />
 
+        <!--
+            Straight under the clock, because it is what a rep clocks in to do.
+            This sat below the targets, the spotlight and the quick actions -
+            a screen of numbers between checking in and seeing that today's
+            appointment is at ten. Appointments lead inside it for the same
+            reason: they are the only items here with a time to be somewhere.
+        -->
+        <BaseCard>
+            <template #header>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0 w-full">
+                    <label class="text-sm font-medium text-slate-700 shrink-0" for="salesagentdashboard-view-date">View date:</label>
+                    <input id="salesagentdashboard-view-date"
+                        v-model="selectedDate"
+                        type="date"
+                        class="form-input w-full sm:w-auto min-w-0 max-w-full"
+                        @change="onDateChange"
+                    />
+                    <BaseButton
+                        v-if="selectedDate !== todayStr"
+                        variant="ghost"
+                        class="shrink-0"
+                        @click="resetDate"
+                    >
+                        Today
+                    </BaseButton>
+                </div>
+            </template>
+            <template #actions>
+                <div class="tab-list" role="group" aria-label="Follow-up range">
+                    <button
+                        type="button"
+                        :class="['tab', activeTab === 'today' ? 'tab-active' : '']"
+                        :aria-pressed="activeTab === 'today' ? 'true' : 'false'"
+                        @click="activeTab = 'today'"
+                    >
+                        Today
+                    </button>
+                    <button
+                        type="button"
+                        :class="['tab', activeTab === 'next7' ? 'tab-active' : '']"
+                        :aria-pressed="activeTab === 'next7' ? 'true' : 'false'"
+                        @click="activeTab = 'next7'"
+                    >
+                        Next 7 Days
+                    </button>
+                </div>
+            </template>
+
+            <!-- Today / Selected Date Follow-ups -->
+            <div v-show="activeTab === 'today'" class="space-y-6">
+                <!-- Today's Appointments -->
+                <section>
+                    <h2 class="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-control bg-warning-100 text-warning-800 flex items-center justify-center shrink-0">
+                            <ClockIcon class="icon" aria-hidden="true" />
+                        </span>
+                        Today's Appointments
+                    </h2>
+                    <EmptyState v-if="todayAppointments.length === 0" heading="No appointments scheduled for today">
+                        <template #icon>
+                            <ClockIcon class="icon" aria-hidden="true" />
+                        </template>
+                    </EmptyState>
+                    <div v-else class="space-y-3">
+                        <div
+                            v-for="apt in todayAppointments"
+                            :key="apt.id"
+                            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-warning-50 rounded-card hover:bg-warning-100 transition-colors min-w-0"
+                        >
+                            <div class="flex-1 min-w-0">
+                                <router-link
+                                    v-if="apt.customer_id"
+                                    :to="`/customers/${apt.customer_id}`"
+                                    class="link break-words"
+                                >
+                                    {{ apt.customer?.name || 'Customer' }}
+                                </router-link>
+                                <div v-else class="font-medium text-slate-900">
+                                    {{ apt.customer?.name || 'Customer' }}
+                                </div>
+                                <div class="text-sm text-slate-600 mt-0.5">{{ apt.description || 'Appointment' }}</div>
+                                <div class="text-xs text-slate-500 mt-1 tabular-nums">{{ apt.appointment_time || '10:00' }}</div>
+                            </div>
+                            <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
+                                <BaseButton
+                                    v-if="apt.lead_id"
+                                    variant="success"
+                                    @click="openCompleteModal({ id: apt.lead_id, appointmentActivityId: apt.id })"
+                                >
+                                    Complete
+                                </BaseButton>
+                                <BaseButton
+                                    v-if="apt.customer_id"
+                                    variant="primary"
+                                    :to="`/customers/${apt.customer_id}`"
+                                >
+                                    View
+                                </BaseButton>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section v-if="overdueFollowUps.length" ref="workSection">
+                    <h2 class="mb-3 flex items-center gap-2 text-base font-semibold text-slate-900">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-danger-100 text-danger-700">
+                            <ExclamationTriangleIcon class="icon" aria-hidden="true" />
+                        </span>
+                        Overdue
+                        <span class="rounded-full bg-danger-100 px-2 py-0.5 text-xs font-semibold text-danger-800 tabular-nums">
+                            {{ overdueFollowUps.length }}
+                        </span>
+                    </h2>
+                    <p class="mb-3 text-xs text-slate-500">
+                        You set these dates yourself and they have passed. Oldest first.
+                    </p>
+                    <div class="space-y-3">
+                        <div
+                            v-for="fu in overdueOnDashboard"
+                            :key="`overdue-${fu.id}`"
+                            class="flex min-w-0 flex-col gap-3 rounded-card border border-danger-200 bg-danger-50/60 p-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <div class="min-w-0 flex-1">
+                                <router-link
+                                    v-if="fu.customer_id"
+                                    :to="`/customers/${fu.customer_id}`"
+                                    class="link break-words"
+                                >
+                                    {{ fu.customer?.business_name || fu.customer?.name || 'Customer' }}
+                                </router-link>
+                                <div v-else class="font-medium text-slate-900">
+                                    {{ fu.customer?.name || 'Customer' }}
+                                </div>
+                                <div class="mt-1 text-xs font-medium text-danger-800 tabular-nums">
+                                    {{ overdueLabel(fu.next_follow_up_at) }}
+                                </div>
+                                <div v-if="fu.customer?.phone" class="mt-1.5 flex items-center gap-1">
+                                    <a
+                                        :href="`tel:${fu.customer.phone}`"
+                                        class="text-sm text-primary-700 hover:underline tabular-nums"
+                                    >{{ fu.customer.phone }}</a>
+                                    <CopyButton :value="fu.customer.phone" label="phone number" size="compact" />
+                                </div>
+                            </div>
+                            <div class="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+                                <BaseButton variant="outline" @click="openActivityModal(fu)">Log</BaseButton>
+                                <BaseButton variant="success" @click="openCompleteModal(fu)">Done</BaseButton>
+                            </div>
+                        </div>
+
+                        <BaseButton
+                            v-if="overdueFollowUps.length > OVERDUE_ON_DASHBOARD"
+                            variant="outline"
+                            block-mobile
+                            to="/followups?overdue=1"
+                        >
+                            See all {{ overdueFollowUps.length }} overdue
+                        </BaseButton>
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-control bg-primary-100 text-primary-700 flex items-center justify-center shrink-0">
+                            <CalendarDaysIcon class="icon" aria-hidden="true" />
+                        </span>
+                        {{ selectedDate === todayStr ? "Today's Follow-ups" : `Follow-ups for ${formatSelectedDateLabel(selectedDate)}` }}
+                    </h2>
+                    <p v-if="loading" class="text-center py-8 text-slate-500" role="status" aria-live="polite">Loading...</p>
+                    <EmptyState
+                        v-else-if="displayFollowUpsToday.length === 0"
+                        :heading="selectedDate === todayStr ? 'No follow-ups scheduled for today' : 'No follow-ups for this date'"
+                    >
+                        <template #icon>
+                            <CalendarDaysIcon class="icon" aria-hidden="true" />
+                        </template>
+                    </EmptyState>
+                    <div v-else class="space-y-3">
+                        <div
+                            v-for="fu in displayFollowUpsToday"
+                            :key="fu.id"
+                            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-slate-50 rounded-card hover:bg-slate-100 transition-colors group min-w-0"
+                        >
+                            <div class="flex-1 min-w-0">
+                                <router-link
+                                    v-if="fu.customer_id"
+                                    :to="`/customers/${fu.customer_id}`"
+                                    class="link break-words"
+                                >
+                                    {{ fu.customer?.name || 'Customer' }}
+                                </router-link>
+                                <div v-else class="font-medium text-slate-900">
+                                    {{ fu.customer?.name || 'Customer' }}
+                                </div>
+                                <div class="text-sm text-slate-600 mt-0.5">
+                                    {{ fu.items?.length ? fu.items.map(i => i.product?.name).filter(Boolean).join(', ') : '-' }}
+                                </div>
+                                <div class="text-xs text-slate-500 mt-1 tabular-nums">{{ formatDateTime(fu.next_follow_up_at) }}</div>
+                            </div>
+                            <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
+                                <BaseButton variant="outline" @click="openActivityModal(fu)">Log Activity</BaseButton>
+                                <BaseButton variant="success" @click="openCompleteModal(fu)">Mark as Done</BaseButton>
+                                <BaseButton
+                                    v-if="fu.customer_id"
+                                    variant="primary"
+                                    :to="`/customers/${fu.customer_id}`"
+                                >
+                                    View
+                                </BaseButton>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- Next 7 Days Follow-ups -->
+            <div v-show="activeTab === 'next7'" class="space-y-4">
+                <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-control bg-success-100 text-success-800 flex items-center justify-center shrink-0">
+                        <ListBulletIcon class="icon" aria-hidden="true" />
+                    </span>
+                    Follow-ups (Next 7 Days)
+                </h2>
+                <EmptyState v-if="next7DaysFollowUps.length === 0" heading="No follow-ups scheduled in the next 7 days">
+                    <template #icon>
+                        <ListBulletIcon class="icon" aria-hidden="true" />
+                    </template>
+                </EmptyState>
+                <div v-else class="space-y-3 max-h-96 overflow-y-auto">
+                    <div
+                        v-for="fu in next7DaysFollowUps"
+                        :key="fu.id"
+                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-slate-50 rounded-card hover:bg-slate-100 transition-colors group min-w-0"
+                    >
+                        <div class="flex-1 min-w-0">
+                            <router-link
+                                v-if="fu.customer_id"
+                                :to="`/customers/${fu.customer_id}`"
+                                class="link break-words"
+                            >
+                                {{ fu.customer?.name || 'Customer' }}
+                            </router-link>
+                            <div v-else class="font-medium text-slate-900">
+                                {{ fu.customer?.name || 'Customer' }}
+                            </div>
+                            <div class="text-sm text-slate-600 mt-0.5">
+                                {{ fu.items?.length ? fu.items.map(i => i.product?.name).filter(Boolean).join(', ') : '-' }}
+                            </div>
+                            <div class="text-xs text-slate-500 mt-1 flex items-center gap-2 tabular-nums">
+                                <span class="font-medium">{{ formatDateOnly(fu.next_follow_up_at) }}</span>
+                                {{ formatTimeOnly(fu.next_follow_up_at) }}
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
+                            <BaseButton
+                                variant="outline"
+                                class="sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity"
+                                @click="openActivityModal(fu)"
+                            >
+                                Log
+                            </BaseButton>
+                            <BaseButton
+                                v-if="fu.customer_id"
+                                variant="primary"
+                                :to="`/customers/${fu.customer_id}`"
+                            >
+                                View
+                            </BaseButton>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </BaseCard>
+
         <MyWork />
 
         <!--
@@ -120,274 +395,6 @@
                 Add Lead
             </BaseButton>
         </div>
-
-        <!-- Follow-ups & Appointments Section -->
-        <BaseCard>
-            <template #header>
-                <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0 w-full">
-                    <label class="text-sm font-medium text-slate-700 shrink-0" for="salesagentdashboard-view-date">View date:</label>
-                    <input id="salesagentdashboard-view-date"
-                        v-model="selectedDate"
-                        type="date"
-                        class="form-input w-full sm:w-auto min-w-0 max-w-full"
-                        @change="onDateChange"
-                    />
-                    <BaseButton
-                        v-if="selectedDate !== todayStr"
-                        variant="ghost"
-                        class="shrink-0"
-                        @click="resetDate"
-                    >
-                        Today
-                    </BaseButton>
-                </div>
-            </template>
-            <template #actions>
-                <div class="tab-list" role="group" aria-label="Follow-up range">
-                    <button
-                        type="button"
-                        :class="['tab', activeTab === 'today' ? 'tab-active' : '']"
-                        :aria-pressed="activeTab === 'today' ? 'true' : 'false'"
-                        @click="activeTab = 'today'"
-                    >
-                        Today
-                    </button>
-                    <button
-                        type="button"
-                        :class="['tab', activeTab === 'next7' ? 'tab-active' : '']"
-                        :aria-pressed="activeTab === 'next7' ? 'true' : 'false'"
-                        @click="activeTab = 'next7'"
-                    >
-                        Next 7 Days
-                    </button>
-                </div>
-            </template>
-
-            <!-- Today / Selected Date Follow-ups -->
-            <div v-show="activeTab === 'today'" class="space-y-6">
-                <section v-if="overdueFollowUps.length" ref="workSection">
-                    <h2 class="mb-3 flex items-center gap-2 text-base font-semibold text-slate-900">
-                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-danger-100 text-danger-700">
-                            <ExclamationTriangleIcon class="icon" aria-hidden="true" />
-                        </span>
-                        Overdue
-                        <span class="rounded-full bg-danger-100 px-2 py-0.5 text-xs font-semibold text-danger-800 tabular-nums">
-                            {{ overdueFollowUps.length }}
-                        </span>
-                    </h2>
-                    <p class="mb-3 text-xs text-slate-500">
-                        You set these dates yourself and they have passed. Oldest first.
-                    </p>
-                    <div class="space-y-3">
-                        <div
-                            v-for="fu in overdueOnDashboard"
-                            :key="`overdue-${fu.id}`"
-                            class="flex min-w-0 flex-col gap-3 rounded-card border border-danger-200 bg-danger-50/60 p-4 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                            <div class="min-w-0 flex-1">
-                                <router-link
-                                    v-if="fu.customer_id"
-                                    :to="`/customers/${fu.customer_id}`"
-                                    class="link break-words"
-                                >
-                                    {{ fu.customer?.business_name || fu.customer?.name || 'Customer' }}
-                                </router-link>
-                                <div v-else class="font-medium text-slate-900">
-                                    {{ fu.customer?.name || 'Customer' }}
-                                </div>
-                                <div class="mt-1 text-xs font-medium text-danger-800 tabular-nums">
-                                    {{ overdueLabel(fu.next_follow_up_at) }}
-                                </div>
-                                <div v-if="fu.customer?.phone" class="mt-1.5 flex items-center gap-1">
-                                    <a
-                                        :href="`tel:${fu.customer.phone}`"
-                                        class="text-sm text-primary-700 hover:underline tabular-nums"
-                                    >{{ fu.customer.phone }}</a>
-                                    <CopyButton :value="fu.customer.phone" label="phone number" size="compact" />
-                                </div>
-                            </div>
-                            <div class="flex shrink-0 flex-wrap gap-2 sm:justify-end">
-                                <BaseButton variant="outline" @click="openActivityModal(fu)">Log</BaseButton>
-                                <BaseButton variant="success" @click="openCompleteModal(fu)">Done</BaseButton>
-                            </div>
-                        </div>
-
-                        <BaseButton
-                            v-if="overdueFollowUps.length > OVERDUE_ON_DASHBOARD"
-                            variant="outline"
-                            block-mobile
-                            to="/followups?overdue=1"
-                        >
-                            See all {{ overdueFollowUps.length }} overdue
-                        </BaseButton>
-                    </div>
-                </section>
-
-                <section>
-                    <h2 class="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                        <span class="w-8 h-8 rounded-control bg-primary-100 text-primary-700 flex items-center justify-center shrink-0">
-                            <CalendarDaysIcon class="icon" aria-hidden="true" />
-                        </span>
-                        {{ selectedDate === todayStr ? "Today's Follow-ups" : `Follow-ups for ${formatSelectedDateLabel(selectedDate)}` }}
-                    </h2>
-                    <p v-if="loading" class="text-center py-8 text-slate-500" role="status" aria-live="polite">Loading...</p>
-                    <EmptyState
-                        v-else-if="displayFollowUpsToday.length === 0"
-                        :heading="selectedDate === todayStr ? 'No follow-ups scheduled for today' : 'No follow-ups for this date'"
-                    >
-                        <template #icon>
-                            <CalendarDaysIcon class="icon" aria-hidden="true" />
-                        </template>
-                    </EmptyState>
-                    <div v-else class="space-y-3">
-                        <div
-                            v-for="fu in displayFollowUpsToday"
-                            :key="fu.id"
-                            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-slate-50 rounded-card hover:bg-slate-100 transition-colors group min-w-0"
-                        >
-                            <div class="flex-1 min-w-0">
-                                <router-link
-                                    v-if="fu.customer_id"
-                                    :to="`/customers/${fu.customer_id}`"
-                                    class="link break-words"
-                                >
-                                    {{ fu.customer?.name || 'Customer' }}
-                                </router-link>
-                                <div v-else class="font-medium text-slate-900">
-                                    {{ fu.customer?.name || 'Customer' }}
-                                </div>
-                                <div class="text-sm text-slate-600 mt-0.5">
-                                    {{ fu.items?.length ? fu.items.map(i => i.product?.name).filter(Boolean).join(', ') : '-' }}
-                                </div>
-                                <div class="text-xs text-slate-500 mt-1 tabular-nums">{{ formatDateTime(fu.next_follow_up_at) }}</div>
-                            </div>
-                            <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
-                                <BaseButton variant="outline" @click="openActivityModal(fu)">Log Activity</BaseButton>
-                                <BaseButton variant="success" @click="openCompleteModal(fu)">Mark as Done</BaseButton>
-                                <BaseButton
-                                    v-if="fu.customer_id"
-                                    variant="primary"
-                                    :to="`/customers/${fu.customer_id}`"
-                                >
-                                    View
-                                </BaseButton>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Today's Appointments -->
-                <section>
-                    <h2 class="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                        <span class="w-8 h-8 rounded-control bg-warning-100 text-warning-800 flex items-center justify-center shrink-0">
-                            <ClockIcon class="icon" aria-hidden="true" />
-                        </span>
-                        Today's Appointments
-                    </h2>
-                    <EmptyState v-if="todayAppointments.length === 0" heading="No appointments scheduled for today">
-                        <template #icon>
-                            <ClockIcon class="icon" aria-hidden="true" />
-                        </template>
-                    </EmptyState>
-                    <div v-else class="space-y-3">
-                        <div
-                            v-for="apt in todayAppointments"
-                            :key="apt.id"
-                            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-warning-50 rounded-card hover:bg-warning-100 transition-colors min-w-0"
-                        >
-                            <div class="flex-1 min-w-0">
-                                <router-link
-                                    v-if="apt.customer_id"
-                                    :to="`/customers/${apt.customer_id}`"
-                                    class="link break-words"
-                                >
-                                    {{ apt.customer?.name || 'Customer' }}
-                                </router-link>
-                                <div v-else class="font-medium text-slate-900">
-                                    {{ apt.customer?.name || 'Customer' }}
-                                </div>
-                                <div class="text-sm text-slate-600 mt-0.5">{{ apt.description || 'Appointment' }}</div>
-                                <div class="text-xs text-slate-500 mt-1 tabular-nums">{{ apt.appointment_time || '10:00' }}</div>
-                            </div>
-                            <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
-                                <BaseButton
-                                    v-if="apt.lead_id"
-                                    variant="success"
-                                    @click="openCompleteModal({ id: apt.lead_id })"
-                                >
-                                    Complete
-                                </BaseButton>
-                                <BaseButton
-                                    v-if="apt.customer_id"
-                                    variant="primary"
-                                    :to="`/customers/${apt.customer_id}`"
-                                >
-                                    View
-                                </BaseButton>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            </div>
-
-            <!-- Next 7 Days Follow-ups -->
-            <div v-show="activeTab === 'next7'" class="space-y-4">
-                <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2">
-                    <span class="w-8 h-8 rounded-control bg-success-100 text-success-800 flex items-center justify-center shrink-0">
-                        <ListBulletIcon class="icon" aria-hidden="true" />
-                    </span>
-                    Follow-ups (Next 7 Days)
-                </h2>
-                <EmptyState v-if="next7DaysFollowUps.length === 0" heading="No follow-ups scheduled in the next 7 days">
-                    <template #icon>
-                        <ListBulletIcon class="icon" aria-hidden="true" />
-                    </template>
-                </EmptyState>
-                <div v-else class="space-y-3 max-h-96 overflow-y-auto">
-                    <div
-                        v-for="fu in next7DaysFollowUps"
-                        :key="fu.id"
-                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-slate-50 rounded-card hover:bg-slate-100 transition-colors group min-w-0"
-                    >
-                        <div class="flex-1 min-w-0">
-                            <router-link
-                                v-if="fu.customer_id"
-                                :to="`/customers/${fu.customer_id}`"
-                                class="link break-words"
-                            >
-                                {{ fu.customer?.name || 'Customer' }}
-                            </router-link>
-                            <div v-else class="font-medium text-slate-900">
-                                {{ fu.customer?.name || 'Customer' }}
-                            </div>
-                            <div class="text-sm text-slate-600 mt-0.5">
-                                {{ fu.items?.length ? fu.items.map(i => i.product?.name).filter(Boolean).join(', ') : '-' }}
-                            </div>
-                            <div class="text-xs text-slate-500 mt-1 flex items-center gap-2 tabular-nums">
-                                <span class="font-medium">{{ formatDateOnly(fu.next_follow_up_at) }}</span>
-                                {{ formatTimeOnly(fu.next_follow_up_at) }}
-                            </div>
-                        </div>
-                        <div class="flex flex-wrap gap-2 shrink-0 sm:justify-end">
-                            <BaseButton
-                                variant="outline"
-                                class="sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity"
-                                @click="openActivityModal(fu)"
-                            >
-                                Log
-                            </BaseButton>
-                            <BaseButton
-                                v-if="fu.customer_id"
-                                variant="primary"
-                                :to="`/customers/${fu.customer_id}`"
-                            >
-                                View
-                            </BaseButton>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </BaseCard>
 
         <!-- Recent Leads & Assigned Customers -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -969,6 +976,11 @@ const completeFollowUp = async () => {
         };
         if (completeForm.value.nextFollowUpAt) {
             payload.next_follow_up_at = completeForm.value.nextFollowUpAt;
+        }
+        // Only set when an appointment is being completed, so the right one of a
+        // lead's appointments is the one that leaves today's list.
+        if (selectedFollowUp.value.appointmentActivityId) {
+            payload.appointment_activity_id = selectedFollowUp.value.appointmentActivityId;
         }
         await axios.post(`/api/leads/${selectedFollowUp.value.id}/complete-followup`, payload);
         closeCompleteModal();

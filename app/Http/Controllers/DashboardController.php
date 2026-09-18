@@ -22,6 +22,76 @@ class DashboardController extends Controller
     }
 
     /**
+     * The appointments still open for today, shaped for the dashboard.
+     *
+     * Only pending ones. This used to read nothing but the date, so completing
+     * an appointment left it on the list for the rest of the day looking exactly
+     * as undone as before - the remark went in and the row never moved.
+     */
+    private function shapeTodayAppointments(\Illuminate\Support\Collection $activities, Carbon $today)
+    {
+        $todayStr = $today->toDateString();
+
+        return $activities
+            ->filter(function (LeadActivity $a) use ($todayStr) {
+                $status = $a->appointment_status ?: LeadActivity::APPOINTMENT_STATUS_PENDING;
+
+                if ($status !== LeadActivity::APPOINTMENT_STATUS_PENDING) {
+                    return false;
+                }
+
+                return $this->appointmentDateOf($a) === $todayStr;
+            })
+            ->sortBy(fn (LeadActivity $a) => $this->appointmentTimeOf($a))
+            ->values()
+            ->map(fn (LeadActivity $a) => [
+                'id' => $a->id,
+                'lead_id' => $a->lead_id,
+                'customer' => $a->lead?->customer,
+                'customer_id' => $a->lead?->customer_id,
+                'description' => $a->description,
+                'appointment_date' => $this->appointmentDateOf($a),
+                'appointment_time' => $this->appointmentTimeOf($a) ?: '10:00',
+                'user' => $a->user,
+            ]);
+    }
+
+    /**
+     * Appointments have carried their date in a column since the 2026_04_03
+     * backfill, but rows written before it still only have theirs in meta.
+     */
+    private function appointmentDateOf(LeadActivity $a): ?string
+    {
+        if ($a->appointment_date) {
+            return $a->appointment_date->toDateString();
+        }
+
+        $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
+        $appDate = $meta['appointment_date'] ?? null;
+
+        if (! $appDate) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($appDate)->startOfDay()->toDateString();
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    private function appointmentTimeOf(LeadActivity $a): string
+    {
+        if ($a->appointment_time) {
+            return $a->appointment_time;
+        }
+
+        $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
+
+        return $meta['appointment_time'] ?? '';
+    }
+
+    /**
      * Dashboard: organization-wide for Admin / System Admin / Manager; everyone else sees only their pipeline.
      */
     public function index(Request $request)
@@ -125,7 +195,6 @@ class DashboardController extends Controller
         $todayFollowUps = $followUpQuery->get();
 
         // Today's appointments (from LeadActivity type=appointment)
-        $todayStr = $today->toDateString();
         $appointmentQuery = LeadActivity::where('type', 'appointment')
             ->where('created_at', '>=', $today->copy()->subDays(60))
             ->with(['lead.customer', 'lead.assignee', 'user']);
@@ -140,37 +209,7 @@ class DashboardController extends Controller
             });
         }
         $appointmentActivities = $appointmentQuery->get();
-        $todayAppointments = $appointmentActivities
-            ->filter(function ($a) use ($todayStr) {
-                $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
-                $appDate = $meta['appointment_date'] ?? null;
-                if (!$appDate) {
-                    return false;
-                }
-                try {
-                    return Carbon::parse($appDate)->startOfDay()->toDateString() === $todayStr;
-                } catch (\Exception $e) {
-                    return false;
-                }
-            })
-            ->sortBy(function ($a) {
-                $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
-                return $meta['appointment_time'] ?? '00:00';
-            })
-            ->values()
-            ->map(function ($a) {
-                $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
-                return [
-                    'id' => $a->id,
-                    'lead_id' => $a->lead_id,
-                    'customer' => $a->lead?->customer,
-                    'customer_id' => $a->lead?->customer_id,
-                    'description' => $a->description,
-                    'appointment_date' => $meta['appointment_date'] ?? null,
-                    'appointment_time' => $meta['appointment_time'] ?? '10:00',
-                    'user' => $a->user,
-                ];
-            });
+        $todayAppointments = $this->shapeTodayAppointments($appointmentActivities, $today);
 
         // Recent leads
         $recentLeadsQuery = Lead::with(['customer', 'items.product', 'assignee'])
@@ -396,7 +435,6 @@ class DashboardController extends Controller
             ->get();
 
         // Today's appointments (from LeadActivity type=appointment)
-        $todayStr = $today->toDateString();
         $appointmentActivities = LeadActivity::where('type', 'appointment')
             ->whereHas('lead', function ($q) use ($user) {
                 $q->where(function ($subQ) use ($user) {
@@ -409,37 +447,7 @@ class DashboardController extends Controller
             ->where('created_at', '>=', $today->copy()->subDays(60))
             ->with(['lead.customer', 'lead.assignee', 'user'])
             ->get();
-        $todayAppointments = $appointmentActivities
-            ->filter(function ($a) use ($todayStr) {
-                $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
-                $appDate = $meta['appointment_date'] ?? null;
-                if (!$appDate) {
-                    return false;
-                }
-                try {
-                    return Carbon::parse($appDate)->startOfDay()->toDateString() === $todayStr;
-                } catch (\Exception $e) {
-                    return false;
-                }
-            })
-            ->sortBy(function ($a) {
-                $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
-                return $meta['appointment_time'] ?? '00:00';
-            })
-            ->values()
-            ->map(function ($a) {
-                $meta = is_array($a->meta) ? $a->meta : (json_decode($a->meta, true) ?? []);
-                return [
-                    'id' => $a->id,
-                    'lead_id' => $a->lead_id,
-                    'customer' => $a->lead?->customer,
-                    'customer_id' => $a->lead?->customer_id,
-                    'description' => $a->description,
-                    'appointment_date' => $meta['appointment_date'] ?? null,
-                    'appointment_time' => $meta['appointment_time'] ?? '10:00',
-                    'user' => $a->user,
-                ];
-            });
+        $todayAppointments = $this->shapeTodayAppointments($appointmentActivities, $today);
 
         // Optional: follow-ups for a specific date (from date picker)
         $followUpsByDate = [];
