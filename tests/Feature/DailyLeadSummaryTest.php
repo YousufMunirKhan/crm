@@ -367,4 +367,69 @@ class DailyLeadSummaryTest extends TestCase
 
         Mail::assertNotSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('gone@example.com'));
     }
+
+    // -------------------------------------------------------- month end push
+
+    /** A working day this many days before the month ends. */
+    private function dayBeforeMonthEnd(int $daysBeforeEnd): string
+    {
+        $day = now(config('app.display_timezone'))->endOfMonth()->subDays($daysBeforeEnd);
+
+        return ($day->isSunday() ? $day->subDay() : $day)->toDateString();
+    }
+
+    public function test_the_monthly_sales_figure_is_pushed_near_the_end_of_the_month(): void
+    {
+        $rep = $this->user('Sales', 'rep@example.com');
+        $this->user('Admin', 'boss@example.com', withTarget: false);
+
+        $this->artisan('emails:daily-lead-summary', ['--date' => $this->dayBeforeMonthEnd(3)])
+            ->assertSuccessful();
+
+        Mail::assertSent(AutomatedEmail::class, function (AutomatedEmail $m) {
+            return $m->hasTo('rep@example.com')
+                && is_array($m->mailData['sales'])
+                && $m->mailData['sales']['target'] === 5
+                && $m->mailData['sales']['short'] === 5;
+        });
+
+        Mail::assertSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('boss@example.com')
+            && count($m->mailData['salesRows']) === 1
+            && $m->mailData['salesTarget'] === 5);
+    }
+
+    public function test_it_is_not_mentioned_earlier_in_the_month(): void
+    {
+        $this->user('Sales', 'rep@example.com');
+        $this->user('Admin', 'boss@example.com', withTarget: false);
+
+        $this->artisan('emails:daily-lead-summary', ['--date' => $this->dayBeforeMonthEnd(20)])
+            ->assertSuccessful();
+
+        Mail::assertSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('rep@example.com')
+            && $m->mailData['sales'] === null);
+        Mail::assertSent(AutomatedEmail::class, fn (AutomatedEmail $m) => $m->hasTo('boss@example.com')
+            && $m->mailData['salesRows'] === []);
+    }
+
+    public function test_the_email_says_plainly_when_the_lead_target_was_missed(): void
+    {
+        $rep = $this->user('Sales', 'rep@example.com');
+        $this->leadsFor($rep, 1);
+
+        $this->artisan('emails:daily-lead-summary')->assertSuccessful();
+
+        $mail = Mail::sent(AutomatedEmail::class)
+            ->first(fn (AutomatedEmail $m) => $m->hasTo('rep@example.com'));
+
+        $level = ob_get_level();
+        $html = view($mail->mailView, $mail->mailData)->render();
+        while (ob_get_level() > $level) {
+            ob_end_clean();
+        }
+
+        $this->assertStringContainsString('Lead target not met', $html);
+        $this->assertStringContainsString('did not hit your lead target', $html);
+        $this->assertStringContainsString('4 leads short', $html);
+    }
 }

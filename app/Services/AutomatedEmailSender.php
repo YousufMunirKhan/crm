@@ -35,6 +35,47 @@ class AutomatedEmailSender
             ->value('value') ?: config('app.name'));
     }
 
+    /**
+     * The logo, as something an email client will actually draw.
+     *
+     * Two things stop the stored value working in a mailbox. It is a relative
+     * path, and an email has no page to be relative to; and it is a .webp,
+     * which every browser renders and Outlook does not. A .png sitting beside
+     * it is preferred when one has been made, so the picture survives the trip.
+     */
+    public function logoUrl(): ?string
+    {
+        $raw = trim((string) Setting::query()->where('key', 'logo_url')->value('value'));
+
+        if ($raw === '') {
+            return null;
+        }
+
+        $png = preg_replace('/\.(webp|avif)$/i', '.png', $raw);
+
+        if ($png !== $raw && is_file(public_path(ltrim(parse_url($png, PHP_URL_PATH) ?: $png, '/')))) {
+            $raw = $png;
+        }
+
+        return str_starts_with($raw, 'http')
+            ? $raw
+            : rtrim((string) config('app.url'), '/').'/'.ltrim($raw, '/');
+    }
+
+    /** Company details for an email footer, straight from Settings. */
+    public function companyDetails(): array
+    {
+        $keys = ['company_website', 'company_phone', 'company_email', 'company_address'];
+        $values = Setting::query()->whereIn('key', $keys)->pluck('value', 'key')->all();
+
+        return [
+            'website' => trim((string) ($values['company_website'] ?? '')),
+            'phone' => trim((string) ($values['company_phone'] ?? '')),
+            'email' => trim((string) ($values['company_email'] ?? '')),
+            'address' => trim((string) ($values['company_address'] ?? '')),
+        ];
+    }
+
     /** Already sent, so a rerun of the same day's command does nothing. */
     public function alreadySent(string $reference): bool
     {
@@ -65,6 +106,15 @@ class AutomatedEmailSender
         if ($this->suppression->isUndeliverable($to)) {
             return false;
         }
+
+        // Branding is the same on every one of these, so it is put on here
+        // rather than repeated at each call site and drifting between them.
+        // Anything the caller set already wins.
+        $mail->mailData = array_merge([
+            'companyName' => $this->companyName(),
+            'logoUrl' => $this->logoUrl(),
+            'company' => $this->companyDetails(),
+        ], $mail->mailData);
 
         MailConfigFromDatabase::apply();
 

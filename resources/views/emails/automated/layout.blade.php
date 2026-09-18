@@ -1,47 +1,84 @@
 {{--
     The shell every automated email shares.
 
-    The rest of resources/views/emails repeats this stylesheet in full in each
-    file, which is why they have drifted apart. These are sent by a schedule
-    nobody is watching, so they are the ones that most need to look the same.
+    Tables and inline styles throughout, because this is read in mail clients
+    rather than browsers: Outlook draws with Word, which ignores flexbox, most
+    of CSS positioning, and background-image. Anything that has to be seen is
+    a table cell with a background colour on it.
 --}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="x-apple-disable-message-reformatting">
     <title>@yield('title')</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 640px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
-        .email-container { background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
-        .header { background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); color: white; padding: 24px; text-align: center; }
-        .header h1 { margin: 0; font-size: 20px; font-weight: 600; }
-        .content { padding: 24px; }
-        .highlight { background: #f1f5f9; border-left: 4px solid #2563eb; border-radius: 8px; padding: 16px; margin: 16px 0; }
-        .highlight.warn { background: #fffbeb; border-left-color: #d97706; }
-        .detail { margin-bottom: 10px; font-size: 14px; }
-        .detail .label { color: #64748b; display: inline-block; min-width: 140px; }
-        .detail .value { color: #0f172a; font-weight: 500; }
-        .row { padding: 12px 0; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
-        .row:last-child { border-bottom: 0; }
-        .row .who { color: #0f172a; font-weight: 600; }
-        .row .meta { color: #64748b; font-size: 13px; }
-        .row .late { color: #b91c1c; font-weight: 600; }
-        .footer { background-color: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b; }
-    </style>
 </head>
-<body>
-    <div class="email-container">
-        <div class="header">
-            <h1>@yield('heading')</h1>
-        </div>
-        <div class="content">
-            @yield('body')
-        </div>
-        <div class="footer">
-            <p style="font-weight: 600; color: #1e293b; margin: 0;">{{ $companyName }}</p>
-            <p style="margin: 8px 0 0; font-size: 12px;">@yield('footnote', 'Automated message — please reply to this email if anything is wrong.')</p>
-        </div>
-    </div>
+<body style="margin:0; padding:0; background-color:#eef2f7; -webkit-font-smoothing:antialiased;">
+    {{-- Shown in the inbox list under the subject, and nowhere else. --}}
+    <div style="display:none; max-height:0; overflow:hidden; opacity:0;">@yield('preview', ' ')</div>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#eef2f7;">
+        <tr>
+            <td align="center" style="padding:28px 12px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="620"
+                       style="width:620px; max-width:100%; background-color:#ffffff; border-radius:14px; overflow:hidden;
+                              box-shadow:0 1px 3px rgba(15,23,42,0.08), 0 8px 24px rgba(15,23,42,0.06);">
+
+                    {{-- Logo on white: the mark has its own colours and a coloured bar behind it fights them. --}}
+                    <tr>
+                        <td align="center" style="padding:26px 28px 18px;">
+                            @if(!empty($logoUrl))
+                                <img src="{{ $logoUrl }}" alt="{{ $companyName }}" height="40"
+                                     style="display:block; height:40px; width:auto; border:0; outline:none; text-decoration:none;">
+                            @else
+                                <div style="font-family:'Segoe UI',Helvetica,Arial,sans-serif; font-size:19px; font-weight:700; color:#0f172a; letter-spacing:0.01em;">
+                                    {{ $companyName }}
+                                </div>
+                            @endif
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="height:3px; background-color:#2563eb; font-size:1px; line-height:1px;">&nbsp;</td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding:26px 28px 8px; font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+                            <h1 style="margin:0; font-size:21px; line-height:1.3; font-weight:700; color:#0f172a;">
+                                @yield('heading')
+                            </h1>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding:6px 28px 28px; font-family:'Segoe UI',Helvetica,Arial,sans-serif;
+                                   font-size:15px; line-height:1.6; color:#334155;">
+                            @yield('body')
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="background-color:#f8fafc; border-top:1px solid #e2e8f0; padding:20px 28px;
+                                   font-family:'Segoe UI',Helvetica,Arial,sans-serif; font-size:12px; line-height:1.7; color:#64748b;">
+                            <div style="font-size:13px; font-weight:700; color:#0f172a;">{{ $companyName }}</div>
+                            @if(!empty($company['address']))
+                                <div>{{ str_replace("\n", ', ', $company['address']) }}</div>
+                            @endif
+                            <div>
+                                @if(!empty($company['phone'])){{ $company['phone'] }}@endif
+                                @if(!empty($company['phone']) && !empty($company['email'])) &middot; @endif
+                                @if(!empty($company['email']))<a href="mailto:{{ $company['email'] }}" style="color:#2563eb; text-decoration:none;">{{ $company['email'] }}</a>@endif
+                            </div>
+                            @if(!empty($company['website']))
+                                <div><a href="{{ $company['website'] }}" style="color:#2563eb; text-decoration:none;">{{ $company['website'] }}</a></div>
+                            @endif
+                            <div style="margin-top:10px; color:#94a3b8;">@yield('footnote', 'Automated message from your CRM.')</div>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

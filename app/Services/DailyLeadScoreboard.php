@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Modules\CRM\Models\Lead;
 use App\Modules\HR\Models\EmployeeTarget;
+use App\Modules\Reporting\Services\ReportingService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -37,6 +38,7 @@ class DailyLeadScoreboard
             $this->month = $month;
             $this->people = null;
             $this->targets = null;
+            $this->rows = null;
         }
 
         return $this;
@@ -44,6 +46,11 @@ class DailyLeadScoreboard
 
     /** @var array<int, int>|null userId => their own daily lead target */
     private ?array $targets = null;
+
+    /** @var Collection<int, EmployeeTarget>|null the rows those came from */
+    private ?Collection $rows = null;
+
+    public function __construct(private ReportingService $reporting) {}
 
     /** The fallback when nobody has set one, and the default a new row gets. */
     public function defaultTarget(): int
@@ -83,11 +90,14 @@ class DailyLeadScoreboard
         $month = $this->month ?? now($this->timezone())->format('Y-m');
 
         $rows = EmployeeTarget::query()
+            ->with('lines')
             ->where('month', $month)
             ->where('target_daily_leads', '>', 0)
-            ->pluck('target_daily_leads', 'user_id');
+            ->get()
+            ->keyBy('user_id');
 
-        $this->targets = $rows->map(fn ($n) => max(1, (int) $n))->all();
+        $this->rows = $rows;
+        $this->targets = $rows->map(fn (EmployeeTarget $t) => max(1, (int) $t->target_daily_leads))->all();
 
         return $this->people = User::query()
             ->where('is_active', true)
@@ -95,6 +105,85 @@ class DailyLeadScoreboard
             ->with('role')
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Days left in the month, today included, on the UK calendar.
+     */
+    public function daysLeftInMonth(string $date): int
+    {
+        $day = Carbon::parse($date, $this->timezone());
+
+        return (int) $day->diffInDays($day->copy()->endOfMonth()) + 1;
+    }
+
+    /**
+     * Near enough the end of the month that the monthly sales figure is the
+     * thing worth saying, rather than a number nobody can move yet.
+     */
+    public function isMonthEndRun(string $date): bool
+    {
+        return $this->daysLeftInMonth($date) <= (int) config('leads.month_end_push_days', 10);
+    }
+
+    /**
+     * One person's monthly sales target and what they have done against it.
+     *
+     * The reporting service owns the rule for what counts as a sale - product
+     * and category lines included - so it is asked rather than reimplemented.
+     *
+     * @return array{target: int, achieved: int, short: int}|null
+     */
+    public function salesProgressFor(int $userId, string $date): ?array
+    {
+        $this->people();
+
+        $target = $this->rows?->get($userId);
+
+        if (! $target) {
+            return null;
+        }
+
+        $day = Carbon::parse($date, $this->timezone());
+        $resolved = $this->reporting->resolveSalesTargetAndAchieved(
+            $target,
+            $userId,
+            $day->copy()->startOfMonth()->startOfDay(),
+            $day->copy()->endOfMonth()->endOfDay(),
+        );
+
+        $wanted = (int) ($resolved['target_sales'] ?? 0);
+
+        if ($wanted <= 0) {
+            return null;
+        }
+
+        $done = (int) ($resolved['achieved_sales'] ?? 0);
+
+        return [
+            'target' => $wanted,
+            'achieved' => $done,
+            'short' => max(0, $wanted - $done),
+        ];
+    }
+
+    /**
+     * Everybody's monthly sales progress, furthest behind first.
+     *
+     * @return array<int, array{name: string, target: int, achieved: int, short: int}>
+     */
+    public function salesTable(string $date): array
+    {
+        return $this->people()
+            ->map(function (User $u) use ($date) {
+                $progress = $this->salesProgressFor($u->id, $date);
+
+                return $progress ? array_merge(['name' => $u->name], $progress) : null;
+            })
+            ->filter()
+            ->sortBy([['short', 'desc'], ['name', 'asc']])
+            ->values()
+            ->all();
     }
 
     /** The people who get everybody's figures. */

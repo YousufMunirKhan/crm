@@ -40,4 +40,16 @@ return [
 
     'summary_roles' => ['Admin', 'System Admin', 'Manager'],
 
+    /*
+    |--------------------------------------------------------------------------
+    | When the monthly sales target starts being mentioned
+    |--------------------------------------------------------------------------
+    |
+    | Days left in the month. Earlier than this the monthly figure is not a
+    | thing anybody can act on today; later than this it is the only thing.
+    |
+    */
+
+    'month_end_push_days' => (int) env('LEADS_MONTH_END_PUSH_DAYS', 10),
+
 ];

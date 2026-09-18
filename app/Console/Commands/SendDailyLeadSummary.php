@@ -92,7 +92,7 @@ class SendDailyLeadSummary extends Command
             if ($sender->send(
                 'lead-summary:'.$watcher->id.':'.$date,
                 $email,
-                $this->summaryMail($sender, $dateLabel, $rows, $teamDays),
+                $this->summaryMail($sender, $board, $date, $dateLabel, $rows, $teamDays),
             )) {
                 $sent++;
             }
@@ -140,7 +140,7 @@ class SendDailyLeadSummary extends Command
         $sender->send(
             'preview:lead-summary:'.$stamp,
             $to,
-            $this->summaryMail($sender, $dateLabel, $rows, $teamDays),
+            $this->summaryMail($sender, $board, $date, $dateLabel, $rows, $teamDays),
         );
 
         $this->info("Sent both versions to {$to} (personal example built from {$person->name}).");
@@ -160,6 +160,10 @@ class SendDailyLeadSummary extends Command
         $days = $board->recentDaysFor($person->id, $date);
         $target = $board->targetFor($person->id);
 
+        // The monthly figure is only mentioned once it is close enough to be
+        // something today can still move.
+        $sales = $board->isMonthEndRun($date) ? $board->salesProgressFor($person->id, $date) : null;
+
         return new AutomatedEmail(
             mailSubject: $short > 0
                 ? "{$count} of {$target} leads — {$short} short"
@@ -175,12 +179,17 @@ class SendDailyLeadSummary extends Command
                 'days' => $days,
                 'weekTotal' => array_sum(array_column($days, 'count')),
                 'weekTarget' => array_sum(array_column($days, 'target')),
+                'sales' => $sales,
+                'daysLeft' => $board->daysLeftInMonth($date),
+                'monthLabel' => Carbon::parse($date, $board->timezone())->format('F'),
             ],
         );
     }
 
     private function summaryMail(
         AutomatedEmailSender $sender,
+        DailyLeadScoreboard $board,
+        string $date,
         string $dateLabel,
         array $rows,
         array $teamDays,
@@ -188,6 +197,8 @@ class SendDailyLeadSummary extends Command
         $teamCount = array_sum(array_column($rows, 'count'));
         // Summed rather than multiplied: people can be asked for different numbers.
         $teamTarget = array_sum(array_column($rows, 'target'));
+
+        $salesRows = $board->isMonthEndRun($date) ? $board->salesTable($date) : [];
 
         return new AutomatedEmail(
             mailSubject: "Leads {$dateLabel}: {$teamCount} of {$teamTarget}",
@@ -201,6 +212,12 @@ class SendDailyLeadSummary extends Command
                 'teamTarget' => $teamTarget,
                 'teamShort' => max(0, $teamTarget - $teamCount),
                 'nobody' => $teamCount === 0,
+                'salesRows' => $salesRows,
+                'salesAchieved' => array_sum(array_column($salesRows, 'achieved')),
+                'salesTarget' => array_sum(array_column($salesRows, 'target')),
+                'salesShort' => array_sum(array_column($salesRows, 'short')),
+                'daysLeft' => $board->daysLeftInMonth($date),
+                'monthLabel' => Carbon::parse($date, $board->timezone())->format('F'),
             ],
         );
     }

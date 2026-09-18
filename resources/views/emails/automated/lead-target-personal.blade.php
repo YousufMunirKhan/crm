@@ -2,55 +2,119 @@
 
 @section('title', 'Your leads today')
 
-@section('heading')Where you are today@endsection
+@section('preview')
+    {{ $count }} of {{ $target }} leads on {{ $dateLabel }}{{ $short > 0 ? ' — '.$short.' short' : '' }}
+@endsection
+
+@section('heading')
+    @if($short > 0)
+        Lead target not met
+    @else
+        Lead target met
+    @endif
+@endsection
 
 @section('body')
-    <p>Hello {{ $repName }},</p>
+    <p style="margin:0 0 16px;">Hello {{ $repName }},</p>
 
-    @if($short <= 0)
-        <p>
-            You put <strong>{{ $count }}</strong> {{ $count === 1 ? 'lead' : 'leads' }} on the board
-            on {{ $dateLabel }} against a target of {{ $target }}. That is the day done.
-        </p>
+    {{-- The verdict first and in plain words: the number below is the evidence. --}}
+    @if($short > 0)
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 20px;">
+            <tr>
+                <td style="background-color:#fff7ed; border-left:4px solid #ea580c; border-radius:10px; padding:16px 18px;">
+                    <div style="font-size:15px; font-weight:700; color:#9a3412;">
+                        You did not hit your lead target on {{ $dateLabel }}.
+                    </div>
+                    <div style="font-size:14px; color:#7c2d12; margin-top:4px;">
+                        The target is {{ $target }} leads a day. You put on {{ $count }}, so you are
+                        {{ $short }} {{ $short === 1 ? 'lead' : 'leads' }} short.
+                    </div>
+                </td>
+            </tr>
+        </table>
     @else
-        <p>
-            The daily target is <strong>{{ $target }}</strong> leads. On {{ $dateLabel }} you put on
-            <strong>{{ $count }}</strong>, so you are <strong>{{ $short }}</strong> short.
-        </p>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 20px;">
+            <tr>
+                <td style="background-color:#f0fdf4; border-left:4px solid #16a34a; border-radius:10px; padding:16px 18px;">
+                    <div style="font-size:15px; font-weight:700; color:#166534;">
+                        Target met on {{ $dateLabel }}.
+                    </div>
+                    <div style="font-size:14px; color:#14532d; margin-top:4px;">
+                        {{ $count }} {{ $count === 1 ? 'lead' : 'leads' }} against a target of {{ $target }}.
+                    </div>
+                </td>
+            </tr>
+        </table>
     @endif
 
-    {{-- The one number, large enough to be the whole message on a phone. --}}
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; margin:18px 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 24px;">
         <tr>
-            <td style="background-color:{{ $short <= 0 ? '#f0fdf4' : '#f1f5f9' }}; border-left:4px solid {{ $short <= 0 ? '#16a34a' : '#2563eb' }}; border-radius:8px; padding:18px 20px;">
-                <div style="font-size:34px; line-height:1.1; font-weight:700; color:{{ $short <= 0 ? '#15803d' : '#0f172a' }};">
-                    {{ $count }} <span style="font-size:18px; font-weight:500; color:#64748b;">of {{ $target }}</span>
+            <td style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:20px;">
+                <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:#64748b; font-weight:600;">
+                    Leads today
                 </div>
-                <div style="font-size:14px; color:#475569; margin-top:6px;">
-                    @if($short <= 0)
-                        Target met.
-                    @else
-                        {{ $short }} more {{ $short === 1 ? 'lead' : 'leads' }} to hit it.
-                    @endif
+                <div style="font-size:40px; line-height:1.05; font-weight:700; color:{{ $short > 0 ? '#0f172a' : '#15803d' }}; margin-top:6px;">
+                    {{ $count }}<span style="font-size:20px; font-weight:500; color:#94a3b8;"> / {{ $target }}</span>
                 </div>
             </td>
         </tr>
     </table>
 
-    <p style="font-size:13px; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px;">
+    <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:#64748b; font-weight:600; margin-bottom:10px;">
         Your last {{ count($days) }} working days
-    </p>
+    </div>
 
     @include('emails.automated.partials.day-chart', ['days' => $days])
 
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; margin-top:20px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:18px 0 0;">
         <tr>
-            <td style="background-color:#f8fafc; border-radius:8px; padding:14px 16px; font-size:14px; color:#334155;">
+            <td style="background-color:#f8fafc; border-radius:10px; padding:14px 16px; font-size:14px; color:#334155;">
                 <strong>{{ $weekTotal }}</strong> {{ $weekTotal === 1 ? 'lead' : 'leads' }} over those days,
                 against <strong>{{ $weekTarget }}</strong> expected.
             </td>
         </tr>
     </table>
+
+    {{-- Only near the end of the month, when the monthly figure is something
+         that can still be moved and is the thing worth saying. --}}
+    @if($sales)
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:26px 0 0;">
+            <tr>
+                <td style="background-color:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:20px;">
+                    <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:#1d4ed8; font-weight:700;">
+                        {{ $daysLeft }} {{ $daysLeft === 1 ? 'day' : 'days' }} left in {{ $monthLabel }}
+                    </div>
+
+                    @if($sales['short'] > 0)
+                        <div style="font-size:17px; font-weight:700; color:#0f172a; margin:8px 0 2px;">
+                            You have achieved {{ $sales['achieved'] }} of {{ $sales['target'] }} sales.
+                        </div>
+                        <div style="font-size:15px; color:#1e3a8a;">
+                            {{ $sales['short'] }} {{ $sales['short'] === 1 ? 'sale' : 'sales' }} still to go.
+                        </div>
+                    @else
+                        <div style="font-size:17px; font-weight:700; color:#15803d; margin:8px 0 2px;">
+                            Monthly sales target met — {{ $sales['achieved'] }} of {{ $sales['target'] }}.
+                        </div>
+                    @endif
+
+                    @php($salesPct = $sales['target'] > 0 ? (int) round(min(1, $sales['achieved'] / $sales['target']) * 100) : 0)
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+                           style="margin-top:14px; background-color:#dbeafe; border-radius:5px;">
+                        <tr>
+                            @if($salesPct > 0)
+                                <td style="width:{{ $salesPct }}%; background-color:{{ $sales['short'] > 0 ? '#2563eb' : '#16a34a' }}; height:16px; border-radius:5px; font-size:1px; line-height:1px;">&nbsp;</td>
+                            @endif
+                            @if($salesPct < 100)
+                                <td style="width:{{ 100 - $salesPct }}%; height:16px; font-size:1px; line-height:1px;">&nbsp;</td>
+                            @endif
+                        </tr>
+                    </table>
+                    <div style="font-size:12px; color:#1e40af; margin-top:6px;">{{ $salesPct }}% of the month's target</div>
+                </td>
+            </tr>
+        </table>
+    @endif
 @endsection
 
-@section('footnote', 'Automated message from your CRM — sent every working day at 10am UK time.')
+@section('footnote', 'Sent every working day at 10am UK time. Sundays excluded.')

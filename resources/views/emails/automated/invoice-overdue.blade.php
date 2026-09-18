@@ -1,7 +1,9 @@
 @extends('emails.automated.layout')
 
 @section('title', 'Invoice overdue')
-@section('heading')Invoice {{ $invoiceNumber }} is overdue@endsection
+@section('heading')
+    Invoice {{ $invoiceNumber }} is overdue
+@endsection
 
 @section('body')
     <p>Hello {{ $customerName }},</p>

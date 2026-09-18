@@ -245,7 +245,16 @@ class AutomatedEmailsTest extends TestCase
         $rep = $this->rep('digest@example.com');
         $tz = config('app.display_timezone');
 
-        foreach ([now($tz)->subDays(3), now($tz)->subDay(), now($tz)->addHours(2)] as $when) {
+        // A fixed hour of today, not "in two hours": run this late enough in the
+        // evening and the third one lands tomorrow, where the digest cannot see
+        // it, and the test fails for the time of day rather than the code.
+        $whens = [
+            now($tz)->subDays(3)->setTime(9, 0),
+            now($tz)->subDay()->setTime(9, 0),
+            now($tz)->startOfDay()->setTime(9, 0),
+        ];
+
+        foreach ($whens as $when) {
             Lead::create([
                 'customer_id' => $this->customer()->id,
                 'stage' => 'follow_up',
