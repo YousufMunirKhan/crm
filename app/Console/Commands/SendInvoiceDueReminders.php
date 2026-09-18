@@ -8,6 +8,7 @@ use App\Modules\Invoice\Services\InvoiceService;
 use App\Services\AutomatedEmailSender;
 use Illuminate\Console\Command;
 use Illuminate\Mail\Mailables\Attachment;
+use Illuminate\Support\Facades\URL;
 
 /**
  * A word before an invoice falls due, rather than only after.
@@ -33,6 +34,9 @@ class SendInvoiceDueReminders extends Command
             ->whereIn('status', ['sent', 'partially_paid'])
             ->whereDate('due_date', $on)
             ->whereColumn('amount_paid', '<', 'total')
+            // Told by the customer that it is settled, so it is somebody's job
+            // to check rather than the schedule's job to keep asking.
+            ->whereNull('payment_claimed_at')
             ->with('customer')
             ->get();
 
@@ -76,6 +80,7 @@ class SendInvoiceDueReminders extends Command
                     'invoiceNumber' => $invoice->invoice_number,
                     'dueDate' => $invoice->due_date->format('l j F Y'),
                     'amountDue' => $this->money($invoice),
+                    'paidUrl' => URL::signedRoute('invoices.payment-claimed', ['invoice' => $invoice->id]),
                     'daysUntilDue' => $days,
                 ],
                 mailFiles: $this->pdf($invoice, $invoices),

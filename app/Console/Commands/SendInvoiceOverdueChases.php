@@ -10,6 +10,7 @@ use App\Services\AutomatedEmailSender;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Mail\Mailables\Attachment;
+use Illuminate\Support\Facades\URL;
 
 /**
  * Chases an overdue invoice, then keeps chasing weekly.
@@ -37,6 +38,9 @@ class SendInvoiceOverdueChases extends Command
             ->whereNotNull('due_date')
             ->whereDate('due_date', '<', $today->toDateString())
             ->whereColumn('amount_paid', '<', 'total')
+            // Chasing somebody who has already said they paid is how a reminder
+            // becomes a complaint.
+            ->whereNull('payment_claimed_at')
             ->with('customer')
             ->get();
 
@@ -88,6 +92,7 @@ class SendInvoiceOverdueChases extends Command
                     'invoiceNumber' => $invoice->invoice_number,
                     'dueDate' => $invoice->due_date->format('l j F Y'),
                     'amountDue' => $this->money($invoice),
+                    'paidUrl' => URL::signedRoute('invoices.payment-claimed', ['invoice' => $invoice->id]),
                     'daysOverdue' => $daysOverdue,
                 ],
                 mailFiles: $this->pdf($invoice, $invoices),

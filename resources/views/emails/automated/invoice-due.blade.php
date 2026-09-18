@@ -43,6 +43,22 @@
         If payment is already on its way, please pay this no mind. If anything on the invoice needs
         explaining, reply to this email and we will talk it through.
     </p>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:22px 0 0;">
+        <tr>
+            <td style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px;">
+                <div style="font-size:14px; color:#334155; margin-bottom:12px;">
+                    Already paid it? Tell us here and we will stop these reminders straight away.
+                </div>
+                <a href="{{ $paidUrl }}"
+                   style="display:inline-block; background-color:#0f172a; color:#ffffff; text-decoration:none;
+                          font-size:14px; font-weight:600; padding:11px 20px; border-radius:8px;">
+                    I have already paid this
+                </a>
+            </td>
+        </tr>
+    </table>
+
 @endsection
 
 @section('footnote', 'You are receiving this because you have an invoice with us.')

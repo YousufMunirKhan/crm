@@ -105,6 +105,13 @@ Schedule::command('emails:daily-lead-summary')
     ->timezone(config('app.display_timezone'))
     ->withoutOverlapping();
 
+// The week just gone, on the morning the daily one does not run. Sunday is when
+// there is time to read a table rather than glance at a number.
+Schedule::command('emails:weekly-team-summary')
+    ->weeklyOn(0, '10:00')
+    ->timezone(config('app.display_timezone'))
+    ->withoutOverlapping();
+
 // After the due-soon run, and after invoices:mark-overdue at 01:00 has moved
 // yesterday's into the overdue status.
 Schedule::command('emails:invoice-overdue')

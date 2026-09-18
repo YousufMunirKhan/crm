@@ -327,6 +327,100 @@ class DailyLeadScoreboard
     }
 
     /**
+     * The working week that has just finished, Monday to Saturday.
+     *
+     * Sunday is not worked, so a week measured Sunday to Saturday would carry a
+     * guaranteed empty day and make every total look worse than it was.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    public function lastWorkingWeek(string $onDate): array
+    {
+        $day = Carbon::parse($onDate, $this->timezone());
+        $monday = $day->copy()->startOfWeek(Carbon::MONDAY);
+
+        // Run on a Sunday the week that just ended is the one before this one.
+        if ($day->isSunday()) {
+            $monday = $monday->subWeek();
+        }
+
+        return [$monday->copy()->startOfDay(), $monday->copy()->addDays(5)->endOfDay()];
+    }
+
+    /**
+     * How everybody did over a week: leads against what was asked of them, and
+     * sales both for the week and for the month they sit in.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function weekTable(string $onDate): array
+    {
+        [$from, $to] = $this->lastWorkingWeek($onDate);
+        $this->forMonthOf($to->toDateString());
+
+        $days = [];
+        for ($d = $from->copy(); $d->lte($to); $d->addDay()) {
+            $days[] = $d->toDateString();
+        }
+
+        return $this->people()
+            ->map(function (User $u) use ($days, $from, $to) {
+                $leads = 0;
+                foreach ($days as $date) {
+                    $leads += $this->countFor($u->id, $date);
+                }
+
+                $leadTarget = $this->targetFor($u->id) * count($days);
+                $month = $this->salesProgressFor($u->id, $to->toDateString());
+
+                return [
+                    'name' => $u->name,
+                    'role' => $u->role?->name,
+                    'leads' => $leads,
+                    'lead_target' => $leadTarget,
+                    'lead_short' => max(0, $leadTarget - $leads),
+                    'sales_week' => $this->reporting->countWonLeadItemsForAgent($u->id, $from, $to),
+                    'sales_month' => $month['achieved'] ?? 0,
+                    'sales_target' => $month['target'] ?? 0,
+                    'sales_short' => $month['short'] ?? 0,
+                    'last_sale' => $this->lastSaleFor($u->id),
+                ];
+            })
+            ->sortBy([['lead_short', 'desc'], ['name', 'asc']])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The team's totals per day across a week, for the chart.
+     *
+     * @return array<int, array{date: string, label: string, count: int, target: int, is_today: bool}>
+     */
+    public function weekChart(string $onDate): array
+    {
+        [$from, $to] = $this->lastWorkingWeek($onDate);
+        $this->forMonthOf($to->toDateString());
+
+        $people = $this->people()->pluck('id')->all();
+        $target = array_sum(array_map(fn (int $id) => $this->targetFor($id), $people));
+        $rows = [];
+
+        for ($d = $from->copy(); $d->lte($to); $d->addDay()) {
+            $counts = $this->countsOn($d->toDateString());
+
+            $rows[] = [
+                'date' => $d->toDateString(),
+                'label' => $d->format('D'),
+                'count' => array_sum(array_intersect_key($counts, array_flip($people))),
+                'target' => $target,
+                'is_today' => false,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
      * Everybody's figures for one day, worst shortfall first.
      *
      * @return array<int, array{name: string, role: string|null, count: int, target: int, short: int}>

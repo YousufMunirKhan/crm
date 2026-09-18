@@ -26,6 +26,7 @@ class PreviewAutomatedEmails extends Command
         'emails:invoice-due',
         'emails:invoice-overdue',
         'emails:daily-lead-summary',
+        'emails:weekly-team-summary',
     ];
 
     public function handle(): int

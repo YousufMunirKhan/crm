@@ -24,6 +24,8 @@ class Invoice extends Model
         'vat_amount',
         'total',
         'amount_paid',
+        'payment_claimed_at',
+        'payment_claim_note',
         'currency',
         'status',
     ];
@@ -36,6 +38,7 @@ class Invoice extends Model
         'vat_amount' => 'decimal:2',
         'total' => 'decimal:2',
         'amount_paid' => 'decimal:2',
+        'payment_claimed_at' => 'datetime',
     ];
 
     public function customer(): BelongsTo

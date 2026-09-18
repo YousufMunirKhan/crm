@@ -43,6 +43,14 @@ Route::get('/scheduler/run/{token}', \App\Http\Controllers\SchedulerRunControlle
     ->middleware('throttle:10,1')
     ->name('scheduler.run');
 
+// "I have already paid this", from the chase email. Signed rather than
+// authenticated: there is no login to hand a customer, and the signature is
+// what proves the link came from us. Declared before the catch-all so the SPA
+// shell does not swallow it.
+Route::get('/invoices/{invoice}/payment-claimed', \App\Http\Controllers\InvoicePaymentClaimController::class)
+    ->middleware(['signed', 'throttle:20,1'])
+    ->name('invoices.payment-claimed');
+
 // SPA catch-all. Must exclude /admin (Filament panel) and /livewire
 // (Livewire's update endpoint), or they render the Vue shell instead.
 Route::get('/{any}', function () {

@@ -165,7 +165,16 @@
                                 <span>Created by: {{ apt.user?.name || 'Unknown' }}</span>
                                 <span v-if="apt.assignee?.name"> • Assigned to: {{ apt.assignee.name }}</span>
                             </div>
-                            <div v-if="apt.description" class="text-sm text-slate-500 mt-1 line-clamp-2">
+                            <!--
+                                Shown in full. It was clamped to two lines, so the
+                                note somebody wrote about the visit - the reason the
+                                card is worth reading - ended in an ellipsis and had
+                                to be opened to be read.
+                            -->
+                            <div
+                                v-if="apt.description"
+                                class="mt-2 rounded-control bg-white border border-slate-200 p-2.5 text-sm text-slate-700 whitespace-pre-wrap break-words"
+                            >
                                 {{ apt.description }}
                             </div>
                             <BaseBadge :tone="resultOf(apt).tone" class="mt-2">
