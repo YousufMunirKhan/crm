@@ -55,11 +55,31 @@ class AutomatedEmailsTest extends TestCase
         ], $attributes));
     }
 
+    /**
+     * An appointment at a fixed hour of some day, rather than "in N hours".
+     *
+     * Run late enough in the evening and "in two hours" is tomorrow, so a test
+     * about today's list finds nothing and fails for the clock rather than the
+     * code.
+     */
+    private function appointmentOn(string $date, string $time, ?User $rep = null): LeadActivity
+    {
+        return $this->appointmentAt(
+            \Carbon\Carbon::parse($date.' '.$time, config('app.display_timezone')),
+            $rep,
+            null
+        );
+    }
+
     private function appointmentIn(int $hours, ?User $rep = null, ?Customer $customer = null): LeadActivity
+    {
+        return $this->appointmentAt(now(config('app.display_timezone'))->addHours($hours), $rep, $customer);
+    }
+
+    private function appointmentAt(\Carbon\Carbon $at, ?User $rep = null, ?Customer $customer = null): LeadActivity
     {
         $rep ??= $this->rep();
         $customer ??= $this->customer();
-        $at = now(config('app.display_timezone'))->addHours($hours);
 
         $lead = Lead::create([
             'customer_id' => $customer->id,
@@ -153,8 +173,9 @@ class AutomatedEmailsTest extends TestCase
     public function test_a_rep_gets_todays_appointments_once(): void
     {
         $rep = $this->rep('sales@example.com');
-        $this->appointmentIn(2, $rep);
-        $this->appointmentIn(4, $rep);
+        $today = now(config('app.display_timezone'))->toDateString();
+        $this->appointmentOn($today, '09:00', $rep);
+        $this->appointmentOn($today, '14:00', $rep);
 
         $this->artisan('emails:rep-day')->assertSuccessful();
         $this->artisan('emails:rep-day')->assertSuccessful();
