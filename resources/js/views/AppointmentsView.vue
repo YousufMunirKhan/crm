@@ -46,7 +46,7 @@
             <div class="rounded-card border border-warning-200 bg-warning-50/60 p-3 sm:p-4">
                 <div class="flex flex-wrap items-baseline justify-between gap-2">
                     <h2 class="text-sm font-semibold text-warning-900">
-                        {{ awaiting.length }} {{ awaiting.length === 1 ? 'appointment needs' : 'appointments need' }} an outcome
+                        {{ awaitingTotal }} {{ awaitingTotal === 1 ? 'appointment needs' : 'appointments need' }} an outcome
                     </h2>
                     <p class="text-xs text-warning-800">The date has passed and nobody said what happened.</p>
                 </div>
@@ -63,7 +63,7 @@
                     :loading="closingAll"
                     @click="closeAllAsHappened"
                 >
-                    Mark all {{ awaiting.length }} as "It happened"
+                    Mark all {{ awaitingTotal }} as "It happened"
                 </BaseButton>
 
                 <ul class="mt-3 space-y-2">
@@ -185,12 +185,25 @@
                     </div>
                 </router-link>
             </div>
+
+            <div v-if="meta.last_page > 1" class="flex items-center justify-between gap-3 pt-2">
+                <BaseButton variant="outline" :disabled="meta.current_page <= 1" @click="loadAppointments(meta.current_page - 1)">
+                    Previous
+                </BaseButton>
+                <span class="text-sm text-slate-600">
+                    Page {{ meta.current_page }} of {{ meta.last_page }}
+                    <span class="text-slate-400">&middot; {{ meta.total }} total</span>
+                </span>
+                <BaseButton variant="outline" :disabled="meta.current_page >= meta.last_page" @click="loadAppointments(meta.current_page + 1)">
+                    Next
+                </BaseButton>
+            </div>
         </div>
     </ListingPageShell>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import axios from 'axios';
 import { CalendarDaysIcon, ChevronRightIcon } from '@heroicons/vue/24/outline';
 import ListingPageShell from '@/components/ListingPageShell.vue';
@@ -224,7 +237,8 @@ const closingAll = ref(false);
  * wants on arrival is the last few visits and what came of them.
  */
 const viewMode = ref('recent');
-const RECENT_LIMIT = 50;
+const awaitingTotal = ref(0);
+const meta = reactive({ current_page: 1, last_page: 1, per_page: 15, total: 0 });
 
 const auth = useAuthStore();
 
@@ -252,11 +266,11 @@ const todayStr = computed(() => {
 });
 
 const appointmentsBadge = computed(() => {
-    if (loading.value || !appointments.value.length) return null;
+    if (loading.value || !meta.total) return null;
 
     return viewMode.value === 'recent'
-        ? `${appointments.value.length} most recent`
-        : `${appointments.value.length} this day`;
+        ? `${meta.total} in total`
+        : `${meta.total} this day`;
 });
 
 function resetDate() {
@@ -310,11 +324,15 @@ function daysAgo(ymd) {
 async function loadAwaiting() {
     try {
         const res = await axios.get('/api/appointments', {
-            params: { needs_outcome: 1, ...(scopeIsEveryone.value ? {} : { mine: 1 }) },
+            // The banner is a to-do list, so it wants all of them rather than
+            // the first page of them.
+            params: { needs_outcome: 1, per_page: 100, ...(scopeIsEveryone.value ? {} : { mine: 1 }) },
         });
-        awaiting.value = res.data ?? [];
+        awaiting.value = res.data?.data ?? [];
+        awaitingTotal.value = res.data?.meta?.total ?? awaiting.value.length;
     } catch {
         awaiting.value = [];
+        awaitingTotal.value = 0;
     }
 }
 
@@ -354,15 +372,16 @@ async function closeAllAsHappened() {
     }
 }
 
-async function loadAppointments() {
+async function loadAppointments(page = 1) {
     loading.value = true;
     try {
         const scoped = scopeIsEveryone.value ? {} : { mine: 1 };
         const params = viewMode.value === 'recent'
-            ? { limit: RECENT_LIMIT, ...scoped }
-            : { date: selectedDate.value || todayStr.value, ...scoped };
+            ? { page, per_page: meta.per_page, ...scoped }
+            : { page, per_page: meta.per_page, date: selectedDate.value || todayStr.value, ...scoped };
         const res = await axios.get('/api/appointments', { params });
-        appointments.value = res.data ?? [];
+        appointments.value = res.data?.data ?? [];
+        Object.assign(meta, res.data?.meta ?? {});
     } catch (e) {
         console.error(e);
         appointments.value = [];

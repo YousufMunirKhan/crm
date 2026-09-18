@@ -66,7 +66,7 @@ class AppointmentOutcomeTest extends TestCase
 
         $response = $this->getJson('/api/appointments?needs_outcome=1')->assertOk();
 
-        $ids = collect($response->json())->pluck('id')->all();
+        $ids = collect($response->json('data'))->pluck('id')->all();
 
         $this->assertSame([$stale->id], $ids);
     }
@@ -77,7 +77,7 @@ class AppointmentOutcomeTest extends TestCase
 
         $this->getJson('/api/appointments?needs_outcome=1')
             ->assertOk()
-            ->assertJsonCount(0);
+            ->assertJsonCount(0, 'data');
     }
 
     public function test_one_tap_records_what_happened(): void
@@ -89,7 +89,7 @@ class AppointmentOutcomeTest extends TestCase
 
         $this->assertSame('no_show', $appointment->fresh()->appointment_status);
 
-        $this->getJson('/api/appointments?needs_outcome=1')->assertOk()->assertJsonCount(0);
+        $this->getJson('/api/appointments?needs_outcome=1')->assertOk()->assertJsonCount(0, 'data');
     }
 
     public function test_the_morning_notification_counts_what_the_screen_shows(): void
@@ -129,12 +129,12 @@ class AppointmentOutcomeTest extends TestCase
         $this->actingAs($manager, 'sanctum')
             ->getJson('/api/appointments?needs_outcome=1')
             ->assertOk()
-            ->assertJsonCount(1);
+            ->assertJsonCount(1, 'data');
 
         $this->actingAs($manager, 'sanctum')
             ->getJson('/api/appointments?needs_outcome=1&mine=1')
             ->assertOk()
-            ->assertJsonCount(0);
+            ->assertJsonCount(0, 'data');
     }
 
     public function test_a_salesperson_still_only_sees_their_own(): void
@@ -148,7 +148,7 @@ class AppointmentOutcomeTest extends TestCase
         $theirs->forceFill(['assigned_user_id' => $colleague->id, 'user_id' => $colleague->id])->saveQuietly();
         $theirs->lead->update(['assigned_to' => $colleague->id]);
 
-        $this->getJson('/api/appointments?needs_outcome=1')->assertOk()->assertJsonCount(0);
+        $this->getJson('/api/appointments?needs_outcome=1')->assertOk()->assertJsonCount(0, 'data');
     }
 
     public function test_closing_a_lead_lost_from_an_appointment_still_needs_a_reason(): void

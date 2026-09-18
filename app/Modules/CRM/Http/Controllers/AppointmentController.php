@@ -37,13 +37,6 @@ class AppointmentController extends Controller
             return ($this->appointmentDateFrom($a) ?? '') . ' ' . ($this->appointmentTimeFrom($a) ?? '00:00');
         })->values();
 
-        // With no date this is the running history rather than one day of it, so
-        // it is capped: the page wants the ones just done, not every appointment
-        // ever booked.
-        if (! $request->boolean('needs_outcome') && ! $request->get('date')) {
-            $limit = max(1, min(200, (int) $request->get('limit', 50)));
-            $activities = $activities->take($limit)->values();
-        }
 
         $list = $activities->map(function ($a) {
             return [
@@ -66,7 +59,21 @@ class AppointmentController extends Controller
             ];
         });
 
-        return response()->json($list);
+        // Paged rather than capped. A cap silently hid the rest; a page says how
+        // many there are and lets somebody reach them.
+        $perPage = max(1, min(100, (int) $request->get('per_page', 15)));
+        $page = max(1, (int) $request->get('page', 1));
+        $total = $list->count();
+
+        return response()->json([
+            'data' => $list->forPage($page, $perPage)->values(),
+            'meta' => [
+                'current_page' => $page,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+                'per_page' => $perPage,
+                'total' => $total,
+            ],
+        ]);
     }
 
     /**

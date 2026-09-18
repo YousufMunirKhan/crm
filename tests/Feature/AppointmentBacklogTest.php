@@ -69,7 +69,7 @@ class AppointmentBacklogTest extends TestCase
 
         $this->assertSame('completed', $first->refresh()->appointment_status);
         $this->assertSame('completed', $second->refresh()->appointment_status);
-        $this->getJson('/api/appointments?needs_outcome=1')->assertOk()->assertJsonCount(0);
+        $this->getJson('/api/appointments?needs_outcome=1')->assertOk()->assertJsonCount(0, 'data');
     }
 
     public function test_it_leaves_alone_what_is_not_overdue_or_not_pending(): void
@@ -151,18 +151,44 @@ class AppointmentBacklogTest extends TestCase
         $newest = $this->appointment(now()->subDays(1)->toDateString(), 'completed');
         $middle = $this->appointment(now()->subDays(10)->toDateString(), 'completed');
 
-        $ids = collect($this->getJson('/api/appointments')->assertOk()->json())->pluck('id')->all();
+        $ids = collect($this->getJson('/api/appointments')->assertOk()->json('data'))->pluck('id')->all();
 
         $this->assertSame([$newest->id, $middle->id, $old->id], $ids);
     }
 
-    public function test_the_recent_list_is_capped(): void
+    public function test_the_list_comes_a_page_at_a_time(): void
     {
         foreach (range(1, 4) as $days) {
             $this->appointment(now()->subDays($days)->toDateString(), 'completed');
         }
 
-        $this->getJson('/api/appointments?limit=2')->assertOk()->assertJsonCount(2);
+        // assertJsonCount on the root would count the two keys of the envelope
+        // and pass whatever the page held, so the page itself is asserted.
+        $response = $this->getJson('/api/appointments?per_page=2')->assertOk();
+
+        $response->assertJsonCount(2, 'data');
+        $this->assertSame(4, $response->json('meta.total'));
+        $this->assertSame(2, $response->json('meta.last_page'));
+
+        $second = $this->getJson('/api/appointments?per_page=2&page=2')->assertOk();
+        $second->assertJsonCount(2, 'data');
+        $this->assertNotSame(
+            $response->json('data.0.id'),
+            $second->json('data.0.id'),
+        );
+    }
+
+    public function test_fifteen_a_page_unless_asked_otherwise(): void
+    {
+        foreach (range(1, 16) as $days) {
+            $this->appointment(now()->subDays($days)->toDateString(), 'completed');
+        }
+
+        $this->getJson('/api/appointments')
+            ->assertOk()
+            ->assertJsonCount(15, 'data')
+            ->assertJsonPath('meta.per_page', 15)
+            ->assertJsonPath('meta.total', 16);
     }
 
     public function test_the_list_still_carries_the_lead_stage_so_a_result_can_be_shown(): void
@@ -172,7 +198,7 @@ class AppointmentBacklogTest extends TestCase
 
         $this->getJson('/api/appointments')
             ->assertOk()
-            ->assertJsonPath('0.appointment_status', 'completed')
-            ->assertJsonPath('0.lead.stage', 'won');
+            ->assertJsonPath('data.0.appointment_status', 'completed')
+            ->assertJsonPath('data.0.lead.stage', 'won');
     }
 }

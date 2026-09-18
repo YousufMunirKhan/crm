@@ -78,7 +78,7 @@ class AppointmentCrudTest extends TestCase
 
         $this->getJson('/api/appointments?date='.$date)
             ->assertOk()
-            ->assertJsonCount(1);
+            ->assertJsonCount(1, 'data');
     }
 
     public function test_an_agent_cannot_book_on_someone_elses_lead(): void
