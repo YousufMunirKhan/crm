@@ -17,7 +17,10 @@ use Illuminate\Mail\Mailables\Attachment;
  */
 class SendInvoiceDueReminders extends Command
 {
-    protected $signature = 'emails:invoice-due {--days=3 : How many days before the due date} {--dry-run}';
+    protected $signature = 'emails:invoice-due
+        {--days=3 : How many days before the due date}
+        {--dry-run}
+        {--preview= : Send one example to this address, built from a real invoice}';
 
     protected $description = 'Email customers whose invoice falls due shortly';
 
@@ -33,13 +36,28 @@ class SendInvoiceDueReminders extends Command
             ->with('customer')
             ->get();
 
+        // A real invoice, so the preview carries a real PDF and real figures.
+        if ($preview = $this->option('preview')) {
+            $latest = Invoice::with('customer')->whereHas('customer')->latest('id')->first();
+
+            if (! $latest) {
+                $this->warn('No invoice to build an example from.');
+
+                return self::SUCCESS;
+            }
+
+            $due = collect([$latest]);
+            $overdue = $due;
+        }
+
         $sent = 0;
 
         foreach ($due as $invoice) {
             $customer = $invoice->customer;
             $email = trim((string) ($customer->email ?? ''));
+            $previewTo = $this->option('preview');
 
-            if ($email === '') {
+            if ($email === '' && ! $previewTo) {
                 continue;
             }
 
@@ -62,6 +80,14 @@ class SendInvoiceDueReminders extends Command
                 ],
                 mailFiles: $this->pdf($invoice, $invoices),
             );
+
+            if ($previewTo) {
+                $mail->mailSubject = '[Preview] '.$mail->mailSubject;
+                $sender->send('preview:invoice-due:'.now()->format('YmdHis'), $previewTo, $mail);
+                $this->info("Sent a due-soon example to {$previewTo}.");
+
+                return self::SUCCESS;
+            }
 
             if ($sender->send('invoice-due:'.$invoice->id, $email, $mail, ['customer_id' => $customer->id])) {
                 $sent++;

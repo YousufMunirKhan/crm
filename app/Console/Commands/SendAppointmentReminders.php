@@ -18,7 +18,9 @@ use Illuminate\Console\Command;
  */
 class SendAppointmentReminders extends Command
 {
-    protected $signature = 'emails:appointment-reminders {--dry-run : List what would be sent without sending}';
+    protected $signature = 'emails:appointment-reminders
+        {--dry-run : List what would be sent without sending}
+        {--preview= : Send one example to this address, built from a real appointment}';
 
     protected $description = 'Email customers a reminder about tomorrow\'s appointment';
 
@@ -41,6 +43,10 @@ class SendAppointmentReminders extends Command
 
                 return $at !== null && $at->gte($from) && $at->lt($until);
             });
+
+        if ($preview = $this->option('preview')) {
+            return $this->preview($sender, $preview, $tz);
+        }
 
         $sent = 0;
 
@@ -84,6 +90,48 @@ class SendAppointmentReminders extends Command
         $this->info($this->option('dry-run')
             ? $appointments->count().' appointment(s) in the hour a day from now.'
             : "Sent {$sent} appointment reminder(s).");
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * One example of this email, built from a real appointment so the preview
+     * shows the template as it will actually arrive rather than as lorem.
+     */
+    private function preview(AutomatedEmailSender $sender, string $to, string $tz): int
+    {
+        $appointment = LeadActivity::query()
+            ->where('type', 'appointment')
+            ->whereHas('lead.customer')
+            ->with(['lead.customer', 'lead.assignee', 'assignee', 'user'])
+            ->latest('id')
+            ->first();
+
+        if (! $appointment) {
+            $this->warn('No appointment to build an example from.');
+
+            return self::SUCCESS;
+        }
+
+        $customer = $appointment->lead->customer;
+        $rep = $appointment->assignee ?? $appointment->lead?->assignee ?? $appointment->user;
+        $at = now($tz)->addDay();
+
+        $mail = new AutomatedEmail(
+            mailSubject: '[Preview] Reminder: your appointment on '.$at->format('D j M').' at '.$at->format('H:i'),
+            mailView: 'emails.automated.appointment-reminder',
+            mailData: [
+                'customerName' => $customer->name ?: ($customer->business_name ?: 'there'),
+                'when' => $at->format('l j F Y').' at '.$at->format('H:i'),
+                'place' => $this->place($customer),
+                'repName' => $rep?->name,
+                'repPhone' => $rep?->phone ?? null,
+                'about' => $appointment->description,
+            ],
+        );
+
+        $sender->send('preview:appointment-reminder:'.now()->format('YmdHis'), $to, $mail);
+        $this->info("Sent an appointment reminder example to {$to}.");
 
         return self::SUCCESS;
     }

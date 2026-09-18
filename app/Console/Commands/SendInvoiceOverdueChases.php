@@ -20,7 +20,10 @@ use Illuminate\Mail\Mailables\Attachment;
  */
 class SendInvoiceOverdueChases extends Command
 {
-    protected $signature = 'emails:invoice-overdue {--every=7 : Days between chases} {--dry-run}';
+    protected $signature = 'emails:invoice-overdue
+        {--every=7 : Days between chases}
+        {--dry-run}
+        {--preview= : Send one example to this address, built from a real invoice}';
 
     protected $description = 'Email customers whose invoice is past its due date';
 
@@ -37,17 +40,38 @@ class SendInvoiceOverdueChases extends Command
             ->with('customer')
             ->get();
 
+        // A real invoice, so the preview carries a real PDF and real figures.
+        if ($preview = $this->option('preview')) {
+            $latest = Invoice::with('customer')->whereHas('customer')->latest('id')->first();
+
+            if (! $latest) {
+                $this->warn('No invoice to build an example from.');
+
+                return self::SUCCESS;
+            }
+
+            $due = collect([$latest]);
+            $overdue = $due;
+        }
+
         $sent = 0;
 
         foreach ($overdue as $invoice) {
             $customer = $invoice->customer;
             $email = trim((string) ($customer->email ?? ''));
+            $previewTo = $this->option('preview');
 
-            if ($email === '' || ! $this->isDueAChase($invoice, $every)) {
+            if (! $previewTo && ($email === '' || ! $this->isDueAChase($invoice, $every))) {
                 continue;
             }
 
             $daysOverdue = (int) $invoice->due_date->startOfDay()->diffInDays($today->copy()->startOfDay());
+
+            if ($previewTo) {
+                // The newest invoice may not actually be late; the template is
+                // what is being looked at, so give it something to show.
+                $daysOverdue = max(1, $daysOverdue);
+            }
 
             if ($this->option('dry-run')) {
                 $this->line(sprintf('%s  %d days  %s  <%s>', $invoice->invoice_number, $daysOverdue, $this->money($invoice), $email));
@@ -68,6 +92,14 @@ class SendInvoiceOverdueChases extends Command
                 ],
                 mailFiles: $this->pdf($invoice, $invoices),
             );
+
+            if ($previewTo) {
+                $mail->mailSubject = '[Preview] '.$mail->mailSubject;
+                $sender->send('preview:invoice-overdue:'.now()->format('YmdHis'), $previewTo, $mail);
+                $this->info("Sent an overdue chase example to {$previewTo}.");
+
+                return self::SUCCESS;
+            }
 
             $reference = 'invoice-overdue:'.$invoice->id.':'.$today->toDateString();
 

@@ -17,7 +17,9 @@ use Illuminate\Console\Command;
  */
 class SendFollowUpDigests extends Command
 {
-    protected $signature = 'emails:follow-up-digest {--dry-run}';
+    protected $signature = 'emails:follow-up-digest
+        {--dry-run}
+        {--preview= : Send one example to this address, built from real follow-ups}';
 
     protected $description = 'Email each person their due and overdue follow-ups';
 
@@ -34,6 +36,12 @@ class SendFollowUpDigests extends Command
             ->whereNotNull('assigned_to')
             ->with(['customer', 'assignee'])
             ->get();
+
+        // The busiest person's, so the example is not an empty list.
+        if ($preview = $this->option('preview')) {
+            $busiest = $leads->groupBy('assigned_to')->sortByDesc->count()->keys()->first();
+            $leads = $busiest ? $leads->where('assigned_to', $busiest) : $leads;
+        }
 
         $sent = 0;
 
@@ -83,6 +91,14 @@ class SendFollowUpDigests extends Command
                     'dueToday' => $dueToday,
                 ],
             );
+
+            if ($preview = $this->option('preview')) {
+                $mail->mailSubject = '[Preview] '.$mail->mailSubject;
+                $sender->send('preview:follow-up-digest:'.now()->format('YmdHis'), $preview, $mail);
+                $this->info("Sent a follow-up digest example to {$preview}.");
+
+                return self::SUCCESS;
+            }
 
             if ($sender->send('follow-up-digest:'.$user->id.':'.$today, $email, $mail)) {
                 $sent++;
