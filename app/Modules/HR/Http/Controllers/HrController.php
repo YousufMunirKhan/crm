@@ -200,7 +200,10 @@ class HrController extends Controller
         // clock in, and their attendance record stopped. Where a person has a
         // fixed work address set, that stands in.
         $data = $request->validate([
-            'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            // Nor is the photo. A camera that will not open - or opens onto a
+            // black frame - used to mean nobody could clock in, so the attendance
+            // simply went unrecorded. A day without a photo is still a day.
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'location_name' => ['nullable', 'string', 'max:500'],
@@ -232,10 +235,14 @@ class HrController extends Controller
 
         $date = Attendance::workingDate();
         $directory = "attendance-proof/{$userId}/{$date}";
-        $photoPath = $request->file('photo')->store($directory, 'public');
+        $photoPath = null;
 
-        if (! $photoPath) {
-            throw new \Exception('Could not save attendance photo. Please try again.');
+        if ($request->hasFile('photo')) {
+            $photoPath = $request->file('photo')->store($directory, 'public');
+
+            if (! $photoPath) {
+                throw new \Exception('Could not save attendance photo. Please try again.');
+            }
         }
 
         return [

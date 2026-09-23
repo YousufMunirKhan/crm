@@ -71,7 +71,7 @@
             </div>
 
             <p v-if="!status.checked_in" class="text-xs text-slate-500">
-                Camera and location permission are required for attendance proof. While you are
+                Camera and location permission are used for attendance proof. While you are
                 clocked in, your location is recorded every 15 minutes if the app is open. It
                 stops when you clock out.
             </p>
@@ -104,9 +104,9 @@
                 the old off-screen input never showed anything.
             -->
             <div v-if="photoPickerOpen" class="rounded-lg border border-warning-200 bg-warning-50 p-3">
-                <div class="text-sm font-medium text-warning-800">No camera available on this device</div>
+                <div class="text-sm font-medium text-warning-800">The camera could not be opened</div>
                 <p class="mt-1 text-xs text-warning-800">
-                    Take or choose a photo instead, and attendance will be recorded as normal.
+                    Take or choose a photo instead, or carry on without one - attendance is recorded either way.
                 </p>
                 <div class="mt-3 flex flex-col gap-2 sm:flex-row">
                     <label class="min-h-11 flex-1 cursor-pointer rounded-lg bg-primary-600 px-4 py-3 text-center text-sm font-medium text-white transition-colors hover:bg-primary-700 touch-manipulation">
@@ -119,6 +119,13 @@
                             @change="onPhotoPicked"
                         />
                     </label>
+                    <button
+                        type="button"
+                        @click="continuePickerWithoutPhoto"
+                        class="min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 touch-manipulation"
+                    >
+                        Continue without photo
+                    </button>
                     <button
                         type="button"
                         @click="cancelPhotoPicker"
@@ -252,6 +259,14 @@
                         class="min-h-11 flex-1 rounded-lg bg-success-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-success-700 touch-manipulation"
                     >
                         Take photo
+                    </button>
+                    <!-- For a camera that opened but shows nothing. -->
+                    <button
+                        type="button"
+                        @click="continuePreviewWithoutPhoto"
+                        class="min-h-11 rounded-lg border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 touch-manipulation"
+                    >
+                        Continue without photo
                     </button>
                     <button
                         type="button"
@@ -408,21 +423,6 @@ const getLocation = () => new Promise((resolve, reject) => {
 });
 
 /**
- * Errors that mean "this browser cannot open a camera for you", as opposed to
- * "you said no". A desktop with no webcam, a camera already held by another
- * app, or a machine whose only camera does not report a facing direction all
- * land here - and for all of them the file input is a working way through.
- */
-const NO_USABLE_CAMERA = [
-    'NotFoundError',
-    'DevicesNotFoundError',
-    'OverconstrainedError',
-    'ConstraintNotSatisfiedError',
-    'NotReadableError',
-    'TrackStartError',
-];
-
-/**
  * Prefer the selfie camera, settle for any.
  *
  * facingMode: 'user' is the right thing to ask for on a phone. On a desktop it
@@ -454,19 +454,10 @@ const capturePhoto = async () => {
     try {
         stream = await openCameraStream();
     } catch (error) {
-        if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
-            throw new Error('Please allow camera permission to record attendance.');
-        }
-
-        // There is no camera this browser can open. The file input still gets a
-        // photo - the camera app on a phone, an existing file on a desktop - and
-        // that beats refusing to let somebody clock in at all, which is what
-        // "Requested device not found" amounted to.
-        if (NO_USABLE_CAMERA.includes(error?.name)) {
-            return requestPhotoFromUser();
-        }
-
-        throw error;
+        // Whatever stopped the camera - no device, one held by another app,
+        // permission refused - the panel offers a file or no photo at all.
+        // Refusing to clock somebody in is worse than either.
+        return requestPhotoFromUser();
     }
 
     try {
@@ -538,6 +529,13 @@ const takePhotoNow = () => {
     }, 'image/jpeg', 0.82);
 };
 
+const continuePreviewWithoutPhoto = () => {
+    const resolve = previewResolve;
+    previewResolve = null;
+    previewReject = null;
+    resolve?.(null);
+};
+
 const cancelCameraPreview = () => {
     const reject = previewReject;
     previewResolve = null;
@@ -594,6 +592,12 @@ const onPhotoPicked = (event) => {
     resolve?.(file);
 };
 
+const continuePickerWithoutPhoto = () => {
+    const resolve = photoPickerResolve;
+    settlePhotoPicker();
+    resolve?.(null);
+};
+
 const cancelPhotoPicker = () => {
     const reject = photoPickerReject;
     settlePhotoPicker();
@@ -615,7 +619,9 @@ const collectProof = async () => {
     ]);
 
     const formData = new FormData();
-    formData.append('photo', photo, `attendance-${Date.now()}.jpg`);
+    if (photo) {
+        formData.append('photo', photo, `attendance-${Date.now()}.jpg`);
+    }
 
     if (position) {
         formData.append('latitude', String(position.coords.latitude));

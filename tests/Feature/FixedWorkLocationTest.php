@@ -123,6 +123,31 @@ class FixedWorkLocationTest extends TestCase
         ]);
     }
 
+    public function test_attendance_is_recorded_when_the_camera_gives_no_photo(): void
+    {
+        $user = $this->makeUser();
+        Sanctum::actingAs($user);
+
+        $this->post('/api/hr/attendance/check-in', [
+            'latitude' => 51.5074,
+            'longitude' => -0.1278,
+            'location_name' => 'London',
+        ])->assertCreated();
+
+        $this->post('/api/hr/attendance/check-out', [
+            'latitude' => 51.5074,
+            'longitude' => -0.1278,
+            'location_name' => 'London',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('attendance', [
+            'user_id' => $user->id,
+            'check_in_photo_path' => null,
+            'check_out_photo_path' => null,
+        ]);
+        $this->assertDatabaseMissing('attendance', ['user_id' => $user->id, 'check_out_at' => null]);
+    }
+
     private function makeUser(array $attributes = []): User
     {
         $role = Role::query()->firstOrCreate(['name' => 'Sales'], ['description' => 'Sales']);
