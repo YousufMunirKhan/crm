@@ -81,7 +81,7 @@
                 </div>
 
                 <template v-else>
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <StatCard
                             label="Total hours"
                             :value="`${formatHours(monthlyTotals.total_hours)}h`"
@@ -103,13 +103,6 @@
                             :value="monthlyTotals.open_shifts"
                             caption="Checked in but not checked out yet."
                             tone="warning"
-                        />
-                        <StatCard
-                            class="sm:col-span-2 lg:col-span-1"
-                            label="Missing proof"
-                            :value="monthlyMissingProof"
-                            caption="Check-in or check-out records missing photo or GPS proof."
-                            tone="danger"
                         />
                     </div>
 
@@ -148,7 +141,7 @@
 
                         <div class="hidden table-wrap lg:block">
                             <table class="table">
-                                <caption class="sr-only">Monthly attendance summary per employee: total hours, present days, completed and open shifts, average hours per day and missing proof</caption>
+                                <caption class="sr-only">Monthly attendance summary per employee: total hours, present days, completed and open shifts and average hours per day</caption>
                                 <thead class="table-thead">
                                     <tr>
                                         <th scope="col" class="table-th">Employee</th>
@@ -167,9 +160,6 @@
                                         <th scope="col" class="table-th-num">
                                             <MetricLabel label="Avg / Day" tooltip="Total completed hours divided by checked-in days." align="right" />
                                         </th>
-                                        <th scope="col" class="table-th-num">
-                                            <MetricLabel label="Missing Proof" tooltip="Missing photo or GPS proof for check-in/check-out." align="right" />
-                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -180,9 +170,6 @@
                                         <td class="table-td-num">{{ employee.completed_shifts }}</td>
                                         <td class="table-td-num">{{ employee.open_shifts }}</td>
                                         <td class="table-td-num">{{ formatHours(employee.average_hours_per_present_day) }}h</td>
-                                        <td class="table-td-num">
-                                            {{ employee.missing_check_in_proof + employee.missing_check_out_proof }}
-                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -337,9 +324,6 @@ const monthlyTotals = computed(() => monthlyReport.value?.totals || {
     missing_check_in_proof: 0,
     missing_check_out_proof: 0,
 });
-const monthlyMissingProof = computed(() => (
-    Number(monthlyTotals.value.missing_check_in_proof || 0) + Number(monthlyTotals.value.missing_check_out_proof || 0)
-));
 
 const baseParams = (perPage = 15, page = 1) => {
     const params = {
