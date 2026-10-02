@@ -336,13 +336,10 @@ class DailyLeadScoreboard
      */
     public function lastWorkingWeek(string $onDate): array
     {
-        $day = Carbon::parse($onDate, $this->timezone());
-        $monday = $day->copy()->startOfWeek(Carbon::MONDAY);
-
-        // Run on a Sunday the week that just ended is the one before this one.
-        if ($day->isSunday()) {
-            $monday = $monday->subWeek();
-        }
+        // Counting weeks from Monday puts a Sunday at the end of its own week,
+        // so the Monday before it is already the start of the week that just
+        // ended. Stepping back again reported a week that was seven days stale.
+        $monday = Carbon::parse($onDate, $this->timezone())->startOfWeek(Carbon::MONDAY);
 
         return [$monday->copy()->startOfDay(), $monday->copy()->addDays(5)->endOfDay()];
     }

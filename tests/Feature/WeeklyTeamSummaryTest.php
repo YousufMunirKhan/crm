@@ -26,6 +26,11 @@ class WeeklyTeamSummaryTest extends TestCase
     {
         parent::setUp();
         Mail::fake();
+
+        // A Wednesday in the middle of a month. Targets are set per month and
+        // the week is read off the calendar, so left on the real clock these
+        // passed or failed depending on the day somebody ran them.
+        $this->travelTo(\Carbon\Carbon::parse('2026-09-16 12:00', config('app.display_timezone')));
     }
 
     private function user(string $roleName, string $email, ?int $dailyLeads = 5): User
@@ -62,7 +67,7 @@ class WeeklyTeamSummaryTest extends TestCase
         ])->saveQuietly();
     }
 
-    /** The Sunday that follows the week we are filling in. */
+    /** The Sunday that closes the week we are filling in. */
     private function sunday(): \Carbon\Carbon
     {
         return now(config('app.display_timezone'))->startOfWeek(\Carbon\Carbon::MONDAY)->addDays(6);
@@ -74,7 +79,7 @@ class WeeklyTeamSummaryTest extends TestCase
         $this->user('Admin', 'boss@example.com', dailyLeads: null);
 
         $sunday = $this->sunday();
-        $monday = $sunday->copy()->subWeek()->startOfWeek(\Carbon\Carbon::MONDAY);
+        $monday = $sunday->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
 
         $this->leadOn($rep, $monday->toDateString());
         $this->leadOn($rep, $monday->copy()->addDays(5)->toDateString());   // Saturday
@@ -86,6 +91,31 @@ class WeeklyTeamSummaryTest extends TestCase
             return $m->hasTo('boss@example.com')
                 && $m->mailData['teamLeads'] === 2
                 && count($m->mailData['days']) === 6;
+        });
+    }
+
+    /**
+     * Run by the scheduler, with no date handed to it. This once went back a
+     * week too far and sent the week before last - which, across a month end,
+     * was a month nobody had a target in, so it sent nothing at all.
+     */
+    public function test_on_sunday_morning_it_reports_the_week_that_ended_yesterday(): void
+    {
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-04 10:00', config('app.display_timezone')));
+
+        $rep = $this->user('Sales', 'rep@example.com');
+        $this->user('Admin', 'boss@example.com', dailyLeads: null);
+
+        $this->leadOn($rep, '2026-09-26');   // the Saturday before, not counted
+        $this->leadOn($rep, '2026-09-28');
+        $this->leadOn($rep, '2026-10-03');
+
+        $this->artisan('emails:weekly-team-summary')->assertSuccessful();
+
+        Mail::assertSent(AutomatedEmail::class, function (AutomatedEmail $m) {
+            return $m->hasTo('boss@example.com')
+                && $m->mailData['weekLabel'] === '28 September to 3 October 2026'
+                && $m->mailData['teamLeads'] === 2;
         });
     }
 
@@ -119,7 +149,7 @@ class WeeklyTeamSummaryTest extends TestCase
         $quiet = $this->user('CallAgent', 'quiet@example.com');
         $this->user('Admin', 'boss@example.com', dailyLeads: null);
 
-        $monday = $this->sunday()->copy()->subWeek()->startOfWeek(\Carbon\Carbon::MONDAY);
+        $monday = $this->sunday()->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
         foreach (range(0, 4) as $offset) {
             $this->leadOn($busy, $monday->copy()->addDays($offset)->toDateString());
         }
