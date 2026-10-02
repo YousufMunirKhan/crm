@@ -89,18 +89,22 @@ export function renderLeaderboardImage(board, { companyName = '' } = {}) {
     });
 }
 
+/** One tile for each thing the board measures - three across is all the width holds. */
 function summaryTiles(board) {
     const s = board.summary ?? {};
     const tiles = [];
 
-    if (s.leads_today?.target > 0) {
-        tiles.push({ label: 'Leads today', ...s.leads_today });
+    if (board.period === 'today' && s.leads_today?.target > 0) {
+        tiles.push({ label: 'Leads today', ...s.leads_today, colour: C.primary600 });
     }
     if (board.period !== 'today' && s.leads_period?.target > 0) {
-        tiles.push({ label: `Leads ${PERIOD_NOUN[board.period]}`, ...s.leads_period });
+        tiles.push({ label: `Leads ${PERIOD_NOUN[board.period]}`, ...s.leads_period, colour: C.primary600 });
     }
     if (s.appointments_month?.target > 0) {
-        tiles.push({ label: 'Appointments this month', ...s.appointments_month, alt: true });
+        tiles.push({ label: 'Appointments · month', ...s.appointments_month, colour: C.primary400 });
+    }
+    if (s.sales_month?.target > 0) {
+        tiles.push({ label: 'Sales · month', ...s.sales_month, colour: C.primary800 });
     }
 
     return tiles;
@@ -153,7 +157,7 @@ function drawTiles(ctx, tiles, y) {
         ctx.textAlign = 'right';
         text(ctx, `${tile.percent}%`, x + width - 24, y + 92, `700 28px ${FONT}`, C.primary700);
 
-        bar(ctx, x + 24, y + 114, width - 48, 12, tile.percent, tile.alt ? C.primary400 : C.primary600);
+        bar(ctx, x + 24, y + 114, width - 48, 12, tile.percent, tile.colour);
     });
 }
 
@@ -170,15 +174,17 @@ function drawBoard(ctx, board, rows, y, height) {
         return;
     }
 
-    const leadsX = x + 470;
-    const appointmentsX = x + 730;
-    const columnWidth = 220;
+    const columns = [
+        { key: 'leads', label: `LEADS · ${board.period.toUpperCase()}`, x: x + 400, colour: C.primary600 },
+        { key: 'appointments', label: 'APPTS · MONTH', x: x + 598, colour: C.primary400 },
+        { key: 'sales', label: 'SALES · MONTH', x: x + 796, colour: C.primary800 },
+    ];
+    const columnWidth = 164;
 
     ctx.textAlign = 'left';
     text(ctx, '#', x + 44, y + 42, `600 18px ${FONT}`, C.slate500);
     text(ctx, 'NAME', x + 104, y + 42, `600 18px ${FONT}`, C.slate500);
-    text(ctx, `LEADS · ${board.period.toUpperCase()}`, leadsX, y + 42, `600 18px ${FONT}`, C.slate500);
-    text(ctx, 'APPOINTMENTS · MONTH', appointmentsX, y + 42, `600 18px ${FONT}`, C.slate500);
+    columns.forEach((column) => text(ctx, column.label, column.x, y + 42, `600 18px ${FONT}`, C.slate500));
 
     rows.forEach((row, i) => {
         const top = y + 64 + i * ROW;
@@ -206,7 +212,7 @@ function drawBoard(ctx, board, rows, y, height) {
 
         // Name, and where they stand underneath it
         ctx.textAlign = 'left';
-        text(ctx, row.name, x + 104, middle - 6, `700 29px ${FONT}`, C.slate900, 340);
+        text(ctx, row.name, x + 104, middle - 6, `700 29px ${FONT}`, C.slate900, 276);
 
         const status = LEADERBOARD_STATUS[row.status] ?? LEADERBOARD_STATUS.in_progress;
         ctx.font = `600 18px ${FONT}`;
@@ -216,8 +222,7 @@ function drawBoard(ctx, board, rows, y, height) {
         ctx.fill();
         text(ctx, status.label, x + 118, middle + 31, `600 18px ${FONT}`, status.text);
 
-        figure(ctx, row.leads, leadsX, middle, columnWidth, C.primary600);
-        figure(ctx, row.appointments, appointmentsX, middle, columnWidth, C.primary400);
+        columns.forEach((column) => figure(ctx, row[column.key], column.x, middle, columnWidth, column.colour));
     });
 }
 
@@ -232,13 +237,13 @@ function figure(ctx, value, x, middle, width, colour) {
     }
 
     const done = String(value.done);
-    text(ctx, done, x, middle - 4, `700 30px ${FONT}`, C.slate900);
-    ctx.font = `700 30px ${FONT}`;
+    text(ctx, done, x, middle - 4, `700 28px ${FONT}`, C.slate900);
+    ctx.font = `700 28px ${FONT}`;
     const doneWidth = ctx.measureText(done).width;
-    text(ctx, `/ ${value.target}`, x + doneWidth + 8, middle - 4, `500 22px ${FONT}`, C.slate500);
+    text(ctx, `/ ${value.target}`, x + doneWidth + 6, middle - 4, `500 20px ${FONT}`, C.slate500);
 
     ctx.textAlign = 'right';
-    text(ctx, `${value.percent}%`, x + width, middle - 4, `600 22px ${FONT}`, C.slate500);
+    text(ctx, `${value.percent}%`, x + width, middle - 4, `600 19px ${FONT}`, C.slate500);
 
     bar(ctx, x, middle + 14, width, 12, value.percent, colour);
 }

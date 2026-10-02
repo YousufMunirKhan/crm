@@ -17,6 +17,7 @@
         $summary['leads_today']['target'] > 0 ? ['Leads today', $summary['leads_today']] : null,
         ! $isToday && $summary['leads_period']['target'] > 0 ? ['Leads this '.$span, $summary['leads_period']] : null,
         $summary['appointments_month']['target'] > 0 ? ['Appointments this month', $summary['appointments_month']] : null,
+        $summary['sales_month']['target'] > 0 ? ['Sales this month', $summary['sales_month']] : null,
     ]));
 @endphp
 <head>
@@ -54,6 +55,7 @@
         .track { height: 6px; background: #e2e8f0; border-radius: 3px; margin-top: 4px; }
         .fill { height: 6px; background: #2563eb; border-radius: 3px; }
         .fill-alt { background: #60a5fa; }
+        .fill-deep { background: #1e40af; }
 
         .board { width: 100%; border-collapse: collapse; }
         .board th { background: #1e3a8a; color: #ffffff; font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; padding: 7px 8px; }
@@ -120,11 +122,12 @@
         <table class="board">
             <thead>
             <tr>
-                <th class="center" style="width: 7%;">#</th>
-                <th style="width: 27%;">Name</th>
-                <th style="width: 22%;">Leads · {{ $span }}</th>
-                <th style="width: 22%;">Appointments · month</th>
-                <th class="center" style="width: 9%;">Overall</th>
+                <th class="center" style="width: 6%;">#</th>
+                <th style="width: 21%;">Name</th>
+                <th style="width: 17%;">Leads · {{ $span }}</th>
+                <th style="width: 18%;">Appointments · month</th>
+                <th style="width: 17%;">Sales · month</th>
+                <th class="center" style="width: 8%;">Overall</th>
                 <th class="center" style="width: 13%;">Status</th>
             </tr>
             </thead>
@@ -139,7 +142,7 @@
                         <div class="name">{{ $row['name'] }}</div>
                         @if($row['role'])<div class="role">{{ $row['role'] }}</div>@endif
                     </td>
-                    @foreach(['leads' => '', 'appointments' => 'fill-alt'] as $key => $fillClass)
+                    @foreach(['leads' => '', 'appointments' => 'fill-alt', 'sales' => 'fill-deep'] as $key => $fillClass)
                         <td>
                             @if($row[$key])
                                 <span class="pct">{{ $row[$key]['percent'] }}%</span>

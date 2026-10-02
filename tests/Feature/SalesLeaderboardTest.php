@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Modules\CRM\Models\Customer;
 use App\Modules\CRM\Models\Lead;
 use App\Modules\CRM\Models\LeadActivity;
+use App\Modules\CRM\Models\LeadItem;
+use App\Modules\CRM\Models\Product;
 use App\Modules\HR\Models\EmployeeTarget;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -79,6 +81,19 @@ class SalesLeaderboardTest extends TestCase
         $activity->forceFill(['created_at' => $at])->saveQuietly();
     }
 
+    private function sale(User $user, string $at): void
+    {
+        $product = Product::firstOrCreate(['name' => 'Card machine'], ['is_active' => true]);
+
+        LeadItem::create([
+            'lead_id' => $this->lead($user, '2026-09-01 10:00:00')->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'status' => LeadItem::STATUS_WON,
+            'closed_at' => $at,
+        ]);
+    }
+
     private function board(User $as, string $period = 'week'): array
     {
         return $this->actingAs($as, 'sanctum')
@@ -93,12 +108,11 @@ class SalesLeaderboardTest extends TestCase
         $manager = $this->user('Manager', 'Has Appointments Target');
         $noTarget = $this->user('Sales', 'No Target');
         $leaver = $this->user('Sales', 'Left Last Month', ['is_active' => false]);
-        $salesOnly = $this->user('Sales', 'Sales Target Only');
+        $salesOnly = $this->user('Sales', 'Has Sales Target');
 
         $this->target($rep, dailyLeads: 5);
         $this->target($manager, appointments: 10);
         $this->target($leaver, dailyLeads: 5);
-        // Sales are not on the board, so a sales target alone is nothing to rank.
         $this->target($salesOnly, sales: 4);
         // Busy, but nobody has given them a number.
         $this->leads($noTarget, 9, '2026-10-07 09:00:00');
@@ -106,8 +120,8 @@ class SalesLeaderboardTest extends TestCase
         $board = $this->board($rep);
         $names = array_column($board['rows'], 'name');
 
-        $this->assertEqualsCanonicalizing(['Has Leads Target', 'Has Appointments Target'], $names);
-        $this->assertSame(2, $board['summary']['members']);
+        $this->assertEqualsCanonicalizing(['Has Leads Target', 'Has Appointments Target', 'Has Sales Target'], $names);
+        $this->assertSame(3, $board['summary']['members']);
     }
 
     public function test_anybody_on_the_staff_can_read_it(): void
@@ -140,7 +154,8 @@ class SalesLeaderboardTest extends TestCase
 
         $encoded = json_encode($this->board($this->user('Support', 'Somebody Else')));
 
-        foreach (['revenue', 'sales', '9000', 'rep@example.test', '12345678'] as $absent) {
+        // A sale is a count of lines won; what it was worth is not on the board.
+        foreach (['revenue', 'price', '9000', 'rep@example.test', '12345678'] as $absent) {
             $this->assertStringNotContainsString($absent, $encoded);
         }
     }
@@ -303,6 +318,34 @@ class SalesLeaderboardTest extends TestCase
         $this->assertSame(2, $board['summary']['appointments_month']['done']);
         $this->assertSame(14, $board['summary']['appointments_month']['target']);
         $this->assertSame(1, $board['summary']['appointments_today']);
+    }
+
+    public function test_sales_are_counted_as_lines_won_this_month_against_the_target(): void
+    {
+        $rep = $this->user('Sales', 'A Rep');
+        $this->target($rep, sales: 4);
+
+        $this->sale($rep, '2026-10-02 10:00:00');
+        $this->sale($rep, '2026-10-07 09:00:00');
+        $this->sale($rep, '2026-09-28 10:00:00'); // last month
+
+        $board = $this->board($rep, 'month');
+        $row = $board['rows'][0];
+
+        $this->assertSame(['target' => 4, 'today' => 1, 'done' => 2, 'percent' => 50], $row['sales']);
+        $this->assertNull($row['leads']);
+        $this->assertSame(50, $row['progress']);
+        $this->assertSame(['done' => 2, 'target' => 4, 'percent' => 50], $board['summary']['sales_month']);
+        $this->assertSame(1, $board['summary']['sales_today']);
+    }
+
+    public function test_somebody_with_no_sales_target_has_no_sales_figure(): void
+    {
+        $rep = $this->user('Sales', 'A Rep');
+        $this->target($rep, dailyLeads: 5);
+        $this->sale($rep, '2026-10-02 10:00:00');
+
+        $this->assertNull($this->board($rep)['rows'][0]['sales']);
     }
 
     public function test_the_chart_leaves_sunday_out(): void

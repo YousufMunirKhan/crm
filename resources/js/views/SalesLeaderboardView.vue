@@ -96,11 +96,12 @@
                     You are <strong class="font-semibold">#{{ me.rank }}</strong> of {{ board.rows.length }}
                     <template v-if="me.leads"> · {{ me.leads.done }} of {{ me.leads.target }} leads {{ periodNoun }}</template>
                     <template v-else-if="me.appointments"> · {{ me.appointments.done }} of {{ me.appointments.target }} appointments this month</template>
+                    <template v-else-if="me.sales"> · {{ me.sales.done }} of {{ me.sales.target }} sales this month</template>
                 </p>
             </section>
 
             <!-- Team totals -->
-            <div :class="['grid grid-cols-2 gap-3', tiles.length > 4 ? 'lg:grid-cols-5' : 'lg:grid-cols-4']">
+            <div :class="['grid grid-cols-2 gap-3', TILE_GRID[tiles.length] ?? 'lg:grid-cols-4']">
                 <div
                     v-for="tile in tiles"
                     :key="tile.label"
@@ -114,7 +115,7 @@
                     <template v-if="tile.percent !== undefined">
                         <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
                             <div
-                                :class="['h-full rounded-full transition-all duration-500', tile.alt ? 'bg-primary-400' : 'bg-primary-600']"
+                                :class="['h-full rounded-full transition-all duration-500', tile.bar ?? 'bg-primary-600']"
                                 :style="{ width: `${clamp(tile.percent)}%` }"
                             />
                         </div>
@@ -124,9 +125,9 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <div class="space-y-6">
                 <!-- The board -->
-                <BaseCard class="xl:col-span-2" :padded="false">
+                <BaseCard :padded="false">
                     <template #header>
                         <h2 class="card-title">Team leaderboard</h2>
                         <p class="card-subtitle">{{ board.range.label }}</p>
@@ -135,7 +136,7 @@
                     <EmptyState
                         v-if="!board.rows.length"
                         :heading="`Nobody has a target set for ${board.month_label}`"
-                        description="People appear here as soon as they are given a daily lead target or a monthly appointment target."
+                        description="People appear here as soon as they are given a target for leads, appointments or sales."
                     >
                         <template #icon><TrophyIcon class="h-6 w-6" aria-hidden="true" /></template>
                         <template v-if="canSetTargets" #action>
@@ -144,11 +145,12 @@
                     </EmptyState>
 
                     <div v-else>
-                        <div :class="[ROW_GRID, 'hidden border-b border-slate-200 px-6 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 md:grid']">
+                        <div :class="[ROW_GRID, 'hidden border-b border-slate-200 px-6 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 xl:grid']">
                             <span class="text-center">#</span>
                             <span>Name</span>
                             <span>Leads · {{ period }}</span>
-                            <span>Appointments · month</span>
+                            <span>Appts · month</span>
+                            <span>Sales · month</span>
                             <span class="text-right">Overall</span>
                             <span class="text-right">Status</span>
                         </div>
@@ -184,10 +186,10 @@
                                     </div>
                                 </div>
 
-                                <!-- One line on a phone, two columns of the table from md up. -->
-                                <div class="order-last col-span-3 grid grid-cols-2 gap-4 md:order-none md:contents">
+                                <!-- One line on a phone, three columns of the table from xl up. -->
+                                <div class="order-last col-span-3 grid grid-cols-3 gap-3 xl:order-none xl:contents">
                                     <div v-for="metric in metrics(row)" :key="metric.key" class="min-w-0">
-                                        <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500 md:hidden">{{ metric.label }}</p>
+                                        <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500 xl:hidden">{{ metric.label }}</p>
                                         <template v-if="metric.value">
                                             <div class="flex items-baseline justify-between gap-2">
                                                 <span class="text-sm tabular-nums text-slate-900">
@@ -208,7 +210,7 @@
                                     </div>
                                 </div>
 
-                                <span class="hidden text-right text-sm font-semibold tabular-nums text-primary-700 md:block">{{ row.progress }}%</span>
+                                <span class="hidden text-right text-sm font-semibold tabular-nums text-primary-700 xl:block">{{ row.progress }}%</span>
 
                                 <span class="justify-self-end">
                                     <BaseBadge :tone="statusOf(row).tone" dot>{{ statusOf(row).label }}</BaseBadge>
@@ -218,7 +220,7 @@
                     </div>
                 </BaseCard>
 
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-1 xl:content-start">
+                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <!-- Top performers -->
                     <BaseCard title="Top performers" :subtitle="topSubtitle">
                         <template #actions>
@@ -248,7 +250,7 @@
                                     </div>
                                     <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
                                         <div
-                                            :class="['h-full rounded-full', topBy === 'leads' ? 'bg-primary-600' : 'bg-primary-400']"
+                                            :class="['h-full rounded-full', BAR[topBy]]"
                                             :style="{ width: `${person.width}%` }"
                                         />
                                     </div>
@@ -324,7 +326,7 @@ import { LEADERBOARD_STATUS, PERIOD_NOUN, renderLeaderboardImage } from '@/utils
  *
  * It opens on today because that is the day anybody can still do something
  * about, and it refreshes itself so it can be left open on a wall or a second
- * monitor. There is no money on it - sales are not on this board at all.
+ * monitor. There is no money on it - a sale is a product line won, not an amount.
  */
 const auth = useAuthStore();
 const branding = useBrandingStore();
@@ -338,11 +340,18 @@ const PERIODS = [
 
 const TOP_BY = [
     { key: 'leads', label: 'Leads' },
-    { key: 'appointments', label: 'Appointments' },
+    { key: 'appointments', label: 'Appts' },
+    { key: 'sales', label: 'Sales' },
 ];
 
-/** The table's columns from md up; on a phone each row lays itself out. */
-const ROW_GRID = 'md:grid-cols-[2.5rem_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_4rem_7.5rem] md:gap-x-5';
+/** One shade of the theme's blue for each thing measured, the same everywhere on the page. */
+const BAR = { leads: 'bg-primary-600', appointments: 'bg-primary-400', sales: 'bg-primary-800' };
+
+/** The table's columns once there is room for seven; below that each row lays itself out. */
+const ROW_GRID = 'xl:grid-cols-[2.5rem_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_3.5rem_7.5rem] xl:gap-x-5';
+
+/** How many tiles sit on a row once there is room, by how many there are. */
+const TILE_GRID = { 3: 'lg:grid-cols-3', 5: 'lg:grid-cols-5', 6: 'lg:grid-cols-3 xl:grid-cols-6' };
 
 const REFRESH_EVERY_MS = 60_000;
 
@@ -378,6 +387,9 @@ const headline = computed(() => {
     }
     if (s.appointments_month.target > 0) {
         return { ...s.appointments_month, unit: 'appointments this month' };
+    }
+    if (s.sales_month.target > 0) {
+        return { ...s.sales_month, unit: 'sales this month' };
     }
 
     return null;
@@ -424,15 +436,28 @@ const tiles = computed(() => {
             value: s.appointments_month.done,
             of: s.appointments_month.target,
             percent: s.appointments_month.percent,
-            alt: true,
+            bar: BAR.appointments,
+        });
+    }
+
+    if (s.sales_month.target > 0) {
+        out.push({
+            label: 'Sales this month',
+            value: s.sales_month.done,
+            of: s.sales_month.target,
+            percent: s.sales_month.percent,
+            bar: BAR.sales,
         });
     }
 
     return out;
 });
 
-const topSubtitle = computed(() =>
-    (topBy.value === 'leads' ? `Leads ${periodNoun.value}` : 'Appointments this month'));
+const topSubtitle = computed(() => ({
+    leads: `Leads ${periodNoun.value}`,
+    appointments: 'Appointments this month',
+    sales: 'Sales this month',
+}[topBy.value]));
 
 const top = computed(() => {
     const people = (board.value?.rows ?? [])
@@ -457,15 +482,22 @@ function metrics(row) {
             key: 'leads',
             label: `Leads · ${period.value}`,
             value: row.leads,
-            bar: 'bg-primary-600',
+            bar: BAR.leads,
             note: row.leads && period.value !== 'today' ? `${row.leads.today} today` : '',
         },
         {
             key: 'appointments',
-            label: 'Appointments · month',
+            label: 'Appts · month',
             value: row.appointments,
-            bar: 'bg-primary-400',
+            bar: BAR.appointments,
             note: row.appointments?.today ? `+${row.appointments.today} today` : '',
+        },
+        {
+            key: 'sales',
+            label: 'Sales · month',
+            value: row.sales,
+            bar: BAR.sales,
+            note: row.sales?.today ? `+${row.sales.today} today` : '',
         },
     ];
 }

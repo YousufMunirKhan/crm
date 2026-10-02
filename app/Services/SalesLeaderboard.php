@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Modules\CRM\Models\LeadActivity;
 use App\Modules\HR\Models\EmployeeTarget;
+use App\Modules\Reporting\Services\ReportingService;
 use Carbon\Carbon;
 
 /**
@@ -14,14 +15,15 @@ use Carbon\Carbon;
  * the lead emails use: role does not come into it, and somebody nobody has
  * given a number to is not a row with blanks in it.
  *
- * Two things are measured, because they are the two targets that are counts of
- * work done: leads a day, and appointments a month. The board opens on today,
- * since that is the day anybody can still do something about. Sales are left off on
- * purpose - the board is read by the whole team, and prices are not recorded,
- * so there is no sales figure to rank anybody on.
+ * Three things are measured, all of them counts of work done: leads a day,
+ * and appointments and sales a month. The board opens on today, since that is
+ * the day anybody can still do something about. A sale is a product line won,
+ * never an amount - prices are not recorded, and the board is read by the
+ * whole team.
  *
- * Lead counts come from DailyLeadScoreboard rather than being counted again
- * here, so the board and the morning emails cannot disagree about a day.
+ * Lead counts come from DailyLeadScoreboard and sales from ReportingService
+ * rather than being counted again here, so the board, the morning emails and
+ * the targets screen cannot disagree about a figure.
  */
 class SalesLeaderboard
 {
@@ -30,7 +32,10 @@ class SalesLeaderboard
     /** How many days the chart looks back, today included. */
     private const CHART_DAYS = 7;
 
-    public function __construct(private DailyLeadScoreboard $scoreboard) {}
+    public function __construct(
+        private DailyLeadScoreboard $scoreboard,
+        private ReportingService $reporting,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -62,7 +67,11 @@ class SalesLeaderboard
         // measured on the one today falls in.
         $targets = EmployeeTarget::query()
             ->where('month', $day->format('Y-m'))
-            ->where(fn ($q) => $q->where('target_daily_leads', '>', 0)->orWhere('target_appointments', '>', 0))
+            ->where(fn ($q) => $q
+                ->where('target_daily_leads', '>', 0)
+                ->orWhere('target_appointments', '>', 0)
+                ->orWhere('target_sales', '>', 0))
+            ->with('lines')
             ->get()
             ->keyBy('user_id');
 
@@ -84,7 +93,7 @@ class SalesLeaderboard
         $countsToday = $this->scoreboard->countsOn($todayStr);
 
         $rows = $people->map(function (User $u) use (
-            $period, $targets, $periodDays, $todayStr, $countsToday, $booked, $monthStart, $periodDaysDone, $monthShareDone, $viewerId
+            $period, $targets, $periodDays, $todayStr, $countsToday, $booked, $day, $monthStart, $monthEnd, $periodDaysDone, $monthShareDone, $viewerId
         ) {
             $target = $targets->get($u->id);
             $dailyLeads = (int) $target->target_daily_leads;
@@ -92,6 +101,7 @@ class SalesLeaderboard
 
             $leads = null;
             $appointments = null;
+            $sales = null;
             $pace = [];
             $hit = [];
 
@@ -131,11 +141,40 @@ class SalesLeaderboard
                 $hit[] = $done >= $monthAppointments;
             }
 
+            // The reporting service owns what counts as a sale - product and
+            // category lines included - and is asked with the same month the
+            // emails ask it with.
+            $resolved = $this->reporting->resolveSalesTargetAndAchieved(
+                $target, $u->id, $monthStart->copy()->startOfDay(), $monthEnd->copy()->endOfDay()
+            );
+
+            if ($resolved['target_sales'] > 0) {
+                $done = (int) $resolved['achieved_sales'];
+                $wanted = (int) $resolved['target_sales'];
+                $expected = $wanted * $monthShareDone;
+
+                $sales = [
+                    'target' => $wanted,
+                    'today' => $this->reporting->countWonLeadItemsForAgent(
+                        $u->id, $day->copy()->startOfDay(), $day->copy()->endOfDay()
+                    ),
+                    'done' => $done,
+                    'percent' => $this->percent($done, $wanted),
+                ];
+                $pace[] = $expected > 0 ? min(1, $done / $expected) : 1;
+                $hit[] = $done >= $wanted;
+            }
+
+            // A target row with nothing on it that the board measures.
+            if (! $leads && ! $appointments && ! $sales) {
+                return null;
+            }
+
             if ($period === 'today') {
-                // Today's board is about today's work. The appointment target
-                // is a monthly one, so it is shown but only ranks somebody who
-                // has no lead target to be ranked on.
-                $measured = $leads ?? $appointments;
+                // Today's board is about today's work. The appointment and
+                // sales targets are monthly, so they are shown but only rank
+                // somebody who has no lead target to be ranked on.
+                $measured = $leads ?? $appointments ?? $sales;
                 $progress = $measured['percent'];
                 $status = match (true) {
                     $measured['done'] >= $measured['target'] => 'achieved',
@@ -143,7 +182,7 @@ class SalesLeaderboard
                     default => 'not_started',
                 };
             } else {
-                $percents = array_column(array_filter([$leads, $appointments]), 'percent');
+                $percents = array_column(array_filter([$leads, $appointments, $sales]), 'percent');
                 $onPace = array_sum($pace) / count($pace);
                 $progress = (int) round(array_sum($percents) / count($percents));
                 $status = match (true) {
@@ -161,12 +200,14 @@ class SalesLeaderboard
                 'is_me' => $viewerId !== null && $u->id === $viewerId,
                 'leads' => $leads,
                 'appointments' => $appointments,
+                'sales' => $sales,
                 'progress' => $progress,
                 'status' => $status,
                 'leads_done' => $leads['done'] ?? 0,
                 'appointments_today' => $appointments['today'] ?? 0,
             ];
         })
+            ->filter()
             ->sortBy([['progress', 'desc'], ['leads_done', 'desc'], ['appointments_today', 'desc'], ['name', 'asc']])
             ->values()
             ->map(function (array $row, int $i) {
@@ -175,9 +216,10 @@ class SalesLeaderboard
                 return ['rank' => $i + 1] + $row;
             });
 
-        $everyone = $people->pluck('id')->all();
+        $everyone = $rows->pluck('user_id')->all();
         $onLeads = $rows->whereNotNull('leads');
         $onAppointments = $rows->whereNotNull('appointments');
+        $onSales = $rows->whereNotNull('sales');
         $leadIds = array_flip($onLeads->pluck('user_id')->all());
         $dailyTarget = (int) $onLeads->sum('leads.daily_target');
         $leadsToday = array_sum(array_intersect_key($countsToday, $leadIds));
@@ -235,6 +277,12 @@ class SalesLeaderboard
                     'done' => $appointmentsMonth,
                     'target' => (int) $onAppointments->sum('appointments.target'),
                     'percent' => $this->percent($appointmentsMonth, (int) $onAppointments->sum('appointments.target')),
+                ],
+                'sales_today' => (int) $onSales->sum('sales.today'),
+                'sales_month' => [
+                    'done' => (int) $onSales->sum('sales.done'),
+                    'target' => (int) $onSales->sum('sales.target'),
+                    'percent' => $this->percent((int) $onSales->sum('sales.done'), (int) $onSales->sum('sales.target')),
                 ],
             ],
             'rows' => $rows->all(),
