@@ -1,7 +1,7 @@
 <template>
     <ListingPageShell
         title="Cold calling"
-        subtitle="UK businesses discovered near a postcode via Google Places, newest saved listings first — converting one to a prospect also creates a separate CRM customer row."
+        subtitle="UK businesses discovered near a postcode via Google Places, or swept from Google Maps around the areas we already have customers in, newest saved listings first — converting one to a prospect also creates a separate CRM customer row."
         :badge="contactsBadge"
     >
         <template #actions>
@@ -142,7 +142,8 @@
         </template>
 
         <template #toolbar>
-            <div class="space-y-3">
+            <!-- All three notices are about Google Places; an area sweep uses none of it. -->
+            <div v-show="activeTab !== 'areas'" class="space-y-3">
                 <div
                     v-if="settingsStatus"
                     class="callout flex flex-wrap items-center gap-3"
@@ -261,6 +262,222 @@
             </div>
         </div>
 
+        <!-- Around our customers -->
+        <div v-show="activeTab === 'areas'" class="p-4 sm:p-6 space-y-4">
+            <div
+                v-if="areaRunner"
+                class="callout flex flex-wrap items-center gap-x-3 gap-y-1"
+                :class="areaRunner.key_configured ? 'callout-info' : 'callout-warning'"
+            >
+                <ExclamationTriangleIcon v-if="!areaRunner.key_configured" class="icon shrink-0" aria-hidden="true" />
+                <span v-if="!areaRunner.key_configured" class="min-w-0">
+                    The scraper runner has no key yet — set <code class="kbd">COLD_CALLING_SWEEP_KEY</code> in
+                    <code class="kbd">.env</code> on the server. Until then areas can be queued but nothing will collect them.
+                </span>
+                <span v-else class="min-w-0">
+                    Areas queued here are swept by the Google Maps scraper on the office PC
+                    (<code class="kbd">php scripts/gmaps-sweep/sweep.php</code>).
+                    <strong>{{ areaRunner.pending }}</strong> waiting ·
+                    runner last checked in: <strong>{{ ukDateTime(areaRunner.last_seen_at) || 'never' }}</strong>
+                </span>
+            </div>
+
+            <div class="card p-5 sm:p-6 space-y-4">
+                <h2 class="card-title">What to look for</h2>
+                <div class="form-grid-3">
+                    <div class="sm:col-span-2">
+                        <label class="form-label" for="coldcallingview-sweep-types">Business types (one per line)</label>
+                        <textarea
+                            id="coldcallingview-sweep-types"
+                            v-model="sweepForm.business_types"
+                            rows="4"
+                            class="form-input"
+                            placeholder="restaurant&#10;takeaway"
+                        />
+                        <p class="text-xs text-slate-500 mt-1">
+                            Each type is one search per area. More types and a higher depth find more, take longer, and are likelier to get the PC’s IP rate-limited by Google for a few hours.
+                        </p>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="form-label" for="coldcallingview-sweep-radius">Radius (meters)</label>
+                            <input
+                                id="coldcallingview-sweep-radius"
+                                v-model.number="sweepForm.radius_meters"
+                                type="number"
+                                min="500"
+                                max="50000"
+                                class="form-input"
+                            >
+                        </div>
+                        <div>
+                            <label class="form-label" for="coldcallingview-sweep-depth">Depth (1–20)</label>
+                            <input
+                                id="coldcallingview-sweep-depth"
+                                v-model.number="sweepForm.depth"
+                                type="number"
+                                min="1"
+                                max="20"
+                                class="form-input"
+                            >
+                        </div>
+                        <label class="form-choice cursor-pointer">
+                            <input v-model="sweepForm.email" type="checkbox" class="form-checkbox" />
+                            <span class="text-sm text-slate-700">Also visit each website for an email (much slower)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap justify-between items-center gap-3">
+                <div>
+                    <h2 class="card-title">Where our customers and leads are</h2>
+                    <p class="text-xs text-slate-500">
+                        Postcode districts (or the town, where no postcode was recorded), busiest first.
+                        <span v-if="areasUnlocated"> {{ areasUnlocated }} customer(s) have neither and are not counted.</span>
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <BaseButton variant="outline" block-mobile :loading="queueing" @click="queueTopUnswept">
+                        Queue top 10 not yet swept
+                    </BaseButton>
+                    <BaseButton
+                        variant="primary"
+                        block-mobile
+                        :loading="queueing"
+                        :disabled="!selectedAreaKeys.length"
+                        @click="queueAreas(selectedAreaKeys)"
+                    >
+                        <template #icon><MapPinIcon class="icon-sm" aria-hidden="true" /></template>
+                        Queue selected ({{ selectedAreaKeys.length }})
+                    </BaseButton>
+                </div>
+            </div>
+
+            <div class="card overflow-hidden">
+                <div v-if="loadingAreas && !areas.length" class="p-4 space-y-3" aria-busy="true">
+                    <span v-for="n in 6" :key="n" class="skeleton-text block w-full" />
+                </div>
+                <EmptyState
+                    v-else-if="!areas.length"
+                    heading="No areas yet"
+                    description="Areas appear once customers, or prospects with a lead, have a postcode or a town on their record."
+                >
+                    <template #icon><MapPinIcon class="icon" aria-hidden="true" /></template>
+                </EmptyState>
+                <div v-else class="table-wrap">
+                    <table class="table" style="min-width: 760px">
+                        <caption class="sr-only">Areas with existing customers and leads</caption>
+                        <thead class="table-thead">
+                            <tr>
+                                <th scope="col" class="table-th w-10"><span class="sr-only">Select</span></th>
+                                <th scope="col" class="table-th">Area</th>
+                                <th scope="col" class="table-th">Customers</th>
+                                <th scope="col" class="table-th">Leads</th>
+                                <th scope="col" class="table-th">Contacts held</th>
+                                <th scope="col" class="table-th">Last sweep</th>
+                                <th scope="col" class="table-th w-40">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="a in areas" :key="a.key" class="table-row">
+                                <td class="table-td">
+                                    <label class="sr-only" :for="`coldcallingview-area-${a.key}`">Select {{ a.label }}</label>
+                                    <input
+                                        :id="`coldcallingview-area-${a.key}`"
+                                        v-model="selectedAreaKeys"
+                                        type="checkbox"
+                                        class="form-checkbox"
+                                        :value="a.key"
+                                        :disabled="isAreaWaiting(a)"
+                                    >
+                                </td>
+                                <td class="table-td">
+                                    <span class="font-semibold text-slate-900">{{ a.label }}</span>
+                                    <span v-if="a.town" class="text-slate-500"> · {{ a.town }}</span>
+                                </td>
+                                <td class="table-td">{{ a.customers }}</td>
+                                <td class="table-td">{{ a.leads }}</td>
+                                <td class="table-td">{{ a.contacts }}</td>
+                                <td class="table-td">
+                                    <template v-if="a.last_sweep">
+                                        <BaseBadge :tone="runTone(a.last_sweep.status)">{{ a.last_sweep.status }}</BaseBadge>
+                                        <span v-if="a.last_sweep.status === 'completed'" class="text-xs text-slate-500 ml-1">
+                                            {{ a.last_sweep.new_count }} new · {{ ukDate(a.last_sweep.finished_at) }}
+                                        </span>
+                                        <p v-if="a.last_sweep.status === 'failed' && a.last_sweep.error_message" class="text-xs text-danger-700 mt-0.5">
+                                            {{ a.last_sweep.error_message }}
+                                        </p>
+                                    </template>
+                                    <span v-else class="text-slate-500">Never</span>
+                                </td>
+                                <td class="table-td space-y-1">
+                                    <BaseButton
+                                        v-if="a.last_sweep?.status === 'pending'"
+                                        variant="ghost"
+                                        size="sm"
+                                        @click="cancelSweep(a)"
+                                    >
+                                        Cancel
+                                    </BaseButton>
+                                    <BaseButton
+                                        v-else
+                                        variant="ghost"
+                                        size="sm"
+                                        :disabled="queueing || isAreaWaiting(a)"
+                                        @click="queueAreas([a.key])"
+                                    >
+                                        {{ a.last_sweep ? 'Sweep again' : 'Queue sweep' }}
+                                    </BaseButton>
+                                    <button
+                                        v-if="a.contacts"
+                                        type="button"
+                                        class="link block text-xs"
+                                        @click="viewAreaContacts(a)"
+                                    >
+                                        View contacts
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card p-5 sm:p-6 space-y-3">
+                <h3 class="card-title">Load a scraper CSV by hand</h3>
+                <p class="text-xs text-slate-500">
+                    For a file the scraper already wrote (<code class="kbd">results-….csv</code>). Businesses already saved are not duplicated.
+                </p>
+                <div class="flex flex-wrap items-end gap-3">
+                    <div>
+                        <label class="form-label" for="coldcallingview-sweep-file">CSV file</label>
+                        <input
+                            id="coldcallingview-sweep-file"
+                            ref="csvInput"
+                            type="file"
+                            accept=".csv,text/csv"
+                            class="form-input"
+                            @change="csvFile = $event.target.files[0] || null"
+                        >
+                    </div>
+                    <div class="w-full sm:w-56">
+                        <label class="form-label" for="coldcallingview-sweep-file-area">Area it was for (optional)</label>
+                        <select id="coldcallingview-sweep-file-area" v-model="csvAreaKey" class="form-select">
+                            <option value="">Not tied to an area</option>
+                            <option v-for="a in areas" :key="a.key" :value="a.key">
+                                {{ a.label }}{{ a.town ? ` · ${a.town}` : '' }}
+                            </option>
+                        </select>
+                    </div>
+                    <BaseButton variant="outline" block-mobile :loading="uploadingCsv" :disabled="!csvFile" @click="uploadCsv">
+                        <template #icon><ArrowUpTrayIcon class="icon-sm" aria-hidden="true" /></template>
+                        Import
+                    </BaseButton>
+                </div>
+            </div>
+        </div>
+
         <!-- Saved contacts -->
         <div v-show="activeTab === 'contacts'">
             <div class="px-4 sm:px-6 pt-4 space-y-2">
@@ -340,7 +557,7 @@
                                     <p v-if="scrapeHints[c.id]" class="mt-1 text-xs text-warning-800 leading-snug">{{ scrapeHints[c.id] }}</p>
                                 </template>
                                 <span v-if="c.email_source" class="block text-xs text-slate-500 mt-0.5">
-                                    {{ c.email_source === 'enrichment_claude' ? 'Claude AI' : c.email_source }}
+                                    {{ emailSourceLabels[c.email_source] || c.email_source }}
                                 </span>
                             </td>
                             <td class="table-td">
@@ -422,7 +639,10 @@
                             <tr v-for="r in runs" :key="r.id" class="table-row">
                                 <td class="table-td">{{ r.id }}</td>
                                 <td class="table-td">{{ r.user?.name || r.user_id }}</td>
-                                <td class="table-td font-mono">{{ r.postcode_input }}</td>
+                                <td class="table-td font-mono">
+                                    {{ r.postcode_input }}
+                                    <BaseBadge v-if="r.engine === 'gmaps_scraper'" tone="neutral">Area sweep</BaseBadge>
+                                </td>
                                 <td class="table-td">{{ r.radius_meters }}m</td>
                                 <td class="table-td">
                                     <BaseBadge :tone="runTone(r.status)">{{ r.status }}</BaseBadge>
@@ -494,13 +714,16 @@ import {
     FunnelIcon,
     LinkIcon,
     ListBulletIcon,
+    ArrowUpTrayIcon,
     MagnifyingGlassIcon,
+    MapPinIcon,
     UserPlusIcon,
 } from '@heroicons/vue/24/outline';
 import { useToastStore } from '@/stores/toast';
 import Pagination from '@/components/Pagination.vue';
 import ListingPageShell from '@/components/ListingPageShell.vue';
 import { BaseBadge, BaseButton, EmptyState } from '@/components/base';
+import { ukDate, ukDateTime } from '@/utils/datetime';
 
 const toast = useToastStore();
 
@@ -509,14 +732,22 @@ function formatIngestSkipped(obj) {
         skipped_high_review_count: 'too many Google reviews',
         skipped_excluded_name: 'name matched blocklist',
         skipped_excluded_place_type: 'chain / mall / supermarket type',
+        skipped_permanently_closed: 'permanently closed',
+        skipped_no_name: 'no business name',
     };
     return Object.entries(obj)
         .map(([k, v]) => `${labels[k] || k}: ${v}`)
         .join(' · ');
 }
 
+const emailSourceLabels = {
+    enrichment_claude: 'Claude AI',
+    gmaps_scraper: 'Maps sweep',
+};
+
 const tabs = [
     { id: 'search', label: 'New search' },
+    { id: 'areas', label: 'Around our customers' },
     { id: 'contacts', label: 'Saved contacts' },
     { id: 'activity', label: 'Activity & logs' },
 ];
@@ -742,6 +973,133 @@ async function exportCsv() {
     }
 }
 
+// --- Around our customers -------------------------------------------------
+
+const areas = ref([]);
+const areasUnlocated = ref(0);
+const areaRunner = ref(null);
+const loadingAreas = ref(false);
+const queueing = ref(false);
+const selectedAreaKeys = ref([]);
+const sweepForm = reactive({
+    business_types: '',
+    radius_meters: 5000,
+    depth: 5,
+    email: false,
+});
+const csvInput = ref(null);
+const csvFile = ref(null);
+const csvAreaKey = ref('');
+const uploadingCsv = ref(false);
+let sweepDefaultsLoaded = false;
+
+function isAreaWaiting(a) {
+    return ['pending', 'processing'].includes(a.last_sweep?.status);
+}
+
+async function loadAreas() {
+    loadingAreas.value = true;
+    try {
+        const { data } = await axios.get('/api/cold-calling/areas');
+        areas.value = data.data;
+        areasUnlocated.value = data.unlocated;
+        areaRunner.value = data.runner;
+        // Once: after that the form is whatever the user last typed.
+        if (!sweepDefaultsLoaded) {
+            sweepForm.business_types = (data.defaults.business_types || []).join('\n');
+            sweepForm.radius_meters = data.defaults.radius_meters;
+            sweepForm.depth = data.defaults.depth;
+            sweepDefaultsLoaded = true;
+        }
+    } catch (e) {
+        toast.error(e.response?.data?.message || 'Failed to load areas');
+    } finally {
+        loadingAreas.value = false;
+    }
+}
+
+async function queueAreas(keys) {
+    const types = sweepForm.business_types
+        .split(/[\n,]+/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+    if (!types.length) {
+        toast.warning('Give at least one business type to look for.');
+        return;
+    }
+    queueing.value = true;
+    try {
+        const { data } = await axios.post('/api/cold-calling/sweeps', {
+            area_keys: keys,
+            business_types: types,
+            radius_meters: sweepForm.radius_meters,
+            depth: sweepForm.depth,
+            email: sweepForm.email,
+        });
+        const unplaced = data.results.filter((r) => r.status === 'not_located').length;
+        // One toast at a time, so the part that needs acting on wins.
+        if (unplaced) {
+            toast.warning(`Queued ${data.queued}. ${unplaced} area(s) could not be found on the map and were not queued.`);
+        } else if (data.queued) {
+            toast.success(data.message);
+        } else {
+            toast.info('Already queued — nothing new to add.');
+        }
+        selectedAreaKeys.value = [];
+        await loadAreas();
+    } catch (e) {
+        toast.error(e.response?.data?.message || 'Could not queue the sweep');
+    } finally {
+        queueing.value = false;
+    }
+}
+
+function queueTopUnswept() {
+    // A sweep that failed or was cancelled brought nothing back, so the area still counts.
+    const keys = areas.value
+        .filter((a) => a.last_sweep?.status !== 'completed' && !isAreaWaiting(a))
+        .slice(0, 10)
+        .map((a) => a.key);
+    if (!keys.length) {
+        toast.warning('Every area has been swept or queued already.');
+        return;
+    }
+    queueAreas(keys);
+}
+
+async function cancelSweep(a) {
+    try {
+        await axios.delete(`/api/cold-calling/sweeps/${a.last_sweep.id}`);
+        toast.success('Sweep cancelled');
+        await loadAreas();
+    } catch (e) {
+        toast.error(e.response?.data?.message || 'Could not cancel');
+    }
+}
+
+function viewAreaContacts(a) {
+    filters.postcode = a.filter_key;
+    activeTab.value = 'contacts';
+}
+
+async function uploadCsv() {
+    uploadingCsv.value = true;
+    try {
+        const body = new FormData();
+        body.append('file', csvFile.value);
+        if (csvAreaKey.value) body.append('area_key', csvAreaKey.value);
+        const { data } = await axios.post('/api/cold-calling/sweeps/import-csv', body);
+        toast.success(data.message);
+        csvFile.value = null;
+        if (csvInput.value) csvInput.value.value = '';
+        await loadAreas();
+    } catch (e) {
+        toast.error(e.response?.data?.message || 'Import failed');
+    } finally {
+        uploadingCsv.value = false;
+    }
+}
+
 async function loadRuns() {
     loadingRuns.value = true;
     try {
@@ -765,6 +1123,7 @@ async function loadExportLogs() {
 
 watch(activeTab, (t) => {
     if (t === 'contacts') loadContacts(1);
+    if (t === 'areas') loadAreas();
     if (t === 'activity') {
         loadRuns();
         loadExportLogs();

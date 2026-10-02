@@ -1,0 +1,22 @@
+# The Google Maps scraper the sweep runner drives (gosom/google-maps-scraper,
+# MIT), set up as in https://github.com/Mahanaicoach/google-maps-scraper-kit.
+#
+# The image has no authentication of its own. The 127.0.0.1 binding below is
+# the only thing keeping it private - do not change it to 0.0.0.0.
+
+services:
+  google-maps-scraper:
+    # Pinned: older builds download a browser driver that is no longer hosted.
+    image: gosom/google-maps-scraper:v1.18.1
+    container_name: gmaps-scraper
+    restart: unless-stopped
+    command: ["-web", "-data-folder", "/gmapsdata"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - gmaps_data:/gmapsdata
+      - gmaps_cache:/opt
+
+volumes:
+  gmaps_data:
+  gmaps_cache:

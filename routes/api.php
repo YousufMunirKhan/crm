@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\ColdCallingController;
+use App\Http\Controllers\ColdCallingSweepController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
 use App\Modules\Commission\Http\Controllers\CommissionManagementController;
@@ -73,6 +74,14 @@ Route::prefix('pos')->middleware(['pos.key', 'throttle:120,1'])->group(function 
 Route::middleware('pos.support.key')->group(function () {
     Route::post('/pos-support-messages', [\App\Http\Controllers\PosSupportMessageController::class, 'store']);
     Route::get('/pos-support-messages/status', [\App\Http\Controllers\PosSupportMessageController::class, 'status']);
+});
+
+// Cold calling sweep runner - the Google Maps scraper on an office PC (X-Api-Key,
+// see config/cold_calling.php). It collects queued areas and posts listings back.
+Route::prefix('cold-calling-runner')->middleware(['sweep.runner.key', 'throttle:120,1'])->group(function () {
+    Route::post('/claim', [ColdCallingSweepController::class, 'claim']);
+    Route::post('/runs/{id}/rows', [ColdCallingSweepController::class, 'rows'])->whereNumber('id');
+    Route::post('/runs/{id}/finish', [ColdCallingSweepController::class, 'finish'])->whereNumber('id');
 });
 
 // Protected routes
@@ -425,6 +434,12 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
         Route::post('/contacts/{id}/mark-prospect', [ColdCallingController::class, 'markAsProspect']);
         Route::post('/contacts/{id}/import-to-crm', [ColdCallingController::class, 'importToCrmCustomer']);
         Route::get('/export-logs', [ColdCallingController::class, 'exportLogs']);
+
+        // Sweeps around existing customers - queued here, scraped by the runner.
+        Route::get('/areas', [ColdCallingSweepController::class, 'areas']);
+        Route::post('/sweeps', [ColdCallingSweepController::class, 'queue']);
+        Route::post('/sweeps/import-csv', [ColdCallingSweepController::class, 'importCsv']);
+        Route::delete('/sweeps/{id}', [ColdCallingSweepController::class, 'cancel'])->whereNumber('id');
     });
 
     // Commission management (Admin/Manager/System Admin only)

@@ -530,6 +530,8 @@ class ColdCallingController extends Controller
             'id' => $run->id,
             'user_id' => $run->user_id,
             'user' => $run->relationLoaded('user') && $run->user ? ['id' => $run->user->id, 'name' => $run->user->name] : null,
+            'engine' => $run->engine,
+            'area_key' => $run->area_key,
             'postcode_input' => $run->postcode_input,
             'postcode_normalized' => $run->postcode_normalized,
             'radius_meters' => $run->radius_meters,

@@ -7,8 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ColdCallingRun extends Model
 {
+    public const ENGINE_GOOGLE_PLACES = 'google_places';
+    public const ENGINE_GMAPS_SCRAPER = 'gmaps_scraper';
+
     protected $fillable = [
         'user_id',
+        'engine',
+        'area_key',
         'postcode_input',
         'postcode_normalized',
         'radius_meters',

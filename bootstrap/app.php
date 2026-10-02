@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'pos.key' => \App\Http\Middleware\AuthenticatePosApiKey::class,
             'pos.support.key' => \App\Http\Middleware\AuthenticatePosSupportApiKey::class,
             'webhook.key' => \App\Http\Middleware\AuthenticateWebhookKey::class,
+            'sweep.runner.key' => \App\Http\Middleware\AuthenticateSweepRunnerKey::class,
         ]);
     })
     ->withCommands([
