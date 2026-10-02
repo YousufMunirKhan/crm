@@ -125,4 +125,4 @@
     @endif
 @endsection
 
-@section('footnote', 'Sent every working day at 10am UK time. Sundays excluded.')
+@section('footnote', 'Sent every working day at 10pm UK time. Sundays excluded.')

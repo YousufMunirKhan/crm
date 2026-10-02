@@ -131,4 +131,4 @@
     @endforeach
 @endsection
 
-@section('footnote', 'Sent every Sunday morning at 10am UK time.')
+@section('footnote', 'Sent every Sunday at 10pm UK time.')

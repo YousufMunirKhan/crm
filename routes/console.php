@@ -11,11 +11,13 @@ Artisan::command('inspire', function () {
 // Schedule WhatsApp template sync every 15 minutes
 Schedule::job(new \App\Jobs\SyncWhatsAppTemplatesJob)->everyFifteenMinutes();
 
-// Monthly commission PDF + emails (1st of month by default; config/commission.php + .env)
+// Monthly commission PDF + emails (1st of month by default; config/commission.php + .env).
+// In the evening with the other reports, and twenty minutes after the daily
+// lead summary so the two are not one burst - see the note on spacing below.
 Schedule::command('commission:send-monthly-reports')
     ->monthlyOn(
         (int) config('commission.monthly_report_day', 1),
-        (string) config('commission.monthly_report_time', '08:00'),
+        (string) config('commission.monthly_report_time', '22:20'),
     )
     ->timezone(config('app.display_timezone'));
 
@@ -97,18 +99,19 @@ Schedule::command('emails:invoice-due')
     ->timezone(config('app.display_timezone'))
     ->withoutOverlapping();
 
-// Ten in the morning, so a rep has had the first of the day to put something on
-// the board before being told where they are. Not Sundays - the command checks,
+// Ten at night, once the day is over and its figures are final. It used to go
+// at ten in the morning and report on a day that had barely started, so every
+// one of them said the target had been missed. Not Sundays - the command checks,
 // rather than the cron expression, so the rule is stated where the figures are.
 Schedule::command('emails:daily-lead-summary')
-    ->dailyAt('10:00')
+    ->dailyAt('22:00')
     ->timezone(config('app.display_timezone'))
     ->withoutOverlapping();
 
-// The week just gone, on the morning the daily one does not run. Sunday is when
-// there is time to read a table rather than glance at a number.
+// The week just gone, at the same hour as the daily one on the night it does
+// not run - every report arrives at ten at night, so there is one time to look.
 Schedule::command('emails:weekly-team-summary')
-    ->weeklyOn(0, '10:00')
+    ->weeklyOn(0, '22:00')
     ->timezone(config('app.display_timezone'))
     ->withoutOverlapping();
 

@@ -7,9 +7,9 @@ return [
     'monthly_report_day' => (int) env('COMMISSION_MONTHLY_REPORT_DAY', 1),
 
     /**
-     * Time (H:i) when the scheduled job runs (app timezone).
+     * Time (H:i) when the scheduled job runs, on the UK clock (app.display_timezone).
      */
-    'monthly_report_time' => env('COMMISSION_MONTHLY_REPORT_TIME', '08:00'),
+    'monthly_report_time' => env('COMMISSION_MONTHLY_REPORT_TIME', '22:20'),
 
     /**
      * Roles that receive the admin summary email with the full PDF attachment.

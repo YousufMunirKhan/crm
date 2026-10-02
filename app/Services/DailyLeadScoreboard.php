@@ -339,8 +339,12 @@ class DailyLeadScoreboard
         $day = Carbon::parse($onDate, $this->timezone());
         $monday = $day->copy()->startOfWeek(Carbon::MONDAY);
 
-        // Run on a Sunday the week that just ended is the one before this one.
-        if ($day->isSunday()) {
+        // Counted from Monday, a week ends on its Sunday - so on a Sunday the
+        // week that just finished is the one that day belongs to. Any other
+        // day is inside a week still being worked, and the finished one is the
+        // week before. This had the two the wrong way round, so the Sunday
+        // email reported the week before last and called it the week just gone.
+        if (! $day->isSunday()) {
             $monday = $monday->subWeek();
         }
 
@@ -350,6 +354,10 @@ class DailyLeadScoreboard
     /**
      * How everybody did over a week: leads against what was asked of them, and
      * sales both for the week and for the month they sit in.
+     *
+     * Targets are set a month at a time, so a week that straddles two is
+     * measured on the one it ends in: whoever has a target that month, at that
+     * month's number, for all six days.
      *
      * @return array<int, array<string, mixed>>
      */

@@ -15,7 +15,7 @@
 @endsection
 
 @section('body')
-    <p style="margin:0 0 18px;">Morning {{ $repName }},</p>
+    <p style="margin:0 0 18px;">Evening {{ $repName }},</p>
 
     {{-- ------------------------------------------------------------ leads --}}
     <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#94a3b8; font-weight:700; margin-bottom:10px;">
@@ -129,7 +129,7 @@
                                 @if($monthEnd && $sales['short'] > 0)
                                     <div style="margin-top:14px; font-size:15px; font-weight:700; color:#9a3412;">
                                         {{ $daysLeft }} {{ $daysLeft === 1 ? 'day' : 'days' }} left in {{ $monthLabel }}.
-                                        {{ $sales['short'] }} still to find — worth lining up the closest ones today.
+                                        {{ $sales['short'] }} still to find — worth lining up the closest ones.
                                     </div>
                                 @endif
                             </td>
@@ -141,4 +141,4 @@
     @endif
 @endsection
 
-@section('footnote', 'Sent every working day at 10am UK time. Sundays excluded.')
+@section('footnote', 'Sent every working day at 10pm UK time. Sundays excluded.')

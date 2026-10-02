@@ -235,13 +235,13 @@ class DailyLeadSummaryTest extends TestCase
         }
     }
 
-    public function test_the_summary_is_ten_oclock_uk(): void
+    public function test_the_summary_is_ten_at_night_uk(): void
     {
         $event = collect(app(Schedule::class)->events())
             ->first(fn ($e) => str_contains((string) $e->command, 'emails:daily-lead-summary'));
 
         $this->assertNotNull($event, 'the daily lead summary is not scheduled');
-        $this->assertSame('0 10 * * *', $event->expression);
+        $this->assertSame('0 22 * * *', $event->expression);
         $this->assertSame('Europe/London', (string) $event->timezone);
     }
 
