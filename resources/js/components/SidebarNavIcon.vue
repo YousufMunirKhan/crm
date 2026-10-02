@@ -34,6 +34,7 @@ import {
     ShoppingCartIcon,
     Squares2X2Icon,
     TicketIcon,
+    TrophyIcon,
     UserPlusIcon,
     UsersIcon,
     ViewfinderCircleIcon,
@@ -46,6 +47,7 @@ import {
  */
 const ICONS = {
     dashboard: HomeIcon,
+    trophy: TrophyIcon,
     wallet: BanknotesIcon,
     calendar: CalendarDaysIcon,
     followup: ClipboardDocumentCheckIcon,

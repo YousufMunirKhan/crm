@@ -81,6 +81,7 @@ const pages = computed(() => {
     const allow = (section) => !section || auth.navSectionAllowed(section);
 
     return [
+        { label: 'Sales Leaderboard', to: '/leaderboard' },
         { label: 'Dashboard', to: '/', section: 'dashboard' },
         { label: 'Prospects', to: '/customers?type=prospect', section: 'prospects' },
         { label: 'Customers', to: '/customers?type=customer', section: 'customers' },

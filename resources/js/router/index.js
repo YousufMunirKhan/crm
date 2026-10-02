@@ -43,6 +43,13 @@ const routes = [
         meta: { requiresAuth: true, title: 'Sales Dashboard' },
     },
     {
+        path: '/leaderboard',
+        name: 'leaderboard',
+        component: () => import('@/views/SalesLeaderboardView.vue'),
+        // No roles and no section: the board is for everybody.
+        meta: { requiresAuth: true, title: 'Leaderboard' },
+    },
+    {
         path: '/customers',
         name: 'customers',
         component: () => import('@/views/CustomersView.vue'),

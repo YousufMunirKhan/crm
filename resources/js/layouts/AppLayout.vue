@@ -375,6 +375,9 @@ const navItems = computed(() => {
     const canMarket = isAdmin || userRole === 'Marketing';
 
     const items = [
+        // First, and with no section: the board is for everybody, so it is not
+        // something the access manager can take away from one person.
+        { to: '/leaderboard', label: 'Sales Leaderboard', icon: 'trophy' },
         { to: '/', label: 'Dashboard', section: 'dashboard', icon: 'dashboard' },
     ];
 

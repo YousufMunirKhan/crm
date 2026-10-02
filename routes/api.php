@@ -102,6 +102,12 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
     Route::get('/dashboard/attention', [\App\Http\Controllers\DashboardController::class, 'attention'])
         ->middleware('role:Admin,Manager,System Admin');
 
+    // Everybody with a target, ranked. Open to every member of staff on
+    // purpose: a board only the managers can read does not move anybody. It
+    // carries names, targets and counts of leads and appointments, nothing else.
+    Route::get('/leaderboard', [\App\Http\Controllers\SalesLeaderboardController::class, 'index']);
+    Route::get('/leaderboard/pdf', [\App\Http\Controllers\SalesLeaderboardController::class, 'pdf']);
+
     // Templates for sending (any authenticated user - used on customer page)
     Route::get('/email-templates-for-sending', [\App\Http\Controllers\EmailTemplateController::class, 'listForSending']);
     Route::get('/message-templates-for-sending', [\App\Http\Controllers\MessageTemplateController::class, 'listForSending']);
